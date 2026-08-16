@@ -1,0 +1,107 @@
+@import 'tailwindcss';
+
+@theme {
+  /* Brand palette --------------------------------------------------------- */
+  --color-ink-50: #f5f7fa;
+  --color-ink-100: #e9edf4;
+  --color-ink-200: #d3dae7;
+  --color-ink-300: #adb9ce;
+  --color-ink-400: #7d8daa;
+  --color-ink-500: #5a6a89;
+  --color-ink-950: #05080f;
+  --color-ink-900: #0a1020;
+  --color-ink-800: #121a2e;
+  --color-ink-700: #1c2743;
+  --color-ink-600: #2c3a5c;
+
+  --color-brand-50: #ecfaff;
+  --color-brand-100: #d3f2ff;
+  --color-brand-200: #ade8ff;
+  --color-brand-300: #71daff;
+  --color-brand-400: #2cc4ff;
+  --color-brand-500: #00a6e8;
+  --color-brand-600: #0084c2;
+  --color-brand-700: #00699d;
+  --color-brand-800: #065881;
+  --color-brand-900: #0b496b;
+
+  /* Lebanon red, used sparingly as a secondary accent. */
+  --color-cedar-500: #e4002b;
+  --color-cedar-600: #c00024;
+
+  --font-sans:
+    'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial,
+    sans-serif;
+
+  --radius-card: 0.875rem;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-white text-ink-800 antialiased;
+    font-family: var(--font-sans);
+  }
+
+  /* Give anchored sections room under the sticky header. */
+  :target {
+    scroll-margin-top: 6rem;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-semibold tracking-tight text-balance;
+  }
+
+  /* Visible keyboard focus everywhere. */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-brand-500;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .text-pretty {
+    text-wrap: pretty;
+  }
+
+  /* Subtle grid used behind dark hero sections. */
+  .bg-grid {
+    background-image:
+      linear-gradient(to right, rgb(255 255 255 / 0.045) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(255 255 255 / 0.045) 1px, transparent 1px);
+    background-size: 56px 56px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

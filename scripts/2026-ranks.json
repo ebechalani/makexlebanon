@@ -1,0 +1,577 @@
+{
+  "_comment": "Rank and winner for each 2026 ranking card, read from the cards themselves. Keys are '<category slug>__<division group slug>'. 'i' is the index of the source file in that Drive folder sorted by filename. rank 0 = the podium summary graphic that lists every placing. Ranks can tie (several cards share rank 3).",
+  "sportswonderland__schools-4-5": [
+    {
+      "i": 0,
+      "rank": 2,
+      "name": "Benita Bachaalany",
+      "team": "Lycée Montaigne - Beit Chabab"
+    },
+    {
+      "i": 1,
+      "rank": 1,
+      "name": "Laeticia Bachaalany",
+      "team": "Lycée Montaigne - Beit Chabab"
+    },
+    {
+      "i": 2,
+      "rank": 3,
+      "name": "Clarita Bachaalany",
+      "team": "Lycée Montaigne - Beit Chabab"
+    },
+    {
+      "i": 3,
+      "rank": 3,
+      "name": "Anthony Chamoun",
+      "team": "Lycée Montaigne - Beit Chabab"
+    },
+    {
+      "i": 4,
+      "rank": 3,
+      "name": "Eslam Metlej",
+      "team": "Saint Joseph School - École de la Mission Educative"
+    },
+    {
+      "i": 5,
+      "rank": 5,
+      "name": "Chris Zgheib",
+      "team": "Soeurs des Saints Coeurs Kfardebiane"
+    },
+    {
+      "i": 6,
+      "rank": 4,
+      "name": "Georges Zgheib",
+      "team": "Soeurs des Saints Coeurs Kfardebiane"
+    },
+    {
+      "i": 7,
+      "rank": 0,
+      "name": "",
+      "team": ""
+    }
+  ],
+  "football__overall": [
+    {
+      "i": 0,
+      "rank": 1,
+      "name": "Charbel Balaa",
+      "team": "Ingenious Coding and Robotics"
+    },
+    {
+      "i": 1,
+      "rank": 2,
+      "name": "Rolanthony Abi Chaaya",
+      "team": "Ingenious Coding and Robotics"
+    },
+    {
+      "i": 2,
+      "rank": 3,
+      "name": "Karim Zreik",
+      "team": "Ingenious Coding and Robotics"
+    },
+    {
+      "i": 3,
+      "rank": 0,
+      "name": "",
+      "team": "Ingenious Coding and Robotics"
+    }
+  ],
+  "locker-room__schools-13-15": [
+    {
+      "i": 0,
+      "rank": 1,
+      "name": "Nohra Bared",
+      "team": "Collège Maristes NDL"
+    },
+    {
+      "i": 1,
+      "rank": 3,
+      "name": "Yana Daher",
+      "team": "Collège Maristes NDL"
+    },
+    {
+      "i": 2,
+      "rank": 2,
+      "name": "Elie Abi Saad",
+      "team": "Mont La Salle"
+    },
+    {
+      "i": 3,
+      "rank": 5,
+      "name": "Nabil El Kadi",
+      "team": "Collège Maristes NDL"
+    },
+    {
+      "i": 4,
+      "rank": 4,
+      "name": "Nabil Zgheib",
+      "team": "SSCC Kfardebiane"
+    },
+    {
+      "i": 5,
+      "rank": 0,
+      "name": "",
+      "team": ""
+    }
+  ],
+  "locker-room__clubs-13-15": [
+    {
+      "i": 0,
+      "rank": 1,
+      "name": "Bachir Rechdan",
+      "team": "Mindscape"
+    },
+    {
+      "i": 1,
+      "rank": 2,
+      "name": "Charbel Khalife",
+      "team": "Mindscape"
+    },
+    {
+      "i": 2,
+      "rank": 3,
+      "name": "Kamal Bou Frem",
+      "team": "Mindscape"
+    },
+    {
+      "i": 3,
+      "rank": 4,
+      "name": "Joseph Hajal",
+      "team": "RoboHolic"
+    },
+    {
+      "i": 4,
+      "rank": 5,
+      "name": "Rayssa Sassin",
+      "team": "Mindscape"
+    },
+    {
+      "i": 5,
+      "rank": 0,
+      "name": "",
+      "team": ""
+    }
+  ],
+  "code-courier__schools": [
+    {
+      "i": 0,
+      "rank": 0,
+      "name": "",
+      "team": ""
+    },
+    {
+      "i": 1,
+      "rank": 1,
+      "name": "Elia Khater",
+      "team": "Ecole Saint Elie Zahle"
+    },
+    {
+      "i": 2,
+      "rank": 2,
+      "name": "Elie Abdelahad",
+      "team": "Ecole Saint Elie Zahle"
+    },
+    {
+      "i": 3,
+      "rank": 3,
+      "name": "Joe Assy",
+      "team": "Ecole Saint Elie Zahle"
+    },
+    {
+      "i": 4,
+      "rank": 4,
+      "name": "Jimmy Daoud",
+      "team": "Ecole Saint Elie Zahle"
+    },
+    {
+      "i": 5,
+      "rank": 5,
+      "name": "Layane Nabhan",
+      "team": "Ecole Saint Elie Zahle"
+    },
+    {
+      "i": 6,
+      "rank": 0,
+      "name": "",
+      "team": ""
+    },
+    {
+      "i": 7,
+      "rank": 0,
+      "name": "",
+      "team": ""
+    },
+    {
+      "i": 8,
+      "rank": 1,
+      "name": "Elia Khater",
+      "team": "Ecole Saint Elie Zahle"
+    }
+  ],
+  "code-courier__clubs": [
+    {
+      "i": 0,
+      "rank": 1,
+      "name": "Kevin Azar",
+      "team": "Ingenious coding and robotics"
+    },
+    {
+      "i": 1,
+      "rank": 2,
+      "name": "Chris Achkar",
+      "team": "RoboHolic"
+    },
+    {
+      "i": 2,
+      "rank": 5,
+      "name": "John Dagher",
+      "team": "Mindscape"
+    },
+    {
+      "i": 3,
+      "rank": 4,
+      "name": "Charbel Rizk",
+      "team": "FutureBots"
+    },
+    {
+      "i": 4,
+      "rank": 3,
+      "name": "Bryan Ibrahim",
+      "team": "Mindscape"
+    },
+    {
+      "i": 5,
+      "rank": 2,
+      "name": "Ray Yazbeck",
+      "team": "RoboHolic"
+    },
+    {
+      "i": 6,
+      "rank": 0,
+      "name": "",
+      "team": ""
+    }
+  ],
+  "sportswonderland__schools-6-7": [
+    {
+      "i": 0,
+      "rank": 1,
+      "name": "Antoine Karam",
+      "team": "Lycée Montaigne - Beit Chabab"
+    },
+    {
+      "i": 1,
+      "rank": 2,
+      "name": "Amar Omar El Cheikh",
+      "team": "Ecole de la mission éducative"
+    },
+    {
+      "i": 2,
+      "rank": 3,
+      "name": "Chris Mhanna",
+      "team": "Sainte Famille Française Jounieh"
+    },
+    {
+      "i": 3,
+      "rank": 4,
+      "name": "Youssef Zgheib",
+      "team": "Soeurs des Saint Coeurs Kfardebiane"
+    },
+    {
+      "i": 4,
+      "rank": 5,
+      "name": "Ilay Zwein",
+      "team": "Sainte Famille Française Jounieh"
+    },
+    {
+      "i": 5,
+      "rank": 5,
+      "name": "Ilay Zwein",
+      "team": "Sainte Famille Française Jounieh"
+    },
+    {
+      "i": 6,
+      "rank": 0,
+      "name": "",
+      "team": ""
+    }
+  ],
+  "sportswonderland__clubs-4-5": [
+    {
+      "i": 0,
+      "rank": 1,
+      "name": "Marwan Chamma",
+      "team": "Mindscape Academy"
+    },
+    {
+      "i": 1,
+      "rank": 2,
+      "name": "Ayan Mansour",
+      "team": "Mindscape Academy"
+    },
+    {
+      "i": 2,
+      "rank": 3,
+      "name": "Jason Merhej",
+      "team": "Mindscape Academy"
+    },
+    {
+      "i": 3,
+      "rank": 4,
+      "name": "Mickael Mahfouz",
+      "team": "Mindscape Academy"
+    },
+    {
+      "i": 4,
+      "rank": 5,
+      "name": "Antonio Kabalan",
+      "team": "Mindscape Academy"
+    },
+    {
+      "i": 5,
+      "rank": 5,
+      "name": "Laetitia Antoun",
+      "team": "Robateks Academy"
+    },
+    {
+      "i": 6,
+      "rank": 0,
+      "name": "",
+      "team": ""
+    }
+  ],
+  "sportswonderland__clubs-6-7": [
+    {
+      "i": 0,
+      "rank": 0,
+      "name": "",
+      "team": ""
+    },
+    {
+      "i": 1,
+      "rank": 1,
+      "name": "Mateo Costantine",
+      "team": "Artetech"
+    },
+    {
+      "i": 2,
+      "rank": 2,
+      "name": "Karl Hanna",
+      "team": "Artetech"
+    },
+    {
+      "i": 3,
+      "rank": 3,
+      "name": "Cesar Lutfallah",
+      "team": "Mindscape"
+    },
+    {
+      "i": 4,
+      "rank": 4,
+      "name": "Amir Faour",
+      "team": "Artetech"
+    },
+    {
+      "i": 5,
+      "rank": 5,
+      "name": "Sama Monzer",
+      "team": "Ingenious coding and robotics"
+    },
+    {
+      "i": 6,
+      "rank": 4,
+      "name": "Daniel Hanna",
+      "team": "Mindscape"
+    }
+  ],
+  "smart-logistics__schools-8-9": [
+    {
+      "i": 0,
+      "rank": 2,
+      "name": "Elie Nasrallah",
+      "team": "Carmelites - Fanar"
+    },
+    {
+      "i": 1,
+      "rank": 1,
+      "name": "Sami Haddad",
+      "team": "Carmelites - Fanar"
+    },
+    {
+      "i": 2,
+      "rank": 3,
+      "name": "Charbel Kassouf",
+      "team": "Carmelites - Fanar"
+    },
+    {
+      "i": 3,
+      "rank": 4,
+      "name": "Maribelle Chami",
+      "team": "Collège Notre Dame"
+    },
+    {
+      "i": 4,
+      "rank": 5,
+      "name": "Charbel Richa",
+      "team": "Collège Notre Dame"
+    },
+    {
+      "i": 5,
+      "rank": 0,
+      "name": "",
+      "team": ""
+    }
+  ],
+  "smart-logistics__schools-10-12": [
+    {
+      "i": 0,
+      "rank": 1,
+      "name": "Lea Kalakesh",
+      "team": "Carmelites - Fanar"
+    },
+    {
+      "i": 1,
+      "rank": 2,
+      "name": "Elio Andos",
+      "team": "Ecole Saint Elie - Zahle"
+    },
+    {
+      "i": 2,
+      "rank": 3,
+      "name": "Chris Mattar",
+      "team": "Carmelites - Fanar"
+    },
+    {
+      "i": 3,
+      "rank": 4,
+      "name": "Ella Farah",
+      "team": "Sainte Famille Française Jounieh"
+    },
+    {
+      "i": 4,
+      "rank": 5,
+      "name": "Kevin Haroun",
+      "team": "Sainte Famille Française Jounieh"
+    },
+    {
+      "i": 5,
+      "rank": 0,
+      "name": "",
+      "team": ""
+    }
+  ],
+  "smart-logistics__clubs-8-9": [
+    {
+      "i": 0,
+      "rank": 0,
+      "name": "",
+      "team": ""
+    },
+    {
+      "i": 1,
+      "rank": 3,
+      "name": "Andy Aoun",
+      "team": "RoboHolic Academy"
+    },
+    {
+      "i": 2,
+      "rank": 1,
+      "name": "Fidel Wanna",
+      "team": "RoboHolic Academy"
+    },
+    {
+      "i": 3,
+      "rank": 2,
+      "name": "Charbel Achkar",
+      "team": "RoboHolic Academy"
+    },
+    {
+      "i": 4,
+      "rank": 4,
+      "name": "Samir Yazbeck",
+      "team": "RoboHolic Academy"
+    },
+    {
+      "i": 5,
+      "rank": 5,
+      "name": "Sam Saadeh",
+      "team": "RoboHolic Academy"
+    },
+    {
+      "i": 6,
+      "rank": -1,
+      "name": "",
+      "team": ""
+    }
+  ],
+  "smart-logistics__clubs-10-12": [
+    {
+      "i": 0,
+      "rank": 5,
+      "name": "Matheo El Hajj",
+      "team": "Mindscape"
+    },
+    {
+      "i": 1,
+      "rank": 0,
+      "name": "",
+      "team": ""
+    },
+    {
+      "i": 2,
+      "rank": 4,
+      "name": "Mario Freiha",
+      "team": "Ingenious coding and robotics"
+    },
+    {
+      "i": 3,
+      "rank": 1,
+      "name": "Loanna Mallah",
+      "team": "Artetech"
+    },
+    {
+      "i": 4,
+      "rank": 2,
+      "name": "Jad Safadi",
+      "team": "Artetech"
+    },
+    {
+      "i": 5,
+      "rank": 3,
+      "name": "Charbel Zouki",
+      "team": "Ingenious coding and robotics"
+    },
+    {
+      "i": 6,
+      "rank": 4,
+      "name": "Marita Abdel Massih",
+      "team": "Mindscape"
+    }
+  ],
+  "signal-rise__overall": [
+    {
+      "i": 0,
+      "rank": 1,
+      "name": "RoboHolic & Mindscape",
+      "team": "Carlo Kafrouni & Jean Paul Mrad; Joe Khoury & Michael Akkawi"
+    },
+    {
+      "i": 1,
+      "rank": 3,
+      "name": "FutureBots",
+      "team": "Kepriyano Youssef & Elie Bou Abboud; Yara Dagher & Angelina Chalouhi"
+    },
+    {
+      "i": 2,
+      "rank": 2,
+      "name": "Mindscape & FutureBots",
+      "team": "Georges Awachi & Yanna Ghosn; Elie Harb & Yasmina Khoury"
+    },
+    {
+      "i": 3,
+      "rank": 4,
+      "name": "RoboHolic & Mindscape",
+      "team": "Elio Azar & Alexander Rabbat; Anthony Matar & Joe-Charbel Saliba"
+    }
+  ]
+}
