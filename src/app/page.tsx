@@ -46,20 +46,19 @@ function Hero({ photoCount }: { photoCount: number }) {
       {/* Looping competition film, behind everything. */}
       <HeroVideo />
 
-      {/* Scrim: keeps the headline legible over moving footage. Darkest on the
-          left, where the text sits. */}
+      {/* Scrim: just enough to keep the headline legible — the film should
+          stay clearly visible, especially on the right. */}
       <div
-        className="absolute inset-0 bg-linear-to-r from-ink-950/95 via-ink-950/80 to-ink-950/55"
+        className="absolute inset-0 bg-linear-to-r from-ink-950/80 via-ink-950/45 to-ink-950/15"
         aria-hidden="true"
       />
-      <div className="absolute inset-0 bg-ink-950/25" aria-hidden="true" />
       {/* Fade the footage out at the bottom so it meets the stats bar cleanly. */}
       <div
         className="absolute inset-x-0 bottom-0 h-40 bg-linear-to-t from-ink-950 to-transparent"
         aria-hidden="true"
       />
 
-      <div className="absolute inset-0 bg-grid opacity-60" aria-hidden="true" />
+      <div className="absolute inset-0 bg-grid opacity-25" aria-hidden="true" />
       <div
         className="absolute -left-40 -top-40 h-[32rem] w-[32rem] rounded-full bg-brand-500/20 blur-3xl"
         aria-hidden="true"
