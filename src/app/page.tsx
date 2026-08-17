@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import ranksJson from '../../scripts/2026-ranks.json';
+import { videos } from '@content/outreach';
 import { currentSeason, internationalEvents, seasons } from '@content/seasons';
 import { site } from '@content/site';
 import { countCategoryImages, getCategoryImages } from '@/lib/gallery';
@@ -26,9 +27,9 @@ export default function HomePage() {
     <>
       <Hero photoCount={photoCount} />
       <StatsBar photoCount={photoCount} />
+      <Watch />
       <SeasonHighlight />
       <Champions />
-      <Watch />
       <PhotoMosaic />
       <WhatWeDo />
       <InternationalStrip />
@@ -276,26 +277,17 @@ function Champions() {
 
 /* -------------------------------------------------------------------------- */
 
-/** Featured films: the 2026 launch and the 2025 national, with a link to all. */
+/** Highlights of the national competition days, straight from the video data. */
 function Watch() {
-  const featured = [
-    {
-      id: 'h5b_zcYibPc',
-      title: 'MakeX 2026 & Capelli Sport — competition launch',
-    },
-    {
-      id: '9OjMK9pIzm4',
-      title: 'MakeX Lebanon 2025 — national competition',
-    },
-  ];
+  const featured = videos.filter((v) => v.topic === 'national').slice(0, 2);
 
   return (
     <Section>
       <div className="flex flex-wrap items-end justify-between gap-6">
         <SectionHeading
           eyebrow="Watch"
-          title="Competition films"
-          lead="Season launches, match footage and training sessions from our channels."
+          title="Competition highlights"
+          lead="The national competition days — matches, teams and podiums."
         />
         <Link
           href="/media"
@@ -322,6 +314,7 @@ function Watch() {
               </div>
             </div>
             <h3 className="mt-4 text-lg text-ink-900">{video.title}</h3>
+            {video.context ? <p className="mt-1 text-sm text-ink-500">{video.context}</p> : null}
           </li>
         ))}
       </ul>
