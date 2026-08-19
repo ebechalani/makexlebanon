@@ -27,8 +27,8 @@ export type Category = {
   /** Robot platform used, e.g. mTiny or mBot2 */
   platform?: string;
   summary: string;
-  /** Price of the official field map in USD, if sold. */
-  mapPriceUsd?: number;
+  /** True when an official printed field map exists for this category. */
+  hasMap?: boolean;
   /** How the field is played, as labelled on the order list. */
   mapMode?: string;
   downloads?: Download[];
@@ -80,7 +80,7 @@ export const seasons: Season[] = [
           'A playful introduction to robotics in a sports world. Children drive their robot along ' +
           'simple paths, discover sports zones, and complete easy missions that build coordination ' +
           'and logic.',
-        mapPriceUsd: 30,
+        hasMap: true,
         downloads: [
           { label: 'SportsWonderland Rules v3.0', href: '/downloads/sportswonderland-rules-v3.0.docx', kind: 'rules' },
           { label: 'SportsWonderland Scoresheet', href: '/downloads/sportswonderland-scoresheet.docx', kind: 'scoresheet' },
@@ -96,7 +96,7 @@ export const seasons: Season[] = [
         summary:
           'Students become logistics managers: the robot must move between stations, pick up the ' +
           'right cargo, and deliver it to the correct zone on time.',
-        mapPriceUsd: 25,
+        hasMap: true,
         downloads: [
           { label: 'Capelli Smart Logistics Rules v3.0', href: '/downloads/capelli-smartlogistics-rules-v3.0.docx', kind: 'rules' },
           { label: 'Capelli Smart Logistics Scoresheet', href: '/downloads/capelli-smartlogistics-scoresheet.docx', kind: 'scoresheet' },
@@ -111,7 +111,7 @@ export const seasons: Season[] = [
         summary:
           'A real competition scenario for teens. The robot starts from the locker room, scans the ' +
           'assigned colour, then selects and scores the correct object.',
-        mapPriceUsd: 25,
+        hasMap: true,
         downloads: [
           { label: 'Capelli Starter Locker Room Rules v2.3', href: '/downloads/capelli-starter-locker-room-rules-v2.3.pdf', kind: 'rules' },
           { label: 'Inspire + Starter cube STL files', href: '/downloads/inspire-starter-cube-stl.zip', kind: 'stl' },
@@ -125,7 +125,7 @@ export const seasons: Season[] = [
         summary:
           'A professionally designed mini-soccer pitch tailored for educational robotics, with safe ' +
           'boundaries, two goal areas and a smooth playing surface.',
-        mapPriceUsd: 25,
+        hasMap: true,
         mapMode: 'Manual mission',
         downloads: [
           { label: 'Capelli Sport Soccer Rules v2.3', href: '/downloads/capelli-sport-soccer-rules-v2.3.pdf', kind: 'rules' },
@@ -139,7 +139,7 @@ export const seasons: Season[] = [
         summary:
           'The official 2026 MakeX Inspire world season. Its theme, “Code Courier”, is built around ' +
           'artificial intelligence and information security as core concepts.',
-        mapPriceUsd: 150,
+        hasMap: true,
         mapMode: 'Manual mission',
         downloads: [
           { label: '2026 MakeX Inspire Code Courier Rules Guide v1.0', href: '/downloads/2026-makex-inspire-code-courier-rules-v1.0.pdf', kind: 'rules' },
@@ -152,9 +152,7 @@ export const seasons: Season[] = [
         summary:
           'The official 2026 MakeX Starter world season. Its theme, “Signal Rise”, takes signal as ' +
           'the starting point of communication and connection.',
-        // NOTE: the old site listed this map at $750 while every other map is $25–$150.
-        // Verify before publishing — it looks like a typo for $75.
-        mapPriceUsd: 750,
+        hasMap: true,
         mapMode: 'Automatic + manual',
         downloads: [
           { label: '2026 MakeX Starter Signal Rise Rules Guide v1.0', href: '/downloads/2026-makex-starter-signal-rise-rules-v1.0.pdf', kind: 'rules' },

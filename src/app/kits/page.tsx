@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 };
 
 export default function KitsPage() {
-  const maps = currentSeason.categories.filter((c) => typeof c.mapPriceUsd === 'number');
+  const maps = currentSeason.categories.filter((c) => c.hasMap);
 
   return (
     <>
@@ -69,9 +69,6 @@ export default function KitsPage() {
                 <th scope="col" className="py-3 pr-4 font-semibold">
                   Mission type
                 </th>
-                <th scope="col" className="py-3 text-right font-semibold">
-                  Price
-                </th>
               </tr>
             </thead>
             <tbody>
@@ -80,9 +77,6 @@ export default function KitsPage() {
                   <td className="py-4 pr-4 font-medium text-ink-800">{category.name}</td>
                   <td className="py-4 pr-4 text-ink-500">{category.platform ?? '—'}</td>
                   <td className="py-4 pr-4 text-ink-500">{category.mapMode ?? '—'}</td>
-                  <td className="py-4 text-right font-semibold text-ink-900 tabular-nums">
-                    ${category.mapPriceUsd?.toFixed(2)}
-                  </td>
                 </tr>
               ))}
             </tbody>

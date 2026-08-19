@@ -308,8 +308,6 @@ These are marked with `TODO` or `NOTE` comments in `content/seasons.ts`:
 
 - **2026 dates and venue** — currently blank, so the badges are hidden. Add them to the `2026`
   season's `dates` and `venue` fields.
-- **Signal Rise field-map price** — the old site listed **$750** while every other map is
-  $25–$150. Verify this; it looks like a typo for $75.
 - **2026 event photos** — the ranking cards are in, but the 1,514 unsorted competition
   photographs on the Drive are not. See "Still not imported" above.
 - **Ranking-card captions** — each 2026 gallery has a `captions.json` describing the division

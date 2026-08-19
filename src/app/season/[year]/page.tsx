@@ -41,7 +41,7 @@ export default async function SeasonPage({ params }: Params) {
     open: 'Registration open',
   }[season.status];
 
-  const mapsForSale = season.categories.filter((c) => typeof c.mapPriceUsd === 'number');
+  const mapsForSale = season.categories.filter((c) => c.hasMap);
 
   return (
     <>
@@ -130,9 +130,6 @@ export default async function SeasonPage({ params }: Params) {
                   <th scope="col" className="py-3 pr-4 font-semibold">
                     Platform
                   </th>
-                  <th scope="col" className="py-3 text-right font-semibold">
-                    Price
-                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -140,9 +137,6 @@ export default async function SeasonPage({ params }: Params) {
                   <tr key={category.slug} className="border-b border-slate-200">
                     <td className="py-4 pr-4 font-medium text-ink-800">{category.name}</td>
                     <td className="py-4 pr-4 text-ink-500">{category.platform ?? '—'}</td>
-                    <td className="py-4 text-right font-semibold text-ink-900 tabular-nums">
-                      ${category.mapPriceUsd?.toFixed(2)}
-                    </td>
                   </tr>
                 ))}
               </tbody>
