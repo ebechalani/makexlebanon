@@ -160,6 +160,14 @@ export const seasons: Season[] = [
           { label: '2026 MakeX Starter Signal Rise Rules Guide v1.0', href: '/downloads/2026-makex-starter-signal-rise-rules-v1.0.pdf', kind: 'rules' },
         ],
       },
+      {
+        slug: 'event',
+        name: 'Competition day',
+        ageRange: 'All ages',
+        summary:
+          'The national competition day itself — opening ceremony, the halls in full swing, ' +
+          'and the awards.',
+      },
     ],
   },
   {

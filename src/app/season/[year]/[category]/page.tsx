@@ -44,14 +44,17 @@ export default async function CategoryPage({ params }: Params) {
   const category = getCategory(year, categorySlug);
   if (!season || !category) notFound();
 
-  const isResults = season.galleryKind === 'results';
   const context = `${category.name}, MakeX Lebanon ${season.year}`;
 
   // 2026 categories are split into schools/clubs divisions by age band; the
   // 2024/2025 archives store their photos flat.
   const groups = getCategoryGroups(season.year, category.slug, context);
-  const images = groups.length > 0 ? [] : getCategoryImages(season.year, category.slug, context);
-  const totalImages = groups.length > 0 ? groups.reduce((n, g) => n + g.images.length, 0) : images.length;
+  // Division subfolders hold ranking cards; flat folders are event photos.
+  const isResults = season.galleryKind === 'results' && groups.length > 0;
+  // Flat files are event photography; division subfolders are ranking cards.
+  const images = getCategoryImages(season.year, category.slug, context);
+  const cardCount = groups.reduce((n, g) => n + g.images.length, 0);
+  const totalImages = cardCount + images.length;
   const downloads = category.downloads ?? [];
 
   const siblings = season.categories.filter((c) => c.slug !== category.slug);
@@ -138,8 +141,11 @@ export default async function CategoryPage({ params }: Params) {
               totalImages === 0
                 ? undefined
                 : isResults
-                  ? `${totalImages} ranking card${totalImages === 1 ? '' : 's'} across ` +
-                    `${groups.length} division${groups.length === 1 ? '' : 's'}.`
+                  ? `${cardCount} ranking card${cardCount === 1 ? '' : 's'} across ` +
+                    `${groups.length} division${groups.length === 1 ? '' : 's'}` +
+                    (images.length > 0
+                      ? `, and ${images.length} photos from the competition day.`
+                      : '.')
                   : `${totalImages} photo${totalImages === 1 ? '' : 's'} from this category.`
             }
           />
@@ -160,6 +166,17 @@ export default async function CategoryPage({ params }: Params) {
                     <Gallery images={group.images} />
                   </section>
                 ))}
+                {images.length > 0 ? (
+                  <section aria-labelledby="group-event-photos">
+                    <div className="mb-6 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-slate-200 pb-3">
+                      <h3 id="group-event-photos" className="text-xl text-ink-900">
+                        From the competition day
+                      </h3>
+                      <span className="text-sm text-ink-500">{images.length} photos</span>
+                    </div>
+                    <Gallery images={images} />
+                  </section>
+                ) : null}
               </div>
             ) : images.length > 0 ? (
               <Gallery images={images} />
