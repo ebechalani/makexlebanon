@@ -56,6 +56,48 @@ export type Season = {
 
 export const seasons: Season[] = [
   {
+    year: 2027,
+    slug: '2027',
+    title: 'MakeX 2027 — Fire Rescue Challenge',
+    subtitle: 'Season announced',
+    status: 'upcoming',
+    intro:
+      'The alarm sounds in 2027. One city, one emergency — and four ways to answer the call, ' +
+      'from a cadet’s very first mission plan to a coordinated two-robot rescue operation. ' +
+      'The categories are announced below; missions, fields and rules will be revealed soon.',
+    categories: [
+      {
+        slug: 'fire-cadet',
+        name: 'Fire Cadet',
+        ageRange: '4–7 years',
+        platform: 'mTiny',
+        summary:
+          'The city’s first alarm rings for its youngest heroes. Every rescue starts with a plan.',
+      },
+      {
+        slug: 'fire-fighter',
+        name: 'Fire Fighter',
+        ageRange: '8–10 years',
+        platform: 'mBot2',
+        summary: 'The robot rolls out on its own. Same city — higher stakes.',
+      },
+      {
+        slug: 'fire-rescue',
+        name: 'Fire Rescue',
+        ageRange: '11–13 years',
+        platform: 'mBot2',
+        summary: 'Nothing goes as planned. Sense the situation, decide, adapt.',
+      },
+      {
+        slug: 'fire-chief',
+        name: 'Fire Chief',
+        ageRange: '14–17 years',
+        platform: 'mBot2 + vision',
+        summary: 'Two robots. One operation. Command the whole response.',
+      },
+    ],
+  },
+  {
     year: 2026,
     slug: '2026',
     title: 'MakeX 2026 — Capelli Sport',
@@ -232,7 +274,11 @@ export const seasons: Season[] = [
   },
 ];
 
-export const currentSeason = seasons[0];
+/** The latest finished season — drives the results-focused sections. */
+export const currentSeason = seasons.find((s) => s.status === 'completed') ?? seasons[0];
+
+/** The announced-but-not-yet-run season, if any. */
+export const upcomingSeason = seasons.find((s) => s.status === 'upcoming');
 
 export function getSeason(slug: string): Season | undefined {
   return seasons.find((s) => s.slug === slug);

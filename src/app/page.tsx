@@ -2,7 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import ranksJson from '../../scripts/2026-ranks.json';
 import { videos } from '@content/outreach';
-import { currentSeason, internationalEvents, seasons } from '@content/seasons';
+import { currentSeason, internationalEvents, seasons, upcomingSeason } from '@content/seasons';
 import { site } from '@content/site';
 import { countCategoryImages, getCategoryImages } from '@/lib/gallery';
 import { HeroVideo } from '@/components/HeroVideo';
@@ -27,6 +27,7 @@ export default function HomePage() {
     <>
       <Hero photoCount={photoCount} />
       <StatsBar photoCount={photoCount} />
+      <FireRescueTeaser />
       <Watch />
       <SeasonHighlight />
       <Champions />
@@ -75,6 +76,15 @@ function Hero({ photoCount }: { photoCount: number }) {
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
               {currentSeason.title} — season complete
             </span>
+            {upcomingSeason ? (
+              <Link
+                href={`/season/${upcomingSeason.slug}`}
+                className="inline-flex items-center gap-2 rounded-full bg-amber-500/15 px-3 py-1 text-xs font-semibold text-amber-200 ring-1 ring-inset ring-amber-400/40 transition-colors hover:bg-amber-500/25"
+              >
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-400" />
+                2027: Fire Rescue Challenge — announced
+              </Link>
+            ) : null}
           </div>
 
           <h1 className="text-4xl leading-[1.08] sm:text-5xl lg:text-6xl">
@@ -112,7 +122,7 @@ function StatsBar({ photoCount }: { photoCount: number }) {
   const stats = [
     { value: `${currentSeason.categories.length}`, label: 'Competition categories' },
     { value: '4–19', label: 'Age range, years' },
-    { value: `${seasons.length}`, label: 'National seasons held' },
+    { value: `${seasons.filter((s) => s.status === 'completed').length}`, label: 'National seasons held' },
     { value: `${internationalEvents.length}`, label: 'International events attended' },
   ];
 
@@ -270,6 +280,74 @@ function Champions() {
           </li>
         ))}
       </ul>
+    </Section>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+
+const TEASER_EMOJI: Record<string, string> = {
+  'fire-cadet': '🔥',
+  'fire-fighter': '🚒',
+  'fire-rescue': '🧯',
+  'fire-chief': '🚨',
+};
+
+/** Season 2027 announcement: category names only — details follow later. */
+function FireRescueTeaser() {
+  if (!upcomingSeason) return null;
+
+  return (
+    <Section dark className="relative overflow-hidden">
+      <div
+        className="absolute -left-32 -top-40 h-[26rem] w-[26rem] rounded-full bg-red-600/20 blur-3xl"
+        aria-hidden="true"
+      />
+      <div
+        className="absolute -bottom-48 -right-24 h-[24rem] w-[24rem] rounded-full bg-amber-500/15 blur-3xl"
+        aria-hidden="true"
+      />
+
+      <div className="relative">
+        <div className="flex flex-wrap items-end justify-between gap-6">
+          <div className="max-w-3xl">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-amber-300">
+              Season 2027 · Just announced
+            </p>
+            <h2 className="text-3xl text-white sm:text-4xl">🔥 Fire Rescue Challenge</h2>
+            <p className="mt-4 text-lg leading-relaxed text-white/70 text-pretty">
+              One city. One alarm. Four ways to answer the call. Missions, fields and rules
+              will be revealed soon — for now, meet the categories.
+            </p>
+          </div>
+          <Button href={`/season/${upcomingSeason.slug}`} variant="ghost">
+            Season 2027 page
+          </Button>
+        </div>
+
+        <ul className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {upcomingSeason.categories.map((category) => (
+            <li
+              key={category.slug}
+              className="flex h-full flex-col rounded-card bg-white/5 p-6 ring-1 ring-inset ring-white/10"
+            >
+              <span className="text-3xl" aria-hidden="true">
+                {TEASER_EMOJI[category.slug] ?? '🔥'}
+              </span>
+              <h3 className="mt-3 text-lg font-semibold text-white">{category.name}</h3>
+              <p className="mt-1 text-xs font-medium uppercase tracking-wider text-amber-300/90">
+                {category.ageRange} · {category.platform}
+              </p>
+              <p className="mt-3 flex-1 text-sm leading-relaxed text-white/60 text-pretty">
+                {category.summary}
+              </p>
+              <span className="mt-4 inline-flex w-fit items-center rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-semibold text-amber-200 ring-1 ring-inset ring-amber-400/30">
+                Details coming soon
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
     </Section>
   );
 }

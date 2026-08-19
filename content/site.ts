@@ -51,7 +51,14 @@ export type NavItem = {
 
 export const nav: NavItem[] = [
   { label: 'Home', href: '/' },
-  { label: 'Season 2026', href: '/season/2026' },
+  {
+    label: 'Seasons',
+    href: '/season/2026',
+    children: [
+      { label: 'Season 2027 — Fire Rescue ✨', href: '/season/2027' },
+      { label: 'Season 2026 — Capelli Sport', href: '/season/2026' },
+    ],
+  },
   {
     label: 'Competitions',
     href: '/competitions',

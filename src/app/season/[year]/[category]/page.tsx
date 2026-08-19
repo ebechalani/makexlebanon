@@ -177,7 +177,11 @@ export default async function CategoryPage({ params }: Params) {
               <Gallery images={images} />
             ) : (
               <GalleryEmpty
-                hint={`Add images to public/gallery/${season.year}/${category.slug}/ and they will appear here automatically.`}
+                hint={
+                  season.status === 'upcoming'
+                    ? 'Missions, rules and the field will be revealed soon — stay tuned.'
+                    : 'Photos from this category will appear here soon.'
+                }
               />
             )}
           </div>
