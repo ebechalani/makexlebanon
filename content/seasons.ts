@@ -257,6 +257,13 @@ export const seasons: Season[] = [
         ageRange: '13–19 years',
         summary: 'The most advanced category, for senior students.',
       },
+      {
+        slug: 'event',
+        name: 'Competition day',
+        ageRange: 'All ages',
+        summary:
+          'The 2025 national weekend — opening, the halls in full swing, and the awards.',
+      },
     ],
   },
   {
