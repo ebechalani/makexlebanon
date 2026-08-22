@@ -26,7 +26,10 @@ export default function GalleryIndexPage() {
     return { season, categories, total };
   });
 
-  const grandTotal = seasonsWithCounts.reduce((sum, s) => sum + s.total, 0);
+  // Announced seasons have no photos yet — a row of "coming soon" tiles adds
+  // nothing here, so the gallery lists only seasons that have been shot.
+  const seasonsWithPhotos = seasonsWithCounts.filter((s) => s.total > 0);
+  const grandTotal = seasonsWithPhotos.reduce((sum, s) => sum + s.total, 0);
 
   return (
     <>
@@ -44,7 +47,7 @@ export default function GalleryIndexPage() {
       <div className="py-16 sm:py-24">
         <Container>
           <div className="space-y-16">
-            {seasonsWithCounts.map(({ season, categories, total }) => (
+            {seasonsWithPhotos.map(({ season, categories, total }) => (
               <section key={season.slug} aria-labelledby={`gallery-${season.slug}`}>
                 <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 border-b border-slate-200 pb-5">
                   <h2 id={`gallery-${season.slug}`} className="text-2xl text-ink-900 sm:text-3xl">

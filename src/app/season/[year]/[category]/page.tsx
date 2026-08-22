@@ -122,7 +122,9 @@ export default async function CategoryPage({ params }: Params) {
         </Section>
       ) : null}
 
-      {/* Photos / results --------------------------------------------------- */}
+      {/* Photos / results — hidden entirely for announced seasons that have
+          no photos yet, so a teaser category page stays clean. ------------- */}
+      {totalImages > 0 || season.status !== 'upcoming' ? (
       <Section id="photos" className={downloads.length > 0 ? 'bg-slate-50 pt-0 sm:pt-0' : ''}>
         <div className={downloads.length > 0 ? 'pt-16 sm:pt-24' : ''}>
           <SectionHeading
@@ -187,6 +189,7 @@ export default async function CategoryPage({ params }: Params) {
           </div>
         </div>
       </Section>
+      ) : null}
 
       {/* Other categories --------------------------------------------------- */}
       {siblings.length > 0 ? (
