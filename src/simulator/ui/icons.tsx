@@ -116,6 +116,20 @@ export const ExamplesIcon = (p: IconProps) => (
   </Svg>
 );
 
+export const LockIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="5" y="11" width="14" height="9" rx="2" />
+    <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+  </Svg>
+);
+
+export const UnlockIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="5" y="11" width="14" height="9" rx="2" />
+    <path d="M8 11V8a4 4 0 0 1 7.6-1.7" />
+  </Svg>
+);
+
 export const ChevronIcon = ({ className = 'h-4 w-4', open = false }: IconProps & { open?: boolean }) => (
   <Svg className={`${className} transition-transform ${open ? 'rotate-90' : ''}`}>
     <path d="m9 6 6 6-6 6" />

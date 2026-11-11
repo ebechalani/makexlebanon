@@ -10,9 +10,9 @@
  * (For developers: PBKDF2-HMAC-SHA256 of the 8 normalised characters, with the fixed salt and
  * the number of rounds below, 32 bytes, written as 64 hex digits. The rounds make every single
  * guess slow, on the server and for anybody trying codes against the public list. The codes are
- * short enough - 31^8 possibilities - that a determined person with a graphics card could still
- * find one from the fingerprints in a few hours; the programs they would unlock are in the
- * same public repository, so there is nothing more to win that way.)
+ * short enough - 31^8 possibilities - that a determined person with a fast graphics card could
+ * still find one of a few hundred codes from the fingerprints in a day or so; the programs it
+ * would unlock are in the same public repository, so there is nothing more to win that way.)
  *
  * =====================================================================================
  *  NEVER CHANGE THE THREE VALUES BELOW ONCE CODES HAVE BEEN HANDED OUT.

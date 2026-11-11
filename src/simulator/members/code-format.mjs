@@ -34,7 +34,7 @@ const MAX_TYPED_LENGTH = 64;
 const CODE_PATTERN = new RegExp(`^[${CODE_ALPHABET}]{${CODE_LENGTH}}$`);
 
 /** Blanks of every kind (also the invisible ones chat apps add) and every kind of dash. */
-const SEPARATORS = /[\s​-‍⁠\-‐-―−]/g;
+const SEPARATORS = /[\s\u200B-\u200D\u2060\uFEFF\-\u2010-\u2015\u2212]/g;
 
 /**
  * Tidy up a typed code: blanks and dashes out, capitals, the word FIRE off. Gives back the 8

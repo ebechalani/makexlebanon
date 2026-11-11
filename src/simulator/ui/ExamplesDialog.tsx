@@ -1,71 +1,72 @@
 'use client';
 
 /**
- * The Examples window: ready-made programs as cards, grouped by level, each with a button that
- * loads it into the workspace.
+ * The Examples window: the ready-made programs as cards, grouped by level.
  *
- * Some examples can be for registered members only. Their cards are shown to everyone - with a
- * lock and "Members only" where the button would be - but their programs are not in the
- * browser: they come from the website's server once a member code was accepted (see
- * ./useMemberExamples.ts). The one place to type a code is the panel at the top of the window.
+ * The examples are for registered members. A visitor without a member code sees that they
+ * exist - a lock, the title, "Members only" - and nothing more: the descriptions and the
+ * programs are not in the browser at all. They come from the website's server once a member
+ * code was accepted (see ./useMemberExamples.ts), and then the cards show their description and
+ * a button that loads the program into the workspace. Examples the owner has opened to
+ * everyone are normal cards for every visitor.
+ *
+ * The one place to type a code is the panel at the top of the window. What the window says
+ * about codes is written in ./examples-words.ts.
+ *
+ * The window stands at the top of the screen and not in the middle (align="top"): its height
+ * changes while a code is checked and when the cards open, and it must not jump under the
+ * student's finger when it does.
  */
-import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
-import type { ProgramJson } from '../core/types';
+import { Fragment, useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { codeMessage, examplesIntro, EXAMPLES_WORDS as WORDS, type CodeMessage, type ExamplesView } from './examples-words';
 import { LockIcon, UnlockIcon } from './icons';
-import { CODE_LOOKS_LIKE, CODE_PLACEHOLDER, hiddenCode } from './member-unlock';
+import { CODE_LOOKS_LIKE, CODE_PLACEHOLDER, hiddenCode, type ExampleCard, type ExampleLevel, type ExampleProgram } from './member-unlock';
 import type { MemberExamples } from './useMemberExamples';
 import { button, Modal } from './widgets';
 
-/** A ready-made program offered in the Examples window. */
-export interface ExampleProgram {
-  id: string;
-  title: string;
-  level: 'starter' | 'intermediate' | 'advanced';
-  description: string;
-  program: ProgramJson;
-}
-
-/** One card: an example that may or may not have its program (a members' example has none until a code was accepted). */
-interface Card {
-  id: string;
-  title: string;
-  level: ExampleProgram['level'];
-  description: string;
-  /** true for a members' example, locked or not */
-  members: boolean;
-  program: ProgramJson | undefined;
-}
-
-const LEVELS: Array<{ id: ExampleProgram['level']; title: string; blurb: string; badge: string }> = [
+const LEVELS: Array<{ id: ExampleLevel; title: string; blurb: string; badge: string }> = [
   { id: 'starter', title: 'Starter', blurb: 'first steps', badge: 'bg-emerald-100 text-emerald-800' },
   { id: 'intermediate', title: 'Intermediate', blurb: 'one mission from start to finish', badge: 'bg-amber-100 text-amber-800' },
   { id: 'advanced', title: 'Advanced', blurb: 'adapting to the combination, and the whole match', badge: 'bg-rose-100 text-rose-800' },
 ];
 
 export interface ExamplesDialogProps {
-  /** the examples everyone may load */
-  examples: ExampleProgram[];
-  /** the members' examples and the state of the member code; null when the category has none */
-  member: MemberExamples | null;
+  examples: MemberExamples;
   onLoad: (example: ExampleProgram) => void;
   onClose: () => void;
 }
 
-export function ExamplesDialog({ examples, member, onLoad, onClose }: ExamplesDialogProps) {
-  const cards: Card[] = [
-    ...examples.map((example) => ({ ...example, members: false })),
-    ...(member?.config.locked ?? []).map((info) => ({ ...info, members: true, program: member?.programs[info.id] })),
-  ];
+export function ExamplesDialog({ examples, onLoad, onClose }: ExamplesDialogProps) {
+  const { config, available, status, openList, refreshOpenList } = examples;
+  const view: ExamplesView =
+    status.phase === 'unlocked'
+      ? 'unlocked'
+      : config.cards.some((card) => available[card.id] !== undefined)
+        ? 'some-open'
+        : // a member is back: the code saved on this device is being checked, there is nothing to type
+          status.phase === 'checking' && status.about === 'saved'
+          ? 'checking-saved'
+          : 'locked';
+
+  // the window was opened after the server could not be reached: ask again, quietly
+  const askedAgain = useRef(false);
+  useEffect(() => {
+    if (askedAgain.current) return;
+    askedAgain.current = true;
+    if (openList === 'unreachable') refreshOpenList();
+  }, [openList, refreshOpenList]);
 
   return (
-    <Modal title="Examples" onClose={onClose} widthClass="max-w-3xl">
-      <p className="mb-3 text-sm text-ink-600">
-        Ready-made programs to run, read and change. Loading one replaces the blocks in your workspace (Undo brings them back).
+    <Modal title="Examples" onClose={onClose} widthClass="max-w-3xl" align="top">
+      <p className="mb-3 text-sm leading-relaxed text-ink-600" data-examples-intro>
+        {examplesIntro(view, config.organisation)}
       </p>
-      {member && member.config.locked.length > 0 && <MemberCodePanel member={member} />}
-      {cards.length === 0 && <p className="text-sm text-ink-500">No examples are available yet.</p>}
+
+      <MemberCodePanel examples={examples} />
+
+      {config.cards.length === 0 && <p className="text-sm text-ink-500">No examples are available yet.</p>}
       {LEVELS.map((level) => {
-        const list = cards.filter((card) => card.level === level.id);
+        const list = config.cards.filter((card) => card.level === level.id);
         if (list.length === 0) return null;
         return (
           <section key={level.id} className="mb-4 last:mb-0" aria-label={`${level.title} examples`}>
@@ -74,9 +75,14 @@ export function ExamplesDialog({ examples, member, onLoad, onClose }: ExamplesDi
               {level.blurb}
             </h3>
             <ul className="grid grid-cols-1 gap-2 md:grid-cols-2">
-              {list.map((card) => (
-                <ExampleCard key={card.id} card={card} onLoad={onLoad} />
-              ))}
+              {list.map((card) => {
+                const example = available[card.id];
+                return example ? (
+                  <OpenCard key={card.id} example={example} onLoad={onLoad} />
+                ) : (
+                  <LockedCard key={card.id} card={card} note={openList === 'ready' ? WORDS.membersOnly : WORDS.locked} />
+                );
+              })}
             </ul>
           </section>
         );
@@ -86,39 +92,29 @@ export function ExamplesDialog({ examples, member, onLoad, onClose }: ExamplesDi
 }
 
 // =============================================================================================
-// One card
+// The cards
 // =============================================================================================
 
-function ExampleCard({ card, onLoad }: { card: Card; onLoad: (example: ExampleProgram) => void }) {
-  const { program } = card;
-  const locked = program === undefined;
+/** An example this visitor may not have: a lock, its title and "Members only". Nothing to read, nothing to press. */
+function LockedCard({ card, note }: { card: ExampleCard; note: string }) {
   return (
-    <li
-      data-example={card.id}
-      data-locked={locked ? 'true' : 'false'}
-      className={`flex flex-col gap-2 rounded-card border p-3 ${locked ? 'border-dashed border-slate-300 bg-white' : 'border-slate-200 bg-slate-50'}`}
-    >
-      <p className="flex items-start gap-1.5 text-sm font-bold text-ink-900">
-        {card.members &&
-          (locked ? <LockIcon className="mt-0.5 h-4 w-4 shrink-0 text-ink-400" /> : <UnlockIcon className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />)}
-        <span>{card.title}</span>
-      </p>
-      <p className="flex-1 text-xs leading-relaxed text-ink-600">{card.description}</p>
-      {program === undefined ? (
-        <p className="inline-flex items-center gap-1.5 self-start rounded-lg bg-ink-100 px-3 py-1.5 text-sm font-semibold text-ink-600">
-          <LockIcon className="h-4 w-4" />
-          Members only
-        </p>
-      ) : (
-        <button
-          type="button"
-          onClick={() => onLoad({ id: card.id, title: card.title, level: card.level, description: card.description, program })}
-          className={`${button.plain} self-start py-1.5`}
-          aria-label={`Load the example ${card.title}`}
-        >
-          Load this example
-        </button>
-      )}
+    <li data-example={card.id} data-locked="true" className="flex items-center gap-2.5 self-start rounded-card border border-dashed border-slate-300 bg-white p-3">
+      <LockIcon className="h-5 w-5 shrink-0 text-ink-400" />
+      <span className="min-w-0 flex-1 text-sm font-bold text-ink-700">{card.title}</span>
+      <span className="shrink-0 rounded-full bg-ink-100 px-2.5 py-1 text-xs font-semibold text-ink-600">{note}</span>
+    </li>
+  );
+}
+
+/** An example the server has handed out: its description and the button that loads it. */
+function OpenCard({ example, onLoad }: { example: ExampleProgram; onLoad: (example: ExampleProgram) => void }) {
+  return (
+    <li data-example={example.id} data-locked="false" className="flex flex-col gap-2 rounded-card border border-slate-200 bg-slate-50 p-3">
+      <p className="text-sm font-bold text-ink-900">{example.title}</p>
+      <p className="flex-1 text-xs leading-relaxed text-ink-600">{example.description}</p>
+      <button type="button" onClick={() => onLoad(example)} className={`${button.plain} self-start py-1.5`} aria-label={`Load the example ${example.title}`}>
+        {WORDS.loadExample}
+      </button>
     </li>
   );
 }
@@ -127,70 +123,52 @@ function ExampleCard({ card, onLoad }: { card: Card; onLoad: (example: ExamplePr
 // The member code
 // =============================================================================================
 
-interface Feedback {
-  text: string;
-  tone: 'info' | 'good' | 'bad';
-}
-
-/** What to tell the visitor about the member code, in plain words. */
-function feedbackFor(member: MemberExamples): Feedback | null {
-  const { phase, about } = member.status;
-  const saved = about === 'saved';
-  switch (phase) {
-    case 'none':
-      return null;
-    case 'checking':
-      return { tone: 'info', text: saved ? 'Checking the member code saved on this device…' : 'Checking your code…' };
-    case 'unlocked':
-      return { tone: 'good', text: "Unlocked: the members' examples below are ready to load." };
-    case 'rejected':
-      return saved
-        ? {
-            tone: 'bad',
-            text:
-              "The member code saved on this device is no longer accepted, so the members' examples are locked again. " +
-              'If you think this is a mistake, ask the person who gave you the code.',
-          }
-        : {
-            tone: 'bad',
-            text: `That code was not accepted. Check it for a typing mistake - a code looks like ${CODE_LOOKS_LIKE} - or ask the person who gave it to you.`,
-          };
-    case 'busy':
-      return { tone: 'bad', text: 'Too many wrong codes were tried from this network. Wait ten minutes, then try again.' };
-    case 'unreachable':
-      return saved
-        ? {
-            tone: 'bad',
-            text:
-              'The member code saved on this device could not be checked, because the website could not be reached. ' +
-              "The members' examples stay locked until it has been checked.",
-          }
-        : { tone: 'bad', text: 'The website could not be reached to check your code. Check your internet connection and try again.' };
-  }
-}
-
-const FEEDBACK_TONE: Record<Feedback['tone'], string> = {
+const MESSAGE_TONE: Record<CodeMessage['tone'], string> = {
+  hint: '',
   info: 'text-ink-600',
   good: 'font-semibold text-emerald-800',
   bad: 'font-semibold text-rose-700',
 };
 
-function MemberCodePanel({ member }: { member: MemberExamples }) {
-  const { status, savedCode } = member;
+const SMALL_BUTTON = `${button.plain} px-2.5 py-1 text-xs`;
+
+/** A sentence in which the made-up code (FIRE-7K2M-9QXD) stands out as a code. */
+function withCode(sentence: string): ReactNode {
+  const parts = sentence.split(CODE_LOOKS_LIKE);
+  return parts.map((part, i) => (
+    <Fragment key={i}>
+      {i > 0 && <span className="whitespace-nowrap font-mono font-semibold">{CODE_LOOKS_LIKE}</span>}
+      {part}
+    </Fragment>
+  ));
+}
+
+/** A small turning ring: "working on it". */
+function Spinner({ className }: { className: string }) {
+  return <span className={`inline-block shrink-0 animate-spin rounded-full border-2 ${className}`} aria-hidden="true" />;
+}
+
+function MemberCodePanel({ examples }: { examples: MemberExamples }) {
+  const { status, savedCode, openList, draft, setDraft } = examples;
   const unlocked = status.phase === 'unlocked';
   const checking = status.phase === 'checking';
-  const feedback = feedbackFor(member);
+  // the field is there to type a code into: not once the examples are open, and not while the
+  // code that is saved on this device is being checked (a member who comes back types nothing)
+  const showForm = !unlocked && !(checking && status.about === 'saved');
+  const message = codeMessage(status, examples.config.organisation);
 
-  const [typed, setTyped] = useState('');
-  const headingId = useId();
+  const [confirmingForget, setConfirmingForget] = useState(false);
   const inputId = useId();
-  const feedbackId = useId();
+  const messageId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
-  const feedbackRef = useRef<HTMLParagraphElement>(null);
+  const messageRef = useRef<HTMLParagraphElement>(null);
+  const forgetRef = useRef<HTMLButtonElement>(null);
+  const keepRef = useRef<HTMLButtonElement>(null);
 
   // Keep the keyboard somewhere sensible when the panel changes under it: back in the field
-  // after a wrong code, and - when the control that had the focus is gone (the field after
-  // unlocking, the "Forget" button after forgetting) - on the message or on the field.
+  // after a wrong code (what was typed stays, ready to be corrected), and - when the control
+  // that had the focus is gone (the field after unlocking, the "Forget" buttons after
+  // forgetting) - on the field or on the message.
   const firstRender = useRef(true);
   useEffect(() => {
     if (firstRender.current) {
@@ -199,53 +177,58 @@ function MemberCodePanel({ member }: { member: MemberExamples }) {
     }
     if (status.phase === 'rejected' && status.about === 'typed') {
       inputRef.current?.focus();
-      inputRef.current?.select();
       return;
     }
     const active = document.activeElement;
     if (active && active !== document.body) return;
-    (inputRef.current ?? feedbackRef.current)?.focus();
+    (inputRef.current ?? messageRef.current)?.focus();
   }, [status.phase, status.about]);
+
+  // The question "really forget?" starts on its harmless answer; after "Keep it" the keyboard
+  // is back on the control that asked.
+  const wasConfirming = useRef(false);
+  useEffect(() => {
+    if (confirmingForget) keepRef.current?.focus();
+    else if (wasConfirming.current) forgetRef.current?.focus();
+    wasConfirming.current = confirmingForget;
+  }, [confirmingForget]);
 
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
-    if (checking || typed.trim() === '') return;
-    member.submit(typed);
+    if (checking) return;
+    if (draft.trim() === '') {
+      // nothing typed yet: show where to type
+      inputRef.current?.focus();
+      return;
+    }
+    examples.submit(draft);
+  };
+
+  const forget = () => {
+    setConfirmingForget(false);
+    examples.forget();
   };
 
   return (
     <section
-      aria-labelledby={headingId}
+      aria-label="Member code"
       data-member-panel={status.phase}
       className={`mb-4 rounded-card border p-3 ${unlocked ? 'border-emerald-200 bg-emerald-50' : 'border-brand-200 bg-brand-50'}`}
     >
-      <div className="flex items-start gap-2.5">
-        {unlocked ? <UnlockIcon className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" /> : <LockIcon className="mt-0.5 h-5 w-5 shrink-0 text-brand-700" />}
-        <div className="min-w-0">
-          <h3 id={headingId} className="text-sm font-bold tracking-normal text-ink-900">
-            {unlocked ? "Members' examples" : 'For registered members'}
-          </h3>
-          {!unlocked && (
-            <p className="mt-0.5 text-xs leading-relaxed text-ink-600">
-              The examples marked &ldquo;Members only&rdquo; open with a member code. {member.config.whereCodesComeFrom}
-            </p>
-          )}
-        </div>
-      </div>
-
-      {!unlocked && (
-        <form onSubmit={onSubmit} className="mt-2.5 flex flex-wrap items-end gap-2" noValidate>
+      {showForm && (
+        <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-2" noValidate>
           <div className="min-w-[12rem] flex-1">
-            <label htmlFor={inputId} className="block text-xs font-bold text-ink-800">
-              I have a member code
+            <label htmlFor={inputId} className="flex items-center gap-1.5 text-sm font-bold text-ink-900">
+              <LockIcon className="h-4 w-4 shrink-0 text-brand-700" />
+              {WORDS.codeLabel}
             </label>
             <input
               ref={inputRef}
               id={inputId}
               name="member-code"
               type="text"
-              value={typed}
-              onChange={(event) => setTyped(event.target.value)}
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
               readOnly={checking}
               placeholder={CODE_PLACEHOLDER}
               maxLength={40}
@@ -254,49 +237,105 @@ function MemberCodePanel({ member }: { member: MemberExamples }) {
               autoCorrect="off"
               spellCheck={false}
               enterKeyHint="go"
-              aria-describedby={feedbackId}
+              aria-describedby={messageId}
               aria-invalid={status.phase === 'rejected' && status.about === 'typed' ? true : undefined}
-              className="mt-1 h-10 w-full rounded-lg border border-slate-300 bg-white px-3 font-mono text-base uppercase tracking-wider text-ink-900 placeholder:normal-case placeholder:tracking-normal placeholder:text-ink-400 sm:text-sm"
+              className="mt-1.5 h-10 w-full rounded-lg border border-slate-300 bg-white px-3 font-mono text-base uppercase tracking-wider text-ink-900 placeholder:normal-case placeholder:tracking-normal placeholder:text-ink-400 sm:text-sm"
             />
           </div>
-          <button type="submit" aria-disabled={checking || typed.trim() === ''} className={`${button.primary} h-10 aria-disabled:cursor-not-allowed aria-disabled:opacity-40`}>
-            {checking && <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden="true" />}
-            Unlock
+          {/* (the button keeps its width while a code is checked: the turning ring takes the place of the word) */}
+          <button
+            type="submit"
+            aria-disabled={checking || draft.trim() === ''}
+            className={`${button.primary} relative h-10 ${checking ? 'cursor-progress' : 'aria-disabled:cursor-not-allowed aria-disabled:opacity-40'}`}
+          >
+            <span className={checking ? 'opacity-0' : undefined}>{WORDS.unlock}</span>
+            {checking && (
+              <span className="absolute inset-0 flex items-center justify-center">
+                <Spinner className="h-4 w-4 border-white/40 border-t-white" />
+              </span>
+            )}
           </button>
         </form>
       )}
 
-      {/* one message, always in the page, so that a screen reader announces every change of it */}
+      {/* One message, always in the page, so that a screen reader announces every change of it.
+          Under the field it keeps room for two lines, so that the cards below do not move when
+          "Checking your code…" takes the place of the hint. */}
       <p
-        ref={feedbackRef}
-        id={feedbackId}
+        ref={messageRef}
+        id={messageId}
         role="status"
         aria-live="polite"
         tabIndex={-1}
-        className={`text-sm leading-snug outline-none ${feedback ? `mt-2 ${FEEDBACK_TONE[feedback.tone]}` : ''} ${unlocked ? 'pl-[1.875rem]' : ''}`}
+        data-member-feedback
+        className={`flex items-start gap-2 text-sm leading-snug text-ink-700 outline-none ${showForm ? 'mt-2 min-h-10' : ''}`}
       >
-        {feedback?.text}
+        {unlocked && <UnlockIcon className="mt-px h-4 w-4 shrink-0 text-emerald-700" />}
+        {!showForm && checking && <Spinner className="mt-0.5 h-4 w-4 border-brand-200 border-t-brand-600" />}
+        <span>
+          {message.lead && <span className={MESSAGE_TONE[message.tone]}>{message.lead}</span>}
+          {message.rest.map((sentence, i) =>
+            // the hint is two short lines; everything else is running text
+            message.tone === 'hint' ? (
+              <span key={i} className="block">
+                {withCode(sentence)}
+              </span>
+            ) : (
+              <Fragment key={i}> {withCode(sentence)}</Fragment>
+            ),
+          )}
+        </span>
       </p>
 
+      {/* without a code, the server also says which examples are open to everyone: say so when it could not be asked
+          (unless the message above already says that the website could not be reached) */}
+      {(status.phase === 'none' || status.phase === 'rejected') && openList === 'unreachable' && (
+        <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-ink-600" role="status">
+          <span>{WORDS.websiteNotReached}</span>
+          <button type="button" onClick={examples.refreshOpenList} className={SMALL_BUTTON}>
+            {WORDS.tryAgain}
+          </button>
+        </p>
+      )}
+
       {savedCode !== null && (
-        <div className={`mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-ink-600 ${unlocked ? 'pl-[1.875rem]' : ''}`}>
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-ink-600">
           <span>
-            {member.remembered ? (
+            {examples.remembered ? (
               <>
-                Saved on this device: <span className="font-mono font-semibold text-ink-800">{hiddenCode(savedCode)}</span>
+                {WORDS.savedOnThisDevice} <span className="font-mono font-semibold text-ink-800">{hiddenCode(savedCode)}</span>
               </>
             ) : (
-              'This browser does not let the website save your code: you will be asked for it again next time.'
+              WORDS.notSaved
             )}
           </span>
           {!unlocked && !checking && status.about === 'saved' && (status.phase === 'unreachable' || status.phase === 'busy') && (
-            <button type="button" onClick={member.retry} className={`${button.plain} px-2.5 py-1 text-xs`}>
-              Try again
+            <button type="button" onClick={examples.retry} className={SMALL_BUTTON}>
+              {WORDS.tryAgain}
             </button>
           )}
-          <button type="button" onClick={member.forget} className={`${button.plain} px-2.5 py-1 text-xs`}>
-            Forget this code on this device
-          </button>
+          {/* forgetting takes two steps, and the second one starts on "Keep it": it cannot happen with one slip.
+              (Nothing to forget when the browser did not save the code.) */}
+          {!examples.remembered ? null : confirmingForget ? (
+            <span role="group" aria-label="Forget this code on this device?" className="flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-lg bg-white px-2.5 py-1.5 ring-1 ring-inset ring-slate-300">
+              <span className="font-semibold text-ink-800">{WORDS.forgetQuestion}</span>
+              <button ref={keepRef} type="button" onClick={() => setConfirmingForget(false)} className={SMALL_BUTTON}>
+                {WORDS.forgetNo}
+              </button>
+              <button type="button" onClick={forget} className={`${SMALL_BUTTON} border-rose-300 text-rose-700 hover:bg-rose-50`}>
+                {WORDS.forgetYes}
+              </button>
+            </span>
+          ) : (
+            <button
+              ref={forgetRef}
+              type="button"
+              onClick={() => setConfirmingForget(true)}
+              className="ml-auto rounded-sm text-xs font-medium text-ink-500 underline decoration-ink-300 underline-offset-2 hover:text-ink-800"
+            >
+              {WORDS.forget}
+            </button>
+          )}
         </div>
       )}
     </section>

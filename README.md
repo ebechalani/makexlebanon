@@ -247,8 +247,10 @@ rules. It lives at:
 https://www.makexlebanon.com/training/simulator/fire-rescue
 ```
 
-(`/training/simulator` on its own leads to the same page.) Nothing is installed and nothing is
-sent to a server — the student's blocks are saved in their own browser.
+(`/training/simulator` on its own leads to the same page.) Nothing is installed, and the
+student's blocks are saved in their own browser — they are never sent anywhere. The one thing
+the simulator asks the website's server for is the ready-made examples, which are for
+registered members: see "Member codes for the simulator examples" below.
 
 Visitors reach it from the **Training** menu, the Training page, the Fire Rescue category page
 and the Season 2027 block on the homepage; the Season 2027 page marks the category with an
@@ -269,6 +271,8 @@ the Blockly library.
 | `src/simulator/vm/` | The interpreter that runs a block program, one block at a time |
 | `src/simulator/blocks/` | The block language: every block, its colour and its place in the palette |
 | `src/simulator/fire-rescue/` | Everything specific to this category: the mat, the combinations, the referee, the example programs |
+| `src/simulator/members/` | The member codes: what a code looks like, its fingerprint, and the check the server makes |
+| `src/app/api/simulator/unlock/` | The address on the website that checks a member code and hands out the examples |
 | `src/simulator/ui/` | What you see: the screen, its buttons and panels, the drawing of the mat, and its stylesheet (`simulator.css`) |
 | `src/app/training/simulator/` | The page itself: its address, title and description |
 | `public/simulator/fire-rescue/` | The two pictures of the mat: `mat.webp` is the one shown, `mat-sensor.webp` is the one the line sensor reads |
@@ -278,7 +282,10 @@ the Blockly library.
 
 | To change… | Edit |
 | --- | --- |
-| The programs in the **Examples** menu | `src/simulator/fire-rescue/samples.ts` |
+| The programs in the **Examples** window, and the texts that explain them | `src/simulator/fire-rescue/samples.ts` |
+| The title or the level of an example | `src/simulator/fire-rescue/sample-catalog.ts` |
+| Who may open the examples: the member codes, and the examples open to everyone | `content/simulator-codes.ts` — see the next section |
+| What the **Examples** window says about member codes (the hint under the field, "That code did not open the examples", …) | `src/simulator/ui/examples-words.ts` |
 | The measurements of the mat (zones, lines, tower squares, sizes of the elements) | `src/simulator/fire-rescue/field.ts` |
 | The scoring (points, bonus, penalties, what counts as delivered) | `src/simulator/fire-rescue/game.ts` |
 | The short rules behind the **Rules** button | `src/simulator/ui/fire-rescue/rules.ts` |
@@ -288,16 +295,97 @@ the Blockly library.
 The scoring file and the short rules are two separate things: the first one decides the points,
 the second is only the summary students read. Change both when a rule changes.
 
+### Member codes for the simulator examples
+
+Every program in the simulator's **Examples** window is for registered members. A visitor
+without a code sees that the examples exist — their titles, each with a lock and "Members
+only" — but cannot read or load them. The programs and the texts that explain them are not
+part of what a browser downloads: the website's server hands them out only after it has
+checked a member code.
+
+**How a member unlocks them.** In the simulator: **Examples**, type the code under "I have a
+member code", **Unlock**. A code looks like `FIRE-7K2M-9QXD`; capitals, dashes and spaces do
+not matter. The cards open at once, with their descriptions and a "Load this example" button.
+The browser remembers the code, so a member types it once per device, and the simulator checks
+it with the server again on every visit. "Forget this code on this device", in the same window,
+removes it — useful on a shared computer.
+
+Everything you decide about the codes is in one file, **`content/simulator-codes.ts`**. After
+any change to it: save, commit and push. The change is live once Vercel has redeployed.
+
+| To… | Do this in `content/simulator-codes.ts` |
+| --- | --- |
+| **Open an example to everyone** | Write its id into the list `examplesOpenToEveryone` at the top of the file, for example `'hello',`. The seven ids are listed right above it. Every visitor then gets that example as a normal card, without a code; the others stay locked. The list is empty now: every example needs a code. |
+| **Lock it again** | Take that line out. |
+| **Cancel one code** | Look up the code's number in your CSV file. In the list `simulatorCodes`, find the line with that number — for code 37 the line that starts with `{ no: 37,` — and delete it, or put `//` in front of it. That code then opens nothing, and a browser that had it saved locks the examples again on its next visit. The other codes are not affected. |
+| **Make more codes** | Do not write lines by hand: run the script below. |
+
+After pushing, check that Vercel reports the deployment as done. If it reports a failed build
+— a missing comma or quote in the file is enough — nothing has changed on the website yet: a
+code you cancelled still works until the file is fixed and pushed again.
+
+**Making codes.**
+
+```bash
+node scripts/generate-simulator-codes.mjs --count 500 --out ~/Documents/makex-simulator-codes.csv
+```
+
+This draws 500 new codes and does two things. It writes the codes to the CSV file you named,
+with the columns `No`, `Code` and `Given to` — open it in Excel and note who got which code.
+And it adds one line per code to the list in `content/simulator-codes.ts`; nothing else in
+that file is touched. Then commit and push `content/simulator-codes.ts`.
+
+- The CSV file **must be outside this folder** — the script refuses anything else — and the
+  script never overwrites a file, so give every run a new file name.
+- Run it again whenever you need more: the new lines are added at the end and the numbers go
+  on from the last one, also when lines were deleted in between.
+- `--replace` empties the list first and starts again at number 1. **Every code handed out
+  before stops working.** Use it only to start over.
+- The codes are not shown on the screen. If you want to see them there as well, add
+  `--print-codes`.
+
+**Never commit the plain codes.** `content/simulator-codes.ts` holds only *fingerprints*: rows
+of letters and digits worked out from the codes, from which a code cannot be read back. The
+CSV file is the only place where the codes themselves exist. Keep it somewhere private, keep a
+copy of it, and never put it in this folder, in a commit or in an issue — this repository is
+public. (As a safety net, `.gitignore` leaves out any `.csv` file with "codes" in its name.)
+
+**What the lock does not do** — the honest limits:
+
+- **The repository is public on GitHub.** Anyone who looks there can read the example programs
+  in `src/simulator/fire-rescue/samples.ts`. The lock keeps the examples out of the website,
+  not out of GitHub. If that ever matters, the repository has to be made private.
+- **A member can pass things on**: their code, or a loaded example saved as a file (the
+  **Save** button), which anyone can open with **Open**. One code per member keeps this in
+  check — when a code gets around, cancel that one code.
+- **A shared computer remembers.** Once a member has unlocked the examples in a browser, they
+  stay open for everybody who uses that browser on that computer afterwards — until somebody
+  presses "Forget this code on this device", or you cancel the code. On school computers, ask
+  members to press it when they are done.
+- **The fingerprints are public too**, and a code is short. With 500 codes on the list, one
+  fast graphics card that tries codes against the fingerprints finds *a* working code in
+  about half a day (it cannot aim at a particular member's code, and you cannot tell which
+  one it found). All such a code opens is the programs that are already in this public
+  repository.
+- **The limit on wrong codes is a courtesy**, not a wall. After a hundred wrong codes within
+  ten minutes from one network — a school, for instance — the server checks only one code per
+  second from that network, and answers "wait a moment" in between. Nobody is locked out
+  for a time: as soon as the wrong codes stop, a right code opens the examples again, a
+  second later at most. A few typing mistakes never get near the limit.
+
 ### Run its tests after every change
 
 ```bash
 npm run test:sim
 ```
 
-It runs about three hundred checks; among them, every example program is played on the real
-engine with the real referee and its score is compared. It takes around ten seconds and must
-end with `fail 0`. If it does not, do not deploy — a failing test means a program would now
-score differently or a block would behave differently.
+It runs more than three hundred and fifty checks; among them, every example program is played
+on the real engine with the real referee and its score is compared. They also check
+`content/simulator-codes.ts` (a misspelt example id, a damaged line) and that no example can
+slip back into what every visitor's browser downloads. It takes around fifteen seconds and
+must end with `fail 0`. If it does not, do not deploy — a failing test means a program would
+now score differently, a block would behave differently, or the examples would no longer be
+for members only.
 
 ### If you change the site header
 
@@ -413,12 +501,14 @@ These are marked with `TODO` or `NOTE` comments in `content/seasons.ts`:
 content/            All editable text and data
   site.ts           Contact details, nav, org info
   seasons.ts        Seasons, categories, downloads, events, training
+  simulator-codes.ts  Member codes for the simulator examples (fingerprints only)
 public/
   gallery/          Competition photos, by year and category
   downloads/        Rules, scoresheets, STL archives
   simulator/        Pictures of the Fire Rescue mat, for the simulator
 scripts/
   fetch-legacy-assets.mjs
+  generate-simulator-codes.mjs   Makes new member codes for the simulator
 src/
   app/              Pages and routing
   components/       Header, Footer, Gallery, shared UI
