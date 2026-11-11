@@ -25,6 +25,7 @@ Other commands:
 | `npm run dev` | Local preview with live reload |
 | `npm run build` | Production build — run this before deploying |
 | `npm run typecheck` | Checks for mistakes without building |
+| `npm run test:sim` | Runs the simulator's own tests — see "The Fire Rescue simulator" below |
 
 > **Known dev-only quirk:** the browser-tab icon and the social share image are generated
 > images. They render correctly in `npm run build` and on Vercel, but return a 500 in
@@ -235,6 +236,93 @@ or `other`.
 
 ---
 
+## The Fire Rescue simulator
+
+A browser simulator of the Makeblock mBot2 for the 2027 **Fire Rescue** category (ages 11–13).
+The student builds a program with mBlock-style blocks and watches the robot run it on the
+competition mat, on any starting combination the referee could draw, scored by the category
+rules. It lives at:
+
+```
+https://www.makexlebanon.com/training/simulator/fire-rescue
+```
+
+(`/training/simulator` on its own leads to the same page.) Nothing is installed and nothing is
+sent to a server — the student's blocks are saved in their own browser.
+
+Visitors reach it from the **Training** menu, the Training page, the Fire Rescue category page
+and the Season 2027 block on the homepage; the Season 2027 page marks the category with an
+"Online simulator" label. All of that comes from the content files: the `simulator` entry on
+the Fire Rescue category and the training track in `content/seasons.ts`, and the menu in
+`content/site.ts`. Remove those entries and the links disappear; the simulator page itself
+stays.
+
+The older, simpler simulator inside the Smart Logistics lessons
+(`/training/interactive/smart-logistics`) is separate and shares nothing with this one except
+the Blockly library.
+
+### Where its files live
+
+| Folder | What is in it |
+| --- | --- |
+| `src/simulator/core/` | The physics: the robot, its motors and sensors, collisions, the match clock |
+| `src/simulator/vm/` | The interpreter that runs a block program, one block at a time |
+| `src/simulator/blocks/` | The block language: every block, its colour and its place in the palette |
+| `src/simulator/fire-rescue/` | Everything specific to this category: the mat, the combinations, the referee, the example programs |
+| `src/simulator/ui/` | What you see: the screen, its buttons and panels, the drawing of the mat, and its stylesheet (`simulator.css`) |
+| `src/app/training/simulator/` | The page itself: its address, title and description |
+| `public/simulator/fire-rescue/` | The two pictures of the mat: `mat.webp` is the one shown, `mat-sensor.webp` is the one the line sensor reads |
+| `public/blockly-media/` | Blockly's own small pictures, shared with the Smart Logistics lessons |
+
+### What to change, and where
+
+| To change… | Edit |
+| --- | --- |
+| The programs in the **Examples** menu | `src/simulator/fire-rescue/samples.ts` |
+| The measurements of the mat (zones, lines, tower squares, sizes of the elements) | `src/simulator/fire-rescue/field.ts` |
+| The scoring (points, bonus, penalties, what counts as delivered) | `src/simulator/fire-rescue/game.ts` |
+| The short rules behind the **Rules** button | `src/simulator/ui/fire-rescue/rules.ts` |
+| The measurements of the robot | `src/simulator/core/robot.ts` |
+| The text on the cards that lead to the simulator | `content/seasons.ts` |
+
+The scoring file and the short rules are two separate things: the first one decides the points,
+the second is only the summary students read. Change both when a rule changes.
+
+### Run its tests after every change
+
+```bash
+npm run test:sim
+```
+
+It runs about three hundred checks; among them, every example program is played on the real
+engine with the real referee and its score is compared. It takes around ten seconds and must
+end with `fail 0`. If it does not, do not deploy — a failing test means a program would now
+score differently or a block would behave differently.
+
+### If you change the site header
+
+The simulator fills the window under the site header, so it has to know how tall the header
+is. That height is written once, in `src/simulator/ui/page-frame.ts` (`--mbot2-site-header`:
+4rem on phones, 5rem on wider screens). If the header in `src/components/Header.tsx` ever gets
+taller or shorter, change the two numbers there to match, or the mat will no longer fit on a
+laptop screen without scrolling.
+
+### Known limits
+
+The simulator is a training tool, not a copy of the real field:
+
+- **Nothing tips over.** Towers, buckets and people always stay upright.
+- **Pushed objects slide but do not turn.** A real bucket pushed off-centre would also rotate.
+- **The claw holds one object at a time.**
+- **Distance-only programs are exact only because the simulated robot is perfect** — no wheel
+  slip, no sensor noise. A program that drives "20.4 cm, turn, 10.4 cm" without looking at a
+  sensor works every time here and will drift on a real mBot2. The examples that use sensors
+  show the way.
+- **Only the two centre lines can be followed** with the line sensor — the ones that run from
+  the Fire Station to the upper and the lower safe zone.
+
+---
+
 ## Deploying
 
 The site is designed for Vercel, the same platform already hosting the 2026 team portal.
@@ -312,8 +400,10 @@ These are marked with `TODO` or `NOTE` comments in `content/seasons.ts`:
   photographs on the Drive are not. See "Still not imported" above.
 - **Ranking-card captions** — each 2026 gallery has a `captions.json` describing the division
   and age band. Edit it to add winner names, which become the alt text.
-- **Training tracks** — four of the five are marked `coming-soon`. Write the content, then
-  change `status` to `available` and add an `href` in `content/seasons.ts`.
+- **Training tracks** — four of the six are marked `coming-soon`. Write the content, then
+  change `status` to `available` and add an `href` in `content/seasons.ts`. (A track can also
+  set `cta` to change the wording of its link — the simulator's card says "Open the simulator"
+  instead of "Open training".)
 
 ---
 
@@ -326,10 +416,12 @@ content/            All editable text and data
 public/
   gallery/          Competition photos, by year and category
   downloads/        Rules, scoresheets, STL archives
+  simulator/        Pictures of the Fire Rescue mat, for the simulator
 scripts/
   fetch-legacy-assets.mjs
 src/
   app/              Pages and routing
   components/       Header, Footer, Gallery, shared UI
   lib/gallery.ts    Reads the photo folders
+  simulator/        The Fire Rescue simulator (see its own section above)
 ```

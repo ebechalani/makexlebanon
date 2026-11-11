@@ -83,6 +83,20 @@ export default async function CategoryPage({ params }: Params) {
         </div>
       </PageHero>
 
+      {/* Simulator — shown when the category has one (content/seasons.ts) ---- */}
+      {category.simulator ? (
+        <Section className="bg-slate-50">
+          <div className="flex flex-wrap items-center justify-between gap-8">
+            <SectionHeading
+              eyebrow="Practise online"
+              title={`Try the ${category.name} simulator`}
+              lead={category.simulator.summary}
+            />
+            <Button href={category.simulator.href}>Open the simulator</Button>
+          </div>
+        </Section>
+      ) : null}
+
       {/* Downloads ---------------------------------------------------------- */}
       {downloads.length > 0 ? (
         <Section>

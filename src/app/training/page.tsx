@@ -46,7 +46,7 @@ export default function TrainingPage() {
                       {track.summary}
                     </p>
                     <span className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-brand-600">
-                      Open training
+                      {track.cta ?? 'Open training'}
                       <ArrowIcon className="transition-transform group-hover:translate-x-0.5" />
                     </span>
                   </Link>

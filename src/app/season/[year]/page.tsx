@@ -86,6 +86,7 @@ export default async function SeasonPage({ params }: Params) {
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge>{category.ageRange}</Badge>
                     {category.platform ? <Badge tone="neutral">{category.platform}</Badge> : null}
+                    {category.simulator ? <Badge tone="success">Online simulator</Badge> : null}
                   </div>
 
                   <h3 className="mt-4 text-lg text-ink-900 group-hover:text-brand-700">
