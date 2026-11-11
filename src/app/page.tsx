@@ -341,9 +341,19 @@ function FireRescueTeaser() {
               <p className="mt-3 flex-1 text-sm leading-relaxed text-white/60 text-pretty">
                 {category.summary}
               </p>
-              <span className="mt-4 inline-flex w-fit items-center rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-semibold text-amber-200 ring-1 ring-inset ring-amber-400/30">
-                Details coming soon
-              </span>
+              {category.simulator ? (
+                <Link
+                  href={category.simulator.href}
+                  className="mt-4 inline-flex w-fit items-center gap-1.5 rounded-full bg-brand-500/15 px-2.5 py-1 text-xs font-semibold text-brand-200 ring-1 ring-inset ring-brand-400/40 transition-colors hover:bg-brand-500/25"
+                >
+                  Try the simulator
+                  <ArrowIcon />
+                </Link>
+              ) : (
+                <span className="mt-4 inline-flex w-fit items-center rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-semibold text-amber-200 ring-1 ring-inset ring-amber-400/30">
+                  Details coming soon
+                </span>
+              )}
             </li>
           ))}
         </ul>

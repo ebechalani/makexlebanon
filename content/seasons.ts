@@ -32,6 +32,17 @@ export type Category = {
   /** How the field is played, as labelled on the order list. */
   mapMode?: string;
   downloads?: Download[];
+  /**
+   * An online simulator for this category. When set, the category page shows a
+   * "try the simulator" block, the season page labels the category "Online simulator",
+   * and the season block on the homepage links to it.
+   */
+  simulator?: {
+    /** The simulator's page on this site. */
+    href: string;
+    /** One or two sentences shown next to the button. */
+    summary: string;
+  };
 };
 
 export type Season = {
@@ -87,6 +98,13 @@ export const seasons: Season[] = [
         ageRange: '11–13 years',
         platform: 'mBot2',
         summary: 'Nothing goes as planned. Sense the situation, decide, adapt.',
+        simulator: {
+          href: '/training/simulator/fire-rescue',
+          summary:
+            'Build a program with mBlock-style blocks and watch the mBot2 run it on the Fire Rescue ' +
+            'mat — on any starting combination the referee could draw, scored by the category rules. ' +
+            'It runs in the browser: no robot and no installation needed.',
+        },
       },
       {
         slug: 'fire-chief',
@@ -327,6 +345,8 @@ export type TrainingTrack = {
   status: 'available' | 'coming-soon';
   href?: string;
   summary: string;
+  /** Text of the link on the track's card. Leave out for the usual "Open training". */
+  cta?: string;
 };
 
 export const trainingTracks: TrainingTrack[] = [
@@ -336,6 +356,16 @@ export const trainingTracks: TrainingTrack[] = [
     status: 'available',
     href: '/training/interactive/smart-logistics',
     summary: 'Setup, sensor calibration and scoring strategy for the logistics field.',
+  },
+  {
+    name: 'Fire Rescue — mBot2 simulator',
+    ageRange: '11–13 years',
+    status: 'available',
+    href: '/training/simulator/fire-rescue',
+    summary:
+      'Program the mBot2 with blocks and watch it run on the 2027 Fire Rescue mat, on any ' +
+      'starting combination, scored by the category rules. Works in the browser, no robot needed.',
+    cta: 'Open the simulator',
   },
   { name: 'Inspire — Fruit Wonderland', ageRange: '4–7 years', status: 'coming-soon', summary: 'Introductory driving and mission basics.' },
   { name: 'Starter — All Core Journey', ageRange: '8–13 years', status: 'coming-soon', summary: 'Core mechanics and autonomous routines.' },

@@ -11,6 +11,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: '/competitions/international', priority: 0.7 },
     { path: '/gallery', priority: 0.8 },
     { path: '/training', priority: 0.6 },
+    { path: '/training/simulator/fire-rescue', priority: 0.7 },
     { path: '/workshops', priority: 0.6 },
     { path: '/kits', priority: 0.6 },
     { path: '/media', priority: 0.6 },
