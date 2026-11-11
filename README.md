@@ -297,11 +297,12 @@ the second is only the summary students read. Change both when a rule changes.
 
 ### Member codes for the simulator examples
 
-Every program in the simulator's **Examples** window is for registered members. A visitor
-without a code sees that the examples exist — their titles, each with a lock and "Members
-only" — but cannot read or load them. The programs and the texts that explain them are not
-part of what a browser downloads: the website's server hands them out only after it has
-checked a member code.
+The three starter programs in the simulator's **Examples** window are open to everyone. The
+other four (intermediate and advanced) are for registered members. A visitor without a code
+sees that those exist — their titles, each with a lock and "Members only" — but cannot read
+or load them. No example program, and no text that explains one, is part of the pages a
+browser downloads: the website's server hands out the open ones on request, and the members'
+ones only after it has checked a member code.
 
 **How a member unlocks them.** In the simulator: **Examples**, type the code under "I have a
 member code", **Unlock**. A code looks like `FIRE-7K2M-9QXD`; capitals, dashes and spaces do
@@ -315,7 +316,7 @@ any change to it: save, commit and push. The change is live once Vercel has rede
 
 | To… | Do this in `content/simulator-codes.ts` |
 | --- | --- |
-| **Open an example to everyone** | Write its id into the list `examplesOpenToEveryone` at the top of the file, for example `'hello',`. The seven ids are listed right above it. Every visitor then gets that example as a normal card, without a code; the others stay locked. The list is empty now: every example needs a code. |
+| **Open an example to everyone** | Write its id into the list `examplesOpenToEveryone` at the top of the file, for example `'hello',`. The seven ids are listed right above it. Every visitor then gets that example as a normal card, without a code; the others stay locked. The three starter examples (`'hello'`, `'line-follow'`, `'gripper-demo'`) are on the list now; the other four need a code. |
 | **Lock it again** | Take that line out. |
 | **Cancel one code** | Look up the code's number in your CSV file. In the list `simulatorCodes`, find the line with that number — for code 37 the line that starts with `{ no: 37,` — and delete it, or put `//` in front of it. That code then opens nothing, and a browser that had it saved locks the examples again on its next visit. The other codes are not affected. |
 | **Make more codes** | Do not write lines by hand: run the script below. |

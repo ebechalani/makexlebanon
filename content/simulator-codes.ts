@@ -1,10 +1,11 @@
 /**
  * Member codes for the examples of the Fire Rescue simulator.
  *
- * Every program in the simulator's Examples window is for registered members: it opens only
- * after a member has typed a code like FIRE-7K2M-9QXD. This file decides two things:
+ * A program in the simulator's Examples window is for registered members unless it is on the
+ * list of examples open to everyone: it opens only after a member has typed a code like
+ * FIRE-7K2M-9QXD. This file decides two things:
  *
- *   1. which examples are open to everyone, without a code  (none, as long as the list is empty)
+ *   1. which examples are open to everyone, without a code  (now: the three starter examples)
  *   2. which member codes work
  *
  * Read "Member codes for the simulator examples" in README.md first. After every change:
@@ -44,7 +45,10 @@
  * its line out.
  */
 export const examplesOpenToEveryone: string[] = [
-  // (empty: every example needs a member code)
+  // the three starter examples; the other four need a member code
+  'hello',
+  'line-follow',
+  'gripper-demo',
 ];
 
 // =====================================================================================
