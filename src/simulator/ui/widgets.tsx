@@ -93,10 +93,27 @@ export interface ModalProps {
   children: ReactNode;
   /** Tailwind max-width class of the window */
   widthClass?: string;
+  /**
+   * Where the window stands. 'center' (the default): in the middle of the screen. 'top': a
+   * little below the top edge, for a window whose content changes height while it is open -
+   * it then grows and shrinks at its lower edge only, and what is being read or typed in it
+   * stays where it is.
+   */
+  align?: 'center' | 'top';
 }
 
+/** The frame around the window, and the tallest the window may be inside it. */
+const MODAL_FRAME = {
+  center: { frame: 'items-center p-3', panel: 'max-h-[calc(100dvh_-_1.5rem)]' },
+  top: {
+    // (on a phone the window starts right under the edge: every line of it counts there)
+    frame: 'items-start px-3 pb-3 pt-[var(--mbot2-modal-top)] [--mbot2-modal-top:0.75rem] sm:[--mbot2-modal-top:max(0.75rem,6dvh)]',
+    panel: 'max-h-[calc(100dvh_-_var(--mbot2-modal-top)_-_0.75rem)]',
+  },
+} as const;
+
 /** A window on top of the page. Escape or a click beside it closes it; Tab stays inside. */
-export function Modal({ title, onClose, children, widthClass = 'max-w-lg' }: ModalProps) {
+export function Modal({ title, onClose, children, widthClass = 'max-w-lg', align = 'center' }: ModalProps) {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
@@ -123,10 +140,13 @@ export function Modal({ title, onClose, children, widthClass = 'max-w-lg' }: Mod
       const first = items[0];
       const last = items[items.length - 1];
       const active = document.activeElement;
-      if (event.shiftKey && (active === first || active === panel)) {
+      // the focus is not in the window (the control that had it is gone): bring it back in,
+      // instead of letting Tab wander through the page behind the window
+      const outside = !active || !panel.contains(active);
+      if (event.shiftKey && (active === first || active === panel || outside)) {
         event.preventDefault();
         last.focus();
-      } else if (!event.shiftKey && active === last) {
+      } else if (!event.shiftKey && (active === last || outside)) {
         event.preventDefault();
         first.focus();
       }
@@ -140,7 +160,7 @@ export function Modal({ title, onClose, children, widthClass = 'max-w-lg' }: Mod
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/55 p-3"
+      className={`fixed inset-0 z-50 flex justify-center bg-ink-950/55 ${MODAL_FRAME[align].frame}`}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -151,7 +171,7 @@ export function Modal({ title, onClose, children, widthClass = 'max-w-lg' }: Mod
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className={`flex max-h-[calc(100dvh-1.5rem)] w-full ${widthClass} flex-col rounded-card bg-white shadow-2xl outline-none`}
+        className={`flex ${MODAL_FRAME[align].panel} w-full ${widthClass} flex-col rounded-card bg-white shadow-2xl outline-none`}
       >
         <div className="flex items-center gap-3 border-b border-slate-200 px-4 py-3">
           <h2 id={titleId} className="text-base font-bold text-ink-900">

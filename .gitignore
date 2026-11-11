@@ -13,3 +13,8 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
+
+# Member codes for the simulator examples: the CSV files with the plain codes must never be
+# committed (README.md, "Member codes for the simulator examples"). The script that makes them
+# refuses to write inside this folder; this line is a safety net for a file copied in by hand.
+*codes*.csv

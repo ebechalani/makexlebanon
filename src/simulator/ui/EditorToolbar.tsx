@@ -5,31 +5,20 @@
  * Undo and Redo.
  */
 import { useRef, useState } from 'react';
-import type { ProgramJson } from '../core/types';
+import { ExamplesDialog } from './ExamplesDialog';
+import { EXAMPLES_WORDS } from './examples-words';
 import { ExamplesIcon, NewFileIcon, OpenIcon, RedoIcon, SaveIcon, UndoIcon } from './icons';
-import { button, Modal } from './widgets';
-
-/** A ready-made program offered in the Examples menu. */
-export interface ExampleProgram {
-  id: string;
-  title: string;
-  level: 'starter' | 'intermediate' | 'advanced';
-  description: string;
-  program: ProgramJson;
-}
-
-const LEVELS: Array<{ id: ExampleProgram['level']; title: string; blurb: string; badge: string }> = [
-  { id: 'starter', title: 'Starter', blurb: 'first steps', badge: 'bg-emerald-100 text-emerald-800' },
-  { id: 'intermediate', title: 'Intermediate', blurb: 'one mission from start to finish', badge: 'bg-amber-100 text-amber-800' },
-  { id: 'advanced', title: 'Advanced', blurb: 'programs that adapt to the combination', badge: 'bg-rose-100 text-rose-800' },
-];
+import type { ExampleProgram } from './member-unlock';
+import type { MemberExamples } from './useMemberExamples';
+import { button } from './widgets';
 
 export interface EditorToolbarProps {
   ready: boolean;
   canUndo: boolean;
   canRedo: boolean;
   blocks: number;
-  examples: ExampleProgram[];
+  /** the examples of the category and what this visitor may load of them (see ./useMemberExamples.ts) */
+  examples: MemberExamples;
   onNew: () => void;
   onExample: (example: ExampleProgram) => void;
   /** the text of the file the student picked */
@@ -45,6 +34,8 @@ const TOOL = `${button.ghost} max-sm:gap-1 max-sm:px-1.5`;
 export function EditorToolbar(props: EditorToolbarProps) {
   const { ready, examples } = props;
   const [examplesOpen, setExamplesOpen] = useState(false);
+  // (what the button says when the pointer rests on it must be true for this visitor)
+  const canLoadExamples = Object.keys(examples.available).length > 0;
   const fileRef = useRef<HTMLInputElement>(null);
 
   const pickFile = async (file: File | undefined) => {
@@ -69,49 +60,20 @@ export function EditorToolbar(props: EditorToolbarProps) {
         aria-haspopup="dialog"
         onClick={() => setExamplesOpen(true)}
         disabled={!ready}
-        title="Load a ready-made program"
+        title={canLoadExamples ? EXAMPLES_WORDS.buttonHint : EXAMPLES_WORDS.buttonHintLocked}
       >
         <ExamplesIcon className="h-4 w-4" />
         Examples
       </button>
       {examplesOpen && (
-        <Modal title="Examples" onClose={() => setExamplesOpen(false)} widthClass="max-w-3xl">
-          <p className="mb-3 text-sm text-ink-600">
-            Ready-made programs to run, read and change. Loading one replaces the blocks in your workspace (Undo brings them back).
-          </p>
-          {examples.length === 0 && <p className="text-sm text-ink-500">No examples are available yet.</p>}
-          {LEVELS.map((level) => {
-            const list = examples.filter((e) => e.level === level.id);
-            if (list.length === 0) return null;
-            return (
-              <section key={level.id} className="mb-4 last:mb-0" aria-label={`${level.title} examples`}>
-                <h3 className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-ink-500">
-                  <span className={`rounded px-1.5 py-0.5 ${level.badge}`}>{level.title}</span>
-                  {level.blurb}
-                </h3>
-                <ul className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                  {list.map((example) => (
-                    <li key={example.id} className="flex flex-col gap-2 rounded-card border border-slate-200 bg-slate-50 p-3">
-                      <p className="text-sm font-bold text-ink-900">{example.title}</p>
-                      <p className="flex-1 text-xs leading-relaxed text-ink-600">{example.description}</p>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setExamplesOpen(false);
-                          props.onExample(example);
-                        }}
-                        className={`${button.plain} self-start py-1.5`}
-                        aria-label={`Load the example ${example.title}`}
-                      >
-                        Load this example
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            );
-          })}
-        </Modal>
+        <ExamplesDialog
+          examples={examples}
+          onLoad={(example) => {
+            setExamplesOpen(false);
+            props.onExample(example);
+          }}
+          onClose={() => setExamplesOpen(false)}
+        />
       )}
 
       <button type="button" className={TOOL} onClick={() => fileRef.current?.click()} disabled={!ready} title="Open a program file from this computer">

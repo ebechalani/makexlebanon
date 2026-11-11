@@ -7,7 +7,21 @@
  *   one-bucket     intermediate  deliver one bucket (default combination)
  *   smart-bucket   advanced      deliver the W1 bucket for ANY combination (colour + ultrasonic sensor)
  *   one-person     intermediate  rescue one person (default combination)
- *   full-mission   advanced      the whole match, 180 points (default combination; not in the menu)
+ *   full-mission   advanced      the whole match, 180 points (default combination)
+ *
+ * =====================================================================================
+ *  THIS FILE STAYS ON THE WEBSITE'S SERVER. NEVER IMPORT IT FROM THE SIMULATOR SCREEN.
+ *
+ *  Every example is for registered members: a visitor's browser gets a program and the text
+ *  that explains it only from the server, in the answer to a member code that was checked
+ *  there (../members/unlock.ts, behind /api/simulator/unlock). So nothing that runs in the
+ *  browser (src/simulator/ui, anything with 'use client') may import this file. The screen
+ *  knows the examples only by id, title and level, from ./sample-catalog.ts. A test
+ *  (../members/client-guard.test.ts) fails when a file of the screen starts to import this one.
+ *
+ *  The title and the level of each example are in ./sample-catalog.ts; the description and the
+ *  blocks are here.
+ * =====================================================================================
  *
  * Every program is written with the program builder (vm/builder.ts), so it is exactly what the
  * block editor would save, and every one of them is run by the tests (integration.test.ts) on the
@@ -69,8 +83,9 @@ import {
   whenStart,
   type BlockNode,
 } from '../vm/builder';
+import { exampleCard, type ExampleLevel } from './sample-catalog';
 
-export type SampleLevel = 'starter' | 'intermediate' | 'advanced';
+export type SampleLevel = ExampleLevel;
 
 export interface SampleProgram {
   /** stable name, used in links and tests */
@@ -115,9 +130,7 @@ function putDownAndLeave(): BlockNode[] {
 // =============================================================================================
 
 const hello: SampleProgram = {
-  id: 'hello',
-  title: 'Hello, mBot2',
-  level: 'starter',
+  ...exampleCard('hello'),
   description:
     'A first program: the robot says hello on its screen, lights its LEDs green, drives 20 cm forward and ' +
     '20 cm back, turns a quarter turn to the right and lights its LEDs blue. Works for every combination ' +
@@ -140,9 +153,7 @@ const hello: SampleProgram = {
 // =============================================================================================
 
 const lineFollow: SampleProgram = {
-  id: 'line-follow',
-  title: 'Follow the black line',
-  level: 'starter',
+  ...exampleCard('line-follow'),
   description:
     'A line follower with the Quad RGB sensor. The robot drives 11 cm out of the Fire Station (the picture ' +
     'inside it has dark spots that are not a line), then follows the black line to the upper safe zone. ' +
@@ -208,9 +219,7 @@ const lineFollow: SampleProgram = {
 // =============================================================================================
 
 const gripperDemo: SampleProgram = {
-  id: 'gripper-demo',
-  title: 'Gripper: grab, put down, lift',
-  level: 'starter',
+  ...exampleCard('gripper-demo'),
   description:
     'Shows every gripper block. The robot opens its claw, raises the arm (so the fingers pass over the ' +
     'tower), drives to water tower W1 and closes the claw around the bucket. It backs away, lowers the arm ' +
@@ -239,9 +248,7 @@ const gripperDemo: SampleProgram = {
 // =============================================================================================
 
 const oneBucket: SampleProgram = {
-  id: 'one-bucket',
-  title: 'Deliver one bucket',
-  level: 'intermediate',
+  ...exampleCard('one-bucket'),
   description:
     'Takes the bucket from water tower W1 and delivers it to square A2 of building A (the Apartment, top ' +
     'right), driving by distance only - no sensors. This scores 20 points ONLY when the bucket on W1 is the ' +
@@ -249,7 +256,7 @@ const oneBucket: SampleProgram = {
     'combination the bucket ends up at the wrong building, or the robot runs into the person. ' +
     'The robot gets in front of A2 by driving backwards, so its gripper never sticks out over the edge of the mat. ' +
     'Distances alone are exact only for the perfect simulated robot at its default start position: move the ' +
-    'robot, or switch on wheel slip, and it starts to miss.',
+    'robot and it starts to miss. On a real robot the wheels also slip a little, so it would miss there too.',
   program: program([
     script(whenStart(), [
       ...fetchBucketFromW1(),
@@ -275,9 +282,7 @@ const oneBucket: SampleProgram = {
 // =============================================================================================
 
 const smartBucket: SampleProgram = {
-  id: 'smart-bucket',
-  title: 'Smart bucket: any colour, any square',
-  level: 'advanced',
+  ...exampleCard('smart-bucket'),
   description:
     'Takes the bucket from water tower W1, reads its colour with the colour sensor at the claw and keeps it ' +
     'in the variable "colour". The colour decides the building: red = A, blue = B, yellow = C, green = D. ' +
@@ -285,8 +290,8 @@ const smartBucket: SampleProgram = {
     'ultrasonic sensor: closer than 20 cm means a person stands there, so the water goes into the other ' +
     'square (the my-block "deliver" does this; it steps sideways by driving backwards, so the gripper stays ' +
     'over the mat). Delivers the W1 bucket correctly (20 points) for every one of the 9216 combinations. ' +
-    'It drives by distance, so it relies on the perfect simulated robot at its default start position; switch ' +
-    'on wheel slip to see why real robots also use the lines.',
+    'It drives by distance, so it relies on the perfect simulated robot at its default start position. On a ' +
+    'real robot the wheels slip a little, which is why real robots also use the lines.',
   program: program([
     // "deliver": the robot stands in front of one square of a building, the bucket in its claw.
     // `other` says on which side the building's second square is: left or right.
@@ -357,9 +362,7 @@ const smartBucket: SampleProgram = {
 // =============================================================================================
 
 const onePerson: SampleProgram = {
-  id: 'one-person',
-  title: 'Rescue one person',
-  level: 'intermediate',
+  ...exampleCard('one-person'),
   description:
     'Drives to square A1 of building A, grips the person standing there, lifts it and carries it to the ' +
     'red rescue tower RR in the lower safe zone, where it is put down on top of the tower. This scores 20 ' +
@@ -404,9 +407,10 @@ const backward = (cm: number): BlockNode => moveCm('backward', cm);
  * square next to it is carried to its rescue tower, which leaves the robot close to the next
  * water tower. Two my-blocks keep it short: "pick up" and "put down".
  *
- * It is not in the sample menu (SAMPLE_PROGRAMS): it hands out a complete solution, so whether
- * students get to see it is the teacher's choice. The tests run it to prove that a full score,
- * bonus included, can be reached through blocks.
+ * It hands out a complete solution. In the Examples window it is the last card ("Full mission"),
+ * for members like every other example; it is kept out of SAMPLE_PROGRAMS, the list of six the
+ * tests know. The tests run it to prove that a full score, bonus included, can be reached
+ * through blocks.
  *
  * Rules the route follows, worth knowing when you change it:
  *  - near a water tower the robot only drives straight in and straight out with the arm up
@@ -417,16 +421,14 @@ const backward = (cm: number): BlockNode => moveCm('backward', cm);
  *    the mat.
  */
 const fullMission: SampleProgram = {
-  id: 'full-mission',
-  title: 'The whole match: 180 points',
-  level: 'advanced',
+  ...exampleCard('full-mission'),
   description:
-    'All eight missions in one run, for the default combination only: every bucket is delivered to its ' +
+    'A complete solution, not a lesson: all eight missions in one run. Every bucket is delivered to its ' +
     'building and every person is carried to the rescue tower of its colour - 160 points plus the 20 point ' +
-    'bonus, in about 103 of the 180 seconds. It drives by distance only (no sensors), so it works for the ' +
-    'default combination, the default start position and the perfect simulated robot; any other ' +
-    'combination needs the ideas of the "smart bucket" program. The my-blocks "pick up" and "put down" ' +
-    'keep the script short.',
+    'bonus, in about 103 of the 180 seconds. It scores 180 ONLY on the default combination, from the default ' +
+    'start position and with the perfect simulated robot, because it drives by distance alone (no sensors). ' +
+    'On any other combination it does not: that needs the ideas of the "Smart bucket" program. ' +
+    'The my-blocks "pick up" and "put down" keep the script short.',
   program: program([
     note(define('pick up', [], [gripper('close'), arm('raise')]), 'Grip what is in the claw and lift it.'),
     note(
@@ -502,12 +504,15 @@ const fullMission: SampleProgram = {
 // The lists
 // =============================================================================================
 
-/** The programs of the sample menu (the menu groups them by level). */
+/**
+ * The six programs the tests know as "the samples". The Examples window shows these and the
+ * full mission below, in the order of ./sample-catalog.ts.
+ */
 export const SAMPLE_PROGRAMS: SampleProgram[] = [hello, lineFollow, gripperDemo, oneBucket, smartBucket, onePerson];
 
 /**
- * A complete solution of the default combination (180 points). Kept out of SAMPLE_PROGRAMS on
- * purpose; add it to a menu only if students are meant to see it.
+ * A complete solution of the default combination (180 points). Kept out of SAMPLE_PROGRAMS, as
+ * it always was; in the Examples window it is the seventh card.
  */
 export const FULL_MISSION_SAMPLE: SampleProgram = fullMission;
 

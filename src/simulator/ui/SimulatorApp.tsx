@@ -18,9 +18,10 @@ import { CombinationPanel } from './CombinationPanel';
 import { ConsolePanel } from './ConsolePanel';
 import { ControlBar } from './ControlBar';
 import { CyberPiPanel, HoldButton } from './CyberPiPanel';
-import { EditorToolbar, type ExampleProgram } from './EditorToolbar';
+import { EditorToolbar } from './EditorToolbar';
 import { formatNumber } from './format';
 import { CentreIcon, RotateLeftIcon, RotateRightIcon, RulesIcon, SensorsIcon, TestIcon, TrailIcon, ZonesIcon } from './icons';
+import type { ExampleProgram } from './member-unlock';
 import { blankProgram, hasRunnableScript, parseProgramFile, programFileName, serializeProgramFile } from './program-file';
 import type { StageOptions } from './render';
 import { ScoreSheet, StatusLine } from './ScoreSheet';
@@ -30,6 +31,7 @@ import { centredPose, headingDegrees, isPose, poseFits, rotatedPose } from './st
 import { PAGE_FRAME } from './page-frame';
 import { isRecord, loadJson, saveJson, storageKey } from './storage';
 import { TitleBar, titleBarButton } from './TitleBar';
+import { useMemberExamples, type ExamplesConfig } from './useMemberExamples';
 import { SPEEDS, useSimulation, type Speed } from './useSimulation';
 import { button, Section, toggleClass, usePopover } from './widgets';
 // The simulator's own stylesheet travels with the simulator: the browser fetches it together with
@@ -51,7 +53,12 @@ export interface SimulatorAppProps<S> {
   title: string;
   /** what the start zone is called in this category, e.g. "Fire Station" */
   startZoneName: string;
-  examples: ExampleProgram[];
+  /**
+   * The examples of the category: their ids, titles and levels, and where on this website the
+   * programs themselves are handed out (they are not part of the screen: see ./useMemberExamples.ts).
+   * Pass one object that stays the same between renders.
+   */
+  examples: ExamplesConfig;
   rules: RulesSection[];
   /** where the robot stands when nothing was saved (must fit the start zone) */
   initialStartPose: Pose;
@@ -126,6 +133,9 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
   const [editorReady, setEditorReady] = useState(false);
   const [editorStatus, setEditorStatus] = useState<EditorStatus>({ canUndo: false, canRedo: false, blocks: 0 });
   const rules = usePopover<HTMLDivElement>();
+  // which examples this visitor may load: the ones open to everyone, or all of them with a member code
+  const examples = useMemberExamples(storageKey(game.id, 'member-code'), props.examples);
+  const canLoadExamples = Object.keys(examples.available).length > 0;
 
   // ------------------------------------------------------------------ the block editor
   const editorRef = useRef<BlocklyEditorHandle | null>(null);
@@ -246,7 +256,11 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
     // a program with nothing under its yellow block ends in the same moment: say why
     const program = getProgram();
     if (program && !hasRunnableScript(program)) {
-      say('Nothing to run yet: snap blocks under the yellow "when CyberPi starts up" block, or open one of the Examples.');
+      say(
+        canLoadExamples
+          ? 'Nothing to run yet: snap blocks under the yellow "when CyberPi starts up" block, or open one of the Examples.'
+          : 'Nothing to run yet: snap blocks under the yellow "when CyberPi starts up" block, then press Start again.',
+      );
     }
   };
   const reset = () => {
@@ -386,7 +400,7 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
             canUndo={editorStatus.canUndo}
             canRedo={editorStatus.canRedo}
             blocks={editorStatus.blocks}
-            examples={props.examples}
+            examples={examples}
             onNew={onNew}
             onExample={onExample}
             onOpenFile={onOpenFile}
@@ -409,8 +423,14 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
               <p className="pointer-events-none absolute left-[10.75rem] right-10 top-28 z-10 max-w-sm text-sm leading-relaxed text-ink-500">
                 <span className="font-bold text-ink-700">Build your program here.</span> Click a group on the left (try{' '}
                 <span className="font-semibold text-ink-700">mBot2 Chassis</span>), drag a block out and snap it under the yellow block. Then press{' '}
-                <span className="font-semibold text-ink-700">Start</span>. Or open one of the <span className="font-semibold text-ink-700">Examples</span> to see how
-                it is done.
+                <span className="font-semibold text-ink-700">Start</span>.
+                {/* (only for a visitor who can open one: the examples are for members) */}
+                {canLoadExamples && (
+                  <>
+                    {' '}
+                    Or open one of the <span className="font-semibold text-ink-700">Examples</span> to see how it is done.
+                  </>
+                )}
               </p>
             )}
           </div>
