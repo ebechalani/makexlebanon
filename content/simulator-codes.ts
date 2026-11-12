@@ -1,11 +1,28 @@
 /**
- * Member codes for the examples of the Fire Rescue simulator.
+ * Codes for the examples of the Fire Rescue simulator.
  *
- * Every program in the simulator's Examples window is for registered members: it opens only
- * after a member has typed a code like FIRE-7K2M-9QXD. This file decides two things:
+ * The simulator's Examples window holds seven ready-made programs. This file decides who gets
+ * which of them. The examples are in three groups, and there are two kinds of codes:
  *
- *   1. which examples are open to everyone, without a code  (none, as long as the list is empty)
- *   2. which member codes work
+ *   GROUP                         WHO SEES THE CARD            WHO CAN OPEN IT
+ *   open to everyone              everybody                    everybody, without a code
+ *   for members                   everybody, with a lock       a member code, or an advanced code
+ *   for advanced codes only       nobody else                  an advanced code
+ *
+ * Both kinds of code look alike (FIRE-7K2M-9QXD) and are typed into the same field. A member
+ * code opens the examples for members. An advanced code opens every example. An example of the
+ * third group is hidden from everybody else: a visitor, and a member with an ordinary member
+ * code, do not see its card, its title or the heading above it - nothing tells them that it
+ * exists.
+ *
+ * The four things you decide here, in this order:
+ *
+ *   1. which examples are open to everyone, without a code   (now: the three starter examples)
+ *   2. which examples only an advanced code shows            (now: the two advanced examples)
+ *   3. which member codes work
+ *   4. which advanced codes work                             (at the very end of the file)
+ *
+ * An example that is on neither list 1 nor list 2 is "for members".
  *
  * Read "Member codes for the simulator examples" in README.md first. After every change:
  * save, commit and push. The change is live once Vercel has redeployed the site.
@@ -16,7 +33,7 @@
 // =====================================================================================
 
 /**
- * The examples anyone may open WITHOUT a member code. Empty = every example needs a code.
+ * The examples anyone may open WITHOUT a code. Empty = every example needs a code.
  *
  * To open an example to everyone, write its id between the square brackets, in quotes and
  * followed by a comma. The seven ids are:
@@ -39,20 +56,52 @@
  *     ];
  *
  * What adding an id does: every visitor sees that example as a normal card in the Examples
- * window, with its description and its "Load this example" button - no code needed. The other
- * examples stay locked. An id that is misspelt opens nothing. To lock an example again, take
- * its line out.
+ * window, with its description and its "Load this example" button - no code needed. An id
+ * that is misspelt opens nothing. To lock an example again, take its line out: it is then
+ * "for members" - shown to everybody with a lock, opened by a code.
+ *
+ * Do not write an id here that is also on list 2 below. If one is on both lists, the stricter
+ * rule wins: the example stays hidden.
  */
 export const examplesOpenToEveryone: string[] = [
-  // (empty: every example needs a member code)
+  // the three starter examples
+  'hello',
+  'line-follow',
+  'gripper-demo',
 ];
 
 // =====================================================================================
-//  2. THE MEMBER CODES
+//  2. EXAMPLES FOR ADVANCED CODES ONLY
 // =====================================================================================
 
 /**
- * The list of the codes that work.
+ * The examples that ONLY an advanced code shows. Everybody else - a visitor without a code,
+ * and a member with an ordinary member code - does not get to see that these examples exist:
+ * no card, no title, no "Advanced" heading.
+ *
+ * The ids are the same seven as above. To hide an example from everybody but the holders of
+ * an advanced code, write its id here. To show it to all members again (with a lock for
+ * visitors), take its line out.
+ *
+ * Empty = nothing is hidden: an advanced code then opens exactly what a member code opens.
+ *
+ * Mind the spelling. An id that is misspelt here would hide nothing - the example you meant
+ * would be shown to everybody. So the website refuses to be built with one: Vercel reports a
+ * failed build that names the line, and the site stays as it was until the line is put right.
+ */
+export const examplesForAdvancedCodesOnly: string[] = [
+  // the two advanced examples
+  'smart-bucket',
+  'full-mission',
+];
+
+// =====================================================================================
+//  3. THE MEMBER CODES
+// =====================================================================================
+
+/**
+ * The list of the member codes that work. A member code opens every example that is not on
+ * list 2 above.
  *
  * The codes themselves are NOT in this file, and must never be: this repository is public.
  * Each line holds the number of a code and its fingerprint - a row of letters and digits that
@@ -60,8 +109,8 @@ export const examplesOpenToEveryone: string[] = [
  * the CSV file that was written when they were made (No, Code, Given to). Keep that file
  * somewhere private, outside this folder.
  *
- * TO CANCEL ONE CODE: look up its number in your CSV file, find the line with that number
- * below (for code 37: "no: 37") and put two slashes in front of it:
+ * TO CANCEL ONE MEMBER CODE: look up its number in your CSV file, find the line with that
+ * number below (for code 37: "no: 37") and put two slashes in front of it:
  *
  *     // { no: 37, fingerprint: '...' },
  *
@@ -69,11 +118,15 @@ export const examplesOpenToEveryone: string[] = [
  * more, and a browser that had it saved locks the examples again on its next visit. Take the
  * two slashes away and the code works again.
  *
- * TO MAKE MORE CODES: never write lines by hand. Run
+ * (The advanced codes have a list of their own, at the very end of this file, with their own
+ * numbers. In your CSV files an advanced code is numbered A1, A2, A3 ... and a member code
+ * 1, 2, 3 ... - so "37" is always a line of THIS list, and "A37" never is.)
+ *
+ * TO MAKE MORE MEMBER CODES: never write lines by hand. Run
  *
  *     node scripts/generate-simulator-codes.mjs --count 50 --out ~/Documents/more-codes.csv
  *
- * It adds the new lines at the end, numbered on from the last one.
+ * It adds the new lines at the end of this list, numbered on from the last one.
  */
 export const simulatorCodes: { no: number; fingerprint: string }[] = [
   { no: 1, fingerprint: '1566bd6476aa12334a6cb7d345c4b8ec5f0e0ae236aab5ddeee6a4a2b15027b8' },
@@ -579,7 +632,95 @@ export const simulatorCodes: { no: number; fingerprint: string }[] = [
 ];
 
 /**
- * The number the next new code gets. The script keeps it up to date so that a number is never
- * given out twice, even after lines were deleted. Leave it alone.
+ * The number the next new member code gets. The script keeps it up to date so that a number is
+ * never given out twice, even after lines were deleted. Leave it alone.
  */
 export const nextSimulatorCodeNumber = 501;
+
+// =====================================================================================
+//  4. THE ADVANCED CODES
+// =====================================================================================
+
+/**
+ * The list of the advanced codes that work. An advanced code opens EVERY example: the ones
+ * for members, and the ones on list 2 above that nobody else gets to see.
+ *
+ * It works like the list of member codes: one line per code, with its number and its
+ * fingerprint - never the code itself. The plain codes are in the CSV file that was written
+ * when they were made. There they are numbered A1, A2, A3 ... (with an A in front), so that
+ * the two files cannot be mixed up. Each line below ends with that number.
+ *
+ * TO CANCEL ONE ADVANCED CODE: look up its number in your CSV file - say A7. Find the line of
+ * THIS list that starts with "{ no: 7," and ends with "// A7", and put two slashes in front
+ * of it:
+ *
+ *     // { no: 7, fingerprint: '...' }, // A7
+ *
+ * Deleting the line works too. (Mind the list: "{ no: 7," further up, in the list of member
+ * codes, is member code 7 - another code, of another person.) Once the site has been
+ * redeployed, a browser that had that code saved locks the examples again on its next visit.
+ *
+ * TO MAKE MORE ADVANCED CODES: never write lines by hand. Run the same script with --advanced:
+ *
+ *     node scripts/generate-simulator-codes.mjs --advanced --count 10 --out ~/Documents/more-advanced-codes.csv
+ *
+ * It adds the new lines at the end of this list, numbered on from the last one.
+ */
+export const advancedSimulatorCodes: { no: number; fingerprint: string }[] = [
+  { no: 1, fingerprint: 'afb25ee40a470e258bc91029028a1eea1532bc7bf23903e80a3aab024a16b963' }, // A1
+  { no: 2, fingerprint: '8af443ff08e12fa902684d1cf7451da3cb5f60e818dcf00be900c5d19b1daf0b' }, // A2
+  { no: 3, fingerprint: 'e8747e909f10d6f6b053256858694478decd2084db78a3f147ee53645ad66e3e' }, // A3
+  { no: 4, fingerprint: 'a7b81d0dba263c90a7a6697bb6a6c280452b3f68f43456acbfeaf053324c3d9b' }, // A4
+  { no: 5, fingerprint: '62f4f4c901f100d987d46962ea2f3054ad9b9f76280797f8ea26b805dcd74dd7' }, // A5
+  { no: 6, fingerprint: '5444cd6c7fe52c97f3f6f5e7f4741479abe786d515a4788a068e826f9ea818e1' }, // A6
+  { no: 7, fingerprint: '440c18cd4fb6558bb5d68b379cbd4fd3a23ed0e471d2800aa7d06f93ae172a23' }, // A7
+  { no: 8, fingerprint: '064e8043a170d16732fc4005a86f7a451ec0d6210043e00b16e0c39eb1a45ef9' }, // A8
+  { no: 9, fingerprint: 'fbcd87a326678c4f8e19385a1fe503719e976e3dbacbe51170fd855fb9556dd1' }, // A9
+  { no: 10, fingerprint: '0ae1619cafd6b57365d7bed3efd8a5cbaa3671c49a3343560ab4093a028e1542' }, // A10
+  { no: 11, fingerprint: 'd34c04846c872ae6381e04670cbc55c9ecc9905890c74a679b282505c5dbba2b' }, // A11
+  { no: 12, fingerprint: '35fe9cce8f92a270e7fcde126ca68523dfe28b3251fefdd221b05316642fcb4e' }, // A12
+  { no: 13, fingerprint: '0b85421ae3031128cdb1a82b8882f785020c92dd1d7499824bd1dee668444013' }, // A13
+  { no: 14, fingerprint: '02b6871fc767ff8d710fb0dfab907f0ee627fb08b0197d8dbf68ba3bb786e047' }, // A14
+  { no: 15, fingerprint: '25eeef362e4ee2df91e0940c2ad737eb21330e6ddabc7c9a477a3d87ccc85e1a' }, // A15
+  { no: 16, fingerprint: '228e3cebefa165961f5176e407460c1d88dc366bcb6aba5db7a6ecc43e9d1a73' }, // A16
+  { no: 17, fingerprint: 'b75009bd10981c28fbb8711ea17f859602ff43dd4d81986087acf3ead954bd38' }, // A17
+  { no: 18, fingerprint: '4140af01b6d283ca527b32ff569e7cbf71147005dd6ccda759a64e96926818d6' }, // A18
+  { no: 19, fingerprint: '22d846f5ce0ed92321aaea18cf28e563a63fcdd935fad733e5812be2a52c995b' }, // A19
+  { no: 20, fingerprint: 'a0dbf5504651d8f163b3aec3ab665cd4a8e9f82750f774f16f4e931f13d64c63' }, // A20
+  { no: 21, fingerprint: 'b92a9cf6ae4919cc45285a52681fb4d1d9e25df7f516851bd15fd638275aad20' }, // A21
+  { no: 22, fingerprint: 'ed852f9f3f15a935055092ba3088f38f909d0f5eed9d5e6f3ee0e925cbf1145c' }, // A22
+  { no: 23, fingerprint: '8ff360e1a47505c265eb63642c057f003543c35dc066c1294ff7bad37033cc8b' }, // A23
+  { no: 24, fingerprint: '8c6de017960827286780109bfeab8716ae2da9a26cc5ddccef4955124e6cbde0' }, // A24
+  { no: 25, fingerprint: 'af1bcae9725dbe366cd436a2809b3123e21d01c6803709f56ef9af65176e4d8d' }, // A25
+  { no: 26, fingerprint: '4ac01ad42bcefa88f8490b12b796c8a02395932d220ce3071abecfe8c00b0a66' }, // A26
+  { no: 27, fingerprint: '3bd5012a3c100f9bcf3444ffba06ea67d1d7f4fb526f9a0601b08f5b1493f615' }, // A27
+  { no: 28, fingerprint: '3498102ce2697038ae6c8a6fd197cacc4c7077c040a6756e3897cabfb7dca1c5' }, // A28
+  { no: 29, fingerprint: '2bf3c017c552af31c98e99b5314dabd34e0491b3f2bd89e39472cb4598d5e3b5' }, // A29
+  { no: 30, fingerprint: 'fbcb22424631b5349a8b3406d6fdcf3dd100799c98f8210fbecd4deb2b4a815c' }, // A30
+  { no: 31, fingerprint: '3417815fa9f75ac26cd92137fa33b56069c284a0e183710bbdcee52bae861f69' }, // A31
+  { no: 32, fingerprint: '04f6cb6fa41292f808bc76394377243711363809ff7155fc4704aa24401e5c66' }, // A32
+  { no: 33, fingerprint: '4ab4d19b2be9b578692935268c728cc93ba56e9b924a069a58ef6c63eebf3371' }, // A33
+  { no: 34, fingerprint: '4465506af47758b1d58d42ad37fe97b6bea65b1288caf30c96608f993690b4a5' }, // A34
+  { no: 35, fingerprint: 'd0078a046811f1d760c2ffe332931ae23c78db71484ff59406ccb29d71cc0c28' }, // A35
+  { no: 36, fingerprint: '7295de5b2a047cfc0589aeda332a1fa7bd59230701e83cf13bc1803072cc4084' }, // A36
+  { no: 37, fingerprint: '15f813423345d03dd413c8e4edd576b29b1459521fa5130770e231aa1c6da3ae' }, // A37
+  { no: 38, fingerprint: '823620dab68db7f9bb3eba144464230e4ea0ac8824b633af37e76258825b8971' }, // A38
+  { no: 39, fingerprint: 'c7a9da395cbea08422537f3dd0924668c320a0ac00b60ee25d73271acd1f9b74' }, // A39
+  { no: 40, fingerprint: '71d79d41dc1c9febe8e3f072f449f21643d453ec1efcfd758af2b5b48e331539' }, // A40
+  { no: 41, fingerprint: 'aa2f2b43f7397acfb375f950bd0b2d588f4d8cd3a942ee208d45b745bd2f6112' }, // A41
+  { no: 42, fingerprint: '51751910a34a60b3433e8dfae78ef28e5490678c4a4d51ab3a46e81d8b4bf512' }, // A42
+  { no: 43, fingerprint: '99d63070a130f6c7a37411bcfa321c6f9245935534862fea48179a442dd73dab' }, // A43
+  { no: 44, fingerprint: 'f9fec72e7b5701b06e00e06519a2f124831b7d6043bc530053f4beaac333cc6c' }, // A44
+  { no: 45, fingerprint: 'db5ae0e9aad15788a90d4c05d700a6b41629efa92982fa09a7928392cc94f91c' }, // A45
+  { no: 46, fingerprint: 'f1282a958ea770f543fb8b858ca5bbb101acd3c9def41fe305d6c72576b6508e' }, // A46
+  { no: 47, fingerprint: 'eafa0ac8e00db11a6334f15f1a8626118e41dc591bc6bc39e0c5aa9ddc583e3f' }, // A47
+  { no: 48, fingerprint: '9d3d0008eec8d5db436907a16b691cd720d1d42d8f9d8aa3792f935d028780e4' }, // A48
+  { no: 49, fingerprint: 'c65f3ea0faa20c4330f47e46798349b615e5163d84a86195b62e6f62a4b0ac1a' }, // A49
+  { no: 50, fingerprint: 'b130ddbc072fba0ffdb191903f331a10652fefd45c8b9daf0ad00f0b7ae5a787' }, // A50
+];
+
+/**
+ * The number the next new advanced code gets (A1 is 1, A2 is 2 ...). The script keeps it up
+ * to date so that a number is never given out twice. Leave it alone.
+ */
+export const nextAdvancedSimulatorCodeNumber = 51;

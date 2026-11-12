@@ -1,21 +1,27 @@
 /**
- * The server's side of the Examples window: decide what a visitor may have.
+ * The server's side of the Examples window: decide what a visitor may see and what they may open.
  *
- * Every example of the simulator is for registered members. A visitor's browser gets a program,
- * and the text that explains it, only from here - and only in two cases:
+ * A visitor's browser holds no example at all - no program, no text that explains one, not even
+ * a title. It gets all of that only from here, and how much depends on what the request carries:
  *
- *   - the request carries a member code that is on the list (content/simulator-codes.ts):
- *     the answer holds all the examples;
- *   - the request carries no code: the answer holds the examples the owner has opened to
- *     everyone ("examplesOpenToEveryone" in the same file) - none, as long as that list is empty.
+ *   - no code: the cards of the examples a visitor may SEE, and - to open - the examples the
+ *     owner has opened to everyone ("examplesOpenToEveryone" in content/simulator-codes.ts);
+ *   - a member code that is on the list ("simulatorCodes"): the same cards, all of them open;
+ *   - an advanced code that is on its list ("advancedSimulatorCodes"): every example.
+ *
+ * An example the owner keeps for advanced codes only ("examplesForAdvancedCodesOnly") is left
+ * out of the first two answers altogether: not its card, not its title, not the heading of its
+ * level when no other card stands under it. Nothing in those answers says that anything was
+ * left out, or that a second kind of code exists: the answer to a member code and the answer to
+ * an advanced code are made of the very same fields.
  *
  * It is written as one plain function, handleUnlockRequest(), that gets everything it needs as
- * arguments (the list of fingerprints, the examples, the clock), so the tests can try every
+ * arguments (the lists of fingerprints, the examples, the clock), so the tests can try every
  * case without a web server. The address of the website that calls it is
  * src/app/api/simulator/unlock/route.ts.
  *
  * What it promises:
- *  - a code that is not on the list gets "no" and nothing else - never an example;
+ *  - a code that is on neither list gets "no" and nothing else - never an example, never a title;
  *  - that "no" is the same few words whatever was wrong with the code: nobody can learn from
  *    the answers whether a code was close, or which numbers exist;
  *  - the codes themselves are never kept, only their fingerprints (./code-fingerprint.mjs);
@@ -54,21 +60,43 @@ function fingerprintBytes(codes: readonly CodeEntry[]): Buffer[] {
 }
 
 /**
- * True when the typed text is a code of the list.
+ * What a typed text is:
  *
- * The fingerprint of the typed code is compared with EVERY fingerprint of the list, each time
- * with a comparison that takes the same time whether the two agree or not: how long the answer
- * takes says nothing about the list.
+ *   'advanced'   a code of the list of advanced codes
+ *   'member'     a code of the list of member codes
+ *   null         neither (not on a list, cancelled, or not a code at all)
  */
-export async function isMemberCode(typed: unknown, codes: readonly CodeEntry[]): Promise<boolean> {
+export type CodeKind = 'advanced' | 'member' | null;
+
+/**
+ * Look a typed code up in the two lists.
+ *
+ * The fingerprint of the typed code is worked out once and then compared with EVERY fingerprint
+ * of BOTH lists, each time with a comparison that takes the same time whether the two agree or
+ * not: how long the answer takes says nothing about the lists, nor about which list a code is on.
+ * A code that is (by a slip while editing) on both lists counts as an advanced code.
+ */
+export async function kindOfCode(typed: unknown, memberCodes: readonly CodeEntry[], advancedCodes: readonly CodeEntry[]): Promise<CodeKind> {
   const characters = normalizeCode(typed);
-  if (characters === null) return false;
+  if (characters === null) return null;
   const mine = Buffer.from(await fingerprintOf(characters), 'hex');
-  let found = false;
-  for (const theirs of fingerprintBytes(codes)) {
-    if (timingSafeEqual(mine, theirs)) found = true;
+  let member = false;
+  let advanced = false;
+  for (const theirs of fingerprintBytes(memberCodes)) {
+    if (timingSafeEqual(mine, theirs)) member = true;
   }
-  return found;
+  for (const theirs of fingerprintBytes(advancedCodes)) {
+    if (timingSafeEqual(mine, theirs)) advanced = true;
+  }
+  return advanced ? 'advanced' : member ? 'member' : null;
+}
+
+/** No code at all: for the answers that look at one list only. */
+const NO_CODES: readonly CodeEntry[] = [];
+
+/** True when the typed text is a code of this one list (see kindOfCode). */
+export async function isMemberCode(typed: unknown, codes: readonly CodeEntry[]): Promise<boolean> {
+  return (await kindOfCode(typed, codes, NO_CODES)) === 'member';
 }
 
 // =============================================================================================
@@ -201,11 +229,26 @@ export class AttemptLimiter {
 /** A request may be this large at most (a code in JSON is about 30 bytes). */
 export const MAX_BODY_BYTES = 512;
 
-/** An example as it is sent to the browser. */
-export interface UnlockedExample {
+/** The heading over the cards of one level, as it is sent to the browser. */
+export interface LevelHeading {
+  /** the name the cards refer to: "starter" */
+  id: string;
+  /** the word on the coloured label: "Starter" */
+  title: string;
+  /** the few words after it: what the examples of this level are about */
+  about: string;
+}
+
+/** A card as it is sent to the browser: an example this visitor may see. */
+export interface VisibleCard {
   id: string;
   title: string;
+  /** the id of its level (see LevelHeading) */
   level: string;
+}
+
+/** An example as it is sent to the browser: one this visitor may open. */
+export interface UnlockedExample extends VisibleCard {
   /** what the program does and when it works */
   description: string;
   /** the blocks (what Blockly.serialization.workspaces.save() writes) */
@@ -215,7 +258,7 @@ export interface UnlockedExample {
 /**
  * Why a request was refused. Deliberately few and vague:
  *
- *   invalid-code        the code is not on the list (never typed right, cancelled, or not a code at all)
+ *   invalid-code        the code is on neither list (never typed right, cancelled, or not a code at all)
  *   bad-request         the request is not `{ "code": "..." }` or `{}`, or it does not say that it is JSON
  *   too-large           the request is larger than MAX_BODY_BYTES
  *   too-many-attempts   too many wrong codes from this address: wait a moment (see Retry-After) and try again
@@ -226,9 +269,13 @@ export type UnlockRefusal = 'invalid-code' | 'bad-request' | 'too-large' | 'too-
 export type UnlockAnswer =
   | {
       ok: true;
-      /** true: the code is on the list. false: there was no code */
+      /** true: the code is on a list. false: there was no code */
       member: boolean;
-      /** member: every example. Not a member: the examples that are open to everyone (often none) */
+      /** the headings of the levels that have a card below, in the order of the Examples window */
+      levels: LevelHeading[];
+      /** every example this visitor may SEE, in the order of the Examples window: enough to draw its card */
+      cards: VisibleCard[];
+      /** the examples this visitor may OPEN: with a code every card, without one those open to everyone (often none) */
       examples: UnlockedExample[];
     }
   | { ok: false; reason: UnlockRefusal };
@@ -251,15 +298,57 @@ export interface UnlockResponse {
 }
 
 export interface UnlockSetup {
-  /** the list of content/simulator-codes.ts */
+  /** the list of member codes ("simulatorCodes" in content/simulator-codes.ts) */
   codes: readonly CodeEntry[];
+  /** the list of advanced codes ("advancedSimulatorCodes") */
+  advancedCodes: readonly CodeEntry[];
   /** every example with its description and its program, in the order of the Examples window */
   examples: readonly UnlockedExample[];
-  /** ids of the examples anyone may have without a code ("examplesOpenToEveryone"); ids that do not exist are ignored */
+  /** the headings of the levels, in the order of the Examples window */
+  levels: readonly LevelHeading[];
+  /** ids of the examples anyone may open without a code ("examplesOpenToEveryone"); ids that do not exist are ignored */
   openToEveryone: readonly string[];
+  /**
+   * ids of the examples that only an advanced code shows ("examplesForAdvancedCodesOnly"); ids
+   * that do not exist are ignored. An id that is also in `openToEveryone` stays hidden: the
+   * stricter rule wins.
+   */
+  advancedOnly: readonly string[];
   limiter?: AttemptLimiter;
   /** the clock, in milliseconds (the tests bring their own) */
   now?: () => number;
+}
+
+/**
+ * What is wrong with the owner's lists in a way that must not go live: every line of
+ * "examplesForAdvancedCodesOnly" that is not the id of an example.
+ *
+ * Answering a request, such a line simply hides nothing (see handleUnlockRequest). But that is
+ * the dangerous direction: 'smart-buckett' instead of 'smart-bucket' - or an example whose id
+ * was changed in sample-catalog.ts and not here - and the example the owner believes hidden is
+ * shown to every visitor. So the website's address (src/app/api/simulator/unlock/route.ts)
+ * asks this function once, when the site is built, and refuses to be built while it names
+ * anything: the site then stays as it was until the line is put right.
+ *
+ * (A misspelt id in "examplesOpenToEveryone" is harmless - the example stays locked - and an id
+ * on both lists stays hidden; the tests point both out, the website is built all the same.)
+ *
+ * Gives the mistakes in plain words, one text each; none when all is well. The texts name only
+ * what the owner wrote, never an example.
+ */
+export function mistakesInSetup(setup: Pick<UnlockSetup, 'examples' | 'advancedOnly'>): string[] {
+  const ids = new Set(setup.examples.map((example) => example.id));
+  const mistakes: string[] = [];
+  if (!Array.isArray(setup.advancedOnly)) return ['"examplesForAdvancedCodesOnly" is not a list any more: it must be [ ... ] with one id per line.'];
+  for (const id of setup.advancedOnly) {
+    if (typeof id !== 'string' || !ids.has(id)) {
+      mistakes.push(
+        `"examplesForAdvancedCodesOnly" holds ${typeof id === 'string' ? `'${id}'` : 'a line that is not an id in quotes'}, which is not the id of an example - so the example it was meant for would NOT be hidden. ` +
+          'Compare it, letter by letter, with the ids listed at the top of content/simulator-codes.ts.',
+      );
+    }
+  }
+  return mistakes;
 }
 
 /** Never keep an answer anywhere: not in the browser, not in between. */
@@ -269,15 +358,24 @@ function refuse(status: number, reason: UnlockRefusal, headers: Record<string, s
   return { status, headers: { ...NO_STORE, ...headers }, body: { ok: false, reason } };
 }
 
-function hand(member: boolean, examples: readonly UnlockedExample[]): UnlockResponse {
+/**
+ * The answer "yes": what this visitor may see, and what of it they may open.
+ *
+ * @param visible  the examples whose cards are shown
+ * @param open     the ones of them that can be opened (a part of `visible`)
+ */
+function hand(member: boolean, visible: readonly UnlockedExample[], open: readonly UnlockedExample[], levels: readonly LevelHeading[]): UnlockResponse {
   return {
     status: 200,
     headers: { ...NO_STORE },
     body: {
       ok: true,
       member,
-      // (copied field by field: nothing but these five ever leaves the server)
-      examples: examples.map(({ id, title, level, description, program }) => ({ id, title, level, description, program })),
+      // (everything is copied field by field: nothing but these ever leaves the server)
+      // a heading goes out only together with a card of its level
+      levels: levels.filter((level) => visible.some((example) => example.level === level.id)).map(({ id, title, about }) => ({ id, title, about })),
+      cards: visible.map(({ id, title, level }) => ({ id, title, level })),
+      examples: open.map(({ id, title, level, description, program }) => ({ id, title, level, description, program })),
     },
   };
 }
@@ -318,14 +416,24 @@ function sentCode(body: string): string | 'bad' {
 /**
  * Answer one request to /api/simulator/unlock.
  *
- *   POST {}                               ->  200  { ok: true, member: false, examples: [ the ones open to everyone ] }
+ *   POST {}                               ->  200  { ok: true, member: false, levels, cards, examples }
+ *                                                  cards: what a visitor may see; examples: the ones open to everyone
  *   POST { "code": "FIRE-7K2M-9QXD" }
- *     code on the list                    ->  200  { ok: true, member: true,  examples: [ all of them ] }
- *     code not on the list                ->  403  { ok: false, reason: "invalid-code" }       never any example
+ *     a member code of the list           ->  200  { ok: true, member: true, levels, cards, examples }
+ *                                                  the same cards, and every one of them as an example
+ *     an advanced code of its list        ->  200  { ok: true, member: true, levels, cards, examples }
+ *                                                  every example there is
+ *     a code on neither list              ->  403  { ok: false, reason: "invalid-code" }       never any example
  *     too many wrong codes just now       ->  429  { ok: false, reason: "too-many-attempts" }  the code was not looked at
  *   anything that is not such a request   ->  4xx  { ok: false, reason }                        never any example
  *
- * An example is { id, title, level, description, program }.
+ * A level is { id, title, about }, a card { id, title, level }, an example
+ * { id, title, level, description, program }.
+ *
+ * The examples kept for advanced codes only are in the third answer and in no other: the first
+ * two do not hold their cards, and do not say that there are any. The second and the third
+ * answer have the same shape, so nothing in a member's answer gives away that another kind of
+ * code exists.
  */
 export async function handleUnlockRequest(request: UnlockRequest, setup: UnlockSetup): Promise<UnlockResponse> {
   if (request.method !== 'POST') return refuse(405, 'method-not-allowed', { Allow: 'POST' });
@@ -336,16 +444,22 @@ export async function handleUnlockRequest(request: UnlockRequest, setup: UnlockS
   const code = sentCode(request.body);
   if (code === 'bad') return refuse(400, 'bad-request');
 
-  // ---- no code: only what the owner has opened to everyone
+  // what everybody without an advanced code may see: every example that is not kept for advanced codes
+  const hidden = new Set(setup.advancedOnly);
+  const forMembers = setup.examples.filter((example) => !hidden.has(example.id));
+
+  // ---- no code: the members' cards, and to open only what the owner has opened to everyone
   if (code === '') {
     const open = new Set(setup.openToEveryone);
     return hand(
       false,
-      setup.examples.filter((example) => open.has(example.id)),
+      forMembers,
+      forMembers.filter((example) => open.has(example.id)),
+      setup.levels,
     );
   }
 
-  // ---- a code: all the examples, or nothing
+  // ---- a code: the examples of its kind, or nothing
   // (text that cannot be a code needs no working out: the answer is the same "no")
   if (normalizeCode(code) === null) return refuse(403, 'invalid-code');
 
@@ -353,8 +467,10 @@ export async function handleUnlockRequest(request: UnlockRequest, setup: UnlockS
   const turn = setup.limiter && request.client !== null ? setup.limiter.admit(request.client, (setup.now ?? Date.now)()) : FREE_TURN;
   if (turn.wait > 0) return refuse(429, 'too-many-attempts', { 'Retry-After': String(turn.wait) });
 
-  if (!(await isMemberCode(code, setup.codes))) return refuse(403, 'invalid-code');
+  const kind = await kindOfCode(code, setup.codes, setup.advancedCodes);
+  if (kind === null) return refuse(403, 'invalid-code');
   // a right code never counts
   turn.giveBack();
-  return hand(true, setup.examples);
+  const theirs = kind === 'advanced' ? setup.examples : forMembers;
+  return hand(true, theirs, theirs, setup.levels);
 }

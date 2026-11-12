@@ -1,13 +1,16 @@
 /**
  * POST /api/simulator/unlock - the one door through which the example programs of the Fire
- * Rescue simulator, and the texts that explain them, leave the server.
+ * Rescue simulator, their titles and the texts that explain them leave the server.
  *
  *   request    {}                                 no code
- *   200        { "ok": true, "member": false, "examples": [ ... ] }   the examples that are open to everyone (often none)
+ *   200        { "ok": true, "member": false, "levels": [ ... ], "cards": [ ... ], "examples": [ ... ] }
+ *              cards: the examples a visitor may see; examples: the ones that are open to everyone (often none)
  *
- *   request    { "code": "FIRE-7K2M-9QXD" }       a member code
- *   200        { "ok": true, "member": true, "examples": [ ... ] }    the code is on the list: all the examples
- *   403        { "ok": false, "reason": "invalid-code" }              the code is not on the list
+ *   request    { "code": "FIRE-7K2M-9QXD" }       a code
+ *   200        { "ok": true, "member": true, "levels": [ ... ], "cards": [ ... ], "examples": [ ... ] }
+ *              a member code of the list: the same cards, every one of them as an example
+ *              an advanced code of its list: every example there is
+ *   403        { "ok": false, "reason": "invalid-code" }              the code is on neither list
  *
  *   400        { "ok": false, "reason": "bad-request" }               not such a request
  *   415        { "ok": false, "reason": "bad-request" }               a request with a text that does not say "Content-Type: application/json"
@@ -15,19 +18,23 @@
  *   413        { "ok": false, "reason": "too-large" }
  *   429        { "ok": false, "reason": "too-many-attempts" }         too many wrong codes just now: wait a moment (Retry-After) and try again
  *
- * An example is { id, title, level, description, program }. A refusal never carries one.
+ * A level is { id, title, about }, a card { id, title, level }, an example
+ * { id, title, level, description, program }. A refusal never carries one. The examples kept
+ * for advanced codes only are in the answer to an advanced code and in no other - not even as
+ * a card.
  *
  * Everything that decides is in src/simulator/members/unlock.ts, where it is tested; this file
  * only reads the request and sends the answer. No database, no cookies; every answer is marked
  * "Cache-Control: no-store".
  *
- * The list of codes and the list of examples that are open to everyone are in
- * content/simulator-codes.ts. Both are built into the site when it is deployed: cancelling a
- * code or opening an example means changing that file and pushing it.
+ * The two lists of codes, the list of examples that are open to everyone and the list of
+ * examples for advanced codes only are in content/simulator-codes.ts. All four are built into
+ * the site when it is deployed: cancelling a code or moving an example means changing that file
+ * and pushing it.
  */
-import { examplesOpenToEveryone, simulatorCodes } from '@content/simulator-codes';
-import { ALL_EXAMPLES } from '@/simulator/members/all-examples';
-import { AttemptLimiter, handleUnlockRequest, MAX_BODY_BYTES, type UnlockResponse } from '@/simulator/members/unlock';
+import { advancedSimulatorCodes, examplesForAdvancedCodesOnly, examplesOpenToEveryone, simulatorCodes } from '@content/simulator-codes';
+import { ALL_EXAMPLES, ALL_LEVELS } from '@/simulator/members/all-examples';
+import { AttemptLimiter, handleUnlockRequest, MAX_BODY_BYTES, mistakesInSetup, type UnlockResponse, type UnlockSetup } from '@/simulator/members/unlock';
 
 /** It hashes with "node:crypto", so it runs on the Node.js runtime ... */
 export const runtime = 'nodejs';
@@ -88,7 +95,27 @@ function send(answer: UnlockResponse): Response {
 }
 
 /** For the answers that never look at a code or an example. */
-const EMPTY_SETUP = { codes: [], examples: [], openToEveryone: [] };
+const EMPTY_SETUP: UnlockSetup = { codes: [], advancedCodes: [], examples: [], levels: [], openToEveryone: [], advancedOnly: [] };
+
+/** What the owner decided (content/simulator-codes.ts), and the examples themselves. */
+const SETUP: UnlockSetup = {
+  codes: simulatorCodes,
+  advancedCodes: advancedSimulatorCodes,
+  examples: ALL_EXAMPLES,
+  levels: ALL_LEVELS,
+  openToEveryone: examplesOpenToEveryone,
+  advancedOnly: examplesForAdvancedCodesOnly,
+  limiter,
+};
+
+/**
+ * A slip in the list of examples for advanced codes only must never go live: a misspelt id
+ * there hides nothing, and the example it was meant for would be shown to every visitor. This
+ * line runs when the site is built (and whenever the server starts): with such a slip the
+ * build fails, Vercel reports it with the text below, and the website stays as it was.
+ */
+const mistakes = mistakesInSetup(SETUP);
+if (mistakes.length > 0) throw new Error(`content/simulator-codes.ts must be put right before the website can be built. ${mistakes.join(' ')}`);
 
 export async function POST(request: Request): Promise<Response> {
   let body: string;
@@ -100,12 +127,7 @@ export async function POST(request: Request): Promise<Response> {
     // the connection broke while the request was read: there is nothing to answer to
     return send({ status: 400, headers: { 'Cache-Control': 'no-store' }, body: { ok: false, reason: 'bad-request' } });
   }
-  return send(
-    await handleUnlockRequest(
-      { method: 'POST', body, contentType: request.headers.get('content-type'), client: clientAddress(request) },
-      { codes: simulatorCodes, examples: ALL_EXAMPLES, openToEveryone: examplesOpenToEveryone, limiter },
-    ),
-  );
+  return send(await handleUnlockRequest({ method: 'POST', body, contentType: request.headers.get('content-type'), client: clientAddress(request) }, SETUP));
 }
 
 /** Every other method gets a plain "405 Method Not Allowed"; the request is not even read. */

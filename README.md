@@ -249,8 +249,9 @@ https://www.makexlebanon.com/training/simulator/fire-rescue
 
 (`/training/simulator` on its own leads to the same page.) Nothing is installed, and the
 student's blocks are saved in their own browser — they are never sent anywhere. The one thing
-the simulator asks the website's server for is the ready-made examples, which are for
-registered members: see "Member codes for the simulator examples" below.
+the simulator asks the website's server for is the ready-made examples: the server decides,
+visitor by visitor, which of them to show and to open. See "Member codes for the simulator
+examples" below.
 
 Visitors reach it from the **Training** menu, the Training page, the Fire Rescue category page
 and the Season 2027 block on the homepage; the Season 2027 page marks the category with an
@@ -271,8 +272,8 @@ the Blockly library.
 | `src/simulator/vm/` | The interpreter that runs a block program, one block at a time |
 | `src/simulator/blocks/` | The block language: every block, its colour and its place in the palette |
 | `src/simulator/fire-rescue/` | Everything specific to this category: the mat, the combinations, the referee, the example programs |
-| `src/simulator/members/` | The member codes: what a code looks like, its fingerprint, and the check the server makes |
-| `src/app/api/simulator/unlock/` | The address on the website that checks a member code and hands out the examples |
+| `src/simulator/members/` | The codes (member codes and advanced codes): what a code looks like, its fingerprint, and the check the server makes |
+| `src/app/api/simulator/unlock/` | The address on the website that checks a code and hands out the examples a visitor may see |
 | `src/simulator/ui/` | What you see: the screen, its buttons and panels, the drawing of the mat, and its stylesheet (`simulator.css`) |
 | `src/app/training/simulator/` | The page itself: its address, title and description |
 | `public/simulator/fire-rescue/` | The two pictures of the mat: `mat.webp` is the one shown, `mat-sensor.webp` is the one the line sensor reads |
@@ -283,8 +284,8 @@ the Blockly library.
 | To change… | Edit |
 | --- | --- |
 | The programs in the **Examples** window, and the texts that explain them | `src/simulator/fire-rescue/samples.ts` |
-| The title or the level of an example | `src/simulator/fire-rescue/sample-catalog.ts` |
-| Who may open the examples: the member codes, and the examples open to everyone | `content/simulator-codes.ts` — see the next section |
+| The title or the level of an example, and the headings "Starter", "Intermediate", "Advanced" | `src/simulator/fire-rescue/sample-catalog.ts` |
+| Who may see and open the examples: the member codes, the advanced codes, and which example belongs to which group | `content/simulator-codes.ts` — see the next section |
 | What the **Examples** window says about member codes (the hint under the field, "That code did not open the examples", …) | `src/simulator/ui/examples-words.ts` |
 | The measurements of the mat (zones, lines, tower squares, sizes of the elements) | `src/simulator/fire-rescue/field.ts` |
 | The scoring (points, bonus, penalties, what counts as delivered) | `src/simulator/fire-rescue/game.ts` |
@@ -297,76 +298,183 @@ the second is only the summary students read. Change both when a rule changes.
 
 ### Member codes for the simulator examples
 
-Every program in the simulator's **Examples** window is for registered members. A visitor
-without a code sees that the examples exist — their titles, each with a lock and "Members
-only" — but cannot read or load them. The programs and the texts that explain them are not
-part of what a browser downloads: the website's server hands them out only after it has
-checked a member code.
+The simulator's **Examples** window holds seven ready-made programs. They are in three
+groups, and there are two kinds of codes:
 
-**How a member unlocks them.** In the simulator: **Examples**, type the code under "I have a
-member code", **Unlock**. A code looks like `FIRE-7K2M-9QXD`; capitals, dashes and spaces do
-not matter. The cards open at once, with their descriptions and a "Load this example" button.
-The browser remembers the code, so a member types it once per device, and the simulator checks
-it with the server again on every visit. "Forget this code on this device", in the same window,
-removes it — useful on a shared computer.
+| Group | Now in it | Who sees the card | Who can open it |
+| --- | --- | --- | --- |
+| **Open to everyone** | the three starter examples | everybody | everybody, without a code |
+| **For members** | the two intermediate examples | everybody — with a lock and "Members only" | a **member code** or an advanced code |
+| **For advanced codes only** | the two advanced examples | nobody else | an **advanced code** |
 
-Everything you decide about the codes is in one file, **`content/simulator-codes.ts`**. After
-any change to it: save, commit and push. The change is live once Vercel has redeployed.
+So there are three kinds of visitor:
 
-| To… | Do this in `content/simulator-codes.ts` |
+- **No code.** Three open cards, two locked ones. Nothing else.
+- **A member code** (one of the 500 you already have). Five open cards. Nothing else.
+- **An advanced code.** All seven cards, under the headings Starter, Intermediate and Advanced.
+
+An example of the third group is *hidden*, not locked. A visitor, and a member with an ordinary
+member code, do not see its card, its title, the "Advanced" heading or a count — nothing on
+the screen, and nothing in what their browser downloads, tells them that there is more. Not
+one word about the examples is part of the pages themselves: the website's server sends each
+browser the cards it may show, and it sends an advanced example only after it has checked an
+advanced code.
+
+**The two kinds of code look the same.** Both look like `FIRE-7K2M-9QXD` and are typed into the
+same field. What makes a code a member code or an advanced code is the list it is on in
+`content/simulator-codes.ts`. To tell them apart in your own files, the script numbers member
+codes `1, 2, 3 …` and advanced codes `A1, A2, A3 …`.
+
+**How somebody uses a code.** In the simulator: **Examples**, type the code under "I have a
+member code", **Unlock**. Capitals, dashes and spaces do not matter. The cards open at once,
+with their descriptions and a "Load this example" button. The browser remembers the code, so
+it is typed once per device, and the simulator checks it with the server again on every visit.
+
+- **A member who gets an advanced code later** presses **Use a different code** in the same
+  window and types the new one. Nothing has to be forgotten first. If the new code is
+  accepted it takes the place of the old one; if it is not — a typing mistake — everything
+  stays as it was.
+- **"Forget this code on this device"**, in the same window, removes the code from the
+  browser — useful on a shared computer.
+
+#### What you change, and where
+
+Everything you decide is in one file, **`content/simulator-codes.ts`**. It has four parts, in
+this order, each with its own explanation:
+
+1. `examplesOpenToEveryone` — the examples that need no code
+2. `examplesForAdvancedCodesOnly` — the examples only an advanced code shows
+3. `simulatorCodes` — the member codes (a long list)
+4. `advancedSimulatorCodes` — the advanced codes (at the very end of the file)
+
+After any change: save, commit and push. The change is live once Vercel has redeployed.
+
+**Moving an example between the three groups.** Every example has an id; the seven ids are
+listed at the top of the file (`'hello'`, `'line-follow'`, `'gripper-demo'`, `'one-bucket'`,
+`'one-person'`, `'smart-bucket'`, `'full-mission'`). An example is in a group because of the
+list its id is on:
+
+| To put an example into the group… | Its id must be… |
 | --- | --- |
-| **Open an example to everyone** | Write its id into the list `examplesOpenToEveryone` at the top of the file, for example `'hello',`. The seven ids are listed right above it. Every visitor then gets that example as a normal card, without a code; the others stay locked. The list is empty now: every example needs a code. |
-| **Lock it again** | Take that line out. |
-| **Cancel one code** | Look up the code's number in your CSV file. In the list `simulatorCodes`, find the line with that number — for code 37 the line that starts with `{ no: 37,` — and delete it, or put `//` in front of it. That code then opens nothing, and a browser that had it saved locks the examples again on its next visit. The other codes are not affected. |
-| **Make more codes** | Do not write lines by hand: run the script below. |
+| **Open to everyone** | on list 1 (`examplesOpenToEveryone`), and not on list 2 |
+| **For members** | on neither list |
+| **For advanced codes only** | on list 2 (`examplesForAdvancedCodesOnly`), and not on list 1 |
+
+To add an id to a list, write it on a line of its own between the square brackets, in quotes
+and followed by a comma — `'one-bucket',`. To take it off, delete that line. Three examples:
+
+- *Show "Smart bucket" to all members* (locked for visitors): delete the line `'smart-bucket',`
+  from list 2.
+- *Open "Deliver one bucket" to everyone*: add the line `'one-bucket',` to list 1.
+- *Hide "Rescue one person" from everybody without an advanced code*: add the line
+  `'one-person',` to list 2.
+
+If an id ends up on both lists, the stricter rule wins — the example stays hidden — and the
+tests fail and name it (see "Run its tests after every change"). If list 2 is empty, nothing
+is hidden, and an advanced code opens exactly what a member code opens.
+
+Mind the spelling of an id. A misspelt id on list 1 opens nothing; the tests point it out. A
+misspelt id on **list 2** would hide nothing — the example you meant to hide would be shown
+to everybody — so the website refuses to be built with one: Vercel reports a **failed build**,
+its log names the line, and the website stays exactly as it was until you correct the line
+and push again.
+
+**Cancelling a code.** Look the code up in your CSV file and note its number.
+
+| The number in your CSV file | The line to cancel in `content/simulator-codes.ts` |
+| --- | --- |
+| a plain number — for example **37** (a member code) | in the list `simulatorCodes`: the line that starts with `{ no: 37,` |
+| a number with an A — for example **A7** (an advanced code) | in the list `advancedSimulatorCodes`, at the end of the file: the line that starts with `{ no: 7,` and ends with `// A7` |
+
+Delete that line, or put `//` in front of it. That code then opens nothing, and a browser that
+had it saved locks the examples again on its next visit. The other codes are not affected.
+
+Mind the list. Both lists have a line `{ no: 7,` — one is member code 7, the other is advanced
+code A7, and they belong to two different people. The surest way to find an advanced code is
+to search the file for its number with the two slashes in front: `// A7`.
+
+A person whose advanced code you cancel has no code any more. If they should go on as an
+ordinary member, give them a member code.
 
 After pushing, check that Vercel reports the deployment as done. If it reports a failed build
 — a missing comma or quote in the file is enough — nothing has changed on the website yet: a
-code you cancelled still works until the file is fixed and pushed again.
+code you cancelled still works, and an example you hid is still shown, until the file is fixed
+and pushed again.
 
-**Making codes.**
+#### Making codes
+
+Do not write lines into the lists by hand: run the script. For **member codes**:
 
 ```bash
-node scripts/generate-simulator-codes.mjs --count 500 --out ~/Documents/makex-simulator-codes.csv
+node scripts/generate-simulator-codes.mjs --count 50 --out ~/Documents/makex-member-codes-2.csv
 ```
 
-This draws 500 new codes and does two things. It writes the codes to the CSV file you named,
+For **advanced codes**, the same script with `--advanced`:
+
+```bash
+node scripts/generate-simulator-codes.mjs --advanced --count 10 --out ~/Documents/makex-advanced-codes.csv
+```
+
+Each run draws new codes and does two things. It writes the codes to the CSV file you named,
 with the columns `No`, `Code` and `Given to` — open it in Excel and note who got which code.
-And it adds one line per code to the list in `content/simulator-codes.ts`; nothing else in
-that file is touched. Then commit and push `content/simulator-codes.ts`.
+And it adds one line per code to one list in `content/simulator-codes.ts`: the member list,
+or with `--advanced` the advanced list. Nothing else in that file is touched. The screen says
+which kind was made. Then commit and push `content/simulator-codes.ts`.
 
 - The CSV file **must be outside this folder** — the script refuses anything else — and the
-  script never overwrites a file, so give every run a new file name.
-- Run it again whenever you need more: the new lines are added at the end and the numbers go
-  on from the last one, also when lines were deleted in between.
-- `--replace` empties the list first and starts again at number 1. **Every code handed out
-  before stops working.** Use it only to start over.
+  script never overwrites a file, so give every run a new file name. Keep the files of the
+  two kinds apart: put "member" or "advanced" in the name. Inside, the numbers tell you
+  (`12` is a member code, `A12` an advanced code).
+- Run it again whenever you need more: the new lines are added at the end of that list and
+  the numbers go on from its last one, also when lines were deleted in between.
+- `--replace` empties one list first and starts it again at number 1: the member list, or
+  with `--advanced` the advanced list. The other list is not touched. **Every code of that
+  kind handed out before stops working.** Use it only to start over.
 - The codes are not shown on the screen. If you want to see them there as well, add
   `--print-codes`.
+- A new code is never one that is already on either list.
+- If the script answers that the file "does not look like the list this script writes", a
+  line of one of the two lists of codes was damaged while editing (a lost quote or bracket,
+  for instance). It then changes nothing and writes no CSV file. Undo your last edit of
+  `content/simulator-codes.ts` and run it again.
 
 **Never commit the plain codes.** `content/simulator-codes.ts` holds only *fingerprints*: rows
 of letters and digits worked out from the codes, from which a code cannot be read back. The
-CSV file is the only place where the codes themselves exist. Keep it somewhere private, keep a
-copy of it, and never put it in this folder, in a commit or in an issue — this repository is
-public. (As a safety net, `.gitignore` leaves out any `.csv` file with "codes" in its name.)
+CSV files are the only place where the codes themselves exist. Keep them somewhere private,
+keep a copy of them, and never put them in this folder, in a commit or in an issue — this
+repository is public. (As a safety net, `.gitignore` leaves out any `.csv` file with "codes"
+in its name.)
 
-**What the lock does not do** — the honest limits:
+#### What the lock does not do
 
-- **The repository is public on GitHub.** Anyone who looks there can read the example programs
-  in `src/simulator/fire-rescue/samples.ts`. The lock keeps the examples out of the website,
-  not out of GitHub. If that ever matters, the repository has to be made private.
-- **A member can pass things on**: their code, or a loaded example saved as a file (the
-  **Save** button), which anyone can open with **Open**. One code per member keeps this in
-  check — when a code gets around, cancel that one code.
-- **A shared computer remembers.** Once a member has unlocked the examples in a browser, they
-  stay open for everybody who uses that browser on that computer afterwards — until somebody
-  presses "Forget this code on this device", or you cancel the code. On school computers, ask
-  members to press it when they are done.
+The honest limits:
+
+- **The repository is public on GitHub.** Anyone who looks there can read every example
+  program in `src/simulator/fire-rescue/samples.ts` — the advanced ones too — and can read in
+  `content/simulator-codes.ts` which examples are kept for advanced codes. The lock and the
+  hiding keep the examples out of the *website*, not out of GitHub. If that ever matters, the
+  repository has to be made private.
+- **Somebody with a code can pass things on**: the code itself, or a loaded example saved as a
+  file (the **Save** button), which anyone can open with **Open**. One code per person keeps
+  this in check — when a code gets around, cancel that one code. Give advanced codes only to
+  people you trust with the advanced programs.
+- **A shared computer remembers.** Once somebody has typed a code in a browser, the examples
+  stay open — the advanced ones too, if it was an advanced code — for everybody who uses that
+  browser on that computer afterwards, until somebody presses "Forget this code on this
+  device", or you cancel the code. On school computers, ask people to press it when they are
+  done.
+- **Forgetting a code does not empty the workspace.** A program that was loaded stays in the
+  blocks — and is saved in that browser — until somebody presses **New** or loads something
+  else. That goes for an advanced example as well.
+- **A member can notice the field.** The window offers "Use a different code" to everybody
+  whose examples are open. That is all it says: it does not say what another code would open,
+  or that there is another kind.
 - **The fingerprints are public too**, and a code is short. With 500 codes on the list, one
-  fast graphics card that tries codes against the fingerprints finds *a* working code in
-  about half a day (it cannot aim at a particular member's code, and you cannot tell which
-  one it found). All such a code opens is the programs that are already in this public
-  repository.
+  fast graphics card that tries codes against the fingerprints finds *a* working member code
+  in about half a day (it cannot aim at a particular person's code, and you cannot tell which
+  one it found). The advanced list is much shorter, so finding an advanced code that way
+  takes correspondingly longer — weeks rather than hours for a list of ten. All such a code
+  opens is the programs that are already in this public repository.
 - **The limit on wrong codes is a courtesy**, not a wall. After a hundred wrong codes within
   ten minutes from one network — a school, for instance — the server checks only one code per
   second from that network, and answers "wait a moment" in between. Nobody is locked out
@@ -379,13 +487,14 @@ public. (As a safety net, `.gitignore` leaves out any `.csv` file with "codes" i
 npm run test:sim
 ```
 
-It runs more than three hundred and fifty checks; among them, every example program is played
-on the real engine with the real referee and its score is compared. They also check
-`content/simulator-codes.ts` (a misspelt example id, a damaged line) and that no example can
-slip back into what every visitor's browser downloads. It takes around fifteen seconds and
-must end with `fail 0`. If it does not, do not deploy — a failing test means a program would
-now score differently, a block would behave differently, or the examples would no longer be
-for members only.
+It runs more than four hundred checks; among them, every example program is played on the
+real engine with the real referee and its score is compared. They also check
+`content/simulator-codes.ts` (a misspelt example id, an example that is on both lists, a
+damaged line, a code that is on both lists of codes) and that nothing about an example —
+not even a title — can slip back into what every visitor's browser downloads. It takes
+around fifteen seconds and must end with `fail 0`. If it does not, do not deploy — a failing
+test means a program would now score differently, a block would behave differently, or an
+example would be shown to somebody who should not see it.
 
 ### If you change the site header
 

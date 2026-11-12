@@ -12,12 +12,14 @@
  * =====================================================================================
  *  THIS FILE STAYS ON THE WEBSITE'S SERVER. NEVER IMPORT IT FROM THE SIMULATOR SCREEN.
  *
- *  Every example is for registered members: a visitor's browser gets a program and the text
- *  that explains it only from the server, in the answer to a member code that was checked
- *  there (../members/unlock.ts, behind /api/simulator/unlock). So nothing that runs in the
- *  browser (src/simulator/ui, anything with 'use client') may import this file. The screen
- *  knows the examples only by id, title and level, from ./sample-catalog.ts. A test
- *  (../members/client-guard.test.ts) fails when a file of the screen starts to import this one.
+ *  A visitor's browser gets a program and the text that explains it only from the server
+ *  (../members/unlock.ts, behind /api/simulator/unlock), which decides for every request what
+ *  that visitor may have: the examples that are open to everyone, the members' examples after
+ *  a member code was checked, and the examples kept for advanced codes only after an advanced
+ *  code was checked. So nothing that runs in the browser (src/simulator/ui, anything with
+ *  'use client') may import this file - nor ./sample-catalog.ts, the list of the titles: the
+ *  screen holds no list of examples at all, it draws the cards the server sends. A test
+ *  (../members/client-guard.test.ts) fails when a file of the screen starts to import either.
  *
  *  The title and the level of each example are in ./sample-catalog.ts; the description and the
  *  blocks are here.
