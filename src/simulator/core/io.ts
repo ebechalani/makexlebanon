@@ -8,10 +8,12 @@
  *   core/engine.ts         export function createSimulation<S>(opts: SimulationOptions<S>): Simulation<S>
  *   vm/index.ts            export function createVM(program: ProgramJson, io: RobotIO): VM
  *   fire-rescue/game.ts    export const fireRescueGame: Game<FireRescueScenario>
+ *   fire-chief/game.ts     export const fireChiefGame: Game<FireChiefScenario>
  *   blocks/                Blockly block definitions + toolbox (browser only)
  */
 import type {
   ButtonName,
+  DcMotorPort,
   ProbeName,
   ProbeReading,
   RGB,
@@ -77,6 +79,21 @@ export interface RobotIO {
   /** unwrapped yaw since the last reset, degrees, clockwise positive */
   yawDeg(): number;
   resetYaw(): void;
+  /**
+   * flame sensor: strength of the infrared light it sees, 0 (none) .. 100 (very strong). Higher
+   * when the flame is nearer and more straight ahead; 0 behind a wall, out of its field of view,
+   * out of range, or when no flame sensor is fitted.
+   */
+  flameValue(): number;
+  /** true when flameValue() is above config.flameSensor.threshold */
+  flameDetected(): boolean;
+
+  // ------------------------------------------------------------------ DC motors (fan)
+  /** run the DC motor on port M1 / M2 at a power of -100..100 % (0 stops it); it keeps running until changed */
+  setDcMotor(port: DcMotorPort, power: number): void;
+  stopDcMotor(port: DcMotorPort | 'all'): void;
+  /** current power of a DC motor port, -100..100 */
+  dcMotorPower(port: DcMotorPort): number;
 
   // ------------------------------------------------------------------ CyberPi
   buttonDown(name: ButtonName): boolean;

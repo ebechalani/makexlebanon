@@ -9,7 +9,9 @@
  *   2. servos         the arm and the claw move a little; the claw may grab or let go
  *   3. wheels         the wheel speeds follow their commands (with an acceleration limit)
  *   4. drive          the robot moves; whatever it runs into is pushed, or blocks the robot
- *   5. clock + rules  the match ends on time, on "Finished", or when the program has ended
+ *   5. clock + rules  the game's referee looks at the field (if the game has one with memory);
+ *                     the match ends on time, on "Finished", when the program has ended, or
+ *                     when that referee ends it
  *
  * The physics is "2.5-D": every thing is a box seen from above plus a height range. Two things
  * touch only when their footprints overlap AND their height ranges overlap. That is enough for
@@ -21,14 +23,18 @@
  * bodies, the table wall pushes back. If that cannot be sorted out (things are jammed), the move
  * is simply taken back: the robot is stuck and its wheels spin, like on a real table.
  *
+ * A game can also put up fixed walls (a maze). They never move: the robot, and whatever it
+ * pushes, is stopped by them and slides along them.
+ *
  * Plain TypeScript, no DOM: it runs in the browser and headless under Node.
  * Use createSimulation() from ./simulation.ts unless you want to plug in your own VM.
  */
 import { boxesOverlap, makeContact, pointInBox, rayBoxDistance, type Contact } from './engine-collide';
-import { fastVectorSampler, hashNoise, lineOffsetOf, lineStatusOf, makeProbeReading } from './engine-sensors';
+import { fastVectorSampler, flameSignal, hashNoise, lineOffsetOf, lineStatusOf, makeProbeReading } from './engine-sensors';
 import { clamp, DEG, makeRng, wrapAngle, type OBB } from './geometry';
 import type { RobotIO } from './io';
 import {
+  DEFAULT_ROBOT_CONFIG,
   clawAngleForGap,
   clawGapForAngle,
   initialServoAngles,
@@ -40,19 +46,25 @@ import {
   widestClawGap,
 } from './robot';
 import {
+  DC_MOTOR_PORTS,
   SERVO_PORTS,
   type Body,
   type ButtonName,
+  type DcMotorPort,
+  type DcMotorState,
   type FinishReason,
+  type FixedWall,
   type Game,
   type MatSampler,
   type Pose,
   type ProbeName,
   type ProbeReading,
   type ProgramJson,
+  type Referee,
   type RGB,
   type RobotConfig,
   type RobotState,
+  type ScoreContext,
   type ScoreReport,
   type SensorColor,
   type SensorSnapshot,
@@ -107,6 +119,24 @@ const GRIP_CONTACT = 0.5;
 const FINGER_PLAY = 0.5;
 /** Number of rays in the ultrasonic beam. */
 const ULTRASONIC_RAYS = 13;
+/**
+ * Numbers kept per fixed wall, packed into one array: centre x, y, half width, half length,
+ * sine and cosine of its angle, height, and the box around it (min x, max x, min y, max y).
+ */
+const WALL_STRIDE = 11;
+const WALL_X = 0;
+const WALL_Y = 1;
+const WALL_HW = 2;
+const WALL_HL = 3;
+const WALL_SIN = 4;
+const WALL_COS = 5;
+const WALL_H = 6;
+const WALL_MIN_X = 7;
+const WALL_MAX_X = 8;
+const WALL_MIN_Y = 9;
+const WALL_MAX_Y = 10;
+/** A body that is pushed into a corner of two walls is moved out of them in at most this many goes. */
+const WALL_ROUNDS = 3;
 /** The front colour sensor looks along three parallel lines this far apart (mm). */
 const FRONT_EYE_SPREAD = 6;
 /** Limits that keep a long batch run from filling the memory. */
@@ -205,6 +235,9 @@ function makeRobotState(config: RobotConfig, pose: Pose): RobotState {
     screen: { lines: [], labels: [] },
     touching: false,
     lastUltrasonicCm: config.ultrasonic.maxRangeCm,
+    dcMotors: { M1: { power: 0 }, M2: { power: 0 } },
+    fanOn: false,
+    lastFlame: 0,
   };
 }
 
@@ -230,7 +263,10 @@ class EngineSimulation<S> implements Simulation<S> {
   // ---- match state
   private currentStatus: SimStatus = 'ready';
   private currentFinishReason: FinishReason | null = null;
+  private currentFinishDetail: string | null = null;
   private restartCount = 0;
+  /** the game's referee with memory, when the game has one (otherwise game.score() judges the field) */
+  private readonly referee: Referee<S> | null;
   private startPose: Pose;
   private events: SimEvent[] = [];
   private readonly buttons: Record<ButtonName, boolean>;
@@ -250,6 +286,8 @@ class EngineSimulation<S> implements Simulation<S> {
   private readonly programRandom: () => number;
   /** the wheels moved the robot during this tick (used to decide whether a contact is a "bump") */
   private robotMoving = false;
+  /** DC motor ports M1 / M2 (the same objects as robot.dcMotors) */
+  private readonly dcMotors: Record<DcMotorPort, DcMotorState>;
 
   // ---- gripper
   private readonly servoList: ServoState[];
@@ -303,6 +341,11 @@ class EngineSimulation<S> implements Simulation<S> {
   private readonly tableMinY: number;
   private readonly tableMaxX: number;
   private readonly tableMaxY: number;
+  /** the game's fixed walls, and the numbers the collision checks need of each (see WALL_STRIDE) */
+  private readonly walls: FixedWall[];
+  private readonly wallCount: number;
+  private readonly wallData: Float64Array;
+  private lastFixedWallBump = -BUMP_QUIET_TICKS - 1;
 
   // ---- sensors (values are cached so that reading a sensor twice in a tick is free)
   /** grows every time the robot's pose changes */
@@ -322,9 +365,14 @@ class EngineSimulation<S> implements Simulation<S> {
   private readonly rayCos = new Float64Array(ULTRASONIC_RAYS);
   private readonly rayDirX = new Float64Array(ULTRASONIC_RAYS);
   private readonly rayDirY = new Float64Array(ULTRASONIC_RAYS);
+  /** indices of the bodies that carry an infrared emitter (what the flame sensor can see) */
+  private readonly emitters: number[] = [];
+  private flameTick = -1;
+  private flameEpoch = -1;
+  private flameNow = 0;
 
   constructor(opts: SimulationOptions<S>, createVM: VMFactory) {
-    const cfg = opts.robotConfig;
+    const cfg = opts.robotConfig ?? opts.game.robotConfig ?? DEFAULT_ROBOT_CONFIG;
     const g = cfg.gripper;
     this.game = opts.game;
     this.scenario = opts.scenario;
@@ -366,14 +414,44 @@ class EngineSimulation<S> implements Simulation<S> {
       this.bodyRadius[i] = Math.hypot(b.w, b.l) / 2;
       this.lastBump[i] = -BUMP_QUIET_TICKS - 1;
       this.dirty[i] = 1; // check once that nothing starts inside something else
+      if (b.infrared) this.emitters.push(i);
     }
     this.unsettled = n > 0;
+
+    // ---- fixed walls (they never move, so everything about them is worked out once)
+    const walls = opts.game.createWalls ? opts.game.createWalls(opts.scenario) : [];
+    this.walls = walls;
+    this.wallCount = walls.length;
+    this.wallData = new Float64Array(walls.length * WALL_STRIDE);
+    for (let w = 0; w < walls.length; w++) {
+      const wall = walls[w];
+      const at = w * WALL_STRIDE;
+      const sin = Math.sin(wall.angle);
+      const cos = Math.cos(wall.angle);
+      // half size of the box around the (possibly turned) wall, along x and y
+      const ex = (wall.w * Math.abs(cos) + wall.l * Math.abs(sin)) / 2;
+      const ey = (wall.w * Math.abs(sin) + wall.l * Math.abs(cos)) / 2;
+      const data = this.wallData;
+      data[at + WALL_X] = wall.x;
+      data[at + WALL_Y] = wall.y;
+      data[at + WALL_HW] = wall.w / 2;
+      data[at + WALL_HL] = wall.l / 2;
+      data[at + WALL_SIN] = sin;
+      data[at + WALL_COS] = cos;
+      data[at + WALL_H] = wall.h;
+      data[at + WALL_MIN_X] = wall.x - ex;
+      data[at + WALL_MAX_X] = wall.x + ex;
+      data[at + WALL_MIN_Y] = wall.y - ey;
+      data[at + WALL_MAX_Y] = wall.y + ey;
+    }
 
     // ---- robot
     const start = opts.startPose ?? opts.game.defaultStartPose;
     this.startPose = { x: start.x, y: start.y, heading: start.heading };
     this.robot = makeRobotState(cfg, this.startPose);
-    this.world = { time: 0, tick: 0, robot: this.robot, bodies };
+    this.dcMotors = this.robot.dcMotors ?? { M1: { power: 0 }, M2: { power: 0 } };
+    this.robot.dcMotors = this.dcMotors;
+    this.world = { time: 0, tick: 0, robot: this.robot, bodies, walls };
     this.servoList = SERVO_PORTS.map((port) => this.robot.servos[port]);
     this.buttons = { a: false, b: false, up: false, down: false, left: false, right: false, middle: false };
 
@@ -418,6 +496,7 @@ class EngineSimulation<S> implements Simulation<S> {
       });
     }
 
+    this.referee = opts.game.createReferee ? opts.game.createReferee(opts.scenario) : null;
     this.io = this.createIO();
     this.vm = createVM(opts.program, this.io);
   }
@@ -434,8 +513,17 @@ class EngineSimulation<S> implements Simulation<S> {
     return this.currentFinishReason;
   }
 
+  get finishDetail(): string | null {
+    return this.currentFinishDetail;
+  }
+
   get restarts(): number {
     return this.restartCount;
+  }
+
+  get restartsLeft(): number {
+    const max = this.game.restartRules?.maxRestarts;
+    return max === undefined ? Infinity : Math.max(0, Math.floor(max) - this.restartCount);
   }
 
   get timeLeft(): number {
@@ -459,6 +547,20 @@ class EngineSimulation<S> implements Simulation<S> {
 
   restart(): void {
     if (this.currentStatus !== 'running') return;
+    const rules = this.game.restartRules;
+    if (this.restartsLeft <= 0) {
+      const max = rules?.maxRestarts ?? 0;
+      this.pushEvent({
+        type: 'log',
+        level: 'warn',
+        text:
+          max <= 0
+            ? 'No restart: this game does not allow restarts.'
+            : `No restart left: this game allows ${max} restart${max === 1 ? '' : 's'} per attempt.`,
+        time: this.world.time,
+      });
+      return;
+    }
     this.restartCount++;
 
     // the referee takes whatever the robot is carrying out of the claw ...
@@ -468,8 +570,16 @@ class EngineSimulation<S> implements Simulation<S> {
     // ... the team puts the robot back in the start zone, exactly as it started ...
     this.resetRobot();
 
-    // ... and the carried object goes back to where it started the match
-    if (carried >= 0) this.returnHome(carried);
+    if (rules?.resetsBodies) {
+      // ... and in this game the referee puts every game element back where it started
+      for (let i = 0; i < this.bodies.length; i++) {
+        const home = this.bodies[i].home;
+        this.placeBody(i, home.x, home.y, home.angle, home.z, home.restingOn);
+      }
+    } else if (carried >= 0) {
+      // ... and the carried object goes back to where it started the match
+      this.returnHome(carried);
+    }
 
     // nothing may end up inside something else (a tower that was pushed into the start zone
     // is nudged out from under the robot; that can take a few rounds)
@@ -483,6 +593,8 @@ class EngineSimulation<S> implements Simulation<S> {
     this.robot.touching = false;
 
     this.pushEvent({ type: 'restart', time: this.world.time });
+    // a referee with memory forgets what the rules say a restart costs
+    if (this.referee) this.referee.restart(this.scoreContext());
 
     // the clock keeps running; the program starts again from the top
     this.vm.stopAll();
@@ -519,13 +631,19 @@ class EngineSimulation<S> implements Simulation<S> {
   }
 
   score(): ScoreReport {
-    return this.game.score({
+    const ctx = this.scoreContext();
+    return this.referee ? this.referee.score(ctx) : this.game.score(ctx);
+  }
+
+  /** What a referee gets to see: the field as it is right now. */
+  private scoreContext(): ScoreContext<S> {
+    return {
       scenario: this.scenario,
       world: this.world,
       robotConfig: this.cfg,
       restarts: this.restartCount,
       robotShapes: this.robotShapes(),
-    });
+    };
   }
 
   robotShapes(): OBB[] {
@@ -542,6 +660,10 @@ class EngineSimulation<S> implements Simulation<S> {
       lineOffset: this.probeOffset,
       ultrasonicCm: this.measureUltrasonic(),
       frontColor: this.lookAtClaw(),
+      flame: this.measureFlame(),
+      flameDetected: this.flameDetected(),
+      dcMotorPower: { M1: this.dcMotors.M1.power, M2: this.dcMotors.M2.power },
+      fanOn: robot.fanOn === true,
       yawDeg: robot.yawDeg,
       leftAngleDeg: robot.left.angleDeg,
       rightAngleDeg: robot.right.angleDeg,
@@ -583,16 +705,30 @@ class EngineSimulation<S> implements Simulation<S> {
     // 2. - 4. the robot
     this.physicsTick();
 
-    // 5. the clock and the end of the match
+    // 5. the clock, the referee and the end of the match
     world.tick++;
     world.time = world.tick * this.dt;
+    if (this.referee) {
+      // (what happens on the very last tick of the match still counts)
+      const call = this.referee.observe(this.scoreContext());
+      if (call) {
+        if (call.say) {
+          for (const text of call.say) this.pushEvent({ type: 'log', level: 'info', text, time: world.time });
+        }
+        if (call.end) {
+          this.finish(call.end.reason, call.end.detail);
+          return;
+        }
+      }
+    }
     if (world.time >= this.game.matchDuration - 1e-9) this.finish('time');
     else if ((this.vmCrashed || this.vm.idle) && this.robotAtRest()) this.finish('program-ended');
   }
 
-  private finish(reason: FinishReason): void {
+  private finish(reason: FinishReason, detail?: string): void {
     this.currentStatus = 'finished';
     this.currentFinishReason = reason;
+    this.currentFinishDetail = detail ?? null;
     try {
       this.vm.stopAll();
     } catch {
@@ -604,6 +740,7 @@ class EngineSimulation<S> implements Simulation<S> {
     haltWheel(this.robot.right);
     this.robot.left.rpm = 0;
     this.robot.right.rpm = 0;
+    this.stopDcMotors();
     // let anything that was just dropped or nudged come to rest before the referee looks
     this.robotMoving = false;
     for (let k = 0; k < 10 && (this.unsettled || this.leftover); k++) {
@@ -611,14 +748,17 @@ class EngineSimulation<S> implements Simulation<S> {
       if (this.bodiesShifted) this.dropUnsupported();
     }
     this.robot.touching = false;
-    this.pushEvent({ type: 'finish', reason, time: this.world.time });
+    if (detail === undefined) this.pushEvent({ type: 'finish', reason, time: this.world.time });
+    else this.pushEvent({ type: 'finish', reason, time: this.world.time, detail });
   }
 
-  /** Wheels stopped and every servo where it should be (or held up by what it grips / rests on). */
+  /** Wheels and DC motors stopped and every servo where it should be (or held up by what it grips / rests on). */
   private robotAtRest(): boolean {
     const { left, right } = this.robot;
     if (this.motion.active) return false;
     if (left.rpm !== 0 || right.rpm !== 0 || left.targetRpm !== 0 || right.targetRpm !== 0) return false;
+    // a fan (or anything else on M1 / M2) that is still running: the robot is still doing something
+    if (this.dcMotors.M1.power !== 0 || this.dcMotors.M2.power !== 0) return false;
     const g = this.cfg.gripper;
     for (let i = 0; i < SERVO_PORTS.length; i++) {
       const s = this.servoList[i];
@@ -836,6 +976,23 @@ class EngineSimulation<S> implements Simulation<S> {
     const { left, right } = this.robot;
     if (left.mode === 'motion') haltWheel(left);
     if (right.mode === 'motion') haltWheel(right);
+  }
+
+  // ===========================================================================================
+  // DC motors and the fan
+  // ===========================================================================================
+
+  /** The fan blows while the DC motor on its port runs with enough power, in either direction. */
+  private updateFan(): void {
+    const fan = this.cfg.fan;
+    this.robot.fanOn =
+      fan !== undefined && fan.enabled && Math.abs(this.dcMotors[fan.port]?.power ?? 0) >= fan.minPower;
+  }
+
+  private stopDcMotors(): void {
+    this.dcMotors.M1.power = 0;
+    this.dcMotors.M2.power = 0;
+    this.updateFan();
   }
 
   // ===========================================================================================
@@ -1432,6 +1589,140 @@ class EngineSimulation<S> implements Simulation<S> {
     return Math.max(Math.abs(dx), Math.abs(dy));
   }
 
+  // ---- fixed walls
+
+  /**
+   * The robot (or what it carries) has driven a little into a fixed wall: slide it back out.
+   * Only the DEEPEST overlap is undone here; the next pass of resolveContacts() looks again.
+   * (Deepest first matters where two wall pieces meet: once the robot is out of the wall it
+   * really ran into, it is also out of the end of the piece next to it. The other way round the
+   * robot would catch on every joint of a long wall instead of sliding along it.)
+   * The robot never moves more than a few millimetres per check and a wall is thicker than
+   * that, so it always comes out on the side it came from.
+   * Returns how deep the robot was in the wall (0 = not at all).
+   */
+  private pushRobotOutOfWalls(): number {
+    const data = this.wallData;
+    const shapes = this.shapes;
+    const active = this.shapeActive;
+    const hit = this.contact;
+    const pose = this.robot.pose;
+    const reach = this.robotRadius;
+    const minX = pose.x - reach;
+    const maxX = pose.x + reach;
+    const minY = pose.y - reach;
+    const maxY = pose.y + reach;
+    let depth = 0;
+    let nx = 0;
+    let ny = 0;
+    let deepestWall = -1;
+    for (let w = 0, at = 0; w < this.wallCount; w++, at += WALL_STRIDE) {
+      // (most walls of a maze are nowhere near the robot)
+      if (data[at + WALL_MIN_X] > maxX || data[at + WALL_MAX_X] < minX) continue;
+      if (data[at + WALL_MIN_Y] > maxY || data[at + WALL_MAX_Y] < minY) continue;
+      const top = data[at + WALL_H];
+      for (let k = 0; k < SHAPE_COUNT; k++) {
+        if (!active[k]) continue;
+        const sh = shapes[k];
+        if (sh.zmin >= top - Z_EPS) continue; // this part of the robot passes above the wall
+        if (
+          !boxesOverlap(
+            data[at + WALL_X],
+            data[at + WALL_Y],
+            data[at + WALL_HW],
+            data[at + WALL_HL],
+            data[at + WALL_SIN],
+            data[at + WALL_COS],
+            sh.x,
+            sh.y,
+            sh.hw,
+            sh.hl,
+            sh.sin,
+            sh.cos,
+            hit,
+          )
+        ) {
+          continue;
+        }
+        if (hit.depth > depth) {
+          depth = hit.depth;
+          nx = hit.nx;
+          ny = hit.ny;
+          deepestWall = w;
+        }
+      }
+    }
+    if (deepestWall < 0) return 0;
+    this.shiftRobot(nx * depth, ny * depth);
+    this.noteFixedWallBump(deepestWall);
+    return depth;
+  }
+
+  /**
+   * Keep a body out of the fixed walls: a body that was pushed into a wall is moved back out
+   * and is now backed by that wall (nothing can push it further that way).
+   * Returns how far (mm) it had to be moved.
+   */
+  private pushBodyOutOfWalls(i: number): number {
+    const data = this.wallData;
+    const hit = this.contact;
+    const b = this.bodies[i];
+    const reach = this.bodyRadius[i];
+    const hw = b.w / 2;
+    const hl = b.l / 2;
+    const bs = Math.sin(b.angle);
+    const bc = Math.cos(b.angle);
+    let moved = 0;
+    // (a body in a corner is pushed out of one wall, then out of the other)
+    for (let round = 0; round < WALL_ROUNDS; round++) {
+      let depth = 0;
+      let nx = 0;
+      let ny = 0;
+      for (let w = 0, at = 0; w < this.wallCount; w++, at += WALL_STRIDE) {
+        if (data[at + WALL_MIN_X] > b.x + reach || data[at + WALL_MAX_X] < b.x - reach) continue;
+        if (data[at + WALL_MIN_Y] > b.y + reach || data[at + WALL_MAX_Y] < b.y - reach) continue;
+        if (b.z >= data[at + WALL_H] - Z_EPS) continue; // it is above the wall
+        if (
+          !boxesOverlap(
+            data[at + WALL_X],
+            data[at + WALL_Y],
+            data[at + WALL_HW],
+            data[at + WALL_HL],
+            data[at + WALL_SIN],
+            data[at + WALL_COS],
+            b.x,
+            b.y,
+            hw,
+            hl,
+            bs,
+            bc,
+            hit,
+          )
+        ) {
+          continue;
+        }
+        if (hit.depth > depth) {
+          depth = hit.depth;
+          nx = hit.nx;
+          ny = hit.ny;
+        }
+      }
+      if (depth === 0) break;
+      this.shiftBody(i, nx * depth, ny * depth);
+      this.addBacking(i, -nx, -ny, HARD);
+      if (depth > moved) moved = depth;
+    }
+    return moved;
+  }
+
+  /** Keep a body on the table and out of the fixed walls. Returns how far (mm) it had to be moved back. */
+  private confineBody(i: number): number {
+    const overEdge = this.clampBodyToTable(i);
+    if (this.wallCount === 0) return overEdge;
+    const inWall = this.pushBodyOutOfWalls(i);
+    return inWall > overEdge ? inWall : overEdge;
+  }
+
   /**
    * Make sure nothing is inside anything else.
    *
@@ -1517,7 +1808,7 @@ class EngineSimulation<S> implements Simulation<S> {
           } else {
             this.shiftBody(i, px, py);
             this.addBacking(i, -nx, -ny, SOFT); // it will not come back: the robot is there
-            this.clampBodyToTable(i);
+            this.confineBody(i);
           }
         }
       }
@@ -1529,8 +1820,9 @@ class EngineSimulation<S> implements Simulation<S> {
           const a = bodies[i];
           if (a.held) continue;
           // A thing that was moved without being pushed (it rides on a pushed tower, the claw
-          // turned it, it was just put down) may stick out over the edge of the table.
-          const overWall = this.clampBodyToTable(i);
+          // turned it, it was just put down) may stick out over the edge of the table, or into
+          // a fixed wall.
+          const overWall = this.confineBody(i);
           if (overWall > deepest) deepest = overWall;
           for (let j = 0; j < n; j++) {
             if (j === i || (dirty[j] && j < i)) continue; // (a pair of moved bodies is looked at once)
@@ -1572,6 +1864,15 @@ class EngineSimulation<S> implements Simulation<S> {
         if (overEdge > deepest) deepest = overEdge;
         touching = true;
         this.noteWallBump();
+      }
+
+      // ---- the robot against the fixed walls of the game
+      if (this.wallCount > 0) {
+        const inWall = this.pushRobotOutOfWalls();
+        if (inWall > 0) {
+          if (inWall > deepest) deepest = inWall;
+          touching = true;
+        }
       }
 
       // The robot is being pushed back further than it can have driven in: it is jammed.
@@ -1669,8 +1970,8 @@ class EngineSimulation<S> implements Simulation<S> {
       this.shiftBody(j, px * shareJ, py * shareJ);
       this.shiftBody(i, -px * (1 - shareJ), -py * (1 - shareJ));
     }
-    this.clampBodyToTable(i);
-    this.clampBodyToTable(j);
+    this.confineBody(i);
+    this.confineBody(j);
   }
 
   /**
@@ -1712,6 +2013,19 @@ class EngineSimulation<S> implements Simulation<S> {
     this.lastWallBump = tick;
   }
 
+  /**
+   * The robot is driving into a fixed wall: report it once (with the id of that wall), then stay
+   * quiet while it keeps touching walls - also when it slides on from one wall piece to the next.
+   */
+  private noteFixedWallBump(w: number): void {
+    if (!this.robotMoving) return;
+    const tick = this.world.tick;
+    if (tick - this.lastFixedWallBump > BUMP_QUIET_TICKS) {
+      this.pushEvent({ type: 'bump', bodyId: this.walls[w].id, time: this.world.time });
+    }
+    this.lastFixedWallBump = tick;
+  }
+
   // ===========================================================================================
   // Restart rule
   // ===========================================================================================
@@ -1735,6 +2049,8 @@ class EngineSimulation<S> implements Simulation<S> {
     robot.screen = fresh.screen;
     robot.touching = false;
     robot.lastUltrasonicCm = fresh.lastUltrasonicCm;
+    robot.lastFlame = 0;
+    this.stopDcMotors();
     this.motion.active = false;
     this.liftBlocked = false;
     this.clawBlocked = false;
@@ -1812,6 +2128,29 @@ class EngineSimulation<S> implements Simulation<S> {
       const sh = this.shapes[k];
       if (z >= sh.zmax - Z_EPS || sh.zmin >= top - Z_EPS) continue;
       if (boxesOverlap(x, y, hw, hl, s, c, sh.x, sh.y, sh.hw, sh.hl, sh.sin, sh.cos, hit)) return false;
+    }
+    const data = this.wallData;
+    for (let w = 0, at = 0; w < this.wallCount; w++, at += WALL_STRIDE) {
+      if (z >= data[at + WALL_H] - Z_EPS) continue;
+      if (
+        boxesOverlap(
+          x,
+          y,
+          hw,
+          hl,
+          s,
+          c,
+          data[at + WALL_X],
+          data[at + WALL_Y],
+          data[at + WALL_HW],
+          data[at + WALL_HL],
+          data[at + WALL_SIN],
+          data[at + WALL_COS],
+          hit,
+        )
+      ) {
+        return false;
+      }
     }
     return true;
   }
@@ -1903,8 +2242,8 @@ class EngineSimulation<S> implements Simulation<S> {
   }
 
   /**
-   * Ultrasonic sensor: distance (cm) to the nearest body inside the beam that is tall enough to
-   * reach the beam. The object in the claw is not seen (the sensor looks past it).
+   * Ultrasonic sensor: distance (cm) to the nearest body or fixed wall inside the beam that is
+   * tall enough to reach the beam. The object in the claw is not seen (the sensor looks past it).
    */
   private measureUltrasonic(): number {
     const tick = this.world.tick;
@@ -1939,6 +2278,23 @@ class EngineSimulation<S> implements Simulation<S> {
       const bc = Math.cos(b.angle);
       for (let k = 0; k < ULTRASONIC_RAYS; k++) {
         const d = rayBoxDistance(ox, oy, dirX[k], dirY[k], b.x, b.y, hw, hl, bs, bc);
+        if (d >= 0 && d < best) best = d;
+      }
+    }
+    const data = this.wallData;
+    for (let w = 0, at = 0; w < this.wallCount; w++, at += WALL_STRIDE) {
+      if (data[at + WALL_H] < u.height) continue; // the beam passes over a low wall
+      // (a wall further away than the nearest thing found so far cannot be nearer)
+      if (data[at + WALL_MIN_X] > ox + best || data[at + WALL_MAX_X] < ox - best) continue;
+      if (data[at + WALL_MIN_Y] > oy + best || data[at + WALL_MAX_Y] < oy - best) continue;
+      const wx = data[at + WALL_X];
+      const wy = data[at + WALL_Y];
+      const hw = data[at + WALL_HW];
+      const hl = data[at + WALL_HL];
+      const ws = data[at + WALL_SIN];
+      const wc = data[at + WALL_COS];
+      for (let k = 0; k < ULTRASONIC_RAYS; k++) {
+        const d = rayBoxDistance(ox, oy, dirX[k], dirY[k], wx, wy, hw, hl, ws, wc);
         if (d >= 0 && d < best) best = d;
       }
     }
@@ -1995,6 +2351,100 @@ class EngineSimulation<S> implements Simulation<S> {
       }
     }
     return seen?.colorName ?? 'none';
+  }
+
+  /**
+   * Flame sensor: the strength (0..100) of the strongest infrared emitter it can see. An emitter
+   * is seen only with a free line of sight; how strong it reads is worked out by flameSignal().
+   * 0 on a robot without a flame sensor.
+   */
+  private measureFlame(): number {
+    const f = this.cfg.flameSensor;
+    if (!f || !f.enabled) return 0;
+    const tick = this.world.tick;
+    if (this.flameTick === tick && this.flameEpoch === this.epoch) return this.flameNow;
+    const bodies = this.bodies;
+    const pose = this.robot.pose;
+    const sx = pose.x + f.forward * Math.sin(pose.heading);
+    const sy = pose.y - f.forward * Math.cos(pose.heading);
+    let best = 0;
+    for (const i of this.emitters) {
+      const b = bodies[i];
+      const e = b.infrared;
+      if (!e) continue;
+      const ex = b.x + e.forward * Math.sin(b.angle);
+      const ey = b.y - e.forward * Math.cos(b.angle);
+      const signal = flameSignal(sx, sy, pose.heading, f.halfAngleDeg, f.rangeMm, ex, ey, b.angle, e.halfAngleDeg);
+      if (signal <= best) continue;
+      if (this.sightBlocked(sx, sy, f.height, ex, ey, b.z + e.height, i)) continue;
+      best = signal;
+    }
+    let value = best;
+    const noise = this.cfg.noise.flame ?? 0;
+    if (noise > 0 && best > 0) value += noise * hashNoise(this.seed, tick, 101);
+    value = Math.round(clamp(value, 0, 100) * 10) / 10;
+    this.flameTick = tick;
+    this.flameEpoch = this.epoch;
+    this.flameNow = value;
+    this.robot.lastFlame = value;
+    return value;
+  }
+
+  private flameDetected(): boolean {
+    const f = this.cfg.flameSensor;
+    return f !== undefined && f.enabled && this.measureFlame() > f.threshold;
+  }
+
+  /**
+   * Is the straight line from (ax, ay) at height az to (bx, by) at height bz cut by a fixed
+   * wall, or by a body other than `skip`? Something cuts the line when it is at least as tall
+   * as the line is high at the place where the line reaches it (and, for a body that stands on
+   * something, when its base is not above the line there).
+   */
+  private sightBlocked(ax: number, ay: number, az: number, bx: number, by: number, bz: number, skip: number): boolean {
+    const dx = bx - ax;
+    const dy = by - ay;
+    const length = Math.hypot(dx, dy);
+    if (length < 1e-9) return false;
+    const ux = dx / length;
+    const uy = dy / length;
+    const minX = Math.min(ax, bx);
+    const maxX = Math.max(ax, bx);
+    const minY = Math.min(ay, by);
+    const maxY = Math.max(ay, by);
+
+    const data = this.wallData;
+    for (let w = 0, at = 0; w < this.wallCount; w++, at += WALL_STRIDE) {
+      if (data[at + WALL_MIN_X] > maxX || data[at + WALL_MAX_X] < minX) continue;
+      if (data[at + WALL_MIN_Y] > maxY || data[at + WALL_MAX_Y] < minY) continue;
+      const d = rayBoxDistance(
+        ax,
+        ay,
+        ux,
+        uy,
+        data[at + WALL_X],
+        data[at + WALL_Y],
+        data[at + WALL_HW],
+        data[at + WALL_HL],
+        data[at + WALL_SIN],
+        data[at + WALL_COS],
+      );
+      if (d < 0 || d >= length) continue;
+      if (az + (bz - az) * (d / length) <= data[at + WALL_H]) return true;
+    }
+
+    const bodies = this.bodies;
+    for (let i = 0; i < bodies.length; i++) {
+      if (i === skip) continue;
+      const b = bodies[i];
+      const far = this.bodyRadius[i];
+      if (b.x - far > maxX || b.x + far < minX || b.y - far > maxY || b.y + far < minY) continue;
+      const d = rayBoxDistance(ax, ay, ux, uy, b.x, b.y, b.w / 2, b.l / 2, Math.sin(b.angle), Math.cos(b.angle));
+      if (d < 0 || d >= length) continue;
+      const height = az + (bz - az) * (d / length);
+      if (height >= b.z && height <= b.z + b.h) return true;
+    }
+    return false;
   }
 
   // ===========================================================================================
@@ -2142,6 +2592,29 @@ class EngineSimulation<S> implements Simulation<S> {
       },
       resetYaw: (): void => {
         robot.yawDeg = 0;
+      },
+      flameValue: (): number => {
+        return this.measureFlame();
+      },
+      flameDetected: (): boolean => {
+        return this.flameDetected();
+      },
+
+      // ---------------------------------------------------------------- DC motors (fan)
+      setDcMotor: (port: DcMotorPort, power: number): void => {
+        const motor = this.dcMotors[port];
+        if (!motor) return;
+        motor.power = clamp(finite(power), -100, 100);
+        this.updateFan();
+      },
+      stopDcMotor: (port: DcMotorPort | 'all'): void => {
+        for (const p of DC_MOTOR_PORTS) {
+          if (port === 'all' || port === p) this.dcMotors[p].power = 0;
+        }
+        this.updateFan();
+      },
+      dcMotorPower: (port: DcMotorPort): number => {
+        return this.dcMotors[port]?.power ?? 0;
       },
 
       // ---------------------------------------------------------------- CyberPi

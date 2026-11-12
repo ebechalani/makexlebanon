@@ -37,6 +37,9 @@ export type SensorColor = 'black' | 'white' | 'red' | 'yellow' | 'green' | 'cyan
 
 export type MotorPort = 'EM1' | 'EM2';
 export type Wheel = 'left' | 'right';
+/** The two DC motor ports of the mBot2 shield (a fan, a pump ... - not the drive wheels). */
+export type DcMotorPort = 'M1' | 'M2';
+export const DC_MOTOR_PORTS: DcMotorPort[] = ['M1', 'M2'];
 export type ServoPort = 'S1' | 'S2' | 'S3' | 'S4';
 export const SERVO_PORTS: ServoPort[] = ['S1', 'S2', 'S3', 'S4'];
 
@@ -81,7 +84,7 @@ export interface MatVector {
 }
 
 // =============================================================================================
-// Bodies (towers, buckets, people ...)
+// Bodies (towers, buckets, people, a fire target ...) and fixed walls
 // =============================================================================================
 
 export interface BodyHome {
@@ -130,6 +133,42 @@ export interface Body {
   mass: number;
   /** where the referee puts it back (restart rule) */
   home: BodyHome;
+  /** an infrared light on this body that a flame sensor can see (the game decides what glows) */
+  infrared?: InfraredEmitter;
+}
+
+/** An infrared light on a body ("the flame"). It shines forward, in the direction the body faces. */
+export interface InfraredEmitter {
+  /** where it sits: mm ahead of the body's centre, along the body's heading (l / 2 = on its front face) */
+  forward: number;
+  /** its height above the base of the body (mm) */
+  height: number;
+  /** it shines into a cone around the body's heading: this far to each side (degrees) */
+  halfAngleDeg: number;
+}
+
+/**
+ * A wall that never moves: a box like a Body (footprint w x l centred on (x, y), turned by
+ * `angle`) that stands on the mat and is `h` mm high. The robot and everything it pushes are
+ * stopped by it and can slide along it, the ultrasonic sensor sees it, infrared light does not
+ * pass it. A game returns its walls from Game.createWalls(); the engine never changes them.
+ */
+export interface FixedWall {
+  /** unique, e.g. 'wall:A1-B1'; reported in 'bump' events */
+  id: string;
+  /** short name for texts, e.g. 'A1-B1' */
+  label: string;
+  x: number;
+  y: number;
+  angle: number;
+  /** footprint size across (mm) */
+  w: number;
+  /** footprint size along its own heading (mm) */
+  l: number;
+  /** height (mm): it occupies 0 .. h above the mat */
+  h: number;
+  /** CSS colour used to draw it */
+  fill: string;
 }
 
 // =============================================================================================
@@ -203,6 +242,10 @@ export interface RobotConfig {
     /** how far ahead of the gripping centre it can still recognise an object (mm) */
     rangeMm: number;
   };
+  /** optional add-on: a flame (infrared) sensor looking forward. Left out = not fitted. */
+  flameSensor?: FlameSensorConfig;
+  /** optional add-on: a fan blowing forward, driven by a DC motor port. Left out = not fitted. */
+  fan?: FanConfig;
   gripper: GripperConfig;
   /** real-world imperfections; 0 = perfect robot */
   noise: {
@@ -212,7 +255,43 @@ export interface RobotConfig {
     sensor: number;
     /** ultrasonic noise amplitude in cm */
     ultrasonicCm: number;
+    /** flame sensor noise amplitude on its 0-100 value (left out = 0) */
+    flame?: number;
   };
+}
+
+/**
+ * A flame sensor: it measures the infrared light of an emitter (Body.infrared) straight ahead
+ * and reports 0 (nothing) .. 100 (very strong). How the value is worked out: flameSignal() in
+ * core/engine-sensors.ts.
+ */
+export interface FlameSensorConfig {
+  enabled: boolean;
+  /** distance of the sensor ahead of the drive axle (mm) */
+  forward: number;
+  /** height of the sensor above the mat (mm) */
+  height: number;
+  /** field of view: it sees this far to each side of straight ahead (degrees) */
+  halfAngleDeg: number;
+  /** from further away than this (mm) it sees nothing */
+  rangeMm: number;
+  /** "a flame is detected" when the value is above this (0-100) */
+  threshold: number;
+}
+
+/** A fan at the front of the robot. It blows while its DC motor runs strongly enough. */
+export interface FanConfig {
+  enabled: boolean;
+  /** the DC motor port that drives it */
+  port: DcMotorPort;
+  /** distance of the fan ahead of the drive axle (mm) */
+  forward: number;
+  /** it blows while the motor power is at least this (percent), forwards or backwards */
+  minPower: number;
+  /** the air leaves in a cone around straight ahead: this far to each side (degrees) ... */
+  coneHalfAngleDeg: number;
+  /** ... and reaches this far (mm) */
+  reachMm: number;
 }
 
 export type WheelMode = 'stop' | 'speed' | 'power' | 'motion';
@@ -234,6 +313,12 @@ export interface ServoState {
   angle: number;
   /** commanded angle, degrees */
   target: number;
+}
+
+/** One DC motor port (M1 / M2). */
+export interface DcMotorState {
+  /** commanded power, -100..100 percent (0 = stopped) */
+  power: number;
 }
 
 export interface ScreenLabel {
@@ -266,6 +351,15 @@ export interface RobotState {
   touching: boolean;
   /** last ultrasonic reading in cm (for the UI) */
   lastUltrasonicCm: number;
+  /**
+   * The DC motor ports M1 / M2. The engine always fills in this and the two fields below; they
+   * are optional only so that a robot state written by hand (older tests) stays valid.
+   */
+  dcMotors?: Record<DcMotorPort, DcMotorState>;
+  /** true while the fan is blowing (always false on a robot without a fan) */
+  fanOn?: boolean;
+  /** last flame sensor reading, 0-100 (for the UI) */
+  lastFlame?: number;
 }
 
 /** One reading of a Quad RGB probe. */
@@ -290,7 +384,7 @@ export type SimEvent =
   | { type: 'bump'; bodyId: string; time: number }
   | { type: 'tone'; frequency: number; seconds: number; time: number }
   | { type: 'restart'; time: number }
-  | { type: 'finish'; reason: FinishReason; time: number }
+  | { type: 'finish'; reason: FinishReason; time: number; detail?: string }
   | { type: 'log'; level: 'info' | 'warn' | 'error'; text: string; blockId?: string; time: number };
 
 export interface World {
@@ -299,10 +393,17 @@ export interface World {
   tick: number;
   robot: RobotState;
   bodies: Body[];
+  /** the fixed walls of this match (the engine always sets it; empty when the game has none) */
+  walls?: readonly FixedWall[];
 }
 
 export type SimStatus = 'ready' | 'running' | 'finished';
-export type FinishReason = 'time' | 'declared' | 'program-ended';
+/**
+ * Why a match ended. The first three can happen in every game; the last two are called by a
+ * game's referee (Game.createReferee): the mission is complete, or the robot moved a game
+ * element that must stay where it is. The referee's own sentence is in Simulation.finishDetail.
+ */
+export type FinishReason = 'time' | 'declared' | 'program-ended' | 'mission-complete' | 'target-displaced';
 
 export interface ScoreLine {
   id: string;
@@ -314,6 +415,8 @@ export interface ScoreLine {
   ok: boolean;
   /** why it does / does not score, in student-friendly words */
   detail: string;
+  /** match time (seconds) at which this line was earned, when the game records it */
+  time?: number;
 }
 
 export interface ScoreReport {
@@ -322,6 +425,8 @@ export interface ScoreReport {
   lines: ScoreLine[];
   /** every mission is complete (the run could be declared finished) */
   complete: boolean;
+  /** match time (seconds) at which this total was reached, when the game ranks by time */
+  time?: number;
 }
 
 /** A coloured area or label the renderer can draw over the mat. */
@@ -341,6 +446,44 @@ export interface ScoreContext<S> {
   restarts: number;
   /** footprints (as oriented boxes) currently occupied by the robot: chassis, fingers */
   robotShapes: import('./geometry').OBB[];
+}
+
+/** What a referee with memory says after it has looked at one tick. */
+export interface RefereeCall {
+  /** sentences for the team, in student words; the simulation puts them into its log */
+  say?: string[];
+  /** set to end the match right now: why (for the program) and the referee's sentence (for people) */
+  end?: { reason: FinishReason; detail: string };
+}
+
+/**
+ * A referee with memory, for games whose points depend on what happened and when (not only on
+ * how the field looks at the end). The simulation creates one per match (Game.createReferee)
+ * and from then on asks it, not Game.score(), for the score.
+ */
+export interface Referee<S = unknown> {
+  /**
+   * Called once after every tick of a running match, with the world as it is now.
+   * Returns null when there is nothing to say (almost always).
+   */
+  observe(ctx: ScoreContext<S>): RefereeCall | null;
+  /**
+   * The team used a restart. The robot is back in the start zone and the game elements are
+   * where the restart rule puts them. The referee forgets what the rules say a restart costs.
+   */
+  restart(ctx: ScoreContext<S>): void;
+  /** the score sheet "if the match ended now" */
+  score(ctx: ScoreContext<S>): ScoreReport;
+}
+
+/** What a restart does in a game, beyond "the robot goes back to the start zone". */
+export interface RestartRules {
+  /** how many restarts one match allows (left out = as many as the team wants) */
+  maxRestarts?: number;
+  /** a restart clears the points earned so far (the screen says so; the game's referee does it) */
+  clearsPoints?: boolean;
+  /** every game element is put back where it started (left out = only what the robot carried) */
+  resetsBodies?: boolean;
 }
 
 /**
@@ -369,7 +512,28 @@ export interface Game<S = unknown> {
   /** create every body in its starting position for this scenario */
   createBodies(s: S): Body[];
   overlays(s: S): ZoneOverlay[];
+  /**
+   * The score of the field as it is now. A game with a referee that has memory (createReferee)
+   * is scored by that referee during a match; its score() then describes a match in which
+   * nothing has been earned yet.
+   */
   score(ctx: ScoreContext<S>): ScoreReport;
+
+  // ---- optional parts: a game that does not need one simply leaves it out
+
+  /** the robot this game is played with (left out = the simulator's standard robot) */
+  robotConfig?: RobotConfig;
+  /** the fixed walls of this combination (left out = no walls) */
+  createWalls?(s: S): FixedWall[];
+  /** a referee with memory for one match (left out = Game.score() judges the field as it is) */
+  createReferee?(s: S): Referee<S>;
+  /** what a restart does in this game (left out = no limit, restartPenalty points each) */
+  restartRules?: RestartRules;
+  /**
+   * What is wrong with a combination, one student-friendly sentence per problem; empty when it
+   * can be played. For editors: a combination being built may be invalid for a while.
+   */
+  scenarioProblems?(s: S): string[];
 }
 
 // =============================================================================================
@@ -435,7 +599,8 @@ export interface VM {
 export interface SimulationOptions<S = unknown> {
   game: Game<S>;
   scenario: S;
-  robotConfig: RobotConfig;
+  /** left out = the robot of the game (game.robotConfig), or the simulator's standard robot */
+  robotConfig?: RobotConfig;
   /** what the floor sensors see; defaults to a vector sampler built from game.mat.vector */
   sampler?: MatSampler;
   program: ProgramJson;
@@ -451,7 +616,11 @@ export interface Simulation<S = unknown> {
   readonly world: World;
   readonly status: SimStatus;
   readonly finishReason: FinishReason | null;
+  /** the referee's sentence about the end of the match, when it ended the match; otherwise null */
+  readonly finishDetail: string | null;
   readonly restarts: number;
+  /** restarts the team may still use in this match (Infinity when the game sets no limit) */
+  readonly restartsLeft: number;
   /** seconds left on the match clock */
   readonly timeLeft: number;
   readonly vm: VM;
@@ -462,7 +631,10 @@ export interface Simulation<S = unknown> {
   start(): void;
   /** advance by n ticks (no-op unless running) */
   step(ticks?: number): void;
-  /** rules: robot goes back to the start zone, carried object is returned, penalty, clock keeps running, program restarts */
+  /**
+   * rules: robot goes back to the start zone, carried object is returned, penalty, clock keeps
+   * running, program restarts. Does nothing (but logs a warning) when no restart is left.
+   */
   restart(): void;
   /** team declares "Finished": stop the robot and freeze the score */
   declareFinished(): void;
@@ -487,6 +659,14 @@ export interface SensorSnapshot {
   lineOffset: number;
   ultrasonicCm: number;
   frontColor: SensorColor | 'none';
+  /** flame sensor value 0-100 (0 on a robot without one) */
+  flame: number;
+  /** the flame value is above the sensor's threshold */
+  flameDetected: boolean;
+  /** power of the DC motor ports M1 / M2, -100..100 */
+  dcMotorPower: Record<DcMotorPort, number>;
+  /** the fan is blowing */
+  fanOn: boolean;
   yawDeg: number;
   leftAngleDeg: number;
   rightAngleDeg: number;

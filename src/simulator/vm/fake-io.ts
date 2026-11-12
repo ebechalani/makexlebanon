@@ -14,6 +14,7 @@
 import type { RobotIO } from '../core/io';
 import type {
   ButtonName,
+  DcMotorPort,
   ProbeName,
   ProbeReading,
   RGB,
@@ -24,7 +25,7 @@ import type {
   VM,
   Wheel,
 } from '../core/types';
-import { PROBE_NAMES, SERVO_PORTS } from '../core/types';
+import { DC_MOTOR_PORTS, PROBE_NAMES, SERVO_PORTS } from '../core/types';
 
 export interface FakeWheel {
   mode: 'stop' | 'speed' | 'power' | 'motion';
@@ -60,6 +61,8 @@ export interface FakeIO extends RobotIO {
   /** every startMotion() received */
   motions: Array<{ leftDeg: number; rightDeg: number; rpm: number }>;
   servos: Record<ServoPort, { angle: number; target: number }>;
+  /** power of the DC motor ports M1 / M2, -100..100 */
+  dcMotors: Record<DcMotorPort, number>;
   buttons: Partial<Record<ButtonName, boolean>>;
   leds: RGB[];
   lines: string[];
@@ -73,6 +76,8 @@ export interface FakeIO extends RobotIO {
     ultrasonicCm: number;
     frontColor: SensorColor | 'none';
     yawDeg: number;
+    /** flame sensor value 0..100; "detected" above config.flameSensor.threshold (10 when no sensor is configured) */
+    flame: number;
   };
   /** values random() hands out next (falls back to 0.5 when empty) */
   randomQueue: number[];
@@ -141,6 +146,7 @@ export function createFakeIO(options: { dt?: number; config?: Partial<RobotConfi
     motion: null,
     motions: [],
     servos: Object.fromEntries(SERVO_PORTS.map((port) => [port, { angle: 90, target: 90 }])) as FakeIO['servos'],
+    dcMotors: { M1: 0, M2: 0 },
     buttons: {},
     leds: Array.from({ length: 5 }, () => ({ r: 0, g: 0, b: 0 })),
     lines: [],
@@ -153,6 +159,7 @@ export function createFakeIO(options: { dt?: number; config?: Partial<RobotConfi
       ultrasonicCm: config.ultrasonic.maxRangeCm,
       frontColor: 'none',
       yawDeg: 0,
+      flame: 0,
     },
     randomQueue: [],
 
@@ -211,6 +218,19 @@ export function createFakeIO(options: { dt?: number; config?: Partial<RobotConfi
       io.calls.push('resetYaw');
       io.sensors.yawDeg = 0;
     },
+    flameValue: () => io.sensors.flame,
+    flameDetected: () => io.sensors.flame > (config.flameSensor?.threshold ?? 10),
+
+    // ---------------------------------------------------------------- DC motors
+    setDcMotor(port, power) {
+      io.calls.push(`setDcMotor ${port} ${n(power)}`);
+      if (port in io.dcMotors) io.dcMotors[port] = Math.max(-100, Math.min(100, power));
+    },
+    stopDcMotor(port) {
+      io.calls.push(`stopDcMotor ${port}`);
+      for (const p of port === 'all' ? DC_MOTOR_PORTS : [port]) if (p in io.dcMotors) io.dcMotors[p] = 0;
+    },
+    dcMotorPower: (port) => io.dcMotors[port] ?? 0,
 
     // ---------------------------------------------------------------- CyberPi
     buttonDown: (name) => io.buttons[name] === true,
