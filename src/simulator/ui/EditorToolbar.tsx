@@ -58,7 +58,11 @@ export function EditorToolbar(props: EditorToolbarProps) {
         type="button"
         className={TOOL}
         aria-haspopup="dialog"
-        onClick={() => setExamplesOpen(true)}
+        onClick={() => {
+          // (the website could not be reached earlier: it is asked again now, before the window says so once more)
+          examples.askAgainIfNotReached();
+          setExamplesOpen(true);
+        }}
         disabled={!ready}
         title={canLoadExamples ? EXAMPLES_WORDS.buttonHint : EXAMPLES_WORDS.buttonHintLocked}
       >

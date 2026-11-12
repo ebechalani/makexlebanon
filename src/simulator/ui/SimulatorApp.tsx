@@ -54,8 +54,8 @@ export interface SimulatorAppProps<S> {
   /** what the start zone is called in this category, e.g. "Fire Station" */
   startZoneName: string;
   /**
-   * The examples of the category: their ids, titles and levels, and where on this website the
-   * programs themselves are handed out (they are not part of the screen: see ./useMemberExamples.ts).
+   * The examples of the category: where on this website they are handed out. Neither the
+   * programs nor their titles are part of the screen (see ./useMemberExamples.ts).
    * Pass one object that stays the same between renders.
    */
   examples: ExamplesConfig;
@@ -133,7 +133,7 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
   const [editorReady, setEditorReady] = useState(false);
   const [editorStatus, setEditorStatus] = useState<EditorStatus>({ canUndo: false, canRedo: false, blocks: 0 });
   const rules = usePopover<HTMLDivElement>();
-  // which examples this visitor may load: the ones open to everyone, or all of them with a member code
+  // which examples this visitor may see and load: the website's server says so (more with a code than without)
   const examples = useMemberExamples(storageKey(game.id, 'member-code'), props.examples);
   const canLoadExamples = Object.keys(examples.available).length > 0;
 

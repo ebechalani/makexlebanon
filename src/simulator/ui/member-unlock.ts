@@ -1,11 +1,11 @@
 /**
  * The browser's side of the Examples window: ask the website's server which examples this
- * visitor may have, and read its answer.
+ * visitor may see and open, and read its answer.
  *
- * No example program and no description is part of the simulator the browser downloads. They
- * arrive here, in the server's answer: all of them for a member code that is on the list, and
- * without a code only the ones the owner has opened to everyone (the server's side is
- * ../members/unlock.ts).
+ * Nothing about the examples is part of the simulator the browser downloads: no program, no
+ * description, no title, no list. All of it arrives here, in the server's answer - the cards
+ * this visitor may see, the headings they stand under, and the examples this visitor may open
+ * (the server's side is ../members/unlock.ts). The window draws exactly what the answer holds.
  *
  * Plain TypeScript (no DOM, no React), so it can be unit-tested under Node with a pretend server.
  */
@@ -18,15 +18,22 @@ import { isRecord } from './storage';
 // Examples
 // =============================================================================================
 
-export type ExampleLevel = 'starter' | 'intermediate' | 'advanced';
+/** A heading of the Examples window, with the cards of one level below it. */
+export interface ExampleLevel {
+  /** the name the cards refer to */
+  id: string;
+  /** the word on the coloured label */
+  title: string;
+  /** the few words after it */
+  about: string;
+}
 
-const EXAMPLE_LEVELS: readonly string[] = ['starter', 'intermediate', 'advanced'];
-
-/** What the browser knows about every example from the start: enough for a locked card. */
+/** An example this visitor may see: enough to draw its card. */
 export interface ExampleCard {
   id: string;
   title: string;
-  level: ExampleLevel;
+  /** the id of the level it stands under */
+  level: string;
 }
 
 /** An example the server has handed out: it can be read and loaded. */
@@ -36,13 +43,52 @@ export interface ExampleProgram extends ExampleCard {
   program: ProgramJson;
 }
 
-function readExample(value: unknown): ExampleProgram | null {
+/** What one answer of the server puts into the Examples window. */
+export interface ExampleShelf {
+  /** the headings, in the order of the window */
+  levels: ExampleLevel[];
+  /** every example this visitor may see, in the order of the window */
+  cards: ExampleCard[];
+  /** the ones of them this visitor may open */
+  examples: ExampleProgram[];
+}
+
+/** A text that says something (not empty, not absurdly long). */
+function isWords(value: unknown, longest: number): value is string {
+  return typeof value === 'string' && value.trim() !== '' && value.length <= longest;
+}
+
+function readLevel(value: unknown): ExampleLevel | null {
   if (!isRecord(value)) return null;
-  const { id, title, level, description, program } = value;
-  if (typeof id !== 'string' || typeof title !== 'string' || typeof description !== 'string') return null;
-  if (typeof level !== 'string' || !EXAMPLE_LEVELS.includes(level)) return null;
+  const { id, title, about } = value;
+  if (!isWords(id, 40) || !isWords(title, 60) || typeof about !== 'string' || about.length > 200) return null;
+  return { id, title, about };
+}
+
+function readCard(value: unknown): ExampleCard | null {
+  if (!isRecord(value)) return null;
+  const { id, title, level } = value;
+  if (!isWords(id, 80) || !isWords(title, 200) || !isWords(level, 40)) return null;
+  return { id, title, level };
+}
+
+function readExample(value: unknown): ExampleProgram | null {
+  const card = readCard(value);
+  if (!card || !isRecord(value)) return null;
+  const { description, program } = value;
+  if (typeof description !== 'string') return null;
   if (!isRecord(program) || !isProgramJson(program)) return null;
-  return { id, title, level: level as ExampleLevel, description, program };
+  return { ...card, description, program };
+}
+
+/** The readable items of a list, each id once (the first one counts). */
+function readList<T extends { id: string }>(items: unknown[], read: (value: unknown) => T | null, keep: (item: T) => boolean = () => true): T[] {
+  const list: T[] = [];
+  for (const value of items) {
+    const item = read(value);
+    if (item && keep(item) && !list.some((other) => other.id === item.id)) list.push(item);
+  }
+  return list;
 }
 
 // =============================================================================================
@@ -55,15 +101,16 @@ export const UNLOCK_TIMEOUT_MS = 15_000;
 /**
  * What came of asking the server:
  *
- *   examples      the server answered: `member` says whether the code is on the list, and
- *                 `examples` holds what this visitor may load (for a member: every example)
- *   rejected      the server says no: the code is not (or no longer) on the list
+ *   examples      the server answered: `member` says whether a code was accepted, `cards` and
+ *                 `levels` hold what this visitor may see, and `examples` what they may open
+ *                 (with an accepted code: every card)
+ *   rejected      the server says no: the code is not (or no longer) accepted
  *   busy          too many wrong codes came from this network; the server asks to wait
  *                 (`waitSeconds`: for how long, when the server said so)
  *   unreachable   no answer, or an answer that makes no sense - nothing is known
  */
 export type UnlockOutcome =
-  | { kind: 'examples'; member: boolean; examples: ExampleProgram[] }
+  | ({ kind: 'examples'; member: boolean } & ExampleShelf)
   | { kind: 'rejected' }
   | { kind: 'busy'; waitSeconds?: number }
   | { kind: 'unreachable' };
@@ -74,15 +121,14 @@ const REFUSED_CODE = new Set(['invalid-code', 'bad-request', 'too-large']);
 /** Read the server's answer. Anything that is not clearly "yes" or "no" counts as "unreachable". */
 export function readUnlockAnswer(status: number, answer: unknown): UnlockOutcome {
   if (!isRecord(answer)) return { kind: 'unreachable' };
-  if (status === 200 && answer.ok === true && typeof answer.member === 'boolean' && Array.isArray(answer.examples)) {
-    const examples: ExampleProgram[] = [];
-    for (const item of answer.examples) {
-      const example = readExample(item);
-      if (example && !examples.some((e) => e.id === example.id)) examples.push(example);
-    }
-    // a member's answer always holds examples: one without any is a broken answer, not a "yes"
-    if (answer.member && examples.length === 0) return { kind: 'unreachable' };
-    return { kind: 'examples', member: answer.member, examples };
+  if (status === 200 && answer.ok === true && typeof answer.member === 'boolean' && Array.isArray(answer.levels) && Array.isArray(answer.cards) && Array.isArray(answer.examples)) {
+    // a card needs a heading to stand under, and an example needs its card: whatever is damaged is left out
+    const levels = readList(answer.levels, readLevel);
+    const cards = readList(answer.cards, readCard, (card) => levels.some((level) => level.id === card.level));
+    const examples = readList(answer.examples, readExample, (example) => cards.some((card) => card.id === example.id));
+    // an accepted code opens examples: an answer that names some, of which not one can be read, is a broken answer and not a "yes"
+    if (answer.member && examples.length === 0 && (answer.examples.length > 0 || answer.cards.length > 0)) return { kind: 'unreachable' };
+    return { kind: 'examples', member: answer.member, levels: levels.filter((level) => cards.some((card) => card.level === level.id)), cards, examples };
   }
   if (answer.ok !== false) return { kind: 'unreachable' };
   if (status === 429 || answer.reason === 'too-many-attempts') return { kind: 'busy' };
@@ -91,9 +137,9 @@ export function readUnlockAnswer(status: number, answer: unknown): UnlockOutcome
 }
 
 /**
- * Ask the server what this visitor may have: with a member code, or with `null` for the
- * examples that are open to everyone. Never throws: a broken connection, a timeout and a server
- * error all come back as "unreachable".
+ * Ask the server what this visitor may see and open: with a code, or with `null` for what a
+ * visitor without a code gets. Never throws: a broken connection, a timeout and a server error
+ * all come back as "unreachable".
  */
 export async function requestUnlock(
   url: string,
@@ -141,7 +187,7 @@ export const PATIENT_TRIES = 3;
 const realSleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * Ask the server about a member code, and wait out a short "wait".
+ * Ask the server about a code, and wait out a short "wait".
  *
  * When very many wrong codes came from one network (a classroom whose browsers all still send
  * a cancelled code, say), the server checks the codes from that network one after the other

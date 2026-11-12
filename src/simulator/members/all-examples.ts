@@ -1,11 +1,13 @@
 /**
  * Every example of the Fire Rescue simulator with its description and its program, in the order
- * of the Examples window: what the server hands out (see ./unlock.ts).
+ * of the Examples window, and the headings of their levels: what the server hands out from
+ * (see ./unlock.ts).
  *
- * Server only. This file brings ../fire-rescue/samples.ts along, so nothing of the simulator
- * screen may import it (a test, ./client-guard.test.ts, watches over this).
+ * Server only. This file brings ../fire-rescue/samples.ts and ../fire-rescue/sample-catalog.ts
+ * along, so nothing of the simulator screen may import it (a test, ./client-guard.test.ts,
+ * watches over this).
  */
-import { SAMPLE_CATALOG } from '../fire-rescue/sample-catalog';
+import { EXAMPLE_LEVELS, SAMPLE_CATALOG } from '../fire-rescue/sample-catalog';
 import { getSampleProgram, type SampleProgram } from '../fire-rescue/samples';
 
 /** The seven examples: the six samples and the full mission, ordered like the list in sample-catalog.ts. */
@@ -14,3 +16,6 @@ export const ALL_EXAMPLES: readonly SampleProgram[] = SAMPLE_CATALOG.map((card) 
   if (!sample) throw new Error(`The example "${card.id}" is on the list (sample-catalog.ts) but has no program in samples.ts.`);
   return sample;
 });
+
+/** The headings of the levels (Starter, Intermediate, Advanced), in the order of the Examples window. */
+export const ALL_LEVELS = EXAMPLE_LEVELS;

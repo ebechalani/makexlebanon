@@ -1,15 +1,18 @@
 /**
- * Member codes and the server's side of the Examples window.
+ * Member codes, advanced codes and the server's side of the Examples window.
  *
  *   - how a typed code is tidied up (code-format.mjs)
  *   - the fingerprint of a code (code-fingerprint.mjs), against a value worked out independently
  *   - what the server answers (unlock.ts): no code, a right code, a wrong one, a broken request,
  *     a request that is too large, a cancelled code, examples that are open to everyone
+ *   - who sees what: a visitor, a member code and an advanced code - and that an example kept
+ *     for advanced codes only is in no answer but the one to an advanced code
  *   - the courtesy limit on wrong codes
  *   - the owner's file (content/simulator-codes.ts) and the list of examples
+ *   - the address of the website itself (src/app/api/simulator/unlock/route.ts), with the owner's lists
  *   - the script that makes new codes (scripts/generate-simulator-codes.mjs): its fingerprints
- *     are the server's, it never writes a code into the repository, and it leaves
- *     "examplesOpenToEveryone" alone
+ *     are the server's, it never writes a code into the repository, it changes one list of
+ *     codes at a time and leaves everything else in the file alone
  */
 import assert from 'node:assert/strict';
 import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
@@ -18,18 +21,30 @@ import path from 'node:path';
 import { after, before, describe, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { examplesOpenToEveryone, nextSimulatorCodeNumber, simulatorCodes } from '../../../content/simulator-codes';
-import { addToListFile, emptyListFile, freshListFile, main as generateCodes, readListFile } from '../../../scripts/generate-simulator-codes.mjs';
-import { SAMPLE_CATALOG } from '../fire-rescue/sample-catalog';
+import {
+  advancedSimulatorCodes,
+  examplesForAdvancedCodesOnly,
+  examplesOpenToEveryone,
+  nextAdvancedSimulatorCodeNumber,
+  nextSimulatorCodeNumber,
+  simulatorCodes,
+} from '../../../content/simulator-codes';
+import { addToListFile, emptyListFile, freshListFile, main as generateCodes, makeCodes, readListFile } from '../../../scripts/generate-simulator-codes.mjs';
+import { GET as routeGet, POST as routePost } from '../../app/api/simulator/unlock/route';
+import { EXAMPLE_LEVELS, SAMPLE_CATALOG } from '../fire-rescue/sample-catalog';
 import { FULL_MISSION_SAMPLE, SAMPLE_PROGRAMS } from '../fire-rescue/samples';
-import { ALL_EXAMPLES } from './all-examples';
+import { ALL_EXAMPLES, ALL_LEVELS } from './all-examples';
 import { FINGERPRINT_BYTES, FINGERPRINT_PATTERN, FINGERPRINT_ROUNDS, FINGERPRINT_SALT, fingerprintOf } from './code-fingerprint.mjs';
 import { CODE_ALPHABET, CODE_EXAMPLE, CODE_LENGTH, CODE_PREFIX, formatCode, maskCode, normalizeCode } from './code-format.mjs';
-import { AttemptLimiter, handleUnlockRequest, isMemberCode, MAX_BODY_BYTES, type CodeEntry, type UnlockRequest, type UnlockResponse, type UnlockSetup } from './unlock';
+import { AttemptLimiter, handleUnlockRequest, isMemberCode, kindOfCode, MAX_BODY_BYTES, mistakesInSetup, type CodeEntry, type UnlockRequest, type UnlockResponse, type UnlockSetup } from './unlock';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 
 const MENU_ORDER = ['hello', 'line-follow', 'gripper-demo', 'one-bucket', 'one-person', 'smart-bucket', 'full-mission'];
+
+/** Every card and every heading, as the server sends them when nothing is hidden. */
+const ALL_CARDS = SAMPLE_CATALOG.map(({ id, title, level }) => ({ id, title, level }));
+const ALL_HEADINGS = EXAMPLE_LEVELS.map(({ id, title, about }) => ({ id, title, about }));
 
 // =============================================================================================
 // What a code looks like
@@ -159,6 +174,23 @@ describe('the list of examples', () => {
     assert.equal(new Set(SAMPLE_CATALOG.map((card) => card.title)).size, 7, 'no title twice');
   });
 
+  test('every level has a heading, in the order of the Examples window', () => {
+    assert.deepEqual(
+      EXAMPLE_LEVELS.map((level) => level.id),
+      ['starter', 'intermediate', 'advanced'],
+    );
+    for (const level of EXAMPLE_LEVELS) {
+      assert.deepEqual(Object.keys(level).sort(), ['about', 'id', 'title'], `${level.id}: nothing but id, title and about`);
+      assert.ok(level.title.length > 3 && level.about.length > 3, level.id);
+    }
+    assert.deepEqual(
+      EXAMPLE_LEVELS.map((level) => level.title),
+      ['Starter', 'Intermediate', 'Advanced'],
+    );
+    for (const card of SAMPLE_CATALOG) assert.ok(EXAMPLE_LEVELS.some((level) => level.id === card.level), `${card.id} stands under a heading`);
+    assert.equal(ALL_LEVELS, EXAMPLE_LEVELS, 'the server hands out these headings');
+  });
+
   test('every example of the catalog has its program and description on the server, and the titles agree', () => {
     assert.deepEqual(
       ALL_EXAMPLES.map((example) => example.id),
@@ -185,10 +217,17 @@ describe('the list of examples', () => {
 // The server's answers
 // =============================================================================================
 
-/** Three made-up codes; only the first two are on the list. */
+/** Made-up codes: the first two are on the list of member codes, the third is on no list, the last two are advanced codes where a test says so. */
 const CODE_A = 'FIRE-AAAA-2222';
 const CODE_B = 'FIRE-BBBB-3333';
 const CODE_NOT_LISTED = 'FIRE-CCCC-4444';
+const CODE_ADVANCED = 'FIRE-DDDD-5555';
+const CODE_ADVANCED_2 = 'FIRE-EEEE-6666';
+
+/** One line of a list for a made-up code. */
+async function entryFor(no: number, code: string): Promise<CodeEntry> {
+  return { no, fingerprint: await fingerprintOf(normalizeCode(code) as string) };
+}
 
 /** Sentences and texts that exist only inside descriptions and programs: no refusal may carry them. */
 const SECRETS = ['Hello MakeX!', 'Person here - other square', 'Mission complete!', 'A first program', 'reads its colour with the colour sensor', 'A complete solution'];
@@ -202,7 +241,7 @@ function assertNoExampleData(response: UnlockResponse, why: string): void {
   assert.equal(response.body.ok, false, why);
   assert.deepEqual(Object.keys(response.body).sort(), ['ok', 'reason'], `${why}: nothing but ok and reason`);
   const text = JSON.stringify(response);
-  for (const word of ['examples', 'description', 'program', 'blocks', ...SECRETS, ...SAMPLE_CATALOG.map((card) => card.title)]) {
+  for (const word of ['examples', 'cards', 'levels', 'description', 'program', 'blocks', ...SECRETS, ...SAMPLE_CATALOG.map((card) => card.title), ...SAMPLE_CATALOG.map((card) => `"${card.id}"`), ...EXAMPLE_LEVELS.map((level) => level.title)]) {
     assert.ok(!text.includes(word), `${why}: the answer does not contain "${word}"`);
   }
   assert.equal(response.headers['Cache-Control'], 'no-store', why);
@@ -217,16 +256,18 @@ describe('POST /api/simulator/unlock (handleUnlockRequest)', () => {
       { no: 1, fingerprint: await fingerprintOf(normalizeCode(CODE_A) as string) },
       { no: 2, fingerprint: await fingerprintOf(normalizeCode(CODE_B) as string) },
     ];
-    setup = { codes, examples: ALL_EXAMPLES, openToEveryone: [] };
+    // (nothing is open to everyone and nothing is kept for advanced codes: the simplest case)
+    setup = { codes, advancedCodes: [], examples: ALL_EXAMPLES, levels: ALL_LEVELS, openToEveryone: [], advancedOnly: [] };
   });
 
-  test('no code: 200, not a member, and no example at all while nothing is open to everyone', async () => {
+  test('no code: 200, not a member, every card to see - and no example to open while nothing is open to everyone', async () => {
     for (const body of [{}, { code: '' }, { code: '   ' }, { code: null }, { other: 'field' }, '', '  \n']) {
       const response = await handleUnlockRequest(post(body), setup);
       assert.equal(response.status, 200, JSON.stringify(body));
-      assert.deepEqual(response.body, { ok: true, member: false, examples: [] }, JSON.stringify(body));
+      assert.deepEqual(response.body, { ok: true, member: false, levels: ALL_HEADINGS, cards: ALL_CARDS, examples: [] }, JSON.stringify(body));
       assert.equal(response.headers['Cache-Control'], 'no-store');
-      for (const secret of SECRETS) assert.ok(!JSON.stringify(response).includes(secret));
+      // a card is an id, a title and a level - never a description or a program
+      for (const secret of [...SECRETS, 'description', 'program', 'blocks']) assert.ok(!JSON.stringify(response).includes(secret), secret);
     }
   });
 
@@ -236,6 +277,9 @@ describe('POST /api/simulator/unlock (handleUnlockRequest)', () => {
     assert.equal(response.headers['Cache-Control'], 'no-store');
     assert.ok(response.body.ok);
     assert.equal(response.body.member, true);
+    assert.deepEqual(Object.keys(response.body).sort(), ['cards', 'examples', 'levels', 'member', 'ok']);
+    assert.deepEqual(response.body.levels, ALL_HEADINGS);
+    assert.deepEqual(response.body.cards, ALL_CARDS);
     assert.deepEqual(
       response.body.examples.map((example) => example.id),
       MENU_ORDER,
@@ -320,7 +364,7 @@ describe('POST /api/simulator/unlock (handleUnlockRequest)', () => {
     // a request without any text is "no code" and has nothing to describe
     for (const contentType of [null, 'text/plain']) {
       const response = await handleUnlockRequest(post('', '10.0.0.1', contentType), setup);
-      assert.deepEqual(response.body, { ok: true, member: false, examples: [] });
+      assert.deepEqual(response.body, { ok: true, member: false, levels: ALL_HEADINGS, cards: ALL_CARDS, examples: [] });
     }
   });
 
@@ -372,6 +416,7 @@ describe('POST /api/simulator/unlock (handleUnlockRequest)', () => {
     assert.equal(open.status, 200);
     assert.ok(open.body.ok);
     assert.equal(open.body.member, false);
+    assert.deepEqual(open.body.cards, ALL_CARDS, 'the cards are the same: only what can be opened changes');
     assert.equal(open.body.examples.length, 1);
     assert.deepEqual(open.body.examples[0], {
       id: 'hello',
@@ -405,6 +450,284 @@ describe('POST /api/simulator/unlock (handleUnlockRequest)', () => {
 });
 
 // =============================================================================================
+// Who sees what: a visitor, a member code, an advanced code
+// =============================================================================================
+
+describe('who sees what: a visitor, a member code and an advanced code', () => {
+  const STARTERS = ['hello', 'line-follow', 'gripper-demo'];
+  const FOR_MEMBERS = ['hello', 'line-follow', 'gripper-demo', 'one-bucket', 'one-person'];
+  const HIDDEN = ['smart-bucket', 'full-mission'];
+
+  /** The owner's choice: the starters are open to everyone, the two advanced examples are for advanced codes only. */
+  let setup: UnlockSetup;
+
+  before(async () => {
+    setup = {
+      codes: [await entryFor(1, CODE_A), await entryFor(2, CODE_B)],
+      advancedCodes: [await entryFor(1, CODE_ADVANCED), await entryFor(2, CODE_ADVANCED_2)],
+      examples: ALL_EXAMPLES,
+      levels: ALL_LEVELS,
+      openToEveryone: STARTERS,
+      advancedOnly: HIDDEN,
+    };
+  });
+
+  const ask = (code: string | null, with_: Partial<UnlockSetup> = {}) => handleUnlockRequest(post(code === null ? {} : { code }), { ...setup, ...with_ });
+
+  /** The "yes" of an answer, or a failed test. */
+  function yes(response: UnlockResponse) {
+    assert.equal(response.status, 200);
+    assert.ok(response.body.ok);
+    assert.equal(response.headers['Cache-Control'], 'no-store');
+    assert.deepEqual(Object.keys(response.body).sort(), ['cards', 'examples', 'levels', 'member', 'ok'], 'the same five fields in every "yes"');
+    return response.body;
+  }
+
+  const ids = (list: Array<{ id: string }>): string[] => list.map((item) => item.id);
+
+  /** Everything that would give a hidden example away: its id, its title, its texts, its program, and the heading of a level nobody else sees. */
+  function assertNothingAbout(hiddenIds: string[], response: UnlockResponse, who: string): void {
+    const text = JSON.stringify(response);
+    for (const example of ALL_EXAMPLES.filter((e) => hiddenIds.includes(e.id))) {
+      assert.ok(!text.includes(`"${example.id}"`), `${who}: the answer does not hold the id "${example.id}"`);
+      assert.ok(!text.includes(example.title), `${who}: the answer does not hold the title "${example.title}"`);
+      assert.ok(!text.includes(example.description.slice(0, 60)), `${who}: the answer does not hold the description of ${example.id}`);
+      assert.ok(!text.includes(JSON.stringify(example.program).slice(0, 200)), `${who}: the answer does not hold the program of ${example.id}`);
+    }
+    for (const level of EXAMPLE_LEVELS) {
+      const shown = ALL_EXAMPLES.some((e) => e.level === level.id && !hiddenIds.includes(e.id));
+      if (shown) continue;
+      for (const word of [`"${level.id}"`, level.title, level.about]) assert.ok(!text.includes(word), `${who}: the answer does not hold "${word}"`);
+    }
+  }
+
+  test('no code: the starters to open, the members\' cards to see - and nothing at all about the advanced examples', async () => {
+    const response = await ask(null);
+    const body = yes(response);
+    assert.equal(body.member, false);
+    assert.deepEqual(ids(body.cards), FOR_MEMBERS, 'five cards, in menu order');
+    assert.deepEqual(ids(body.examples), STARTERS, 'three of them can be opened');
+    assert.deepEqual(
+      body.levels.map((level) => level.title),
+      ['Starter', 'Intermediate'],
+      'no "Advanced" heading',
+    );
+    for (const card of body.cards) assert.deepEqual(Object.keys(card).sort(), ['id', 'level', 'title']);
+    for (const example of body.examples) assert.deepEqual(example, ALL_EXAMPLES.find((e) => e.id === example.id));
+    assertNothingAbout(HIDDEN, response, 'a visitor');
+    // the intermediate examples are cards only: a title, no description, no program
+    for (const secret of ['Person here - other square', 'driving by distance only', 'Mission complete!', 'A complete solution', '9216', 'Smart', 'smart', 'Full mission', 'dvanced']) {
+      assert.ok(!JSON.stringify(response).includes(secret), `a visitor's answer does not hold "${secret}"`);
+    }
+  });
+
+  test('a member code: the five examples for members, all open - and nothing at all about the advanced examples', async () => {
+    for (const code of [CODE_A, CODE_B, 'fire bbbb 3333']) {
+      const response = await ask(code);
+      const body = yes(response);
+      assert.equal(body.member, true);
+      assert.deepEqual(ids(body.cards), FOR_MEMBERS);
+      assert.deepEqual(ids(body.examples), FOR_MEMBERS, 'every card can be opened');
+      assert.deepEqual(
+        body.levels.map((level) => level.title),
+        ['Starter', 'Intermediate'],
+      );
+      for (const example of body.examples) assert.deepEqual(example, ALL_EXAMPLES.find((e) => e.id === example.id));
+      assertNothingAbout(HIDDEN, response, 'a member');
+      for (const secret of ['Mission complete!', 'A complete solution', '9216', 'Smart', 'smart', 'Full mission', 'dvanced', 'tier', 'kind', 'hidden']) {
+        assert.ok(!JSON.stringify(response).includes(secret), `a member's answer does not hold "${secret}"`);
+      }
+    }
+  });
+
+  test('an advanced code: all seven examples, with the "Advanced" heading', async () => {
+    for (const code of [CODE_ADVANCED, CODE_ADVANCED_2, ' dddd-5555 ']) {
+      const body = yes(await ask(code));
+      assert.equal(body.member, true);
+      assert.deepEqual(ids(body.cards), MENU_ORDER);
+      assert.deepEqual(ids(body.examples), MENU_ORDER);
+      assert.deepEqual(body.levels, ALL_HEADINGS);
+      assert.deepEqual(body.cards, ALL_CARDS);
+      body.examples.forEach((example, i) => assert.deepEqual(example, { ...ALL_CARDS[i], description: ALL_EXAMPLES[i].description, program: ALL_EXAMPLES[i].program }));
+    }
+  });
+
+  test('nothing in an answer says that examples were left out, or that another kind of code exists', async () => {
+    // a website that simply HAS only the five examples answers a visitor and a member in exactly the same way
+    const onlyFive: Partial<UnlockSetup> = { examples: ALL_EXAMPLES.filter((e) => !HIDDEN.includes(e.id)), advancedOnly: [], advancedCodes: [] };
+    assert.deepEqual(await ask(null), await ask(null, onlyFive), 'a visitor');
+    assert.deepEqual(await ask(CODE_A), await ask(CODE_A, onlyFive), 'a member');
+    // a member's answer and an advanced answer are made of the same fields, and say "member" alike
+    const member = yes(await ask(CODE_A));
+    const advanced = yes(await ask(CODE_ADVANCED));
+    assert.deepEqual(Object.keys(member), Object.keys(advanced));
+    assert.equal(member.member, advanced.member);
+    assert.deepEqual(Object.keys(member.cards[0]), Object.keys(advanced.cards[0]));
+    assert.deepEqual(Object.keys(member.examples[0]), Object.keys(advanced.examples[0]));
+    // and what both may open is the same, example for example
+    assert.deepEqual(member.examples, advanced.examples.slice(0, 5));
+  });
+
+  test('a code on neither list: 403 and nothing else, also when it is close to an advanced code', async () => {
+    const answers = new Set<string>();
+    for (const code of [CODE_NOT_LISTED, 'FIRE-DDDD-5556', 'FIRE-DDDD-555', 'advanced', 'ADVANCED-DDDD-5555']) {
+      const response = await ask(code);
+      assert.equal(response.status, 403, code);
+      assert.deepEqual(response.body, { ok: false, reason: 'invalid-code' });
+      assertNoExampleData(response, code);
+      answers.add(JSON.stringify(response));
+    }
+    assert.equal(answers.size, 1, 'one and the same answer');
+  });
+
+  test('a cancelled advanced code opens nothing any more - not even what a member code opens; the other codes still work', async () => {
+    const afterCancelling: Partial<UnlockSetup> = { advancedCodes: setup.advancedCodes.filter((entry) => entry.no !== 1) };
+    const cancelled = await ask(CODE_ADVANCED, afterCancelling);
+    assert.equal(cancelled.status, 403);
+    assertNoExampleData(cancelled, 'a cancelled advanced code');
+    assert.deepEqual(ids(yes(await ask(CODE_ADVANCED_2, afterCancelling)).examples), MENU_ORDER);
+    assert.deepEqual(ids(yes(await ask(CODE_A, afterCancelling)).examples), FOR_MEMBERS);
+    // no advanced code at all: the advanced examples are hidden from everybody
+    assert.equal((await ask(CODE_ADVANCED, { advancedCodes: [] })).status, 403);
+    assertNothingAbout(HIDDEN, await ask(CODE_A, { advancedCodes: [] }), 'a member, with no advanced code on the list');
+    // and a cancelled member code does not touch the advanced codes
+    assert.equal((await ask(CODE_A, { codes: [] })).status, 403);
+    assert.deepEqual(ids(yes(await ask(CODE_ADVANCED, { codes: [] })).examples), MENU_ORDER);
+  });
+
+  test('the two lists are told apart by the code alone: a hit on the advanced list wins', async () => {
+    assert.equal(await kindOfCode(CODE_A, setup.codes, setup.advancedCodes), 'member');
+    assert.equal(await kindOfCode(CODE_ADVANCED, setup.codes, setup.advancedCodes), 'advanced');
+    assert.equal(await kindOfCode(CODE_NOT_LISTED, setup.codes, setup.advancedCodes), null);
+    for (const notACode of ['', 'hello', null, 42, undefined]) assert.equal(await kindOfCode(notACode, setup.codes, setup.advancedCodes), null);
+    // a code that is on both lists (a slip while editing) is an advanced code
+    const both = [...setup.codes, await entryFor(3, CODE_ADVANCED)];
+    assert.equal(await kindOfCode(CODE_ADVANCED, both, setup.advancedCodes), 'advanced');
+    assert.deepEqual(ids(yes(await ask(CODE_ADVANCED, { codes: both })).examples), MENU_ORDER);
+    // lines that are not a fingerprint are ignored in both lists
+    const sloppy = [{ no: 1, fingerprint: '' }, { no: 2, fingerprint: 'not hex' }, { no: 3 }, null] as CodeEntry[];
+    assert.equal(await kindOfCode(CODE_ADVANCED, [...sloppy, ...setup.codes], [...sloppy, ...setup.advancedCodes]), 'advanced');
+    assert.equal(await kindOfCode(CODE_A, [...sloppy, ...setup.codes], [...sloppy, ...setup.advancedCodes]), 'member');
+    assert.equal(await kindOfCode(CODE_NOT_LISTED, sloppy, sloppy), null);
+    // looked at as ONE list, an advanced code is no member code
+    assert.equal(await isMemberCode(CODE_ADVANCED, setup.codes), false);
+    assert.equal(await isMemberCode(CODE_ADVANCED, setup.advancedCodes), true);
+  });
+
+  test('"examplesForAdvancedCodesOnly" empty: nothing is hidden, and an advanced code opens exactly what a member code opens', async () => {
+    const nothingHidden: Partial<UnlockSetup> = { advancedOnly: [] };
+    const visitor = yes(await ask(null, nothingHidden));
+    assert.deepEqual(ids(visitor.cards), MENU_ORDER, 'a visitor sees all seven cards');
+    assert.deepEqual(ids(visitor.examples), STARTERS);
+    assert.deepEqual(visitor.levels, ALL_HEADINGS);
+    const member = await ask(CODE_A, nothingHidden);
+    assert.deepEqual(ids(yes(member).examples), MENU_ORDER);
+    assert.deepEqual(await ask(CODE_ADVANCED, nothingHidden), member, 'the very same answer');
+  });
+
+  test('an example that is on both lists stays hidden: the stricter rule wins', async () => {
+    const both: Partial<UnlockSetup> = { openToEveryone: [...STARTERS, 'full-mission'], advancedOnly: HIDDEN };
+    const visitor = await ask(null, both);
+    assert.deepEqual(ids(yes(visitor).cards), FOR_MEMBERS);
+    assert.deepEqual(ids(yes(visitor).examples), STARTERS, '"full-mission" is not opened to everyone');
+    assertNothingAbout(HIDDEN, visitor, 'a visitor');
+    assertNothingAbout(HIDDEN, await ask(CODE_A, both), 'a member');
+    assert.deepEqual(ids(yes(await ask(CODE_ADVANCED, both)).examples), MENU_ORDER);
+    // also a starter can be hidden - then it is hidden from visitors too, whatever the other list says
+    const starterHidden: Partial<UnlockSetup> = { advancedOnly: ['hello'] };
+    const withoutHello = MENU_ORDER.filter((id) => id !== 'hello');
+    assert.deepEqual(ids(yes(await ask(null, starterHidden)).cards), withoutHello);
+    assert.deepEqual(ids(yes(await ask(null, starterHidden)).examples), ['line-follow', 'gripper-demo']);
+    assert.deepEqual(ids(yes(await ask(CODE_A, starterHidden)).examples), withoutHello);
+    assertNothingAbout(['hello'], await ask(null, starterHidden), 'a visitor');
+    assert.deepEqual(ids(yes(await ask(CODE_ADVANCED, starterHidden)).examples), MENU_ORDER);
+  });
+
+  test('ids that do not exist, doubles and wrong capitals hide nothing', async () => {
+    const sloppy: Partial<UnlockSetup> = { advancedOnly: ['no-such-example', 'FULL-MISSION', 'full mission', '', 'smart-bucket', 'smart-bucket'] };
+    const visitor = yes(await ask(null, sloppy));
+    assert.deepEqual(
+      ids(visitor.cards),
+      MENU_ORDER.filter((id) => id !== 'smart-bucket'),
+      'only the id that is spelt right is hidden',
+    );
+    assert.deepEqual(visitor.levels, ALL_HEADINGS, '"Advanced" still has a card: the full mission');
+    assert.deepEqual(
+      ids(yes(await ask(CODE_A, sloppy)).examples),
+      MENU_ORDER.filter((id) => id !== 'smart-bucket'),
+    );
+  });
+
+  test('a line of "examplesForAdvancedCodesOnly" that is no example is a mistake that must not go live: the website refuses to be built with it', () => {
+    // (answering a request, such a line hides nothing - see the test above - which is exactly why the site must not be built with one)
+    assert.deepEqual(mistakesInSetup(setup), [], 'the two advanced examples: all is well');
+    assert.deepEqual(mistakesInSetup({ ...setup, advancedOnly: [] }), [], 'nothing hidden is a choice, not a mistake');
+    assert.deepEqual(mistakesInSetup({ ...setup, advancedOnly: MENU_ORDER }), [], 'everything hidden too');
+    assert.deepEqual(mistakesInSetup({ ...setup, advancedOnly: ['full-mission', 'full-mission'] }), [], 'a line written twice hides the same example');
+    for (const slip of ['smart-buckett', 'Smart-Bucket', 'smart bucket', 'smartbucket', ' full-mission', 'advanced', '']) {
+      const mistakes = mistakesInSetup({ ...setup, advancedOnly: ['full-mission', slip] });
+      assert.equal(mistakes.length, 1, JSON.stringify(slip));
+      assert.ok(mistakes[0].includes(`'${slip}'`) && mistakes[0].includes('examplesForAdvancedCodesOnly') && mistakes[0].includes('NOT be hidden'), mistakes[0]);
+      // the text names what the owner wrote, and no example: it ends up in a build log
+      // (what the owner wrote is taken out first: 'smart-buckett' holds the id it was meant to be)
+      const besidesTheSlip = mistakes[0].split(`'${slip}'`).join('');
+      for (const example of ALL_EXAMPLES) {
+        assert.ok(!mistakes[0].includes(example.title), example.title);
+        if (example.id.includes('-')) assert.ok(!besidesTheSlip.includes(example.id), example.id);
+      }
+    }
+    assert.equal(mistakesInSetup({ ...setup, advancedOnly: ['a', 'b', 'hello'] }).length, 2, 'every such line is named');
+    // an example that was given a new id in the catalog, while the owner's list still has the old one
+    const renamed = ALL_EXAMPLES.map((example) => (example.id === 'full-mission' ? { ...example, id: 'whole-match' } : example));
+    assert.equal(mistakesInSetup({ examples: renamed, advancedOnly: HIDDEN }).length, 1);
+    // a list that is no list any more (a slip that TypeScript does not always see)
+    assert.equal(mistakesInSetup({ examples: ALL_EXAMPLES, advancedOnly: 'full-mission' as unknown as string[] }).length, 1);
+    assert.equal(mistakesInSetup({ examples: ALL_EXAMPLES, advancedOnly: [null as unknown as string] }).length, 1);
+  });
+
+  test('a heading is sent only together with a card of its level', async () => {
+    // one advanced example left for members: the heading is there, and the card is locked for a visitor
+    const oneLeft = yes(await ask(null, { advancedOnly: ['full-mission'] }));
+    assert.deepEqual(oneLeft.levels, ALL_HEADINGS);
+    assert.ok(ids(oneLeft.cards).includes('smart-bucket') && !ids(oneLeft.examples).includes('smart-bucket'));
+    // a whole level in the middle hidden: its heading is gone, the others stay in order
+    const noIntermediate = yes(await ask(CODE_A, { advancedOnly: ['one-bucket', 'one-person'] }));
+    assert.deepEqual(
+      noIntermediate.levels.map((level) => level.id),
+      ['starter', 'advanced'],
+    );
+    assertNothingAbout(['one-bucket', 'one-person'], await ask(CODE_A, { advancedOnly: ['one-bucket', 'one-person'] }), 'a member');
+  });
+
+  test('every example for advanced codes only: a visitor and a member get an honest, empty answer', async () => {
+    const all: Partial<UnlockSetup> = { advancedOnly: MENU_ORDER };
+    assert.deepEqual((await ask(null, all)).body, { ok: true, member: false, levels: [], cards: [], examples: [] });
+    assert.deepEqual((await ask(CODE_A, all)).body, { ok: true, member: true, levels: [], cards: [], examples: [] });
+    assert.deepEqual(ids(yes(await ask(CODE_ADVANCED, all)).examples), MENU_ORDER);
+    // and with no example at all on the website, everybody does
+    assert.deepEqual((await ask(CODE_ADVANCED, { examples: [] })).body, { ok: true, member: true, levels: [], cards: [], examples: [] });
+  });
+
+  test('an advanced code is a right code for the courtesy limit: it never counts, and it waits its turn like any other', async () => {
+    const limiter = new AttemptLimiter(2, 60_000, 5000, 1_000);
+    let clock = 1_000;
+    const from = (code: string) => handleUnlockRequest(post({ code }, 'school'), { ...setup, limiter, now: () => clock });
+    for (let i = 0; i < 12; i++) assert.equal((await from(CODE_ADVANCED)).status, 200);
+    assert.equal((limiter as unknown as { clients: Map<string, unknown> }).clients.size, 0, 'nothing is remembered about this address');
+    for (let i = 0; i < 3; i++) assert.equal((await from(CODE_NOT_LISTED)).status, 403);
+    // over the limit: nothing is looked at until the second is over - not a member code, not an advanced code
+    for (const code of [CODE_ADVANCED, CODE_A]) {
+      const waiting = await from(code);
+      assert.equal(waiting.status, 429);
+      assertNoExampleData(waiting, 'a right code that was not looked at');
+    }
+    clock = 2_000;
+    assert.deepEqual(ids(yes(await from(CODE_ADVANCED)).examples), MENU_ORDER);
+    assert.deepEqual(ids(yes(await from(CODE_A)).examples), FOR_MEMBERS, 'the advanced code did not use the turn up');
+  });
+});
+
+// =============================================================================================
 // The courtesy limit
 // =============================================================================================
 
@@ -415,8 +738,11 @@ describe('the courtesy limit on wrong codes', () => {
   before(async () => {
     setup = {
       codes: [{ no: 1, fingerprint: await fingerprintOf(normalizeCode(CODE_A) as string) }],
+      advancedCodes: [],
       examples: ALL_EXAMPLES,
+      levels: ALL_LEVELS,
       openToEveryone: [],
+      advancedOnly: [],
       now: () => clock,
     };
   });
@@ -581,42 +907,215 @@ describe('the courtesy limit on wrong codes', () => {
 describe('content/simulator-codes.ts', () => {
   const file = path.join(REPO_ROOT, 'content', 'simulator-codes.ts');
   const text = readFileSync(file, 'utf8');
+  const exampleIds = SAMPLE_CATALOG.map((card) => card.id);
 
-  test('every line of the list is a number and a fingerprint; no number and no fingerprint twice', () => {
-    assert.ok(Array.isArray(simulatorCodes));
-    for (const entry of simulatorCodes) {
-      assert.ok(Number.isInteger(entry.no) && entry.no >= 1, `number ${entry.no}`);
-      assert.match(entry.fingerprint, FINGERPRINT_PATTERN, `the fingerprint of number ${entry.no}`);
+  for (const [name, codes, next] of [
+    ['simulatorCodes (the member codes)', simulatorCodes, nextSimulatorCodeNumber],
+    ['advancedSimulatorCodes (the advanced codes)', advancedSimulatorCodes, nextAdvancedSimulatorCodeNumber],
+  ] as const) {
+    test(`${name}: every line is a number and a fingerprint; no number and no fingerprint twice`, () => {
+      assert.ok(Array.isArray(codes));
+      for (const entry of codes) {
+        assert.ok(Number.isInteger(entry.no) && entry.no >= 1, `number ${entry.no}`);
+        assert.match(entry.fingerprint, FINGERPRINT_PATTERN, `the fingerprint of number ${entry.no}`);
+      }
+      assert.equal(new Set(codes.map((entry) => entry.no)).size, codes.length, 'no number twice');
+      assert.equal(new Set(codes.map((entry) => entry.fingerprint)).size, codes.length, 'no fingerprint twice');
+      const highest = Math.max(0, ...codes.map((entry) => entry.no));
+      assert.ok(Number.isInteger(next) && next > highest, 'the next number is above every number on the list');
+    });
+  }
+
+  test('no code is on both lists: a member code is not an advanced code as well', () => {
+    const advanced = new Map(advancedSimulatorCodes.map((entry) => [entry.fingerprint, entry.no]));
+    const onBoth = simulatorCodes.filter((entry) => advanced.has(entry.fingerprint)).map((entry) => `member code ${entry.no} = advanced code A${advanced.get(entry.fingerprint)}`);
+    assert.deepEqual(onBoth, [], 'a line was copied from one list to the other: take it out of one of them');
+  });
+
+  test('the script can read the file, and sees the same two lists', () => {
+    for (const [kind, codes, next] of [
+      ['member', simulatorCodes, nextSimulatorCodeNumber],
+      ['advanced', advancedSimulatorCodes, nextAdvancedSimulatorCodeNumber],
+    ] as const) {
+      const info = readListFile(text, kind);
+      assert.ok(info, `the list of ${kind} codes has the shape the script writes`);
+      assert.equal(info.active, codes.length, kind);
+      assert.equal(info.nextNumber, next, kind);
+      for (const entry of codes) assert.ok(info.fingerprints.has(entry.fingerprint));
     }
-    assert.equal(new Set(simulatorCodes.map((entry) => entry.no)).size, simulatorCodes.length, 'no number twice');
-    assert.equal(new Set(simulatorCodes.map((entry) => entry.fingerprint)).size, simulatorCodes.length, 'no fingerprint twice');
-    const highest = Math.max(0, ...simulatorCodes.map((entry) => entry.no));
-    assert.ok(nextSimulatorCodeNumber > highest, 'the next number is above every number on the list');
+    // the two lists are two different places in the file
+    const member = readListFile(text, 'member');
+    const advanced = readListFile(text, 'advanced');
+    assert.ok(member && advanced && (member.listTo <= advanced.listFrom || advanced.listTo <= member.listFrom));
   });
 
-  test('the script can read the file, and sees the same list', () => {
-    const info = readListFile(text);
-    assert.ok(info, 'the file has the shape the script writes');
-    assert.equal(info.active, simulatorCodes.length);
-    assert.equal(info.nextNumber, nextSimulatorCodeNumber);
-    for (const entry of simulatorCodes) assert.ok(info.fingerprints.has(entry.fingerprint));
-  });
-
-  test('examplesOpenToEveryone names only examples that exist', () => {
-    assert.ok(Array.isArray(examplesOpenToEveryone));
-    const ids = SAMPLE_CATALOG.map((card) => card.id);
-    for (const id of examplesOpenToEveryone) {
-      assert.ok(ids.includes(id), `"${id}" is not an example. The ids are: ${ids.join(', ')}`);
+  test('every line of the advanced list ends with its number as the CSV file writes it ("// A7"), so that it is not mistaken for a member code', () => {
+    const info = readListFile(text, 'advanced');
+    assert.ok(info);
+    const lines = text
+      .slice(info.listFrom, info.listTo)
+      .split('\n')
+      .filter((line) => line.includes('fingerprint'));
+    for (const line of lines) {
+      const no = /\{ no: (\d+),/.exec(line)?.[1];
+      assert.ok(no && line.trimEnd().endsWith(`// A${no}`), `the line of advanced code A${no} ends with "// A${no}"`);
     }
   });
 
-  test('there is no member code in the file - only the made-up one that shows what a code looks like', () => {
+  test('examplesOpenToEveryone and examplesForAdvancedCodesOnly name only examples that exist', () => {
+    for (const [name, list] of [
+      ['examplesOpenToEveryone', examplesOpenToEveryone],
+      ['examplesForAdvancedCodesOnly', examplesForAdvancedCodesOnly],
+    ] as const) {
+      assert.ok(Array.isArray(list), name);
+      for (const id of list) {
+        assert.ok(exampleIds.includes(id), `${name}: "${id}" is not an example, so this line does nothing. The ids are: ${exampleIds.join(', ')}`);
+      }
+      assert.equal(new Set(list).size, list.length, `${name}: no id twice`);
+    }
+  });
+
+  test('no example is on both lists: open to everyone AND for advanced codes only', () => {
+    const onBoth = examplesOpenToEveryone.filter((id) => examplesForAdvancedCodesOnly.includes(id));
+    assert.deepEqual(
+      onBoth,
+      [],
+      `\n\n${onBoth.map((id) => `'${id}'`).join(', ')} ${onBoth.length === 1 ? 'is' : 'are'} on "examplesOpenToEveryone" and on "examplesForAdvancedCodesOnly".\n` +
+        'The stricter rule wins - the example is hidden from everybody without an advanced code - but one of the two lines is a mistake.\n' +
+        'Take the id out of one of the two lists in content/simulator-codes.ts.\n',
+    );
+  });
+
+  test('with the owner\'s lists, an example for advanced codes only is in no answer but the one to an advanced code', async () => {
+    const setup: UnlockSetup = {
+      codes: [await entryFor(1, CODE_A)],
+      advancedCodes: [await entryFor(1, CODE_ADVANCED)],
+      examples: ALL_EXAMPLES,
+      levels: ALL_LEVELS,
+      openToEveryone: examplesOpenToEveryone,
+      advancedOnly: examplesForAdvancedCodesOnly,
+    };
+    const hidden = ALL_EXAMPLES.filter((example) => examplesForAdvancedCodesOnly.includes(example.id));
+    const shown = ALL_EXAMPLES.filter((example) => !examplesForAdvancedCodesOnly.includes(example.id));
+    for (const [who, code] of [
+      ['a visitor', null],
+      ['a member', CODE_A],
+    ] as const) {
+      const response = await handleUnlockRequest(post(code === null ? {} : { code }), setup);
+      assert.ok(response.body.ok, who);
+      assert.deepEqual(
+        response.body.cards.map((card) => card.id),
+        shown.map((example) => example.id),
+        `${who} sees the examples that are not for advanced codes only`,
+      );
+      const answer = JSON.stringify(response);
+      for (const example of hidden) {
+        for (const secret of [`"${example.id}"`, example.title, example.description.slice(0, 60)]) {
+          assert.ok(!answer.includes(secret), `${who}: the answer does not hold ${secret}`);
+        }
+      }
+      // every card stands under a heading, and no heading stands alone
+      assert.deepEqual(
+        response.body.levels.map((level) => level.id),
+        EXAMPLE_LEVELS.map((level) => level.id).filter((id) => shown.some((example) => example.level === id)),
+        who,
+      );
+      // a visitor can open exactly what is open to everyone, a member every card
+      assert.deepEqual(
+        response.body.examples.map((example) => example.id),
+        shown.filter((example) => code !== null || examplesOpenToEveryone.includes(example.id)).map((example) => example.id),
+        who,
+      );
+    }
+    const advanced = await handleUnlockRequest(post({ code: CODE_ADVANCED }), setup);
+    assert.ok(advanced.body.ok);
+    assert.deepEqual(
+      advanced.body.examples.map((example) => example.id),
+      MENU_ORDER,
+      'an advanced code opens every example',
+    );
+  });
+
+  test('there is no code in the file - only the made-up one that shows what a code looks like', () => {
     const found = text.match(/FIRE[- ]?[2-9A-Z]{4}[- ]?[2-9A-Z]{4}/g) ?? [];
     assert.deepEqual([...new Set(found)], [CODE_EXAMPLE]);
   });
 
-  test('the made-up code of the texts is not a member code', async () => {
-    assert.equal(await isMemberCode(CODE_EXAMPLE, simulatorCodes), false);
+  test('the made-up code of the texts is neither a member code nor an advanced code', async () => {
+    assert.equal(await kindOfCode(CODE_EXAMPLE, simulatorCodes, advancedSimulatorCodes), null);
+  });
+});
+
+// =============================================================================================
+// The address itself
+// =============================================================================================
+
+describe('src/app/api/simulator/unlock/route.ts, with the owner\'s lists', () => {
+  const ask = (body: string, contentType: string | null = 'application/json'): Promise<Response> =>
+    routePost(new Request('http://localhost/api/simulator/unlock', { method: 'POST', headers: contentType === null ? {} : { 'Content-Type': contentType }, body }));
+
+  test('no code: the cards and the examples the owner\'s two lists allow - and not a word about an example for advanced codes only', async () => {
+    const response = await ask('{}');
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('Cache-Control'), 'no-store');
+    const text = await response.text();
+    const body = JSON.parse(text) as { ok: boolean; member: boolean; levels: Array<{ id: string }>; cards: Array<{ id: string }>; examples: Array<{ id: string }> };
+    assert.deepEqual(Object.keys(body).sort(), ['cards', 'examples', 'levels', 'member', 'ok']);
+    assert.equal(body.ok, true);
+    assert.equal(body.member, false);
+    const shown = MENU_ORDER.filter((id) => !examplesForAdvancedCodesOnly.includes(id));
+    assert.deepEqual(
+      body.cards.map((card) => card.id),
+      shown,
+      'every example that is not on "examplesForAdvancedCodesOnly"',
+    );
+    assert.deepEqual(
+      body.examples.map((example) => example.id),
+      shown.filter((id) => examplesOpenToEveryone.includes(id)),
+      'to open: the ones on "examplesOpenToEveryone"',
+    );
+    for (const example of ALL_EXAMPLES.filter((e) => examplesForAdvancedCodesOnly.includes(e.id))) {
+      for (const secret of [`"${example.id}"`, example.title, example.description.slice(0, 60)]) assert.ok(!text.includes(secret), `the answer does not hold ${secret}`);
+    }
+  });
+
+  test('a code that is on no list, and what is not such a request, are refused as before', async () => {
+    const wrong = await ask(JSON.stringify({ code: CODE_EXAMPLE }));
+    assert.equal(wrong.status, 403);
+    assert.equal(wrong.headers.get('Cache-Control'), 'no-store');
+    assert.deepEqual(await wrong.json(), { ok: false, reason: 'invalid-code' });
+    assert.equal((await ask('garbage')).status, 400);
+    assert.equal((await ask(JSON.stringify({ code: CODE_EXAMPLE }), 'text/plain')).status, 415);
+    assert.equal((await ask(JSON.stringify({ code: CODE_EXAMPLE, padding: 'x'.repeat(MAX_BODY_BYTES) }))).status, 413);
+    const get = await routeGet(new Request('http://localhost/api/simulator/unlock'));
+    assert.equal(get.status, 405);
+    assert.equal(get.headers.get('Allow'), 'POST');
+    assert.deepEqual(await get.json(), { ok: false, reason: 'method-not-allowed' });
+  });
+
+  test('the website is not built while "examplesForAdvancedCodesOnly" names something that is no example', () => {
+    // the owner's lists as they are: nothing to complain about (or this very file could not have been loaded)
+    assert.deepEqual(mistakesInSetup({ examples: ALL_EXAMPLES, advancedOnly: examplesForAdvancedCodesOnly }), []);
+    // the route asks once, where the file is loaded - that is: while the site is built - and stops there
+    const source = readFileSync(path.join(REPO_ROOT, 'src/app/api/simulator/unlock/route.ts'), 'utf8');
+    const check = source.indexOf('\nconst mistakes = mistakesInSetup(SETUP);\nif (mistakes.length > 0) throw new Error(');
+    assert.ok(check > 0, 'route.ts checks the owner\'s lists and throws');
+    assert.ok(check > source.indexOf('\nconst SETUP: UnlockSetup = {') && check < source.indexOf('\nexport async function POST('), 'outside every function, so that it runs when the site is built');
+  });
+
+  test('each of the owner\'s four lists is handed to the place it belongs to', () => {
+    // (the plain codes are not in the repository, so the two lists of codes cannot be tried out here: this reads the file instead)
+    const source = readFileSync(path.join(REPO_ROOT, 'src/app/api/simulator/unlock/route.ts'), 'utf8');
+    for (const line of [
+      'codes: simulatorCodes,',
+      'advancedCodes: advancedSimulatorCodes,',
+      'examples: ALL_EXAMPLES,',
+      'levels: ALL_LEVELS,',
+      'openToEveryone: examplesOpenToEveryone,',
+      'advancedOnly: examplesForAdvancedCodesOnly,',
+    ]) {
+      assert.equal(source.split(`\n  ${line}\n`).length, 2, `route.ts says "${line}" once`);
+    }
   });
 });
 
@@ -624,31 +1123,43 @@ describe('content/simulator-codes.ts', () => {
 // The script that makes new codes
 // =============================================================================================
 
-/** The lines of a list file that count (not the cancelled ones). */
-function entriesOf(listText: string): CodeEntry[] {
+type ListKind = 'member' | 'advanced';
+
+/** The lines of one list of a list file that count (not the cancelled ones). */
+function entriesOf(listText: string, kind: ListKind = 'member'): CodeEntry[] {
+  const info = readListFile(listText, kind);
+  assert.ok(info, `the file has a list of ${kind} codes`);
   const entries: CodeEntry[] = [];
-  for (const line of listText.split('\n')) {
-    const match = /^\s*\{ no: (\d+), fingerprint: '([0-9a-f]{64})' \},$/.exec(line);
-    if (match) entries.push({ no: Number(match[1]), fingerprint: match[2] });
+  for (const line of listText.slice(info.listFrom, info.listTo).split('\n')) {
+    // (a line of the advanced list ends with its number as the CSV file writes it)
+    const match = kind === 'member' ? /^ {2}\{ no: (\d+), fingerprint: '([0-9a-f]{64})' \},$/.exec(line) : /^ {2}\{ no: (\d+), fingerprint: '([0-9a-f]{64})' \}, \/\/ A(\d+)$/.exec(line);
+    if (!match) continue;
+    if (kind === 'advanced') assert.equal(match[3], match[1], 'the number at the end of the line is the number of the line');
+    entries.push({ no: Number(match[1]), fingerprint: match[2] });
   }
   return entries;
 }
 
-/** The rows of a CSV file written by the script. */
-function rowsOf(csv: string): Array<{ no: number; code: string; givenTo: string }> {
+/** The lines of one list exactly as they stand in the file. */
+function linesOf(listText: string, kind: ListKind): string {
+  const info = readListFile(listText, kind);
+  assert.ok(info);
+  return listText.slice(info.listFrom, info.listTo);
+}
+
+/** The rows of a CSV file written by the script. `label` is the number as it is written ("12", "A12"), `no` the number in it. */
+function rowsOf(csv: string): Array<{ no: number; label: string; code: string; givenTo: string }> {
   const [header, ...lines] = csv.split('\r\n').filter((line) => line !== '');
   assert.equal(header, 'No,Code,Given to');
   return lines.map((line) => {
-    const [no, code, givenTo] = line.split(',');
-    return { no: Number(no), code, givenTo };
+    const [label, code, givenTo] = line.split(',');
+    return { no: Number(label.replace(/^A/, '')), label, code, givenTo };
   });
 }
 
-/** Everything in a list file except the lines of the list and the next number. */
+/** Everything in a list file except the lines of the two lists and the two next numbers. */
 function restOf(listText: string): string {
-  const info = readListFile(listText);
-  assert.ok(info);
-  return `${listText.slice(0, info.listFrom)}${listText.slice(info.listTo)}`.replace(/nextSimulatorCodeNumber = \d+/, 'nextSimulatorCodeNumber = N');
+  return emptyListFile(emptyListFile(listText, 'member'), 'advanced');
 }
 
 describe('scripts/generate-simulator-codes.mjs', () => {
@@ -682,6 +1193,14 @@ describe('scripts/generate-simulator-codes.mjs', () => {
       assert.equal(row.givenTo, '');
     }
     assert.equal(new Set(rows.map((row) => row.code)).size, 3);
+    assert.deepEqual(
+      rows.map((row) => row.label),
+      ['1', '2', '3'],
+      'member codes are numbered with plain numbers',
+    );
+    assert.match(printed.join('\n'), /Making 3 member codes/);
+    assert.match(printed.join('\n'), /Done: 3 new member codes, numbers 1 to 3\./);
+    assert.doesNotMatch(printed.join('\n'), /new advanced code/);
 
     const listText = readFileSync(list, 'utf8');
     const entries = entriesOf(listText);
@@ -696,7 +1215,7 @@ describe('scripts/generate-simulator-codes.mjs', () => {
       assert.equal(entries[row.no - 1].fingerprint, await fingerprintOf(characters), `code number ${row.no}`);
     }
     // ... so the server accepts every new code, and only those
-    const setup: UnlockSetup = { codes: entries, examples: ALL_EXAMPLES, openToEveryone: [] };
+    const setup: UnlockSetup = { codes: entries, advancedCodes: [], examples: ALL_EXAMPLES, levels: ALL_LEVELS, openToEveryone: [], advancedOnly: [] };
     for (const row of rows) {
       const response = await handleUnlockRequest(post({ code: row.code }), setup);
       assert.ok(response.status === 200 && response.body.ok && response.body.member, row.code);
@@ -746,7 +1265,7 @@ describe('scripts/generate-simulator-codes.mjs', () => {
 
   test('"examplesOpenToEveryone" is never touched: not when codes are added, not with --replace', async () => {
     const opened = readFileSync(list, 'utf8').replace(
-      "export const examplesOpenToEveryone: string[] = [\n  // (empty: every example needs a member code)\n];",
+      "export const examplesOpenToEveryone: string[] = [\n  // (empty: every example needs a code)\n];",
       "export const examplesOpenToEveryone: string[] = [\n  'hello',\n  'line-follow', // for the open day\n];",
     );
     assert.ok(opened.includes("'line-follow', // for the open day"));
@@ -853,12 +1372,400 @@ describe('scripts/generate-simulator-codes.mjs', () => {
     const fresh = freshListFile();
     assert.deepEqual(readListFile(fresh)?.active, 0);
     assert.equal(readListFile(fresh)?.nextNumber, 1);
-    assert.match(fresh, /export const examplesOpenToEveryone: string\[\] = \[\n {2}\/\/ \(empty: every example needs a member code\)\n\];/);
+    assert.match(fresh, /export const examplesOpenToEveryone: string\[\] = \[\n {2}\/\/ \(empty: every example needs a code\)\n\];/);
+    // a new file keeps the advanced examples for advanced codes: starting over never shows them to everybody
+    assert.match(fresh, /export const examplesForAdvancedCodesOnly: string\[\] = \[\n {2}\/\/ the two advanced examples\n {2}'smart-bucket',\n {2}'full-mission',\n\];/);
+    assert.deepEqual(readListFile(fresh, 'advanced')?.active, 0);
+    assert.equal(readListFile(fresh, 'advanced')?.nextNumber, 1);
     for (const id of MENU_ORDER) assert.ok(fresh.includes(`'${id}'`), `the explanation lists '${id}'`);
     const fingerprint = 'ab'.repeat(32);
     const added = addToListFile(fresh, [{ no: 1, fingerprint }]);
     assert.deepEqual(entriesOf(added), [{ no: 1, fingerprint }]);
+    assert.deepEqual(entriesOf(added, 'advanced'), [], 'the other list is not touched');
     assert.equal(emptyListFile(added), fresh);
     assert.equal(readListFile('nothing of the kind'), null);
+    // the same for the advanced list, whose lines end with "// A<number>"
+    const other = 'cd'.repeat(32);
+    const both = addToListFile(added, [{ no: 7, fingerprint: other }], 'advanced');
+    assert.ok(both.includes(`  { no: 7, fingerprint: '${other}' }, // A7\n`));
+    assert.deepEqual(entriesOf(both, 'advanced'), [{ no: 7, fingerprint: other }]);
+    assert.deepEqual(entriesOf(both), [{ no: 1, fingerprint }], 'the member list is not touched');
+    assert.equal(readListFile(both, 'advanced')?.nextNumber, 8);
+    assert.equal(readListFile(both, 'member')?.nextNumber, 2);
+    assert.equal(emptyListFile(both, 'advanced'), added);
+    assert.equal(emptyListFile(emptyListFile(both, 'member'), 'advanced'), fresh);
+    assert.equal(readListFile('nothing of the kind', 'advanced'), null);
+  });
+
+  // ------------------------------------------------------------------------------------------
+  // Advanced codes (--advanced)
+  // ------------------------------------------------------------------------------------------
+
+  test('--advanced: a CSV file numbered A1, A2, A3, lines in the advanced list only - and the server takes the codes as advanced codes', async () => {
+    const before = readFileSync(list, 'utf8');
+    printed.length = 0;
+    const csv = path.join(folder, 'advanced-first.csv');
+    await run('--advanced', '--count', '3', '--out', csv);
+
+    const rows = rowsOf(readFileSync(csv, 'utf8'));
+    assert.deepEqual(
+      rows.map((row) => row.label),
+      ['A1', 'A2', 'A3'],
+      'advanced codes are numbered with an A in front',
+    );
+    for (const row of rows) {
+      assert.match(row.code, /^FIRE-[2-9A-HJKMNP-Z]{4}-[2-9A-HJKMNP-Z]{4}$/, 'the same shape as a member code');
+      assert.equal(row.givenTo, '');
+    }
+
+    // the screen says which kind was made, and shows no code
+    const screen = printed.join('\n');
+    assert.match(screen, /Making 3 advanced codes/);
+    assert.match(screen, /Done: 3 new advanced codes, numbers A1 to A3\./);
+    assert.match(screen, /3 advanced codes on the list now/);
+    assert.doesNotMatch(screen, /new member code/);
+    assert.ok(!/FIRE-[2-9A-Z]{4}-[2-9A-Z]{4}/.test(screen), 'nothing that looks like a code');
+
+    // only the advanced list changed
+    const listText = readFileSync(list, 'utf8');
+    const advanced = entriesOf(listText, 'advanced');
+    assert.deepEqual(
+      advanced.map((entry) => entry.no),
+      [1, 2, 3],
+    );
+    assert.equal(readListFile(listText, 'advanced')?.nextNumber, 4);
+    assert.equal(linesOf(listText, 'member'), linesOf(before, 'member'), 'not one line of the member list changed');
+    assert.equal(readListFile(listText, 'member')?.nextNumber, readListFile(before, 'member')?.nextNumber);
+    assert.equal(restOf(listText), restOf(before), 'nothing but the advanced list and its next number changed');
+    assert.equal(emptyListFile(listText, 'advanced'), emptyListFile(before, 'advanced'));
+    for (const row of rows) assert.ok(!listText.includes(row.code) && !listText.includes(normalizeCode(row.code) as string), 'the list holds no code');
+
+    // the fingerprints are the server's, and the server tells the two kinds apart
+    const members = entriesOf(listText, 'member');
+    assert.ok(members.length > 0);
+    for (const row of rows) {
+      assert.equal(advanced[row.no - 1].fingerprint, await fingerprintOf(normalizeCode(row.code) as string), row.label);
+      assert.equal(await kindOfCode(row.code, members, advanced), 'advanced', row.label);
+    }
+    const setup: UnlockSetup = { codes: members, advancedCodes: advanced, examples: ALL_EXAMPLES, levels: ALL_LEVELS, openToEveryone: ['hello'], advancedOnly: ['smart-bucket', 'full-mission'] };
+    const opened = await handleUnlockRequest(post({ code: rows[0].code }), setup);
+    assert.ok(opened.body.ok && opened.body.member && opened.body.examples.length === 7 && opened.body.cards.length === 7);
+    // a member code of the same file opens five, and sees five
+    const memberCode = rowsOf(readFileSync(path.join(folder, 'loud.csv'), 'utf8'))[0].code;
+    assert.equal(await kindOfCode(memberCode, members, advanced), 'member');
+    const member = await handleUnlockRequest(post({ code: memberCode }), setup);
+    assert.ok(member.body.ok && member.body.member && member.body.examples.length === 5 && member.body.cards.length === 5);
+  });
+
+  test('--advanced: more codes are numbered on, also after a line was cancelled; --print-codes shows them with their A', async () => {
+    const edited = readFileSync(list, 'utf8').replace(/^  (\{ no: 2, .* \/\/ A2)$/m, '  // $1');
+    assert.ok(edited.includes("  // { no: 2, fingerprint: '"));
+    writeFileSync(list, edited);
+    assert.deepEqual(
+      entriesOf(edited, 'advanced').map((entry) => entry.no),
+      [1, 3],
+    );
+
+    printed.length = 0;
+    const csv = path.join(folder, 'advanced-second.csv');
+    await run('--advanced', '--count', '1', '--print-codes', '--out', csv);
+    const rows = rowsOf(readFileSync(csv, 'utf8'));
+    assert.deepEqual(
+      rows.map((row) => row.label),
+      ['A4'],
+    );
+    const listText = readFileSync(list, 'utf8');
+    assert.deepEqual(
+      entriesOf(listText, 'advanced').map((entry) => entry.no),
+      [1, 3, 4],
+    );
+    assert.ok(/^ {2}\/\/ \{ no: 2, fingerprint: '[0-9a-f]{64}' \}, \/\/ A2$/m.test(listText), 'the cancelled line is still there, still cancelled');
+    assert.equal(linesOf(listText, 'member'), linesOf(edited, 'member'));
+    assert.match(printed.join('\n'), /Done: 1 new advanced code, number A4\./);
+    assert.ok(printed.some((line) => /^ {2}A4 +FIRE-/.test(line) && line.includes(rows[0].code)), 'shown with its number A4');
+    // the cancelled code is no code any more, the others are advanced codes
+    const first = rowsOf(readFileSync(path.join(folder, 'advanced-first.csv'), 'utf8'));
+    const advanced = entriesOf(listText, 'advanced');
+    assert.equal(await kindOfCode(first[1].code, entriesOf(listText), advanced), null, 'A2 was cancelled');
+    assert.equal(await kindOfCode(first[2].code, entriesOf(listText), advanced), 'advanced');
+    assert.equal(await kindOfCode(rows[0].code, entriesOf(listText), advanced), 'advanced');
+  });
+
+  test('--replace empties ONLY the list it is aimed at: with --advanced the advanced codes, without it the member codes', async () => {
+    const before = readFileSync(list, 'utf8');
+    const memberLines = linesOf(before, 'member');
+    assert.ok(entriesOf(before).length > 0 && entriesOf(before, 'advanced').length > 0);
+
+    // ---- the advanced list
+    printed.length = 0;
+    await run('--advanced', '--replace', '--count', '2', '--out', path.join(folder, 'advanced-third.csv'));
+    const afterAdvanced = readFileSync(list, 'utf8');
+    const rows = rowsOf(readFileSync(path.join(folder, 'advanced-third.csv'), 'utf8'));
+    assert.deepEqual(
+      rows.map((row) => row.label),
+      ['A1', 'A2'],
+      'the advanced numbers start again at A1',
+    );
+    assert.deepEqual(
+      entriesOf(afterAdvanced, 'advanced').map((entry) => entry.no),
+      [1, 2],
+    );
+    assert.ok(!afterAdvanced.includes('// { no: 2, fingerprint:'), 'the cancelled advanced line is gone too');
+    assert.equal(linesOf(afterAdvanced, 'member'), memberLines, 'not one line of the member list changed');
+    assert.equal(readListFile(afterAdvanced, 'member')?.nextNumber, readListFile(before, 'member')?.nextNumber);
+    assert.equal(restOf(afterAdvanced), restOf(before));
+    assert.match(printed.join('\n'), /The list of advanced codes was started again/);
+    const oldAdvanced = [...rowsOf(readFileSync(path.join(folder, 'advanced-first.csv'), 'utf8')), ...rowsOf(readFileSync(path.join(folder, 'advanced-second.csv'), 'utf8'))];
+    for (const row of oldAdvanced) assert.equal(await kindOfCode(row.code, entriesOf(afterAdvanced), entriesOf(afterAdvanced, 'advanced')), null, `old advanced code ${row.label}`);
+    for (const row of rows) assert.equal(await kindOfCode(row.code, entriesOf(afterAdvanced), entriesOf(afterAdvanced, 'advanced')), 'advanced');
+
+    // ---- the member list
+    printed.length = 0;
+    const advancedLines = linesOf(afterAdvanced, 'advanced');
+    await run('--replace', '--count', '2', '--out', path.join(folder, 'member-again.csv'));
+    const afterMember = readFileSync(list, 'utf8');
+    assert.deepEqual(
+      entriesOf(afterMember).map((entry) => entry.no),
+      [1, 2],
+    );
+    assert.equal(linesOf(afterMember, 'advanced'), advancedLines, 'not one line of the advanced list changed');
+    assert.equal(readListFile(afterMember, 'advanced')?.nextNumber, 3);
+    assert.equal(restOf(afterMember), restOf(before));
+    assert.match(printed.join('\n'), /The list of member codes was started again/);
+    for (const row of rows) assert.equal(await kindOfCode(row.code, entriesOf(afterMember), entriesOf(afterMember, 'advanced')), 'advanced', 'the advanced codes still work');
+  });
+
+  test('a new code is never one that is on either list already: it is thrown away and drawn again', async () => {
+    const onMemberList = 'MEMBER22';
+    const onAdvancedList = 'ADVANCE2';
+    const fresh = ['FRESH222', 'FRESH333'];
+    const taken = new Set([await fingerprintOf(onMemberList), await fingerprintOf(onAdvancedList)]);
+    // (the 8 characters of the made-up code of the texts are never handed out either)
+    const drawn = [onMemberList, onAdvancedList, normalizeCode(CODE_EXAMPLE) as string, fresh[0], fresh[0], onMemberList, fresh[1]];
+    let draws = 0;
+    const made = await makeCodes(2, 41, taken, undefined, () => drawn[draws++]);
+    assert.deepEqual(
+      made.map((code: { code: string }) => code.code),
+      fresh.map((characters) => formatCode(characters)),
+    );
+    assert.deepEqual(
+      made.map((code: { no: number }) => code.no),
+      [41, 42],
+      'the numbers have no gaps',
+    );
+    assert.equal(draws, drawn.length);
+
+    // ---- the script itself looks at BOTH lists, whichever kind it makes
+    const aMemberCode = normalizeCode(rowsOf(readFileSync(path.join(folder, 'member-again.csv'), 'utf8'))[0].code) as string;
+    const anAdvancedCode = normalizeCode(rowsOf(readFileSync(path.join(folder, 'advanced-third.csv'), 'utf8'))[0].code) as string;
+    const drawing = (characters: string[]) => {
+      let next = 0;
+      return () => characters[next++];
+    };
+    const onlyCodeOf = (file: string): string => {
+      const rows = rowsOf(readFileSync(path.join(folder, file), 'utf8'));
+      assert.equal(rows.length, 1);
+      return rows[0].code;
+    };
+    // an advanced code that would be a member code as well is drawn again ...
+    await generateCodes(['--list', list, '--advanced', '--count', '1', '--out', path.join(folder, 'no-double-1.csv')], print, drawing([aMemberCode, anAdvancedCode, 'FRESH444']));
+    assert.equal(onlyCodeOf('no-double-1.csv'), 'FIRE-FRES-H444');
+    // ... and so is a member code that would be an advanced code as well
+    await generateCodes(['--list', list, '--count', '1', '--out', path.join(folder, 'no-double-2.csv')], print, drawing([anAdvancedCode, aMemberCode, 'FRESH555']));
+    assert.equal(onlyCodeOf('no-double-2.csv'), 'FIRE-FRES-H555');
+    // --replace does not hand out again a code of the list it empties
+    await generateCodes(['--list', list, '--advanced', '--replace', '--count', '1', '--out', path.join(folder, 'no-double-3.csv')], print, drawing([anAdvancedCode, aMemberCode, 'FRESH666']));
+    assert.equal(onlyCodeOf('no-double-3.csv'), 'FIRE-FRES-H666');
+
+    const listText = readFileSync(list, 'utf8');
+    const all = [...entriesOf(listText), ...entriesOf(listText, 'advanced')].map((entry) => entry.fingerprint);
+    assert.equal(new Set(all).size, all.length, 'no fingerprint is on both lists of the file');
+    assert.equal(await kindOfCode('FIRE-FRES-H555', entriesOf(listText), entriesOf(listText, 'advanced')), 'member');
+    assert.equal(await kindOfCode('FIRE-FRES-H666', entriesOf(listText), entriesOf(listText, 'advanced')), 'advanced');
+    assert.equal(await kindOfCode('FIRE-FRES-H444', entriesOf(listText), entriesOf(listText, 'advanced')), null, 'A3 went with the list that was started again');
+  });
+
+  test('--advanced needs a file with a list of advanced codes; without --advanced an older file with one list still works', async () => {
+    // a list file from before there were advanced codes: the member list and its next number only
+    const older = path.join(folder, 'older.ts');
+    const olderText = "export const examplesOpenToEveryone: string[] = [\n];\n\nexport const simulatorCodes: { no: number; fingerprint: string }[] = [\n];\n\nexport const nextSimulatorCodeNumber = 1;\n";
+    writeFileSync(older, olderText);
+    await assert.rejects(generateCodes(['--list', older, '--advanced', '--count', '1', '--out', path.join(folder, 'z.csv')], print), /list of advanced codes .* is missing or damaged/s);
+    await assert.rejects(generateCodes(['--list', older, '--advanced', '--replace', '--count', '1', '--out', path.join(folder, 'z.csv')], print), /list of advanced codes/);
+    assert.equal(readFileSync(older, 'utf8'), olderText, 'nothing was changed');
+    assert.ok(!existsSync(path.join(folder, 'z.csv')), 'and no CSV file was written');
+
+    await generateCodes(['--list', older, '--count', '1', '--out', path.join(folder, 'older.csv')], print);
+    assert.deepEqual(
+      entriesOf(readFileSync(older, 'utf8')).map((entry) => entry.no),
+      [1],
+    );
+  });
+
+  test('advanced codes obey the same safety rules: outside the repository only, and never over an existing file', async () => {
+    const before = readFileSync(list, 'utf8');
+    const inside = path.join(REPO_ROOT, 'content', 'advanced-codes.csv');
+    assert.ok(!existsSync(inside));
+    await assert.rejects(run('--advanced', '--count', '1', '--out', inside), /inside the website's folder/);
+    assert.ok(!existsSync(inside));
+    await assert.rejects(run('--advanced', '--count', '1', '--out', path.join(folder, 'advanced-first.csv')), /already exists/);
+    await assert.rejects(run('--advanced', '--count', '1', '--out', path.join(folder, 'first.csv')), /already exists/, 'not over a file of member codes either');
+    await assert.rejects(run('--advanced', '--count', '0', '--out', path.join(folder, 'w.csv')), /whole number/);
+    await assert.rejects(run('--advanced', '--out', path.join(folder, 'w.csv')), /how many codes and where/);
+    assert.ok(!existsSync(path.join(folder, 'w.csv')));
+    assert.equal(readFileSync(list, 'utf8'), before);
+  });
+
+  // ------------------------------------------------------------------------------------------
+  // A list file that was damaged by a slip while editing
+  // ------------------------------------------------------------------------------------------
+
+  /** A list file with two member codes and two advanced codes (made-up fingerprints). */
+  const twoAndTwo = (): string => {
+    const members = addToListFile(freshListFile(), [
+      { no: 1, fingerprint: '1a'.repeat(32) },
+      { no: 2, fingerprint: '2b'.repeat(32) },
+    ]);
+    return addToListFile(
+      members,
+      [
+        { no: 1, fingerprint: '3c'.repeat(32) },
+        { no: 2, fingerprint: '4d'.repeat(32) },
+      ],
+      'advanced',
+    );
+  };
+  /** The same file with the line that closes the list of member codes ("];") written differently. */
+  const withMemberListClosedBy = (closing: string): string => {
+    const good = twoAndTwo();
+    const info = readListFile(good, 'member');
+    assert.ok(info && good.slice(info.listTo, info.listTo + 3) === '\n];');
+    return `${good.slice(0, info.listTo)}${closing}${good.slice(info.listTo + 3)}`;
+  };
+
+  test('a list is never read on into the next one: with a damaged "];" a member code cannot end up among the advanced codes', async () => {
+    const good = twoAndTwo();
+    const advancedLines = linesOf(good, 'advanced');
+
+    // ---- slips after which the file still builds: a blank in front of "];", a lost ";", a remark behind it
+    let nth = 0;
+    for (const closing of ['\n  ];', '\n]', '\n ] ;', '\n]; // end of the member codes']) {
+      const damaged = withMemberListClosedBy(closing);
+      const file = path.join(folder, `slip-${++nth}.ts`);
+      writeFileSync(file, damaged);
+      // the two lists are still two places in the file
+      const member = readListFile(damaged, 'member');
+      const advanced = readListFile(damaged, 'advanced');
+      assert.ok(member && advanced && member.listTo < advanced.listFrom, JSON.stringify(closing));
+      assert.equal(member.active, 2, 'the member list holds its two codes, not the advanced ones as well');
+      assert.equal(member.fingerprints.size, 2);
+
+      // a new member code goes into the member list ...
+      const csv = path.join(folder, `slip-${nth}.csv`);
+      await generateCodes(['--list', file, '--count', '1', '--out', csv], print);
+      const now = readFileSync(file, 'utf8');
+      const code = rowsOf(readFileSync(csv, 'utf8'))[0].code;
+      assert.equal(linesOf(now, 'advanced'), advancedLines, `${JSON.stringify(closing)}: not one line of the advanced list changed`);
+      assert.equal(readListFile(now, 'advanced')?.active, 2);
+      assert.equal(readListFile(now, 'member')?.active, 3);
+      assert.ok(linesOf(now, 'member').includes(await fingerprintOf(normalizeCode(code) as string)), 'the new line is in the member list');
+      assert.ok(!linesOf(now, 'advanced').includes(await fingerprintOf(normalizeCode(code) as string)));
+      // ... and --replace empties the member list only
+      await generateCodes(['--list', file, '--replace', '--count', '1', '--out', path.join(folder, `slip-${nth}-again.csv`)], print);
+      const replaced = readFileSync(file, 'utf8');
+      assert.equal(linesOf(replaced, 'advanced'), advancedLines, `${JSON.stringify(closing)}: --replace left the advanced list alone`);
+      assert.equal(readListFile(replaced, 'member')?.active, 1);
+      assert.equal(readListFile(replaced, 'advanced')?.nextNumber, 3);
+    }
+
+    // ---- slips the script cannot make sense of: it refuses, and writes nothing at all
+    const unreadable: Array<[string, string]> = [
+      ['the closing line is gone', withMemberListClosedBy('')],
+      ['the closing line is a wrong bracket', withMemberListClosedBy('\n}')],
+      ['a line that is no code stands in the list', good.replace(/^( {2}\{ no: 2, fingerprint: '2b.*)$/m, '$1\n  somebody@example.com')],
+      ['a line of the list lost its quotes', good.replace(`'${'2b'.repeat(32)}'`, `"${'2b'.repeat(32)}"`)],
+      ['a line of the list lost its end', good.replace(/^( {2}\{ no: 2, fingerprint: '2b[0-9a-f]+)' \},$/m, '$1')],
+      ['two lists of member codes', `${good}\nexport const simulatorCodes: { no: number; fingerprint: string }[] = [\n];\n`],
+      ['the list was put on one line', good.replace(/(export const simulatorCodes: .* = \[)\n[^]*?\n\];/, '$1];')],
+    ];
+    for (const [what, damaged] of unreadable) {
+      assert.notEqual(damaged, good, what);
+      assert.equal(readListFile(damaged, 'member'), null, what);
+      const file = path.join(folder, `unreadable-${++nth}.ts`);
+      const csv = path.join(folder, `unreadable-${nth}.csv`);
+      for (const extra of [[], ['--replace'], ['--advanced'], ['--advanced', '--replace']]) {
+        writeFileSync(file, damaged);
+        await assert.rejects(generateCodes(['--list', file, '--count', '1', '--out', csv, ...extra], print), /does not look like the list/, `${what} ${extra.join(' ')}`);
+        assert.equal(readFileSync(file, 'utf8'), damaged, `${what}: the file was left alone`);
+        assert.ok(!existsSync(csv), `${what}: no CSV file was written`);
+      }
+    }
+  });
+
+  test('a damaged list of advanced codes stops the script too - also when member codes are asked for', async () => {
+    const good = twoAndTwo();
+    const damagedOnes: Array<[string, string]> = [
+      ['a line of the advanced list lost its quotes', good.replace(`'${'4d'.repeat(32)}'`, `"${'4d'.repeat(32)}"`)],
+      ['the advanced list lost its closing line', good.replace(/(\/\/ A2)\n\];/, '$1')],
+      ['the next advanced number is gone', good.replace(/^export const nextAdvancedSimulatorCodeNumber = \d+;\n/m, '')],
+    ];
+    let nth = 0;
+    for (const [what, damaged] of damagedOnes) {
+      assert.notEqual(damaged, good, what);
+      assert.equal(readListFile(damaged, 'advanced'), null, what);
+      const file = path.join(folder, `advanced-damaged-${++nth}.ts`);
+      const csv = path.join(folder, `advanced-damaged-${nth}.csv`);
+      for (const extra of [[], ['--replace'], ['--advanced'], ['--advanced', '--replace']]) {
+        writeFileSync(file, damaged);
+        await assert.rejects(generateCodes(['--list', file, '--count', '1', '--out', csv, ...extra], print), /list of advanced codes .* is missing or damaged/s, `${what} ${extra.join(' ')}`);
+        assert.equal(readFileSync(file, 'utf8'), damaged, `${what}: the file was left alone`);
+        assert.ok(!existsSync(csv), `${what}: no CSV file was written`);
+      }
+    }
+    // a remark and an empty line between the codes are no damage
+    const withRemarks = good.replace(/^( {2}\{ no: 2, fingerprint: '4d.*)$/m, '\n  // for the coaches:\n$1');
+    assert.equal(readListFile(withRemarks, 'advanced')?.active, 2);
+    assert.equal(readListFile(withRemarks, 'member')?.active, 2);
+  });
+
+  test('with the owner\'s real file: neither kind of run changes a letter of the other list, of the lists of examples or of the explanations', async () => {
+    const real = readFileSync(path.join(REPO_ROOT, 'content/simulator-codes.ts'), 'utf8');
+    const copy = path.join(folder, 'copy-of-the-real-file.ts');
+    /** The file cut in three: everything before the list of that kind, the list with its next number, everything after. */
+    const cut = (textOf: string, kind: ListKind): [string, string, string] => {
+      const name = kind === 'member' ? 'simulatorCodes' : 'advancedSimulatorCodes';
+      const next = kind === 'member' ? 'nextSimulatorCodeNumber' : 'nextAdvancedSimulatorCodeNumber';
+      const from = textOf.indexOf(`export const ${name}:`);
+      const nextAt = textOf.indexOf(`export const ${next} = `);
+      const to = textOf.indexOf('\n', nextAt) + 1;
+      assert.ok(from > 0 && nextAt > from && to > nextAt);
+      return [textOf.slice(0, from), textOf.slice(from, to), textOf.slice(to)];
+    };
+    const memberPart = cut(real, 'member')[1];
+    const advancedPart = cut(real, 'advanced')[1];
+    assert.equal((memberPart.match(/^ {2}\{ no: \d+, fingerprint: '[0-9a-f]{64}' \},$/gm) ?? []).length, simulatorCodes.length);
+
+    let nth = 0;
+    for (const [args, changed] of [
+      [['--advanced'], 'advanced'],
+      [['--advanced', '--replace'], 'advanced'],
+      [[], 'member'],
+      [['--replace'], 'member'],
+    ] as const) {
+      writeFileSync(copy, real);
+      await generateCodes(['--list', copy, '--count', '2', '--out', path.join(folder, `real-${++nth}.csv`), ...args], print);
+      const now = readFileSync(copy, 'utf8');
+      assert.notEqual(now, real);
+      const [before, mine, afterwards] = cut(now, changed);
+      const [realBefore, realMine, realAfterwards] = cut(real, changed);
+      assert.equal(before, realBefore, `${args.join(' ')}: everything in front of the ${changed} list is as it was`);
+      assert.equal(afterwards, realAfterwards, `${args.join(' ')}: everything behind the ${changed} list is as it was`);
+      assert.notEqual(mine, realMine);
+      // the other list, byte for byte
+      if (changed === 'advanced') assert.equal(cut(now, 'member')[1], memberPart, `${args.join(' ')}: all ${simulatorCodes.length} member lines are byte for byte the same`);
+      else assert.equal(cut(now, 'advanced')[1], advancedPart, `${args.join(' ')}: the advanced lines are byte for byte the same`);
+    }
+    // (and the real file itself was never written to)
+    assert.equal(readFileSync(path.join(REPO_ROOT, 'content/simulator-codes.ts'), 'utf8'), real);
   });
 });

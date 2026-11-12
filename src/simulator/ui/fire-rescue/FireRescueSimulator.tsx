@@ -5,16 +5,17 @@
  * (../SimulatorApp) filled in with this category's game, robot, examples, rules and
  * combination editor.
  *
- * Of the examples only the list (id, title, level) is here: ../../fire-rescue/sample-catalog.
- * The programs and their descriptions (../../fire-rescue/samples) must NEVER be imported by
- * this file or by anything else on the screen - they are for registered members and are handed
- * out by the website's server, at /api/simulator/unlock, once a member code was checked.
+ * Nothing about the examples is here - no program, no description, not even a title: only the
+ * address on this website that hands them out (/api/simulator/unlock). The server decides for
+ * every visitor which examples they may see and open, and the Examples window draws its answer.
+ * So this file, and everything else on the screen, must NEVER import
+ * ../../fire-rescue/sample-catalog (the titles) or ../../fire-rescue/samples (the programs and
+ * their descriptions).
  */
 import type { ReactNode } from 'react';
 import { DEFAULT_ROBOT_CONFIG } from '../../core/robot';
 import { WATER_TOWER_IDS } from '../../fire-rescue/field';
 import { fireRescueGame, startPoseFor } from '../../fire-rescue/game';
-import { SAMPLE_CATALOG } from '../../fire-rescue/sample-catalog';
 import { COLOR_PERMUTATIONS, type FireRescueScenario } from '../../fire-rescue/scenario';
 import type { BatchPreset } from '../BatchDialog';
 import { SimulatorApp } from '../SimulatorApp';
@@ -46,9 +47,8 @@ function renderCombinationEditor(scenario: FireRescueScenario, onChange: (next: 
   return <CombinationEditor scenario={scenario} onChange={onChange} />;
 }
 
-/** The Examples window: the cards everyone sees, and the address that hands out the programs. */
+/** The Examples window: the address that hands out the cards and the programs, and whose members they are for. */
 const EXAMPLES: ExamplesConfig = {
-  cards: SAMPLE_CATALOG,
   unlockUrl: '/api/simulator/unlock',
   organisation: 'MakeX Lebanon',
 };
