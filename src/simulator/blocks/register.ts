@@ -15,8 +15,10 @@
  */
 import type * as BlocklyModule from 'blockly';
 import { blocklyDefinitions, LIST_VARIABLE_TYPE } from './catalog';
+import { gripperVariantOf } from './gripper-original';
+import type { GripperVariantId } from './gripper-original';
 import { EDITOR_LOOK } from './theme';
-import { GROUP_GAP, TOOLBOX, toolboxBlock } from './toolbox';
+import { GRIPPER_CODE_CALLBACK, GROUP_GAP, SEE_MBLOCK_CODE, TOOLBOX, toolboxBlock } from './toolbox';
 import type { ToolboxItem, ToolboxJson } from './toolbox';
 
 /** The Blockly module, as you get it from `import * as Blockly from 'blockly'`. */
@@ -159,6 +161,8 @@ export function registerBlocks(Blockly: BlocklyApi): void {
   usePlainTextBubble(Blockly);
 
   applyScratchWording(Blockly);
+
+  registerGripperCodeMenu(Blockly);
 }
 
 /**
@@ -278,6 +282,65 @@ export function attachToolboxCallbacks(Blockly: BlocklyApi, workspace: BlocklyMo
 }
 
 // =============================================================================================
+// "See the real mBlock code" (the Gripper blocks are shortcuts mBlock does not have)
+// =============================================================================================
+
+/**
+ * Called when the student asks for the real mBlock code of the Gripper blocks: with the block
+ * that was right-clicked, or with null when the button of the Gripper palette was pressed.
+ */
+export type GripperCodeHandler = (at: GripperVariantId | null) => void;
+
+/** Name of the entry in Blockly's list of right-click menu entries. */
+export const GRIPPER_CODE_MENU_ID = 'mbot2_gripper_code';
+
+/** Who shows the code, per workspace (the menu entry itself is one for all workspaces of the page). */
+const gripperCodeHandlers = new WeakMap<BlocklyModule.Workspace, GripperCodeHandler>();
+
+function gripperCodeHandlerFor(block: BlocklyModule.BlockSvg): GripperCodeHandler | undefined {
+  const workspace = block.workspace;
+  // a block in the open palette lives in the palette's own little workspace
+  const editor = workspace.isFlyout ? workspace.targetWorkspace : workspace;
+  return editor ? gripperCodeHandlers.get(editor) : undefined;
+}
+
+/** The Gripper variant of a block on the workspace (undefined for any other block). */
+function gripperVariantOfBlock(block: BlocklyModule.Block): GripperVariantId | undefined {
+  return gripperVariantOf({ type: block.type, fields: { ACTION: block.getFieldValue('ACTION') } })?.id;
+}
+
+/**
+ * Adds the entry "See the real mBlock code" to the menu a right-click (a long press on a touch
+ * screen) opens on a Gripper block. It only shows on Gripper blocks, and only in an editor that
+ * said who shows the code (attachGripperCode); every other Blockly workspace is left as it is.
+ */
+function registerGripperCodeMenu(Blockly: BlocklyApi): void {
+  const registry = Blockly.ContextMenuRegistry.registry;
+  if (registry.getItem(GRIPPER_CODE_MENU_ID)) return;
+  registry.register({
+    id: GRIPPER_CODE_MENU_ID,
+    scopeType: Blockly.ContextMenuRegistry.ScopeType.BLOCK,
+    // first in the menu: it is the one entry that is about this block in particular
+    weight: 0,
+    displayText: SEE_MBLOCK_CODE,
+    preconditionFn: (scope) => (scope.block && gripperVariantOfBlock(scope.block) && gripperCodeHandlerFor(scope.block) ? 'enabled' : 'hidden'),
+    callback: (scope) => {
+      const block = scope.block;
+      if (block) gripperCodeHandlerFor(block)?.(gripperVariantOfBlock(block) ?? null);
+    },
+  });
+}
+
+/**
+ * Call once after Blockly.inject(): wires the button at the top of the Gripper palette and the
+ * right-click entry of the Gripper blocks of this workspace to `handler`, which shows the code.
+ */
+export function attachGripperCode(workspace: BlocklyModule.WorkspaceSvg, handler: GripperCodeHandler): void {
+  gripperCodeHandlers.set(workspace, handler);
+  workspace.registerButtonCallback(GRIPPER_CODE_CALLBACK, () => handler(null));
+}
+
+// =============================================================================================
 // White bubbles for "My Blocks"
 // =============================================================================================
 
@@ -345,17 +408,24 @@ export function addBubblesToMyBlocks(Blockly: BlocklyApi, workspace: BlocklyModu
 export interface EditorOptions extends Omit<BlocklyModule.BlocklyOptions, 'toolbox'> {
   /** defaults to the complete TOOLBOX; pass buildToolbox([...]) for a smaller one */
   toolbox?: ToolboxJson;
+  /**
+   * Shows the real mBlock code of the Gripper blocks (the button of the Gripper palette and the
+   * right-click entry of a Gripper block call it). Without it the button does nothing and the
+   * entry does not show.
+   */
+  onGripperCode?: GripperCodeHandler;
 }
 
 /**
  * Register the blocks, create a Blockly workspace inside `container` with the mBlock toolbox and
- * look, and install the Scratch-like Variables palette and the bubbles of the my-block slots. Any
+ * look, and install the Scratch-like Variables palette, the bubbles of the my-block slots and the
+ * "See the real mBlock code" button and menu entry of the Gripper blocks. Any
  * Blockly option can be overridden
  * (readOnly, media, plugins: CONTINUOUS_TOOLBOX_PLUGINS, zoom ...).
  */
 export function createEditor(Blockly: BlocklyApi, container: Element | string, options: EditorOptions = {}): BlocklyModule.WorkspaceSvg {
   registerBlocks(Blockly);
-  const { toolbox = TOOLBOX, ...rest } = options;
+  const { toolbox = TOOLBOX, onGripperCode, ...rest } = options;
   const workspace = Blockly.inject(container, {
     ...EDITOR_LOOK,
     ...rest,
@@ -364,5 +434,8 @@ export function createEditor(Blockly: BlocklyApi, container: Element | string, o
   });
   attachToolboxCallbacks(Blockly, workspace);
   addBubblesToMyBlocks(Blockly, workspace);
+  if (onGripperCode) attachGripperCode(workspace, onGripperCode);
+  // (the palette has the button either way: without a handler a press on it simply does nothing)
+  else workspace.registerButtonCallback(GRIPPER_CODE_CALLBACK, () => {});
   return workspace;
 }

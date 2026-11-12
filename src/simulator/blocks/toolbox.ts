@@ -12,6 +12,9 @@
  * Two categories fill themselves while the editor runs:
  *   - Variables  (custom: 'VARIABLE')  -> see variablesFlyout() in register.ts
  *   - My Blocks  (custom: 'PROCEDURE') -> Blockly's own "functions" category
+ *
+ * One category starts with a few words and a button: Gripper. Real mBlock has no such category
+ * (its blocks are shortcuts made for the simulator), and the button shows the code they stand for.
  */
 import { BLOCKS, CATEGORIES, fieldArgs, fieldDefault, getBlockDef, getCategory, valueInputs } from './catalog';
 import type { CategoryId, ShadowSpec } from './catalog';
@@ -71,6 +74,31 @@ export interface ToolboxJson {
 /** Space left above a block that starts a new group inside a category. */
 export const GROUP_GAP = 40;
 
+/** Space between two lines of words at the top of a category. */
+const LINE_GAP = 6;
+
+/**
+ * The button at the top of the Gripper category, and the entry of the same name in the menu that
+ * a right-click (or a long press) on a Gripper block opens: both show the window "Inside the
+ * Gripper blocks". register.ts connects the two to whoever shows that window.
+ */
+export const SEE_MBLOCK_CODE = 'See the real mBlock code';
+export const GRIPPER_CODE_CALLBACK = 'MBOT2_GRIPPER_CODE';
+
+/**
+ * What a category shows above its blocks.
+ * Gripper: mBlock has no Gripper category. A student who only knows the simulator would look for
+ * these blocks in mBlock and not find them, so the palette says what they are.
+ */
+const CATEGORY_INTRO: Partial<Record<CategoryId, ToolboxItem[]>> = {
+  gripper: [
+    { kind: 'label', text: 'Shortcuts made for this simulator.' },
+    { kind: 'sep', gap: LINE_GAP },
+    { kind: 'label', text: 'mBlock does not have these blocks.' },
+    { kind: 'button', text: SEE_MBLOCK_CODE, callbackkey: GRIPPER_CODE_CALLBACK },
+  ],
+};
+
 // =============================================================================================
 // Builders
 // =============================================================================================
@@ -109,13 +137,15 @@ export function toolboxBlock(type: string, fields?: Record<string, unknown>): To
   return entry;
 }
 
-/** The blocks of one static category, in catalog order, with gaps between groups. */
+/** What one static category shows: its few words (if it has any), then its blocks in catalog order, with gaps between groups. */
 export function categoryContents(id: CategoryId): ToolboxItem[] {
-  const items: ToolboxItem[] = [];
+  const items: ToolboxItem[] = (CATEGORY_INTRO[id] ?? []).map((item) => ({ ...item }));
+  let blocks = 0;
   for (const def of BLOCKS) {
     if (def.category !== id || def.hidden) continue;
-    if (def.gapBefore && items.length > 0) items.push({ kind: 'sep', gap: GROUP_GAP });
+    if (def.gapBefore && blocks > 0) items.push({ kind: 'sep', gap: GROUP_GAP });
     items.push(toolboxBlock(def.type));
+    blocks++;
   }
   return items;
 }

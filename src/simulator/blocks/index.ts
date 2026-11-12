@@ -5,6 +5,8 @@
  *   toolbox.ts   the palette on the left (plain JSON)
  *   theme.ts     Scratch / mBlock look (plain JSON)
  *   register.ts  registerBlocks(Blockly) + the Scratch-like Variables palette (needs the Blockly module)
+ *   gripper-original.ts  what the Gripper blocks stand for in real mBlock: My Blocks made of the
+ *                        servo block and a wait (plain data, no Blockly)
  *
  * Typical use in a client component:
  *
@@ -19,3 +21,4 @@ export * from './catalog';
 export * from './toolbox';
 export * from './theme';
 export * from './register';
+export * from './gripper-original';

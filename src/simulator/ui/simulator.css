@@ -212,3 +212,23 @@
   background: var(--color-brand-600, #0084c2);
   color: #ffffff;
 }
+
+/*
+ * The window "Inside the Gripper blocks" shows blocks as pictures: small read-only Blockly
+ * workspaces, each exactly as large as its blocks (see GripperCodeDialog.tsx). A picture has no
+ * workspace look of its own - no grey background, no frame - so the blocks stand on the white of
+ * the window like in a book.
+ */
+.mbot2-block-picture .injectionDiv {
+  border: 0;
+  outline: none;
+}
+
+.mbot2-block-picture .blocklySvg {
+  background-color: transparent !important;
+}
+
+.mbot2-block-picture .blocklyMainBackground {
+  fill: none !important;
+  stroke: none !important;
+}
