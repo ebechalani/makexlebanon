@@ -42,12 +42,31 @@ export function TitleBar({ title, children }: TitleBarProps) {
         </ol>
       </nav>
 
-      <h1 className="min-w-0 flex-1 truncate text-base font-semibold text-white">
-        {title} simulator <span className="font-medium text-brand-300 max-md:hidden">· mBot2</span>
-      </h1>
+      {/* The title and, under it, who the simulator is powered by. The two lines together are
+          lower than the row, so the row keeps its height. */}
+      <div className="flex min-w-0 flex-1 flex-col justify-center">
+        <h1 className="truncate text-base font-semibold leading-tight text-white">
+          {title} simulator <span className="font-medium text-brand-300 max-md:hidden">· mBot2</span>
+        </h1>
+        <PoweredBy className="truncate max-sm:hidden" />
+      </div>
 
       {children ? <div className="ml-auto flex items-center gap-1.5">{children}</div> : null}
+
+      {/* (on a phone the title shares its line with the buttons: the credit gets a line of its own, so it is never cut off) */}
+      <PoweredBy className="w-full sm:hidden" />
     </div>
+  );
+}
+
+/** Who the simulator is powered by. Shown on every simulator page, also while it loads. */
+export const POWERED_BY = 'RoboHolic Robotics Academy';
+
+function PoweredBy({ className }: { className: string }) {
+  return (
+    <p className={`text-[11px] leading-tight text-white/60 ${className}`} data-powered-by>
+      Powered by <span className="font-semibold text-white/85">{POWERED_BY}</span>
+    </p>
   );
 }
 
