@@ -213,6 +213,13 @@ export const LINE_PATTERNS: [string, string][] = Array.from({ length: 16 }, (_, 
   return [`(${value}) ${squares}`, String(value)];
 });
 
+/**
+ * Said by the tooltip of every Gripper block: real mBlock has no Gripper category. These blocks
+ * are shortcuts made for the simulator; what they stand for is in ./gripper-original.ts.
+ */
+const GRIPPER_SHORTCUT =
+  'This block is a shortcut that mBlock does not have: right-click it (on a touch screen, press and hold) to see the real mBlock code.';
+
 const listField = (name = 'LIST'): VariableFieldArg => ({
   type: 'field_variable',
   name,
@@ -904,13 +911,15 @@ export const BLOCKS: BlockDef[] = [
   },
 
   // ------------------------------------------------------------------------------- Gripper (helpers on top of the servos)
+  // Not mBlock blocks: mBlock has no Gripper category. Each one stands for a My Block made of the
+  // servo block and a wait (./gripper-original.ts), which the simulator can show next to it.
   {
     type: 'gripper_claw',
     category: 'gripper',
     shape: 'statement',
     message: 'gripper %1 until done',
     args: [menu('ACTION', [['opens', 'open'], ['closes', 'close']])],
-    tooltip: 'Opens or closes the claw and waits until it has finished. Closing on a bucket or a person grabs it.',
+    tooltip: `Opens or closes the claw and waits until it has finished. Closing on a bucket or a person grabs it. ${GRIPPER_SHORTCUT}`,
   },
   {
     type: 'gripper_arm',
@@ -918,7 +927,7 @@ export const BLOCKS: BlockDef[] = [
     shape: 'statement',
     message: 'arm %1 until done',
     args: [menu('ACTION', [['raises', 'raise'], ['lowers', 'lower']])],
-    tooltip: 'Lifts the arm all the way up or lowers it all the way down, and waits until it has finished.',
+    tooltip: `Lifts the arm all the way up or lowers it all the way down, and waits until it has finished. ${GRIPPER_SHORTCUT}`,
   },
   {
     type: 'gripper_arm_height',
@@ -926,7 +935,7 @@ export const BLOCKS: BlockDef[] = [
     shape: 'statement',
     message: 'arm moves to height %1 % until done',
     args: [num('HEIGHT', 50)],
-    tooltip: 'Moves the arm to a height between 0 % (all the way down) and 100 % (all the way up).',
+    tooltip: `Moves the arm to a height between 0 % (all the way down) and 100 % (all the way up). ${GRIPPER_SHORTCUT}`,
   },
 
   // ------------------------------------------------------------------------------- Quad RGB sensor

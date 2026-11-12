@@ -13,7 +13,7 @@
  */
 import { memo, useEffect, useRef, useState } from 'react';
 import type * as BlocklyModule from 'blockly';
-import { createEditor, type BlocklyApi } from '../blocks';
+import { createEditor, type BlocklyApi, type GripperCodeHandler } from '../blocks';
 import type { ProgramJson } from '../core/types';
 import { isProgramJson } from './program-file';
 import { programFitScale } from './program-view';
@@ -32,6 +32,8 @@ export interface BlocklyEditorHandle {
   selectBlock: (id: string) => boolean;
   /** number of blocks in the workspace (white bubbles not counted) */
   blockCount: () => number;
+  /** give the keyboard to the workspace, so that its shortcuts (Ctrl+Z ...) work without a click on it first */
+  focus: () => void;
 }
 
 export interface EditorStatus {
@@ -51,6 +53,8 @@ export interface BlocklyEditorProps {
   onReady: (handle: BlocklyEditorHandle | null) => void;
   /** called after every change of the blocks */
   onStatus?: (status: EditorStatus) => void;
+  /** called when the student asks to see the real mBlock code of the Gripper blocks (see ./GripperCodeDialog.tsx) */
+  onGripperCode?: GripperCodeHandler;
 }
 
 /** Space kept free above and to the left of the program after loading (pixels). */
@@ -126,6 +130,8 @@ function BlocklyEditorImpl(props: BlocklyEditorProps) {
         media: mediaPath,
         // a classroom full of clicking robots is loud enough
         sounds: false,
+        // the button of the Gripper palette and the right-click entry of the Gripper blocks
+        onGripperCode: (at) => propsRef.current.onGripperCode?.(at),
       });
       workspace = ws;
       const serializer = Blockly.serialization.workspaces;
@@ -223,6 +229,7 @@ function BlocklyEditorImpl(props: BlocklyEditorProps) {
           return true;
         },
         blockCount: () => status().blocks,
+        focus: () => Blockly.getFocusManager().focusTree(ws),
       };
 
       setPhase('ready');

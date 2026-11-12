@@ -11,6 +11,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { DEG } from '../core/geometry';
+import type { GripperVariantId } from '../blocks/gripper-original';
 import type { Game, Pose, ProgramJson, RobotConfig, Simulation } from '../core/types';
 import { BatchDialog, type BatchPreset } from './BatchDialog';
 import { BlocklyEditor, type BlocklyEditorHandle, type EditorStatus } from './BlocklyEditor';
@@ -20,6 +21,7 @@ import { ControlBar } from './ControlBar';
 import { CyberPiPanel, HoldButton } from './CyberPiPanel';
 import { EditorToolbar } from './EditorToolbar';
 import { formatNumber } from './format';
+import { GripperCodeDialog } from './GripperCodeDialog';
 import { CentreIcon, RotateLeftIcon, RotateRightIcon, RulesIcon, SensorsIcon, TestIcon, TrailIcon, ZonesIcon } from './icons';
 import type { ExampleProgram } from './member-unlock';
 import { blankProgram, hasRunnableScript, parseProgramFile, programFileName, serializeProgramFile } from './program-file';
@@ -129,6 +131,9 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
   const [rotateStep, setRotateStep] = useState<number>(saved.rotateStep);
   const [ghost, setGhost] = useState<Pose | null>(null);
   const [batchOpen, setBatchOpen] = useState(false);
+  // the window "Inside the Gripper blocks": closed (null), or open at one Gripper block (or at none)
+  const [gripperCode, setGripperCode] = useState<{ at: GripperVariantId | null } | null>(null);
+  const showGripperCode = useCallback((at: GripperVariantId | null) => setGripperCode({ at }), []);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [editorReady, setEditorReady] = useState(false);
   const [editorStatus, setEditorStatus] = useState<EditorStatus>({ canUndo: false, canRedo: false, blocks: 0 });
@@ -415,6 +420,7 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
               mediaPath={BLOCKLY_MEDIA}
               onReady={onEditorReady}
               onStatus={setEditorStatus}
+              onGripperCode={showGripperCode}
             />
             {/* An empty workspace says how to begin. The note lies under the open block palette
                 (which has z-index 20) and lets clicks and drags through; it goes away with the
@@ -640,6 +646,20 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
             say('Combination loaded. Press Start to watch your program on it.');
           }}
           onClose={() => setBatchOpen(false)}
+        />
+      )}
+
+      {gripperCode && (
+        <GripperCodeDialog
+          robotConfig={robotConfig}
+          at={gripperCode.at}
+          getEditor={() => editorRef.current}
+          mediaPath={BLOCKLY_MEDIA}
+          onConverted={() => {
+            // (as after New / Examples / Open: the robot still runs the blocks it was started with)
+            if (matchOn) replacedDuringMatch.current = true;
+          }}
+          onClose={() => setGripperCode(null)}
         />
       )}
     </div>

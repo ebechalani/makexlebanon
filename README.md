@@ -395,6 +395,61 @@ is. That height is written once, in `src/simulator/ui/page-frame.ts` (`--mbot2-s
 taller or shorter, change the two numbers there to match, or the mat will no longer fit on a
 laptop screen without scrolling.
 
+### The Gripper blocks are shortcuts: "Inside the Gripper blocks"
+
+Real mBlock has no Gripper category. The three blocks of the simulator's **Gripper** palette
+were made for the simulator; in mBlock a student builds each of them as a **My Block**, out of
+the "set servo … angle to …" block and a "wait". The simulator says so and shows that original
+code, so that students can rebuild it in mBlock:
+
+- The Gripper palette starts with two lines ("Shortcuts made for this simulator. mBlock does
+  not have these blocks.") and the button **See the real mBlock code**. A right-click on a
+  Gripper block — a long press on a touch screen — has an entry of the same name, and the
+  tooltip of each Gripper block points to it.
+- Both open the window **Inside the Gripper blocks**: five pairs, on the left a Gripper block,
+  on the right the My Block it stands for, both drawn as real blocks.
+
+| Gripper block | The My Block it stands for (default robot) |
+| --- | --- |
+| gripper opens until done | `define gripper opens`: set servo S2 angle to 0 °, wait 0.4 seconds |
+| gripper closes until done | `define gripper closes`: set servo S2 angle to 60 °, wait 0.4 seconds |
+| arm raises until done | `define arm raises`: set servo S1 angle to 90 °, wait 0.5 seconds |
+| arm lowers until done | `define arm lowers`: set servo S1 angle to 0 °, wait 0.5 seconds |
+| arm moves to height (50) % until done | `define arm moves to height (height)`: set servo S1 angle to height * 0.9 °, wait 0.5 seconds |
+
+The window has two buttons; each is a single step of **Undo**:
+
+- **Add these My Blocks to my program** puts the five definitions into the student's workspace
+  as ordinary My Blocks: they appear under **My Blocks** and can be changed like any other. A
+  second press adds nothing.
+- **Show my program the mBlock way** replaces every Gripper block of the program by its My
+  Block and adds the definitions that are needed. What is left is made only of blocks mBlock
+  has. The examples score the same afterwards.
+
+**Where the angles come from.** Nothing in the window is typed in by hand. The servo ports and
+the angles are the measurements of the gripper in `src/simulator/core/robot.ts` (`gripper`:
+servo S1 lifts the arm, 0° down and 90° up; servo S2 moves the claw, 0° open and 60° closed).
+Each wait is the time that servo needs between its two positions at `servoSpeed` (180° per
+second), rounded up to a tenth of a second. Change the robot there and the window, the My
+Blocks and the rewritten programs follow. On a real mBot2 the right angles depend on how the
+servos are mounted, so expect students to adjust the numbers in their own My Blocks.
+
+Good to know:
+
+- A Gripper block waits exactly until its servo has arrived (or is held up by what it grips);
+  a My Block always waits its fixed time. A rewritten program therefore takes a little longer —
+  the full mission 108 seconds instead of 103 — and scores the same.
+- "arm moves to height" as a Gripper block keeps the height between 0 and 100. The My Block
+  does not check it.
+- A My Block the student already has under one of the five names is used as it is when it has
+  the same number of inputs, moves the same servo and holds no Gripper block or other My Block
+  (the student may have tuned its numbers). Any other My Block of that name is left alone, and
+  the new one gets a number: "gripper opens 2".
+
+The My Blocks themselves are written in `src/simulator/blocks/gripper-original.ts`, the words
+of the window in `src/simulator/ui/gripper-code-words.ts`, the two lines of the palette in
+`src/simulator/blocks/toolbox.ts`.
+
 ### Known limits
 
 The simulator is a training tool, not a copy of the real field:
