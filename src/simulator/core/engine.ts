@@ -137,6 +137,14 @@ const WALL_MIN_Y = 9;
 const WALL_MAX_Y = 10;
 /** A body that is pushed into a corner of two walls is moved out of them in at most this many goes. */
 const WALL_ROUNDS = 3;
+/**
+ * Fixed walls can be thin (a maze panel is 3 mm). Between two collision checks no point of the
+ * robot may move further than this share of the thinnest wall of the game - then no part of the
+ * robot can be on one side of a wall at one check and on the other side at the next.
+ */
+const WALL_SUBSTEP_SHARE = 0.8;
+/** With fixed walls a fast robot simply gets more small steps per tick (up to this many) instead of longer ones. */
+const MAX_SUBSTEPS_WITH_WALLS = 64;
 /** The front colour sensor looks along three parallel lines this far apart (mm). */
 const FRONT_EYE_SPREAD = 6;
 /** Limits that keep a long batch run from filling the memory. */
@@ -241,6 +249,33 @@ function makeRobotState(config: RobotConfig, pose: Pose): RobotState {
   };
 }
 
+/**
+ * What a referee with memory is shown (ScoreContext). It is asked on every tick and mostly does
+ * not need the robot's footprint, so that is worked out only when the referee looks at it, and
+ * the same object is handed over every time (nothing new is built 100 times per second).
+ */
+class RefereeView<S> implements ScoreContext<S> {
+  restarts = 0;
+  private shapes: OBB[] | null = null;
+
+  constructor(
+    readonly scenario: S,
+    readonly world: World,
+    readonly robotConfig: RobotConfig,
+    private readonly measure: () => OBB[],
+  ) {}
+
+  get robotShapes(): OBB[] {
+    if (this.shapes === null) this.shapes = this.measure();
+    return this.shapes;
+  }
+
+  /** The robot may have moved: measure again at the next look. */
+  forgetShapes(): void {
+    this.shapes = null;
+  }
+}
+
 // =============================================================================================
 // The engine
 // =============================================================================================
@@ -267,6 +302,8 @@ class EngineSimulation<S> implements Simulation<S> {
   private restartCount = 0;
   /** the game's referee with memory, when the game has one (otherwise game.score() judges the field) */
   private readonly referee: Referee<S> | null;
+  /** what that referee is shown (one object for the whole match, see RefereeView) */
+  private readonly refereeView: RefereeView<S> | null;
   private startPose: Pose;
   private events: SimEvent[] = [];
   private readonly buttons: Record<ButtonName, boolean>;
@@ -346,6 +383,9 @@ class EngineSimulation<S> implements Simulation<S> {
   private readonly wallCount: number;
   private readonly wallData: Float64Array;
   private lastFixedWallBump = -BUMP_QUIET_TICKS - 1;
+  /** the robot never moves further than this (mm) between two collision checks, in at most `maxSubsteps` steps per tick */
+  private readonly maxSubstep: number;
+  private readonly maxSubsteps: number;
 
   // ---- sensors (values are cached so that reading a sensor twice in a tick is free)
   /** grows every time the robot's pose changes */
@@ -444,6 +484,15 @@ class EngineSimulation<S> implements Simulation<S> {
       data[at + WALL_MIN_Y] = wall.y - ey;
       data[at + WALL_MAX_Y] = wall.y + ey;
     }
+    // How finely a move is cut up. Without walls: as always. With walls: fine enough for the
+    // thinnest of them, however fast the robot is (see WALL_SUBSTEP_SHARE).
+    let substep = MAX_SUBSTEP_MM;
+    for (const wall of walls) {
+      const thickness = Math.min(wall.w, wall.l);
+      if (thickness > 0 && thickness * WALL_SUBSTEP_SHARE < substep) substep = thickness * WALL_SUBSTEP_SHARE;
+    }
+    this.maxSubstep = substep;
+    this.maxSubsteps = walls.length > 0 ? MAX_SUBSTEPS_WITH_WALLS : MAX_SUBSTEPS;
 
     // ---- robot
     const start = opts.startPose ?? opts.game.defaultStartPose;
@@ -497,6 +546,9 @@ class EngineSimulation<S> implements Simulation<S> {
     }
 
     this.referee = opts.game.createReferee ? opts.game.createReferee(opts.scenario) : null;
+    this.refereeView = this.referee
+      ? new RefereeView<S>(opts.scenario, this.world, cfg, () => this.robotShapes())
+      : null;
     this.io = this.createIO();
     this.vm = createVM(opts.program, this.io);
   }
@@ -637,6 +689,12 @@ class EngineSimulation<S> implements Simulation<S> {
 
   /** What a referee gets to see: the field as it is right now. */
   private scoreContext(): ScoreContext<S> {
+    if (this.refereeView) {
+      // (a referee with memory looks on every tick: it gets the same object every time)
+      this.refereeView.restarts = this.restartCount;
+      this.refereeView.forgetShapes();
+      return this.refereeView;
+    }
     return {
       scenario: this.scenario,
       world: this.world,
@@ -822,7 +880,7 @@ class EngineSimulation<S> implements Simulation<S> {
 
       // move in small steps so that fast moves cannot jump over (or deep into) things
       const reach = Math.abs(forward) + Math.abs(turn) * this.robotRadius;
-      const steps = reach > MAX_SUBSTEP_MM ? Math.min(MAX_SUBSTEPS, Math.ceil(reach / MAX_SUBSTEP_MM)) : 1;
+      const steps = reach > this.maxSubstep ? Math.min(this.maxSubsteps, Math.ceil(reach / this.maxSubstep)) : 1;
       const stepForward = forward / steps;
       const stepTurn = turn / steps;
       const pose = robot.pose;
@@ -832,6 +890,9 @@ class EngineSimulation<S> implements Simulation<S> {
         // If everything was neatly apart before this step, the step can be taken back.
         const canUndo = !this.unsettled;
         if (canUndo) this.saveState();
+        const beforeX = pose.x;
+        const beforeY = pose.y;
+        const beforeHeading = pose.heading;
         const mid = pose.heading + stepTurn / 2;
         pose.x += stepForward * Math.sin(mid);
         pose.y -= stepForward * Math.cos(mid);
@@ -844,6 +905,18 @@ class EngineSimulation<S> implements Simulation<S> {
           // way: the step is taken back. The robot is stuck, its wheels spin on the spot.
           // (The remaining small steps of this tick would end the same way.)
           this.restoreState();
+          break;
+        }
+        if (!settled && this.wallCount > 0) {
+          // Things were not neatly apart before this step either (something was just put down or
+          // is still being sorted out), so the whole step cannot be taken back. In a game with
+          // fixed walls the robot at least never keeps a step that ended in a jam: otherwise
+          // jam after jam could carry it into a wall, and out of it on the wrong side.
+          pose.x = beforeX;
+          pose.y = beforeY;
+          pose.heading = beforeHeading;
+          this.updateShapes();
+          if (this.bodiesShifted) this.dropUnsupported();
           break;
         }
         if (this.bodiesShifted) this.dropUnsupported();
@@ -1597,8 +1670,9 @@ class EngineSimulation<S> implements Simulation<S> {
    * (Deepest first matters where two wall pieces meet: once the robot is out of the wall it
    * really ran into, it is also out of the end of the piece next to it. The other way round the
    * robot would catch on every joint of a long wall instead of sliding along it.)
-   * The robot never moves more than a few millimetres per check and a wall is thicker than
-   * that, so it always comes out on the side it came from.
+   * It always comes out on the side it came from, also when the wall is only 3 mm thick: the
+   * push goes towards the side where the middle of that part of the robot is, and the robot
+   * moves less than the thickness of a wall between two checks (WALL_SUBSTEP_SHARE).
    * Returns how deep the robot was in the wall (0 = not at all).
    */
   private pushRobotOutOfWalls(): number {
@@ -2281,12 +2355,77 @@ class EngineSimulation<S> implements Simulation<S> {
         if (d >= 0 && d < best) best = d;
       }
     }
+    if (this.wallCount > 0) best = this.nearestWallInBeam(ox, oy, u.height, best);
+    let cm = best / 10;
+    const noise = this.cfg.noise.ultrasonicCm;
+    if (noise > 0 && best < maxMm) cm += noise * hashNoise(this.seed, tick, 100);
+    cm = Math.round(clamp(cm, u.minRangeCm, u.maxRangeCm) * 10) / 10;
+    this.sonarTick = tick;
+    this.sonarEpoch = this.epoch;
+    this.sonarCm = cm;
+    this.robot.lastUltrasonicCm = cm;
+    return cm;
+  }
+
+  /**
+   * Ultrasonic sensor and fixed walls: the distance (mm) from (ox, oy) to the nearest wall that
+   * one of the rays of the beam (rayDirX / rayDirY) hits before `best` mm, or `best` when there
+   * is none. Walls lower than `beamHeight` are not seen.
+   *
+   * A maze has dozens of walls and the beam is narrow, so most walls are sorted out by a quick
+   * look at the box around the beam; only the few that remain are tested ray by ray.
+   */
+  private nearestWallInBeam(ox: number, oy: number, beamHeight: number, best: number): number {
     const data = this.wallData;
+    const dirX = this.rayDirX;
+    const dirY = this.rayDirY;
+
+    // First the middle ray alone: it usually finds the wall straight ahead, and everything
+    // further away than that wall no longer matters.
+    const middle = ULTRASONIC_RAYS >> 1;
+    const mx = dirX[middle];
+    const my = dirY[middle];
+    let minX = Math.min(ox, ox + mx * best);
+    let maxX = Math.max(ox, ox + mx * best);
+    let minY = Math.min(oy, oy + my * best);
+    let maxY = Math.max(oy, oy + my * best);
     for (let w = 0, at = 0; w < this.wallCount; w++, at += WALL_STRIDE) {
-      if (data[at + WALL_H] < u.height) continue; // the beam passes over a low wall
-      // (a wall further away than the nearest thing found so far cannot be nearer)
-      if (data[at + WALL_MIN_X] > ox + best || data[at + WALL_MAX_X] < ox - best) continue;
-      if (data[at + WALL_MIN_Y] > oy + best || data[at + WALL_MAX_Y] < oy - best) continue;
+      if (data[at + WALL_H] < beamHeight) continue; // the beam passes over a low wall
+      if (data[at + WALL_MIN_X] > maxX || data[at + WALL_MAX_X] < minX) continue;
+      if (data[at + WALL_MIN_Y] > maxY || data[at + WALL_MAX_Y] < minY) continue;
+      const d = rayBoxDistance(
+        ox,
+        oy,
+        mx,
+        my,
+        data[at + WALL_X],
+        data[at + WALL_Y],
+        data[at + WALL_HW],
+        data[at + WALL_HL],
+        data[at + WALL_SIN],
+        data[at + WALL_COS],
+      );
+      if (d >= 0 && d < best) best = d;
+    }
+
+    // Then all rays, against the walls that reach into the box around the beam (the sensor
+    // and the points `best` mm along every ray).
+    minX = ox;
+    maxX = ox;
+    minY = oy;
+    maxY = oy;
+    for (let k = 0; k < ULTRASONIC_RAYS; k++) {
+      const ex = ox + dirX[k] * best;
+      const ey = oy + dirY[k] * best;
+      if (ex < minX) minX = ex;
+      else if (ex > maxX) maxX = ex;
+      if (ey < minY) minY = ey;
+      else if (ey > maxY) maxY = ey;
+    }
+    for (let w = 0, at = 0; w < this.wallCount; w++, at += WALL_STRIDE) {
+      if (data[at + WALL_H] < beamHeight) continue;
+      if (data[at + WALL_MIN_X] > maxX || data[at + WALL_MAX_X] < minX) continue;
+      if (data[at + WALL_MIN_Y] > maxY || data[at + WALL_MAX_Y] < minY) continue;
       const wx = data[at + WALL_X];
       const wy = data[at + WALL_Y];
       const hw = data[at + WALL_HW];
@@ -2298,15 +2437,7 @@ class EngineSimulation<S> implements Simulation<S> {
         if (d >= 0 && d < best) best = d;
       }
     }
-    let cm = best / 10;
-    const noise = this.cfg.noise.ultrasonicCm;
-    if (noise > 0 && best < maxMm) cm += noise * hashNoise(this.seed, tick, 100);
-    cm = Math.round(clamp(cm, u.minRangeCm, u.maxRangeCm) * 10) / 10;
-    this.sonarTick = tick;
-    this.sonarEpoch = this.epoch;
-    this.sonarCm = cm;
-    this.robot.lastUltrasonicCm = cm;
-    return cm;
+    return best;
   }
 
   /**

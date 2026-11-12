@@ -465,6 +465,8 @@ export interface Referee<S = unknown> {
   /**
    * Called once after every tick of a running match, with the world as it is now.
    * Returns null when there is nothing to say (almost always).
+   * (The context shows the field at the moment of the call. Take from it what must be
+   * remembered; do not keep the object itself - the simulation hands over the same one again.)
    */
   observe(ctx: ScoreContext<S>): RefereeCall | null;
   /**
