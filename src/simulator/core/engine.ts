@@ -377,6 +377,14 @@ class EngineSimulation<S> implements Simulation<S> {
   /** bodies that moved and still have to be checked against the other bodies */
   private readonly dirty: Uint8Array;
   private unsettled = false;
+  /**
+   * True only while the robot is being put down in a game with fixed walls (the start signal;
+   * a restart that puts every game element back): the game elements stand where the referee put
+   * them and do not give way - a robot that was put on top of one is moved off it. (Pushed out
+   * from under the robot instead, an element that stands against a wall would land behind that
+   * wall: such a push is longer than the wall is thick.)
+   */
+  private placing = false;
   private bodiesShifted = false;
   /** counts every time a body is moved, so that a settling pass can tell whether it still moved something */
   private shiftCount = 0;
@@ -620,13 +628,16 @@ class EngineSimulation<S> implements Simulation<S> {
     // In a game with fixed walls nothing starts inside a wall: what was put into one is moved
     // out of it now, however deep it is - the same settling as after a restart. (Left to the
     // first tick, a robot that drives off at once would stay stuck: a step that ends in a jam
-    // is taken back, and so is the push out of the wall that came with it.)
+    // is taken back, and so is the push out of the wall that came with it.) And a robot that
+    // was put on top of a game element is moved off it; the element stays (see `placing`).
     if (this.wallCount > 0) {
       this.robotMoving = false;
+      this.placing = true;
       for (let k = 0; k < 10 && (this.unsettled || this.leftover); k++) {
         this.resolveContacts();
         if (this.bodiesShifted) this.dropUnsupported();
       }
+      this.placing = false;
       this.robot.touching = false;
       // (the robot may stand somewhere else now: no sensor value from before the start is kept)
       this.epoch++;
@@ -682,10 +693,14 @@ class EngineSimulation<S> implements Simulation<S> {
     this.dirty.fill(1);
     this.unsettled = this.bodies.length > 0 || this.wallCount > 0;
     this.robotMoving = false;
+    // (in a game with walls whose elements were all put back: as at the start signal, they
+    // stay where they are and the robot is moved off them - see `placing`)
+    this.placing = this.wallCount > 0 && rules?.resetsBodies === true;
     for (let k = 0; k < 10 && (this.unsettled || this.leftover); k++) {
       this.resolveContacts();
       if (this.bodiesShifted) this.dropUnsupported();
     }
+    this.placing = false;
     this.robot.touching = false;
 
     this.pushEvent({ type: 'restart', time: this.world.time });
@@ -1717,7 +1732,8 @@ class EngineSimulation<S> implements Simulation<S> {
    * it anywhere at the start (SimulationOptions.startPose is not checked; setStartPose() is).
    * At the start signal it is moved out of the wall (see start()) - towards the side on which
    * the larger part of it stands, which need not be the side the caller meant. So when it
-   * stands deeper in a wall than it could ever have driven (MAX_PUSH_BACK), the log says so.
+   * stands deeper in a wall than it could ever have driven (MAX_PUSH_BACK), the log says so -
+   * and also when it stands that deep in a game element.
    */
   private warnIfStartsInWall(): void {
     const hit = this.contact;
@@ -1752,13 +1768,41 @@ class EngineSimulation<S> implements Simulation<S> {
         }
       }
     }
-    if (deepest === null || depth <= MAX_PUSH_BACK) return;
-    this.pushEvent({
-      type: 'log',
-      level: 'warn',
-      text: `The robot stands ${Math.round(depth * 10) / 10} mm inside a wall (${deepest.label}) at its start position. At the start it is moved out of that wall.`,
-      time: 0,
-    });
+    if (deepest !== null && depth > MAX_PUSH_BACK) {
+      this.pushEvent({
+        type: 'log',
+        level: 'warn',
+        text: `The robot stands ${Math.round(depth * 10) / 10} mm inside a wall (${deepest.label}) at its start position. At the start it is moved out of that wall.`,
+        time: 0,
+      });
+    }
+
+    // The same for a game element: in a game with walls a robot that was put on top of one is
+    // moved off it at the start signal (see `placing`), and the log names the element.
+    if (this.wallCount === 0) return;
+    for (let i = 0; i < this.bodies.length; i++) {
+      const b = this.bodies[i];
+      if (b.held) continue;
+      const bs = Math.sin(b.angle);
+      const bc = Math.cos(b.angle);
+      let onIt = 0;
+      for (let k = 0; k < SHAPE_COUNT; k++) {
+        if (!this.shapeActive[k]) continue;
+        const sh = this.shapes[k];
+        if (sh.zmin >= b.z + b.h - Z_EPS || b.z >= sh.zmax - Z_EPS) continue; // one passes above the other
+        if (boxesOverlap(sh.x, sh.y, sh.hw, sh.hl, sh.sin, sh.cos, b.x, b.y, b.w / 2, b.l / 2, bs, bc, hit) && hit.depth > onIt) {
+          onIt = hit.depth;
+        }
+      }
+      if (onIt <= MAX_PUSH_BACK) continue;
+      this.pushEvent({
+        type: 'log',
+        level: 'warn',
+        // (the id, as in a 'bump' event: a label like "F" alone would say little)
+        text: `The robot stands on a game element (${b.id}) at its start position. At the start it is moved off it.`,
+        time: 0,
+      });
+    }
   }
 
   /**
@@ -1951,7 +1995,8 @@ class EngineSimulation<S> implements Simulation<S> {
           let nx = hit.nx;
           let ny = hit.ny;
           let depth = hit.depth;
-          let behind = this.backingAgainst(i, nx, ny);
+          // (while the robot is being put down no game element gives way: see `placing`)
+          let behind = this.placing ? HARD : this.backingAgainst(i, nx, ny);
           if (behind === SOFT) {
             // Another part of the robot is on the other side. If the body stands askew between
             // the two fingers but would fit between them, they simply turn it straight ...

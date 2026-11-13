@@ -591,6 +591,59 @@ test('walls: a robot that is put deep into a wall is moved out of it at the star
   assert.deepEqual(warnings(free.sim), []);
 });
 
+test('walls: a robot that is put on top of a game element is moved off it at the start signal - the element is not thrown behind the wall', () => {
+  // A box of 60 x 20 mm flat against the lower face of a wall, like a target at the edge of a
+  // maze (x = 470 .. 530, y = 301.5 .. 321.5). Pushed out from under the robot, it would land
+  // behind the 3 mm wall: there is nothing in between that could stop it.
+  const wall = levelWall('ahead', 500, 300, 800); // lower face at y = 301.5
+  const box = makeBody({ id: 'box', x: 500, y: 311.5, w: 60, l: 20, h: 120 });
+  const warnings = (sim: Simulation<null>): string[] =>
+    sim.drainEvents().flatMap((e) => (e.type === 'log' && e.level === 'warn' ? [e.text] : []));
+  const ON_IT = 'The robot stands on a game element (box) at its start position. At the start it is moved off it.';
+  const overlap = (sim: Simulation<null>, b: Body): number =>
+    Math.max(0, ...sim.robotShapes().map((shape) => obbOverlap(shape, { x: b.x, y: b.y, w: b.w, l: b.l, angle: b.angle })?.depth ?? 0));
+  const poses: Array<[string, Pose, boolean]> = [
+    // (what, where the robot is put, the log speaks of the box)
+    ['over the box, its front 16.5 mm inside the wall', { x: 500, y: 390, heading: 0 }, true],
+    ['over one end of the box', { x: 450, y: 395, heading: 0 }, true],
+    ['across the box, looking along the wall', { x: 520, y: 340, heading: 90 * DEG }, true],
+    ['slanted over the box', { x: 510, y: 400, heading: 20 * DEG }, true],
+    ['its front 3 mm into the box', { x: 500, y: 321.5 + FRONT - 3, heading: 0 }, false],
+  ];
+  for (const [what, pose, said] of poses) {
+    const { sim, robot, body } = setup(fullSpeed(-1), { walls: [wall], bodies: [box], startPose: pose });
+    const log = warnings(sim);
+    assert.equal(log.includes(ON_IT), said, `${what}: ${JSON.stringify(log)}`);
+    assert.ok(overlap(sim, body('box')) > 2, `${what}: before the start signal the robot stands on the box`);
+    sim.start();
+    // the box has not moved at all, the robot is off it and out of the wall
+    assert.deepEqual([body('box').x, body('box').y, body('box').angle], [500, 311.5, 0], `${what}: the box stays`);
+    assert.ok(overlap(sim, body('box')) <= SKIN, `${what}: the robot is off the box (${overlap(sim, body('box'))} mm)`);
+    assert.ok(deepestInWall(sim) <= SKIN, `${what}: nothing is inside the wall`);
+    assert.ok(robot.pose.y > pose.y - 1e-9, `${what}: the robot was moved away from the wall, not through it`);
+    // and it can drive away
+    runWatching(sim, 100, (tick) => {
+      assert.ok(deepestInWall(sim) <= SKIN, `${what}, tick ${tick}`);
+    });
+    assert.ok(Math.hypot(robot.pose.x - pose.x, robot.pose.y - pose.y) > 300, `${what}: it drove away`);
+    assert.deepEqual([body('box').x, body('box').y], [500, 311.5], `${what}: the box still stands where it was`);
+  }
+  // a robot that is put down beside the box hears nothing and is not moved
+  const beside = setup(function* () { yield* forever(); }, { walls: [wall], bodies: [box], startPose: { x: 500, y: 500, heading: 0 } });
+  assert.deepEqual(warnings(beside.sim), []);
+  beside.sim.start();
+  assert.deepEqual({ ...beside.robot.pose }, { x: 500, y: 500, heading: 0 });
+  // In a game WITHOUT walls nothing changes: the box is nudged out from under the robot on the
+  // first tick, as always (Fire Rescue: a tower that stands where the robot is put), and the
+  // log does not speak of it.
+  const open = setup(function* () { yield* forever(); }, { walls: null, bodies: [box], startPose: { x: 500, y: 390, heading: 0 } });
+  assert.deepEqual(warnings(open.sim), []);
+  open.sim.start();
+  open.sim.step(2);
+  assert.deepEqual({ ...open.robot.pose }, { x: 500, y: 390, heading: 0 }, 'without walls the robot stays');
+  assert.ok(open.body('box').y < 311.5 - 30, `without walls the box gives way (now at y = ${open.body('box').y})`);
+});
+
 // =============================================================================================
 // Ultrasonic sensor
 // =============================================================================================

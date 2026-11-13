@@ -58,7 +58,8 @@
  *      stands flat against its wall, does not move it - so that costs nothing here ("must not
  *      knock over", §7, is not modelled). The referee says a sentence when the robot touches
  *      the target; only sliding or turning it by more than 5 mm ends the attempt.
- *  10. "Touching" (§7) = closer than half a millimetre.                               TOUCH_MM
+ *  10. "Touching" (§7) = closer than half a millimetre. (Measured with the target made that
+ *      much larger on every side: at a corner of the target it is up to 0.7 mm.)       TOUCH_MM
  *  11. "Stationary" (§7) = both wheel speeds are 0 and the robot is exactly where it was one
  *      tick (1/100 s) before. Wheels that spin against a wall are not stationary.   observe()
  *  12. "Directed towards the wooden flame" (§7) = the straight-ahead line of the fan hits the
@@ -80,13 +81,15 @@
  *      is put back.                                                   fireChiefGame.restartRules
  *  18. A fifth end that §8 does not name: the program has ended, the robot stands still and no
  *      DC motor runs ('program-ended'). It is the simulator's way to say "nothing more will
- *      happen". A program that ends with a DC motor left on runs to 180 s.   core/engine.ts
+ *      happen". A program that ends with a DC motor left on runs to 180 s. After this end, as
+ *      after every end, no restart is possible.                              core/engine.ts
  *  19. The start (§6.1, §8): the screen puts the robot only where the whole robot is inside
  *      START (Simulation.setStartPose refuses everything else). A start pose handed over in
  *      SimulationOptions is NOT held to START - tests use it to begin next to the target. The
  *      referee notes it at the start signal and writes it on the sheet (line 'start-position').
- *      (A robot that such a pose puts into a wall is moved out of the wall at the start signal,
- *      with a sentence in the log: core/engine.ts.)
+ *      (A robot that such a pose puts into a wall, or on top of the target, is moved out of the
+ *      wall and off the target at the start signal and after a restart, with a sentence in the
+ *      log; the target stays where it is: core/engine.ts.)
  *
  * D. The engine (core/engine.ts)
  *  20. Walls cannot be moved, are perfectly smooth and never stop a turn: a robot that touches
@@ -95,6 +98,8 @@
  *      judged.
  *
  * E. Rule sentences that are NOT implemented
+ *      §3        "must not depend solely on a memorised sequence of movements": the referee does
+ *                not judge how a program finds its way.
  *      §4, §6.2  "operate autonomously, no remote control": the CyberPi buttons work during an
  *                attempt, so a program that reads them can be steered by hand.
  *      §6.6      "stop to indicate mission completion": at "mission complete" the simulator
@@ -105,6 +110,9 @@
  *                displaced target.
  *      §10       "touching the robot without authorisation ends the attempt": there is no hand
  *                in the simulator.
+ *      §12       "two scored attempts, the best one counts": the simulator plays one attempt at
+ *                a time; it records the score and the time of each achievement (ScoreLine.time,
+ *                ScoreReport.time), which is what the ranking needs.
  */
 import { boxesOverlap, makeContact, rayBoxDistance } from '../core/engine-collide';
 import {
@@ -186,7 +194,11 @@ export const MAX_RESTARTS = 1;
  * where it stood. ASSUMPTION - the rules only say "displaces".
  */
 export const TARGET_DISPLACED_MM = 5;
-/** ASSUMPTION: the robot "touches" the target when the two are closer than this (mm). */
+/**
+ * ASSUMPTION: the robot "touches" the target when the two are closer than this (mm). (The test
+ * makes the target this much larger on every side - obbTouches() in core/geometry.ts - so at a
+ * corner of the target "closer than" reaches up to 0.7 mm.)
+ */
 export const TOUCH_MM = 0.5;
 /** The referee says "the robot touches the target" once per touch; touches less than this (seconds) apart are one touch. */
 const TOUCH_QUIET_SECONDS = 0.5;

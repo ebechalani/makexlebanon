@@ -630,6 +630,12 @@ export interface SimulationOptions<S = unknown> {
   /** what the floor sensors see; defaults to a vector sampler built from game.mat.vector */
   sampler?: MatSampler;
   program: ProgramJson;
+  /**
+   * where the robot stands at the start (left out = game.defaultStartPose). It is NOT held to the
+   * start zone - tests use it to begin anywhere; a screen places the robot with setStartPose(),
+   * which is. Outside the start zone the log says so; in a game with fixed walls a robot that
+   * was put into a wall or on top of a game element is moved out of it at the start signal.
+   */
   startPose?: Pose;
   /** seed for the noise generator (noise is off unless robotConfig.noise has non-zero values) */
   seed?: number;

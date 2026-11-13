@@ -5,6 +5,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { runMatch } from '../core/batch';
 import { createEngineSimulation } from '../core/engine';
 import { DEG, obbCorners, obbOverlap } from '../core/geometry';
@@ -14,6 +16,7 @@ import { drive, forever, near, scripted, sleep, turn, waitUntil, type Script } f
 import type { Body, Pose, RobotConfig, ScoreContext, ScoreLine, SimEvent, Simulation } from '../core/types';
 import { wallFootprint } from '../core/walls';
 import {
+  FIELD_SIZE,
   FIRE_SPOTS,
   ROOM_IDS,
   START_RECT,
@@ -24,6 +27,8 @@ import {
   roomRect,
   targetPose,
   wallIndexBetween,
+  type FireSpot,
+  type RoomId,
 } from './field';
 import {
   ACHIEVEMENT_IDS,
@@ -38,6 +43,7 @@ import {
   clock,
   fanProblem,
   fireChiefGame,
+  footprint,
   hasLeftStart,
   lookAtFan,
   roomAround,
@@ -1446,6 +1452,56 @@ test('start position: a robot that does not start completely inside START gets a
   assert.deepEqual(usual.lines.map((l) => l.id), [...ACHIEVEMENT_IDS, 'restart']);
 });
 
+test('start position: a robot that is put on top of the fire target is moved off it - the target stays in the field and in its place', () => {
+  // (only a start pose in the options can do this. Before, the target was pushed out from under
+  // the robot and landed up to 60 mm outside the field, behind the 3 mm outer wall.)
+  const ON_IT = 'The robot stands on a game element (target:fire) at its start position. At the start it is moved off it.';
+  const cases: Array<[RoomId, FireSpot, Pose]> = [
+    ['living', 'corner', { x: 90, y: 90, heading: 0 }],
+    ['living', 'back', { x: 90, y: 90, heading: 0 }],
+    ['living', 'back', { x: 150, y: 80, heading: 180 * DEG }], // its rear 10 mm into the target
+    ['living', 'side', { x: 90, y: 150, heading: -90 * DEG }],
+    ['living', 'side', { x: 60, y: 150, heading: 0 }],
+    ['bedroom', 'side', { x: 1410, y: 150, heading: 90 * DEG }],
+    ['bedroom', 'corner', { x: 1440, y: 70, heading: 30 * DEG }],
+  ];
+  for (const [room, spot, pose] of cases) {
+    const what = `${room} ${spot}, robot put at (${pose.x}, ${pose.y})`;
+    const { sim, robot, target } = play(function* () { yield* forever(); }, { scenario: openField(room, spot), startPose: pose });
+    const warned = sim.drainEvents().flatMap((e) => (e.type === 'log' && e.level === 'warn' ? [e.text] : []));
+    assert.ok(warned.includes(ON_IT), `${what}: ${JSON.stringify(warned)}`);
+    const clear = (when: string): void => {
+      assert.equal(targetShift(target), 0, `${what}, ${when}: the target has not moved`);
+      const hit = obbOverlap(footprint(target), sim.robotShapes()[0]);
+      assert.ok(!hit || hit.depth < 0.05, `${what}, ${when}: the robot is off the target`);
+      for (const corner of obbCorners(sim.robotShapes()[0])) {
+        assert.ok(corner.x > -0.05 && corner.y > -0.05 && corner.x < FIELD_SIZE + 0.05 && corner.y < FIELD_SIZE + 0.05, `${what}, ${when}: the robot is inside the field`);
+      }
+    };
+    sim.start();
+    clear('at the start signal');
+    sim.step(50);
+    clear('after 50 ticks');
+    assert.equal(sim.status, 'running', `${what}: the attempt was not ended ("target displaced")`);
+    assert.ok(Math.hypot(robot.pose.x - pose.x, robot.pose.y - pose.y) > 5, `${what}: the robot was moved`);
+    // a restart puts the robot back on that start position - and off the target again
+    sim.restart();
+    clear('after the restart');
+    sim.step(50);
+    clear('50 ticks after the restart');
+    assert.equal(sim.status, 'running');
+  }
+  // a robot next to the target hears nothing and is not moved
+  const next = play(function* () { yield* forever(); }, { startPose: IN_ROOM });
+  assert.deepEqual(
+    next.sim.drainEvents().flatMap((e) => (e.type === 'log' && e.level === 'warn' ? [e.text] : [])),
+    ['The robot is not completely inside the start zone at its start position.'],
+  );
+  next.sim.start();
+  next.sim.step(10);
+  assert.deepEqual({ ...next.robot.pose }, IN_ROOM);
+});
+
 // =============================================================================================
 // §10 Restart
 // =============================================================================================
@@ -1582,6 +1638,28 @@ test('fanProblem: says in student words why the action does not count', () => {
   assert.equal(fanProblem(ctx(), true), null);
 });
 
+test('touching: closer than 0.5 mm in front of a face of the target; at a corner of it up to 0.7 mm', () => {
+  // (assumption 10 in game.ts: the test makes the target 0.5 mm larger on every side)
+  const touching = (pose: Pose): boolean => {
+    const { sim } = play(function* () { yield* forever(); }, { startPose: pose });
+    sim.start();
+    sim.step(2);
+    assert.deepEqual({ ...sim.world.robot.pose }, pose, 'the robot was not moved');
+    const view = lookAtFan({ scenario: sim.scenario, world: sim.world, robotConfig: sim.robotConfig, restarts: 0, robotShapes: sim.robotShapes() });
+    assert.ok(view);
+    return view.touching;
+  };
+  // straight in front of the 'back' target (front face at y = 20): the gap between the two faces
+  const facing = (gap: number): Pose => ({ x: BACK_TARGET.x, y: 20 + gap + FRONT, heading: 0 });
+  assert.equal(touching(facing(0.45)), true);
+  assert.equal(touching(facing(0.55)), false);
+  // beside and below its right front corner (180, 20): `d` mm away from that corner, diagonally
+  const atCorner = (d: number): Pose => ({ x: 180 + d / Math.SQRT2 + FIRE_CHIEF_ROBOT.chassisWidth / 2, y: 20 + d / Math.SQRT2 + FRONT, heading: 0 });
+  assert.equal(touching(atCorner(0.45)), true);
+  assert.equal(touching(atCorner(0.65)), true, 'at a corner the limit is 0.5 x the square root of 2');
+  assert.equal(touching(atCorner(0.75)), false);
+});
+
 test('referee: random mazes - the fire target is never where the robot starts, and START is never the fire room', () => {
   for (let seed = 0; seed < 50; seed++) {
     const scenario = randomScenario(makeRng(seed));
@@ -1589,5 +1667,66 @@ test('referee: random mazes - the fire target is never where the robot starts, a
     assert.equal(sim.world.walls?.length, 4 + wallCount(scenario), encodeScenario(scenario));
     assert.ok(target.y < 300 && (target.x < 300 || target.x > 1200));
     assert.equal(sim.score().total, 0);
+  }
+});
+
+// =============================================================================================
+// The one list of assumptions
+// =============================================================================================
+
+test('assumptions: the one list at the top of game.ts names every constant that holds an assumption', () => {
+  const read = (file: string): string => readFileSync(fileURLToPath(new URL(file, import.meta.url)), 'utf8');
+  const game = read('./game.ts');
+  const field = read('./field.ts');
+  const robot = read('./robot.ts');
+  // the list is the header comment of game.ts (everything before the first import)
+  const list = game.slice(0, game.indexOf('\nimport '));
+  assert.match(list, /ASSUMPTIONS AND DECISIONS - the one list of everything the draft rules do not say/);
+  // the constants that hold an assumption, a limit of the referee or a number of the robot's add-ons
+  for (const name of [
+    'OUTER_WALLS',
+    'WALL_LENGTH',
+    'TARGET_WIDTH',
+    'TARGET_DEPTH',
+    'TARGET_HEIGHT',
+    'TARGET_MASS',
+    'EMITTER_HEIGHT',
+    'EMITTER_HALF_ANGLE_DEG',
+    'EMITTER_FADE',
+    'FIRE_SPOTS',
+    'FLAME_SENSOR',
+    'FAN',
+    'TARGET_DISPLACED_MM',
+    'TOUCH_MM',
+  ]) {
+    assert.match(list, new RegExp(`\\b${name}\\b`), `${name} is in the list`);
+  }
+  // A constant whose own comment says ASSUMPTION is in the list: one that is added later
+  // without a line there fails here. (A comment "ASSUMPTION ..." followed by "... and" comments
+  // covers the constants that follow it, as with the three measures of the target.)
+  for (const [file, source] of [['field.ts', field], ['game.ts', game.slice(list.length)]] as const) {
+    // (every doc comment that stands directly in front of an exported constant)
+    const marked = [...source.matchAll(/\/\*\*((?:(?!\*\/)[^])*)\*\/\s*export const (\w+)/g)]
+      .filter((m) => m[1].includes('ASSUMPTION'))
+      .map((m) => m[2]);
+    assert.ok(marked.length >= 2, `${file}: ${marked.join(', ')}`);
+    for (const name of marked) assert.match(list, new RegExp(`\\b${name}\\b`), `${file}: ${name} is marked ASSUMPTION but is not in the list`);
+  }
+  // the two other files that hold measures point to the list
+  assert.match(field, /The ONE list of all assumptions and decisions of this game[^]*is at the top of \.\/game\.ts/);
+  assert.match(robot, /the list of every assumption\s+\* of this game is at the top of \.\/game\.ts/);
+  // the decisions of the referee that a reviewer found unnamed are named there
+  for (const said of [
+    /cannot fall over/,
+    /"Stationary" \(§7\) = both wheel speeds are 0/,
+    /needs neither the room nor a flame reading/,
+    /"mission\s+\*?\s*complete" on that tick wins over "time"/,
+    /ScoreReport\.complete is true only with all four achievements/,
+    /'program-ended'/,
+    /is NOT held to START/,
+    /perfectly smooth/,
+    /Rule sentences that are NOT implemented/,
+  ]) {
+    assert.match(list, said);
   }
 });
