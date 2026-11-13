@@ -1,6 +1,6 @@
 /**
  * Drawing the stage: the mat seen from above, the game elements, the robot, and the optional
- * helpers (zones, sensor view, driven path).
+ * helpers (zones, sensor view, driven path, ruler).
  *
  * Everything is drawn in MILLIMETRES: drawStage() first sets a transform that maps mat
  * millimetres to screen pixels, so the numbers below are real sizes (a 70 mm tower is drawn 70
@@ -23,6 +23,7 @@ import {
   type ZoneOverlay,
 } from '../core/types';
 import { inkOn, parseHex, rgbCss, shade } from './format';
+import { rulerLabels, type Ruler, type RulerLabel } from './ruler';
 import type { Trail } from './trail';
 
 // =============================================================================================
@@ -717,6 +718,119 @@ function drawGhost(ctx: CanvasRenderingContext2D, config: RobotConfig, pose: Pos
 }
 
 // =============================================================================================
+// The ruler
+// =============================================================================================
+
+/** The ruler's own colour: an orange that is neither on the mat nor used by another helper. */
+const RULER_COLOR = '#ea580c';
+const RULER_DARK = '#9a3412';
+
+/** How far the line that shows where the robot faces reaches from its turning centre (mm): just past the open claw. */
+const RULER_HEADING_LENGTH = 190;
+
+/**
+ * Where the numbers of the ruler were written in the last picture. Finding their places measures
+ * every text and tries many spots, and during a match the stage is drawn sixty times a second
+ * while the ruler does not change. The places are the same as long as the line is the same
+ * (ruler.ts makes a new object for every change), the stage has the same size (a new view for
+ * every new size) and the letters have the same width (they change once, when the website's
+ * font has loaded).
+ */
+let lastRulerLabels: { ruler: Ruler; view: StageView; letter: number; labels: RulerLabel[] } | null = null;
+
+/**
+ * The ruler lies on top of everything else: its line, a dot on every point, and the numbers
+ * (where each number goes is decided in ruler.ts). Line widths, dots and letters have a fixed
+ * size on the SCREEN, whatever the size of the mat - hence all the "/ view.scale".
+ */
+function drawRuler(ctx: CanvasRenderingContext2D, ruler: Ruler, view: StageView): void {
+  const { points } = ruler;
+  if (points.length === 0) return;
+  const px = 1 / view.scale;
+  // letters grow a little with the stage, so that the enlarged stage is also easier to read
+  const fontSize = Math.max(11, Math.min(14, view.cssWidth / 48)) * px;
+
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+
+  // a line that starts on the robot: where the robot faces now (its first turn is measured from there)
+  if (ruler.startHeading !== null) {
+    const ahead = localToWorld({ ...points[0], heading: ruler.startHeading }, RULER_HEADING_LENGTH, 0);
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    ctx.lineTo(ahead.x, ahead.y);
+    ctx.setLineDash([5 * px, 5 * px]);
+    ctx.lineWidth = 3.5 * px;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.stroke();
+    ctx.lineWidth = 1.5 * px;
+    ctx.strokeStyle = RULER_DARK;
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // the line, with a white edge so that it shows on the black lines of the mat too
+  if (points.length > 1) {
+    ctx.beginPath();
+    points.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+    ctx.lineWidth = 5.5 * px;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.92)';
+    ctx.stroke();
+    ctx.lineWidth = 2.5 * px;
+    ctx.strokeStyle = RULER_COLOR;
+    ctx.stroke();
+  }
+
+  // the points: a filled dot where the line starts on the robot, a ring everywhere else
+  points.forEach((p, i) => {
+    const onRobot = i === 0 && ruler.startHeading !== null;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 5 * px, 0, Math.PI * 2);
+    ctx.fillStyle = onRobot ? RULER_COLOR : '#ffffff';
+    ctx.fill();
+    ctx.lineWidth = 2 * px;
+    ctx.strokeStyle = onRobot ? '#ffffff' : RULER_COLOR;
+    ctx.stroke();
+    if (onRobot) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 6.5 * px, 0, Math.PI * 2);
+      ctx.lineWidth = 1.2 * px;
+      ctx.strokeStyle = RULER_DARK;
+      ctx.stroke();
+    }
+  });
+
+  // the numbers, each in a small box so that it can be read on any part of the mat
+  ctx.font = `700 ${fontSize}px ${FONT}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const letter = ctx.measureText('0').width;
+  if (!lastRulerLabels || lastRulerLabels.ruler !== ruler || lastRulerLabels.view !== view || lastRulerLabels.letter !== letter) {
+    const corner = viewToMat(view, 0, 0);
+    const labels = rulerLabels(ruler, {
+      textWidth: (text) => ctx.measureText(text).width,
+      fontSize,
+      clearance: 9 * px,
+      bounds: { x: corner.x + 2 * px, y: corner.y + 2 * px, w: view.cssWidth * px - 4 * px, h: view.cssHeight * px - 4 * px },
+    });
+    lastRulerLabels = { ruler, view, letter, labels };
+  }
+  for (const label of lastRulerLabels.labels) {
+    roundRect(ctx, label.x - label.w / 2, label.y - label.h / 2, label.w, label.h, 4 * px);
+    // lengths: white; turns: light yellow; the total: filled, because it is the sum of the others
+    ctx.fillStyle = label.kind === 'total' ? RULER_DARK : label.kind === 'turn' ? 'rgba(254, 243, 199, 0.95)' : 'rgba(255, 255, 255, 0.95)';
+    ctx.fill();
+    ctx.lineWidth = 1 * px;
+    ctx.strokeStyle = label.kind === 'total' ? '#ffffff' : RULER_COLOR;
+    ctx.stroke();
+    ctx.fillStyle = label.kind === 'total' ? '#ffffff' : '#0f172a';
+    ctx.fillText(label.text, label.x, label.y + fontSize * 0.06);
+  }
+  ctx.restore();
+}
+
+// =============================================================================================
 // The whole picture
 // =============================================================================================
 
@@ -740,6 +854,8 @@ export interface StageScene {
   placing: boolean;
   /** where the student is trying to put the robot although it does not fit there */
   ghost: Pose | null;
+  /** the measuring line, while the ruler is on (null = no ruler) */
+  ruler: Ruler | null;
 }
 
 /** The table the mat lies on: the website's ink-600 (the frame of the stage in StageCanvas.tsx has the same colour). */
@@ -783,4 +899,5 @@ export function drawStage(ctx: CanvasRenderingContext2D, scene: StageScene): voi
   if (sensors) drawProbes(ctx, sim, sensors);
   if (sensors && beam) drawUltrasonicLabel(ctx, sim, sensors, beam, view);
   if (scene.ghost) drawGhost(ctx, sim.robotConfig, scene.ghost, view);
+  if (scene.ruler) drawRuler(ctx, scene.ruler, view);
 }

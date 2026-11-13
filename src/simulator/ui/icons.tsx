@@ -232,3 +232,22 @@ export const CopyIcon = (p: IconProps) => (
     <path d="M5 15V6a2 2 0 0 1 2-2h9" />
   </Svg>
 );
+
+export const RulerIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M3.5 15.5 15.5 3.5l5 5-12 12z" />
+    <path d="m7.5 11.5 2 2M10.5 8.5l2 2M13.5 5.5l2 2" />
+  </Svg>
+);
+
+export const EnlargeIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5" />
+  </Svg>
+);
+
+export const ShrinkIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4 9h5V4M20 9h-5V4M4 15h5v5M20 15h-5v5" />
+  </Svg>
+);
