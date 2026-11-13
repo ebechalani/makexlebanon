@@ -13,8 +13,8 @@
  * Blocks that need to know about scripts (control, events, variables, my blocks) live in index.ts.
  */
 import type { RobotIO } from '../core/io';
-import type { ButtonName, MotorPort, ProbeName, Scalar, SensorColor, ServoPort, Wheel } from '../core/types';
-import { BUTTON_NAMES, PROBE_NAMES, SERVO_PORTS } from '../core/types';
+import type { ButtonName, DcMotorPort, MotorPort, ProbeName, Scalar, SensorColor, ServoPort, Wheel } from '../core/types';
+import { BUTTON_NAMES, DC_MOTOR_PORTS, PROBE_NAMES, SERVO_PORTS } from '../core/types';
 import { clampNumber, compare, isWholeNumber, parseColour, toNumber, toText } from './values';
 
 /** Wheel speed used by the "... cm until done" and "... ° until done" blocks (they have no speed slot). */
@@ -160,6 +160,29 @@ const tidy = (n: number): number => Math.round(n * 1e10) / 1e10;
 
 const NO_GRIPPER = 'This robot has no gripper fitted, so this block does nothing.';
 
+const NO_FLAME_SENSOR = 'This robot has no flame sensor fitted, so this block always reads "no flame".';
+const ONE_FLAME_SENSOR = 'This robot has one flame sensor: its number is 1. Any other number reads "no flame".';
+
+/**
+ * The flame sensor blocks carry the number of the sensor (mBuild modules of one kind are
+ * numbered along their chain; 1 is the first). The robot has at most one flame sensor, so only
+ * number 1 reads anything. True when this block reads the robot's flame sensor.
+ */
+function readsFlameSensor(ctx: BlockContext): boolean {
+  if (ctx.io.config.flameSensor?.enabled !== true) {
+    ctx.warn(NO_FLAME_SENSOR);
+    return false;
+  }
+  if (Math.round(ctx.num('INDEX')) !== 1) {
+    ctx.warn(ONE_FLAME_SENSOR);
+    return false;
+  }
+  return true;
+}
+
+/** Power for a DC motor port: -100 .. 100 %. */
+const dcPower = (ctx: BlockContext, slot: string): number => clampNumber(ctx.finite(slot), -100, 100);
+
 // =============================================================================================
 // Statements
 // =============================================================================================
@@ -244,6 +267,23 @@ export const STATEMENTS: Record<string, StatementHandler> = {
   mbot2_motor_reset_angle(ctx) {
     const which = ctx.field('PORT');
     ctx.io.resetWheelAngle(which === 'EM1' || which === 'EM2' ? WHEEL_OF[which] : 'all');
+  },
+
+  // ------------------------------------------------------------------ DC motor ports M1 / M2 (a fan ...)
+  // These do not touch the drive wheels, so they never take the drive motors away from a move.
+  mbot2_dc_motor_power(ctx) {
+    const port: DcMotorPort = ctx.field('PORT') === 'M2' ? 'M2' : 'M1';
+    ctx.io.setDcMotor(port, dcPower(ctx, 'POWER'));
+  },
+
+  mbot2_dc_motor_drive(ctx) {
+    ctx.io.setDcMotor('M1', dcPower(ctx, 'M1'));
+    ctx.io.setDcMotor('M2', dcPower(ctx, 'M2'));
+  },
+
+  mbot2_dc_motor_stop(ctx) {
+    const which = ctx.field('PORT') as DcMotorPort;
+    ctx.io.stopDcMotor(DC_MOTOR_PORTS.includes(which) ? which : 'all');
   },
 
   // ------------------------------------------------------------------ servos
@@ -389,6 +429,14 @@ export const REPORTERS: Record<string, ReporterHandler> = {
   },
   sensing_claw_object_detected(ctx) {
     return ctx.io.frontColor() !== 'none';
+  },
+
+  // ------------------------------------------------------------------ flame sensor
+  sensing_flame_detected(ctx) {
+    return readsFlameSensor(ctx) && ctx.io.flameDetected();
+  },
+  sensing_flame_size(ctx) {
+    return readsFlameSensor(ctx) ? roundTo(ctx.io.flameValue(), 1) : 0;
   },
 
   // ------------------------------------------------------------------ CyberPi

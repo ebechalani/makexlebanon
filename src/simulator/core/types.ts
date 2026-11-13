@@ -275,6 +275,12 @@ export interface FlameSensorConfig {
   halfAngleDeg: number;
   /** from further away than this (mm) it sees nothing */
   rangeMm: number;
+  /**
+   * how fast the value falls with the distance: straight ahead it is
+   * 100 x (1 - distance / rangeMm) to this power. 1 = a straight line, larger = it falls faster
+   * near the flame and more slowly far away. Left out = 2.
+   */
+  distancePower?: number;
   /** "a flame is detected" when the value is above this (0-100) */
   threshold: number;
 }

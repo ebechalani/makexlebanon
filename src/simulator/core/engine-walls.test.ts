@@ -253,6 +253,44 @@ test('walls: from the middle of a walled room no direction leads out, at full sp
   }
 });
 
+test('walls: a wall may stand at any angle - no direction leads out of a room with three or six slanted walls', () => {
+  for (const sides of [3, 6]) {
+    // a room whose walls are all 250 mm from its middle (500, 500); wall k is turned by `facing`
+    const inside = 250;
+    const walls: FixedWall[] = [];
+    for (let k = 0; k < sides; k++) {
+      const facing = 20 * DEG + (k * 2 * Math.PI) / sides; // the direction from the middle to the wall
+      const away = inside + 1.5;
+      walls.push({
+        id: `wall:s${k}`,
+        label: `s${k}`,
+        x: 500 + away * Math.sin(facing),
+        y: 500 - away * Math.cos(facing),
+        angle: facing,
+        // (turned by `facing`, the wall is thin along that direction and long across it)
+        w: 2 * inside * Math.tan(Math.PI / sides) + 12,
+        l: 3,
+        h: 150,
+        fill: '#999',
+      });
+    }
+    for (let degrees = 0; degrees < 360; degrees += 15) {
+      const { sim, robot } = setup(fullSpeed(), { walls, startPose: { x: 500, y: 500, heading: degrees * DEG } });
+      runWatching(sim, 250, () => {
+        for (const c of obbCorners(sim.robotShapes()[0])) {
+          for (const wall of walls) {
+            // how far the corner is from the middle, measured towards this wall
+            const towards = (c.x - 500) * Math.sin(wall.angle) - (c.y - 500) * Math.cos(wall.angle);
+            assert.ok(towards <= inside + SKIN, `${sides} walls, heading ${degrees}: corner ${towards - inside} mm behind ${wall.id}`);
+          }
+        }
+      });
+      assert.equal(robot.touching, true, `${sides} walls, heading ${degrees}: it drove to a wall`);
+      assert.ok(deepestInWall(sim) <= SKIN);
+    }
+  }
+});
+
 test('walls: turning and driving wildly inside one 297 mm cell never puts a corner through a wall', () => {
   // the free inside of a maze cell: 300 mm minus two half walls
   const walls = room(500, 500, 297);
@@ -446,6 +484,38 @@ test('walls: a body that starts inside a wall is moved out of it before anything
   sim.start();
   sim.step(2);
   near(body('box').y, 211.5, 1e-6);
+});
+
+test('walls: a robot that starts a little inside a wall is moved out of it on the first tick, also when it stands still', () => {
+  const wall = levelWall('ahead', 500, 300, 800); // lower face at y = 301.5
+  const inWall: Pose = { x: 500, y: 301.5 + FRONT - 1, heading: 0 }; // its front is 1 mm inside the wall
+  // a game with walls and no bodies, a robot that never drives
+  const standing = setup(function* () {
+    yield* forever();
+  }, { walls: [wall], startPose: inWall });
+  near(deepestInWall(standing.sim), 1, 1e-9);
+  standing.sim.start();
+  standing.sim.step(1);
+  assert.ok(deepestInWall(standing.sim) <= SKIN);
+  near(standing.robot.pose.y - FRONT, 301.5, SKIN);
+  // the same when the team puts the robot there before the start ...
+  const placed = setup(function* () {
+    yield* forever();
+  }, { walls: [wall] });
+  assert.equal(placed.sim.setStartPose(inWall), true);
+  placed.sim.start();
+  placed.sim.step(1);
+  assert.ok(deepestInWall(placed.sim) <= SKIN);
+  // ... and after a restart, which puts the robot back on that start position
+  placed.sim.step(50);
+  placed.sim.restart();
+  assert.ok(deepestInWall(placed.sim) <= SKIN);
+  // a robot that drives off at once comes out of the wall just the same
+  const driving = setup(fullSpeed(-1), { walls: [wall], startPose: inWall });
+  runWatching(driving.sim, 100, (tick) => {
+    if (tick > 1) assert.ok(deepestInWall(driving.sim) <= SKIN, `tick ${tick}: ${deepestInWall(driving.sim)} mm inside the wall`);
+  });
+  assert.ok(driving.robot.pose.y > inWall.y + 300, 'it drove away backwards');
 });
 
 // =============================================================================================

@@ -116,8 +116,11 @@ export function lineOffsetOf(
 // Flame sensor
 // =============================================================================================
 
-/** The flame value falls with the distance like (1 - distance / range) to this power. */
-const FLAME_DISTANCE_POWER = 2;
+/**
+ * The flame value falls with the distance like (1 - distance / range) to this power, unless the
+ * sensor's configuration names another one (FlameSensorConfig.distancePower).
+ */
+export const FLAME_DISTANCE_POWER = 2;
 /** An emitter shines at full strength in the inner part of its cone; in this outer share of it the light fades to nothing. */
 const EMITTER_FADE = 0.25;
 
@@ -127,8 +130,8 @@ const EMITTER_FADE = 0.25;
  *
  *   value = 100 x distance part x direction part x emitter part
  *
- *  - distance part: (1 - distance / range) squared. 1 at the sensor, about 0.5 at 30 % of the
- *    range, 0.25 at half the range, 0 from the full range on.
+ *  - distance part: (1 - distance / range) to the power `distancePower`, normally squared: 1 at
+ *    the sensor, about 0.5 at 30 % of the range, 0.25 at half the range, 0 from the full range on.
  *  - direction part: how far the emitter is from "straight ahead" of the sensor. 1 straight
  *    ahead, 0.5 at half the field of view, 0 at its edge (a cosine squared).
  *  - emitter part: the emitter shines forward, into a cone. 1 in the inner three quarters of
@@ -151,6 +154,7 @@ export function flameSignal(
   emitterY: number,
   emitterHeading: number,
   emitterHalfAngleDeg: number,
+  distancePower: number = FLAME_DISTANCE_POWER,
 ): number {
   const half = halfAngleDeg * DEG;
   const cone = emitterHalfAngleDeg * DEG;
@@ -174,7 +178,7 @@ export function flameSignal(
   }
   if (off >= half || side >= cone) return 0;
 
-  const distancePart = Math.pow(1 - distance / rangeMm, FLAME_DISTANCE_POWER);
+  const distancePart = Math.pow(1 - distance / rangeMm, distancePower > 0 ? distancePower : FLAME_DISTANCE_POWER);
   const directionPart = Math.pow(Math.cos((off / half) * (Math.PI / 2)), 2);
   const full = cone * (1 - EMITTER_FADE);
   const emitterPart = side <= full ? 1 : Math.pow(Math.cos(((side - full) / (cone - full)) * (Math.PI / 2)), 2);

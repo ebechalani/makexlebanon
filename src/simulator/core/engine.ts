@@ -493,6 +493,8 @@ class EngineSimulation<S> implements Simulation<S> {
     }
     this.maxSubstep = substep;
     this.maxSubsteps = walls.length > 0 ? MAX_SUBSTEPS_WITH_WALLS : MAX_SUBSTEPS;
+    // check once that the robot does not start inside a wall (also in a game without bodies)
+    if (walls.length > 0) this.unsettled = true;
 
     // ---- robot
     const start = opts.startPose ?? opts.game.defaultStartPose;
@@ -636,7 +638,7 @@ class EngineSimulation<S> implements Simulation<S> {
     // nothing may end up inside something else (a tower that was pushed into the start zone
     // is nudged out from under the robot; that can take a few rounds)
     this.dirty.fill(1);
-    this.unsettled = this.bodies.length > 0;
+    this.unsettled = this.bodies.length > 0 || this.wallCount > 0;
     this.robotMoving = false;
     for (let k = 0; k < 10 && (this.unsettled || this.leftover); k++) {
       this.resolveContacts();
@@ -677,8 +679,9 @@ class EngineSimulation<S> implements Simulation<S> {
     this.epoch++;
     this.updateShapes();
     // if something stands where the robot was put, it is nudged aside on the first tick
+    // (and a robot that was put a little into a fixed wall is moved out of it)
     this.dirty.fill(1);
-    this.unsettled = this.bodies.length > 0;
+    this.unsettled = this.bodies.length > 0 || this.wallCount > 0;
     return true;
   }
 
@@ -2505,7 +2508,18 @@ class EngineSimulation<S> implements Simulation<S> {
       if (!e) continue;
       const ex = b.x + e.forward * Math.sin(b.angle);
       const ey = b.y - e.forward * Math.cos(b.angle);
-      const signal = flameSignal(sx, sy, pose.heading, f.halfAngleDeg, f.rangeMm, ex, ey, b.angle, e.halfAngleDeg);
+      const signal = flameSignal(
+        sx,
+        sy,
+        pose.heading,
+        f.halfAngleDeg,
+        f.rangeMm,
+        ex,
+        ey,
+        b.angle,
+        e.halfAngleDeg,
+        f.distancePower,
+      );
       if (signal <= best) continue;
       if (this.sightBlocked(sx, sy, f.height, ex, ey, b.z + e.height, i)) continue;
       best = signal;

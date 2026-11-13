@@ -39,6 +39,8 @@ export const FLAME_SENSOR: FlameSensorConfig = {
   halfAngleDeg: 30,
   // and up to one metre
   rangeMm: 1000,
+  // the value falls with the square of (1 - distance / range): fast near the flame, slowly far away
+  distancePower: 2,
   // "a flame is detected" above 10: straight ahead that is up to about 680 mm (two cells)
   threshold: 10,
 };

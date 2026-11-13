@@ -48,7 +48,8 @@ export const GRID_LINE_STARTS = [299.9, 599.8, 899.7, 1199.6];
 
 /** Colours as printed: plain cells are white, the two rooms are pictures (their average colour). */
 const WHITE: RGB = { r: 255, g: 255, b: 255 };
-const GRID_BLACK: RGB = { r: 8, g: 7, b: 6 };
+/** The black of the grid lines, as it is in the print file (not quite pure black). */
+export const GRID_LINE_COLOR: RGB = { r: 35, g: 31, b: 32 };
 const OFF_THE_MAT: RGB = { r: 120, g: 120, b: 120 };
 export const LIVING_ROOM_COLOR: RGB = { r: 177, g: 125, b: 89 };
 export const BEDROOM_COLOR: RGB = { r: 153, g: 123, b: 105 };
@@ -371,7 +372,7 @@ export const MAT_VECTOR: MatVector = {
         { x: start + GRID_LINE_WIDTH / 2, y: FIELD_SIZE },
       ],
       width: GRID_LINE_WIDTH,
-      color: GRID_BLACK,
+      color: GRID_LINE_COLOR,
     })),
     // ... and four that run left-right
     ...GRID_LINE_STARTS.map((start) => ({
@@ -381,7 +382,7 @@ export const MAT_VECTOR: MatVector = {
         { x: FIELD_SIZE, y: start + GRID_LINE_WIDTH / 2 },
       ],
       width: GRID_LINE_WIDTH,
-      color: GRID_BLACK,
+      color: GRID_LINE_COLOR,
     })),
   ],
 };

@@ -198,6 +198,32 @@ test('flame value: a sensor without range or field of view reads nothing', () =>
   assert.equal(flameSignal(5, 5, 1, 30, 1000, 5, 5, 2, 70), 100);
 });
 
+test('flame value: how fast it falls with the distance is a setting of the sensor (distancePower)', () => {
+  const at = (distance: number, power?: number): number => flameSignal(0, 0, 0, 30, 1000, 0, -distance, Math.PI, 70, power);
+  // left out: the square
+  near(at(300), 49, 1e-9);
+  near(at(300, 2), 49, 1e-9);
+  // 1: a straight line from 100 at the sensor to 0 at the end of the range
+  near(at(300, 1), 70, 1e-9);
+  near(at(500, 1), 50, 1e-9);
+  // 3: falls faster near the flame
+  near(at(300, 3), 34.3, 1e-9);
+  // the ends stay where they are, whatever the power
+  for (const power of [1, 2, 3]) {
+    near(at(0, power), 100, 1e-9);
+    assert.equal(at(1000, power), 0);
+  }
+  // a power that makes no sense counts as "left out"
+  near(at(300, 0), 49, 1e-9);
+  near(at(300, -1), 49, 1e-9);
+  near(at(300, NaN), 49, 1e-9);
+  // ... and the robot's sensor uses the setting of its configuration
+  const pose = sensorAt(500, EMITTER.y + 300, 0);
+  assert.equal(flameAt(pose), 49);
+  assert.equal(flameAt(pose, { config: { ...MAZE_ROBOT, flameSensor: { ...FLAME, distancePower: 1 } } }), 70);
+  assert.equal(flameAt(pose, { config: { ...MAZE_ROBOT, flameSensor: { ...FLAME, distancePower: 3 } } }), 34.3);
+});
+
 // =============================================================================================
 // The flame sensor on the robot
 // =============================================================================================

@@ -10,12 +10,18 @@
  *              --> vm/          (knows which inputs / fields each block has and their defaults)
  *
  * The wording follows mBlock 5 (device CyberPi + extensions mBot2, Quad RGB Sensor, Ultrasonic
- * Sensor 2) closely enough that students recognise the blocks.
+ * Sensor 2) closely enough that students recognise the blocks. The texts of the DC motor and
+ * flame sensor blocks are not confirmed yet: they are kept apart, in ./mblock-wording.ts.
+ *
+ * Not every game shows every category: which categories a game's palette holds is written in
+ * ./palettes.ts.
  *
  * mBot2 wiring reminder (important for the "encoder motor EM1 ... EM2 ..." blocks):
  *   EM1 = LEFT wheel, EM2 = RIGHT wheel, and the two motors are mounted mirrored. A positive speed
  *   turns a motor clockwise, so driving straight ahead needs EM1 = +50 and EM2 = -50.
  */
+
+import { DC_MOTOR_MENU, DC_MOTOR_STOP_MENU, UNCONFIRMED_BLOCK_TEXTS, UNCONFIRMED_CATEGORY_NAMES } from './mblock-wording';
 
 // =============================================================================================
 // Types
@@ -33,11 +39,13 @@ export type CategoryId =
   | 'variables'
   | 'myblocks'
   | 'chassis'
+  | 'extensionport'
   | 'servo'
   | 'gripper'
   | 'quadrgb'
   | 'ultrasonic'
-  | 'colorsensor';
+  | 'colorsensor'
+  | 'flamesensor';
 
 export interface CategoryDef {
   id: CategoryId;
@@ -129,6 +137,10 @@ export const LIST_VARIABLE_TYPE = 'list';
 // Categories (toolbox order = mBlock order: device blocks, Scratch basics, then the extensions)
 // =============================================================================================
 
+/**
+ * Every category of the block language. A game shows only some of them (./palettes.ts): the
+ * Fire Rescue robot has a gripper and no fan, the Fire Chief robot a fan and no gripper.
+ */
 export const CATEGORIES: CategoryDef[] = [
   { id: 'cyberpi', name: 'CyberPi', colour: '#9966FF' },
   { id: 'sensing', name: 'Sensing', colour: '#5CB1D6' },
@@ -138,11 +150,15 @@ export const CATEGORIES: CategoryDef[] = [
   { id: 'variables', name: 'Variables', colour: '#FF8C1A', custom: 'VARIABLE' },
   { id: 'myblocks', name: 'My Blocks', colour: '#FF6680', custom: 'PROCEDURE' },
   { id: 'chassis', name: 'mBot2 Chassis', colour: '#4C97FF' },
+  // the DC motor ports M1 / M2 of the mBot2 shield (in mBlock this category holds the servo blocks too)
+  { id: 'extensionport', name: UNCONFIRMED_CATEGORY_NAMES.extensionPort.text, colour: '#3F6FD9' },
   { id: 'servo', name: 'Servos', colour: '#4A6CD4' },
   { id: 'gripper', name: 'Gripper', colour: '#CF63CF' },
   { id: 'quadrgb', name: 'Quad RGB Sensor', colour: '#0FBD8C' },
   { id: 'ultrasonic', name: 'Ultrasonic Sensor 2', colour: '#0E9E86' },
   { id: 'colorsensor', name: 'Colour Sensor', colour: '#2E9BB5' },
+  // an mBuild module added with "+ extension", so it comes last
+  { id: 'flamesensor', name: UNCONFIRMED_CATEGORY_NAMES.flameSensor.text, colour: '#E0533D' },
 ];
 
 /** Colour of the list blocks inside the Variables category (same as Scratch). */
@@ -892,6 +908,34 @@ export const BLOCKS: BlockDef[] = [
     tooltip: 'Sets the rotated angle of the motor back to 0.',
   },
 
+  // ------------------------------------------------------------------------------- mBot2 extension port: DC motors M1 / M2
+  // (the texts of these three blocks are not confirmed against mBlock yet: see ./mblock-wording.ts)
+  {
+    type: 'mbot2_dc_motor_power',
+    category: 'extensionport',
+    shape: 'statement',
+    message: UNCONFIRMED_BLOCK_TEXTS.mbot2_dc_motor_power.text,
+    args: [pick('PORT', DC_MOTOR_MENU), num('POWER', 50)],
+    tooltip:
+      'Runs the DC motor on port M1 or M2 of the mBot2 shield at this power (-100 to 100; a negative power turns it the other way). It keeps running until you change the power or stop it. A fan on this port blows from a power of 20 % on.',
+  },
+  {
+    type: 'mbot2_dc_motor_drive',
+    category: 'extensionport',
+    shape: 'statement',
+    message: UNCONFIRMED_BLOCK_TEXTS.mbot2_dc_motor_drive.text,
+    args: [num('M1', 50), num('M2', 50)],
+    tooltip: 'Sets the power of both DC motor ports at once (each -100 to 100). 0 stops a motor.',
+  },
+  {
+    type: 'mbot2_dc_motor_stop',
+    category: 'extensionport',
+    shape: 'statement',
+    message: UNCONFIRMED_BLOCK_TEXTS.mbot2_dc_motor_stop.text,
+    args: [pick('PORT', DC_MOTOR_STOP_MENU)],
+    tooltip: 'Stops the DC motor on this port (or on both ports). A fan on it stops blowing.',
+  },
+
   // ------------------------------------------------------------------------------- Servos (mBot2 shield)
   {
     type: 'mbot2_servo_set',
@@ -1055,6 +1099,27 @@ export const BLOCKS: BlockDef[] = [
     message: 'object detected at claw ?',
     args: [],
     tooltip: 'True when there is a bucket or a person in (or just in front of) the claw.',
+  },
+
+  // ------------------------------------------------------------------------------- Flame sensor (mBuild module, add-on)
+  // (the texts of these two blocks are not confirmed against mBlock yet: see ./mblock-wording.ts)
+  {
+    type: 'sensing_flame_detected',
+    category: 'flamesensor',
+    shape: 'boolean',
+    message: UNCONFIRMED_BLOCK_TEXTS.sensing_flame_detected.text,
+    args: [num('INDEX', 1)],
+    tooltip:
+      'True when the flame sensor sees the infrared light of a flame in front of the robot. The number says which flame sensor is meant: 1 is the first one (this robot has one).',
+  },
+  {
+    type: 'sensing_flame_size',
+    category: 'flamesensor',
+    shape: 'reporter',
+    message: UNCONFIRMED_BLOCK_TEXTS.sensing_flame_size.text,
+    args: [num('INDEX', 1)],
+    tooltip:
+      'How strong the infrared light is that the flame sensor sees: 0 = no flame, 100 = very strong. The value is higher when the flame is nearer and more straight ahead. A wall between the sensor and the flame gives 0.',
   },
 ];
 

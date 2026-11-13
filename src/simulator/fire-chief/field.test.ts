@@ -4,6 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { makeProbeReading } from '../core/engine-sensors';
 import { VectorMatSampler } from '../core/mat';
 import { DEG, obbCorners, pointInRect, rectContainsOBB, wrapAngle } from '../core/geometry';
 import { DEFAULT_ROBOT_CONFIG, robotFitsInRect, robotShapesAt, robotSize } from '../core/robot';
@@ -14,6 +15,7 @@ import {
   FIELD_SIZE,
   FIRE_SPOTS,
   GRID_CELLS,
+  GRID_LINE_COLOR,
   GRID_LINE_STARTS,
   GRID_LINE_WIDTH,
   INNER_WALL_COUNT,
@@ -260,7 +262,14 @@ test('fire target: it stands inside its room, against the outer walls, and looks
 test('mat: white cells, eight black grid lines where they are printed, the two rooms in their colours', () => {
   const mat = new VectorMatSampler(MAT_VECTOR);
   const white = { r: 255, g: 255, b: 255 };
-  const isBlack = (c: { r: number; g: number; b: number }): boolean => c.r < 20 && c.g < 20 && c.b < 20;
+  // the black of the lines as it is in the print file: dark enough for the Quad RGB sensor to
+  // call it a line (its brightness is about 13 of 100; "line" is below 35) and to name it black
+  assert.deepEqual(GRID_LINE_COLOR, { r: 35, g: 31, b: 32 });
+  const seen = makeProbeReading(GRID_LINE_COLOR, FIRE_CHIEF_ROBOT.quadRgb.lineThreshold);
+  assert.ok(seen.onLine && seen.light > 12 && seen.light < 13.5, `brightness ${seen.light}`);
+  assert.equal(seen.color, 'black');
+  const isBlack = (c: { r: number; g: number; b: number }): boolean =>
+    c.r === GRID_LINE_COLOR.r && c.g === GRID_LINE_COLOR.g && c.b === GRID_LINE_COLOR.b;
   assert.equal(MAT_VECTOR.width, 1500);
   assert.equal(MAT_VECTOR.height, 1500);
   assert.equal(GRID_LINE_WIDTH, 6.5);
@@ -340,7 +349,15 @@ test('robot: the mBot2 without gripper and front colour sensor, inside the size 
 
 test('robot: a flame sensor and a fan on M1 at its front, no sensor higher than 150 mm', () => {
   assert.equal(FIRE_CHIEF_ROBOT.flameSensor, FLAME_SENSOR);
-  assert.deepEqual(FLAME_SENSOR, { enabled: true, forward: 105, height: 60, halfAngleDeg: 30, rangeMm: 1000, threshold: 10 });
+  assert.deepEqual(FLAME_SENSOR, {
+    enabled: true,
+    forward: 105,
+    height: 60,
+    halfAngleDeg: 30,
+    rangeMm: 1000,
+    distancePower: 2,
+    threshold: 10,
+  });
   assert.equal(FIRE_CHIEF_ROBOT.fan, FAN);
   assert.deepEqual(FAN, { enabled: true, port: 'M1', forward: 105, minPower: 20, coneHalfAngleDeg: 20, reachMm: 300 });
   assert.equal(FLAME_SENSOR.forward, FIRE_CHIEF_ROBOT.chassisFront);

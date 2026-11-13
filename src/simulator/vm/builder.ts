@@ -433,6 +433,7 @@ export type StraightDirection = 'forward' | 'backward';
 export type TurnDirection = 'left' | 'right';
 export type MotorName = 'EM1' | 'EM2';
 export type ServoName = 'S1' | 'S2' | 'S3' | 'S4';
+export type DcMotorName = 'M1' | 'M2';
 export type ProbeId = 'L2' | 'L1' | 'R1' | 'R2';
 export type ColourName = 'red' | 'yellow' | 'green' | 'cyan' | 'blue' | 'purple' | 'white' | 'black';
 export type ButtonId = 'a' | 'b';
@@ -579,6 +580,14 @@ export const motorSpeed = (port: MotorName): BlockNode => b('mbot2_motor_rpm', {
 export const motorPowerValue = (port: MotorName): BlockNode => b('mbot2_motor_power_value', { fields: { PORT: port } });
 export const resetMotorAngle = (port: MotorName | 'all' = 'all'): BlockNode => b('mbot2_motor_reset_angle', { fields: { PORT: port } });
 
+// ------------------------------------------------------------------------------- DC motor ports M1 / M2 (a fan ...)
+/** power -100..100; the motor keeps running until it gets another power or is stopped */
+export const dcMotor = (port: DcMotorName, power: Value): BlockNode =>
+  b('mbot2_dc_motor_power', { fields: { PORT: port }, inputs: { POWER: power } });
+/** both ports at once: the first power is for M1, the second for M2 */
+export const dcMotors = (m1: Value, m2: Value): BlockNode => b('mbot2_dc_motor_drive', { inputs: { M1: m1, M2: m2 } });
+export const stopDcMotor = (port: DcMotorName | 'all' = 'M1'): BlockNode => b('mbot2_dc_motor_stop', { fields: { PORT: port } });
+
 // ------------------------------------------------------------------------------- servos and gripper
 export const setServo = (port: ServoName | 'all', angle: Value): BlockNode =>
   b('mbot2_servo_set', { fields: { PORT: port }, inputs: { ANGLE: angle } });
@@ -606,6 +615,10 @@ export const ultrasonic = (): BlockNode => b('sensing_ultrasonic_distance');
 export const clawColorIs = (colour: ColourName): BlockNode => b('sensing_claw_color_is', { fields: { COLOR: colour } });
 export const clawColor = (): BlockNode => b('sensing_claw_color');
 export const clawObjectDetected = (): BlockNode => b('sensing_claw_object_detected');
+/** true when the flame sensor sees a flame; `index` = which flame sensor (the robot has one: 1) */
+export const flameDetected = (index: Value = 1): BlockNode => b('sensing_flame_detected', { inputs: { INDEX: index } });
+/** 0 (no flame) .. 100 (very strong): higher when the flame is nearer and more straight ahead */
+export const flameSize = (index: Value = 1): BlockNode => b('sensing_flame_size', { inputs: { INDEX: index } });
 
 // ------------------------------------------------------------------------------- CyberPi
 /** colour as '#rrggbb' */
