@@ -370,6 +370,34 @@ test('walls: a robot that hits a wall at an angle slides along it', () => {
   assert.equal(events.filter((e) => e.type === 'bump').length, 1);
 });
 
+test('walls are perfectly smooth: a turn right beside a wall always completes, and pushes the robot away from the wall', () => {
+  // (A decision of the engine, written down in its header: a real robot would catch on the
+  // wall here. The examples tell students to keep away from the walls when they turn.)
+  const wall = uprightWall('beside', 300, 500, 800); // its right face is at x = 301.5
+  for (const rpm of [30, 90, 180]) {
+    const start: Pose = { x: 301.5 + 1 + HALF_WIDTH, y: 500, heading: 0 }; // its left side 1 mm from the wall
+    const { sim, robot } = setup(
+      function* (io) {
+        yield* turn(io, -90, rpm);
+      },
+      { walls: [wall], startPose: start },
+    );
+    let touched = false;
+    runWatching(sim, 2000, (tick) => {
+      if (robot.touching) touched = true;
+      if (tick > 1) assert.ok(deepestInWall(sim) <= SKIN, `tick ${tick}`);
+    });
+    assert.equal(sim.finishReason, 'program-ended');
+    assert.ok(touched, `${rpm} RPM: its corner met the wall`);
+    near(robot.yawDeg, -90, 0.01, `${rpm} RPM: the gyro has seen the whole quarter turn`);
+    near(robot.pose.heading, -90 * DEG, 0.001);
+    // its front corner is 123.5 mm from the point it turns around: while that corner swept past
+    // the wall, the wall pushed the robot away until the corner had room (123.5 - 65 - 1 = 57.5 mm)
+    near(robot.pose.x - start.x, Math.hypot(FRONT, HALF_WIDTH) - HALF_WIDTH - 1, 0.1, `${rpm} RPM: pushed away from the wall`);
+    near(robot.pose.y, start.y, 0.1, `${rpm} RPM: not along it`);
+  }
+});
+
 test('walls: sliding along a wall made of several panels does not catch on the joints', () => {
   // ten 100 mm panels in a row, like the panels of a maze
   const panels: FixedWall[] = [];
@@ -518,6 +546,51 @@ test('walls: a robot that starts a little inside a wall is moved out of it on th
   assert.ok(driving.robot.pose.y > inWall.y + 300, 'it drove away backwards');
 });
 
+test('walls: a robot that is put deep into a wall is moved out of it at the start signal - and the log says so', () => {
+  const wall = levelWall('ahead', 500, 300, 800); // lower face at y = 301.5
+  const warnings = (sim: Simulation<null>): string[] =>
+    sim.drainEvents().flatMap((e) => (e.type === 'log' && e.level === 'warn' ? [e.text] : []));
+  for (const deep of [1, 4.9, 10, 36]) {
+    const pose: Pose = { x: 500, y: 301.5 + FRONT - deep, heading: 0 };
+    // up to 5 mm (as deep as a driving robot can get into a wall): nothing to say
+    const expected =
+      deep <= 5 ? [] : [`The robot stands ${deep} mm inside a wall (ahead) at its start position. At the start it is moved out of that wall.`];
+    // a robot that drives off at once, one that turns first, one that stands: none stays in the wall
+    const driving = setup(fullSpeed(-1), { walls: [wall], startPose: pose });
+    assert.deepEqual(warnings(driving.sim), expected, `${deep} mm inside`);
+    assert.deepEqual({ ...driving.robot.pose }, pose, 'before the start signal it stands where it was put');
+    assert.ok(deepestInWall(driving.sim) > SKIN);
+    driving.sim.start();
+    assert.ok(deepestInWall(driving.sim) <= SKIN, `${deep} mm inside: out of the wall at the start signal`);
+    near(driving.robot.pose.y - FRONT, 301.5, SKIN, `${deep} mm inside: moved back to the face of the wall`);
+    driving.sim.step(100);
+    assert.ok(driving.robot.pose.y > 600, `${deep} mm inside: it drove away`);
+
+    const turning = setup(
+      function* (io) {
+        yield* drive(io, -60, 60);
+        yield* turn(io, 90, 60);
+      },
+      { walls: [wall], startPose: pose },
+    );
+    runWatching(turning.sim, 600, (tick) => {
+      assert.ok(deepestInWall(turning.sim) <= SKIN, `${deep} mm inside, tick ${tick}`);
+    });
+    near(turning.robot.yawDeg, 90, 0.01, `${deep} mm inside: it turned`);
+
+    const standing = setup(function* () { yield* forever(); }, { walls: [wall], startPose: pose });
+    standing.sim.start();
+    standing.sim.step(5);
+    near(standing.robot.pose.y - FRONT, 301.5, SKIN);
+    // after a restart it is put back on its start position, and moved out of the wall again
+    standing.sim.restart();
+    assert.ok(deepestInWall(standing.sim) <= SKIN);
+  }
+  // a game without walls never says it
+  const free = setup(fullSpeed(-1), { walls: null, startPose: { x: 500, y: 300, heading: 0 } });
+  assert.deepEqual(warnings(free.sim), []);
+});
+
 // =============================================================================================
 // Ultrasonic sensor
 // =============================================================================================
@@ -603,7 +676,35 @@ test('walls: the ultrasonic value follows the robot as it drives up to a wall', 
   assert.equal(robot.touching, false);
 });
 
-test('walls: the ultrasonic sensor agrees with a ray-by-ray check of every wall (60 walls, also slanted ones)', () => {
+test('walls: the ultrasonic sensor sees the end of a thin wall that stands between two of its rays', () => {
+  // A 3 mm panel seen from its end. The rays of the beam are 2 degrees apart: 343.5 mm away
+  // they are 12 mm apart, and the end of the panel fits between the middle ray and the next.
+  // (a short piece of a panel, so that no slanted ray meets its long side further up)
+  const panel = uprightWall('edge-on', 600, 446.5, 10); // its lower end is at y = 451.5, x = 598.5 .. 601.5
+  const far = levelWall('far', 600, 100, 800); // behind it: lower face at y = 101.5
+  const sensorY = 451.5 + 343.5;
+  const from = (x: number): number => sonarAt({ x, y: sensorY + FRONT, heading: 0 }, [panel, far]);
+  assert.equal(from(600), 34.4, 'the middle ray hits the end face');
+  // 5 mm beside the middle of the beam (0.8 degrees): no ray hits it, its corners are seen
+  near(from(595), 34.4, 0.051, 'the end is 3.5 .. 6.5 mm right of the middle ray');
+  near(from(605), 34.4, 0.051, 'and the same on the other side');
+  for (let beside = 0; beside <= 70; beside += 1) {
+    // inside the beam (12 degrees to each side: up to 73 mm beside at this distance) the end
+    // is seen at its distance, at every place - not only where a ray happens to pass
+    const expected = Math.hypot(343.5, Math.max(0, beside - 1.5)) / 10;
+    near(from(600 - beside), expected, 0.06, `${beside} mm beside the middle`);
+  }
+  // outside the beam it is not seen: the wall behind it is
+  near(from(600 - 80), (sensorY - 101.5) / 10, 0.051, '80 mm beside: 13 degrees');
+  // a corner behind a wall that the rays hit changes nothing
+  const front = levelWall('front', 600, 600, 800); // lower face at y = 601.5, in front of the panel
+  near(sonarAt({ x: 595, y: sensorY + FRONT, heading: 0 }, [panel, far, front]), (sensorY - 601.5) / 10, 0.051, 'hidden');
+  // and a panel that is too low for the beam has no corners to see
+  const low = uprightWall('low', 600, 446.5, 10, 3, 20);
+  near(sonarAt({ x: 595, y: sensorY + FRONT, heading: 0 }, [low, far]), (sensorY - 101.5) / 10, 0.051, 'a low panel');
+});
+
+test('walls: the ultrasonic sensor agrees with a slow check of every wall - 13 rays and the corners inside the beam (60 walls, also slanted ones)', () => {
   const rng = makeRng(2027);
   for (let round = 0; round < 40; round++) {
     // 60 walls anywhere on the mat, a third of them slanted, some too low to be seen
@@ -635,6 +736,16 @@ test('walls: the ultrasonic sensor agrees with a ray-by-ray check of every wall 
           if (wall.h < u.height) continue;
           const d = rayOBB(origin, dir, wallFootprint(wall));
           if (d !== null && d < best) best = d;
+        }
+      }
+      // ... and every corner of a wall that lies inside the beam (the end of a thin wall can stand between two rays)
+      for (const wall of walls) {
+        if (wall.h < u.height) continue;
+        for (const corner of obbCorners(wallFootprint(wall))) {
+          const d = Math.hypot(corner.x - origin.x, corner.y - origin.y);
+          const bearing = Math.atan2(corner.x - origin.x, origin.y - corner.y);
+          const off = Math.abs(Math.atan2(Math.sin(bearing - pose.heading), Math.cos(bearing - pose.heading)));
+          if (off <= u.halfAngleDeg * DEG + 1e-9 && d < best) best = d;
         }
       }
       const expected = Math.min(u.maxRangeCm, Math.max(u.minRangeCm, best / 10));

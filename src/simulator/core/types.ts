@@ -263,7 +263,8 @@ export interface RobotConfig {
 /**
  * A flame sensor: it measures the infrared light of an emitter (Body.infrared) straight ahead
  * and reports 0 (nothing) .. 100 (very strong). How the value is worked out: flameSignal() in
- * core/engine-sensors.ts.
+ * core/engine-sensors.ts. (Whether the robot is in front of the emitter is judged from the
+ * point the robot turns around, so that the highest value of a turn on the spot points at it.)
  */
 export interface FlameSensorConfig {
   enabled: boolean;
@@ -408,6 +409,8 @@ export type SimStatus = 'ready' | 'running' | 'finished';
  * Why a match ended. The first three can happen in every game; the last two are called by a
  * game's referee (Game.createReferee): the mission is complete, or the robot moved a game
  * element that must stay where it is. The referee's own sentence is in Simulation.finishDetail.
+ * ('mission-complete' says why the match ended, not how many points it brought: whether every
+ * point was earned is ScoreReport.complete.)
  */
 export type FinishReason = 'time' | 'declared' | 'program-ended' | 'mission-complete' | 'target-displaced';
 
@@ -429,7 +432,10 @@ export interface ScoreReport {
   total: number;
   max: number;
   lines: ScoreLine[];
-  /** every mission is complete (the run could be declared finished) */
+  /**
+   * every mission is complete (the run could be declared finished). What that means is the
+   * game's decision; it is not the same as "the match ended with the reason 'mission-complete'".
+   */
   complete: boolean;
   /** match time (seconds) at which this total was reached, when the game ranks by time */
   time?: number;
@@ -469,6 +475,11 @@ export interface RefereeCall {
  */
 export interface Referee<S = unknown> {
   /**
+   * Optional. Called once at the referee's start signal, before the first tick: the robot stands
+   * where the team put it. A referee that has to check the starting position does it here.
+   */
+  begin?(ctx: ScoreContext<S>): void;
+  /**
    * Called once after every tick of a running match, with the world as it is now.
    * Returns null when there is nothing to say (almost always).
    * (The context shows the field at the moment of the call. Take from it what must be
@@ -480,7 +491,14 @@ export interface Referee<S = unknown> {
    * where the restart rule puts them. The referee forgets what the rules say a restart costs.
    */
   restart(ctx: ScoreContext<S>): void;
-  /** the score sheet "if the match ended now" */
+  /**
+   * Optional. Called once when the match ends, whatever ended it (time, "Finished", the end of
+   * the program, or this referee itself), BEFORE the simulation stops the robot's motors: the
+   * context still shows the field as it was at the last moment of the match. From now on
+   * score() is the final sheet, and its texts can say "was" instead of "is".
+   */
+  finished?(ctx: ScoreContext<S>, reason: FinishReason): void;
+  /** the score sheet "if the match ended now" (after the end: the final sheet) */
   score(ctx: ScoreContext<S>): ScoreReport;
 }
 

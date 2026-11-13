@@ -129,6 +129,13 @@ export const WALL_NEAR_CM = 20;
 export const FIRST_WALL_STOP_CM = 8;
 /** The line counter drives this many cells. */
 export const LINE_COUNTER_CELLS = 2;
+/**
+ * Wheel speed (RPM) of the line counter. Measured on the drawing of the mat and on its picture:
+ * up to 170 RPM a program that looks at the sensor on every tick sees every grid line; at the
+ * full 180 RPM the robot moves 6 mm per tick, as much as a line is wide, and a crossing is
+ * missed now and then (7 of 1200).
+ */
+export const LINE_COUNTER_RPM = 50;
 /** After the Quad RGB sensor has crossed a grid line: this far (cm) to the middle of the cell (8.5 + 15). */
 export const AFTER_LINE_CM = 23.5;
 /** The first look at the flame sensor turns once round in this many steps ... */
@@ -281,6 +288,9 @@ const firstWall: SampleProgram = {
     `"wait until" lets it drive until the sensor measures less than ${FIRST_WALL_STOP_CM} cm. ` +
     'The LEDs turn green and the screen shows the distance to the wall. It never touches a wall. ' +
     'It scores 10 points (the robot has left START completely) in every maze that can be played. ' +
+    'It needs the robot at its default start position. ' +
+    'Walls in the simulator are perfectly smooth: a robot that touches one slides along it, also while it turns. ' +
+    'A real robot gets stuck there, so keep away from the walls. ' +
     `Try 20 instead of ${FIRST_WALL_STOP_CM}: the robot stops earlier - is it still completely out of START? ` +
     'Or add a turn and a second "wait until" to go on to the next wall.',
   program: program([
@@ -314,6 +324,7 @@ const countLines: SampleProgram = {
     `The screen shows how many cells it has counted. In the default maze that is ${LINE_COUNTER_CELLS}. ` +
     'It scores 10 points (the robot has left START completely) in every maze that can be played, and it never touches a wall. ' +
     'It needs the robot at its default start position. ' +
+    'Do not count lines at full speed: a line can be missed. ' +
     'Try another number of cells. Or count the lines on the way out of START too: the START picture has dark parts - what does the sensor count there?',
   program: program([
     script(whenStart(), [
@@ -326,7 +337,10 @@ const countLines: SampleProgram = {
       turn('left', 90),
       note(
         repeatUntil(or(eq(v('cells'), LINE_COUNTER_CELLS), wallAhead()), [
-          move('forward', 50),
+          note(
+            move('forward', LINE_COUNTER_RPM),
+            `${LINE_COUNTER_RPM} RPM is slow enough to count lines. Do not count at full speed (180 RPM): the robot then moves 6 mm between two looks at the sensor - as much as a line is wide - and misses a line now and then.`,
+          ),
           note(waitUntil(probeDetects('L1', 'line')), 'L1 is one of the two middle probes of the sensor. Wait until it is over the black grid line ...'),
           note(waitUntil(probeDetects('L1', 'background')), '... and until it has left the line again: the sensor has crossed into the next cell.'),
           note(
@@ -466,7 +480,7 @@ const fullMission: SampleProgram = {
     'In a room it looks around with the flame sensor and shows the highest value on its screen. ' +
     'No flame: it follows the wall on to the other room. A flame: it turns to face it, stands still and lets the fan blow. ' +
     'After 3 seconds the referee ends the attempt: mission complete. ' +
-    'The robot does not drive closer: the fan reaches the fire from the middle of the room, and pushing the fire target would end the attempt. ' +
+    'The robot does not drive closer: the fan reaches the fire from the middle of the room, and moving the fire target would end the attempt. ' +
     'It scored 100 points in every maze it was tested on - the default maze, 300 random mazes and 240 of the hardest kinds - ' +
     'without touching a wall or the target. The default maze takes 37 seconds, the slowest maze found 139 of the 180 seconds. ' +
     'It needs the robot at its default start position. ' +

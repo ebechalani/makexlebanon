@@ -371,7 +371,9 @@ test('real run, blocks only: a route learned by heart through the default maze e
   assert.ok(left.time !== undefined && room.time !== undefined && left.time > 1 && left.time < room.time);
   assert.ok(room.time < sim.world.time);
   assert.equal(report.time, room.time, 'the score was reached when the robot was inside the room');
-  assert.equal(lineOf(report.lines, 'fan-start').detail, 'not yet - the fan is off');
+  // (the attempt is over: the sheet says what was not earned, not what to do next)
+  assert.equal(lineOf(report.lines, 'fan-start').detail, 'not earned - the fan never blew');
+  assert.equal(lineOf(report.lines, 'fan-complete').detail, 'not earned - the fan never blew at the fire for 3 seconds without a break');
   assert.equal(said(events).length, 2);
   assert.match(said(events)[0], /^\+10 points at 0:0\d\.\d: the robot has left START completely\.$/);
   assert.match(said(events)[1], /^\+20 points at 0:\d\d\.\d: the robot is completely inside the living room\.$/);

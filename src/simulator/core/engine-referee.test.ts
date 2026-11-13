@@ -19,6 +19,7 @@ import type {
   RefereeCall,
   RestartRules,
   RobotConfig,
+  RobotState,
   ScoreContext,
   SimEvent,
 } from './types';
@@ -243,6 +244,99 @@ test('referee: time, "Finished" and the end of the program end the match as in e
   ended.sim.step(2000);
   assert.equal(ended.sim.finishReason, 'program-ended');
   assert.equal(ended.sim.score().total, 1, 'the points earned stay');
+});
+
+test('referee: begin() is called once at the start signal - the robot still stands where the team put it', () => {
+  const log: string[] = [];
+  const referee = (): Referee<null> => ({
+    begin: (ctx) => {
+      log.push(`begin tick ${ctx.world.tick} at ${ctx.world.robot.pose.x},${ctx.world.robot.pose.y} shapes ${ctx.robotShapes.length}`);
+    },
+    observe: (ctx) => {
+      if (ctx.world.tick <= 2) log.push(`observe ${ctx.world.tick}`);
+      return null;
+    },
+    restart: () => {
+      log.push('restart');
+    },
+    score: () => ({ total: 0, max: 0, lines: [], complete: false }),
+  });
+  const { sim } = setup(driveUp, { referee });
+  assert.deepEqual(log, [], 'not when the simulation is created');
+  assert.equal(sim.setStartPose({ x: 400, y: 700, heading: 0 }), true);
+  assert.deepEqual(log, [], 'not when the robot is placed');
+  sim.start();
+  assert.deepEqual(log, ['begin tick 0 at 400,700 shapes 1'], 'at the start signal, before anything moved');
+  sim.start(); // (a second start signal does nothing)
+  sim.step(100);
+  sim.restart();
+  sim.step(100);
+  assert.deepEqual(log, ['begin tick 0 at 400,700 shapes 1', 'observe 1', 'observe 2', 'restart'], 'once per match, not again after a restart');
+});
+
+test('referee: finished() is called once at every kind of end, while the motors still run', () => {
+  const makeReferee = (log: string[], endAt = Infinity) => (): Referee<null> => ({
+    observe: (ctx) => (ctx.world.tick >= endAt ? { end: { reason: 'mission-complete', detail: 'Done.' } } : null),
+    restart: () => {},
+    finished: (ctx, reason) => {
+      const robot = ctx.world.robot;
+      log.push(`${reason} at tick ${ctx.world.tick}: M1 ${robot.dcMotors?.M1.power}, fan ${robot.fanOn}, left wheel ${robot.left.targetRpm} RPM`);
+    },
+    score: () => ({ total: 0, max: 0, lines: [], complete: false }),
+  });
+  // a robot with a fan that drives and blows for the whole match
+  const busy: Script = function* (io) {
+    io.setDcMotor('M1', 80);
+    io.setWheelRpm('left', 30);
+    io.setWheelRpm('right', -30);
+    yield* forever();
+  };
+  const FAN_ROBOT: RobotConfig = { ...BARE, fan: { enabled: true, port: 'M1', forward: 105, minPower: 20, coneHalfAngleDeg: 20, reachMm: 300 } };
+  const stopped = (robot: RobotState): void => {
+    assert.equal(robot.dcMotors?.M1.power, 0, 'afterwards the motor is stopped');
+    assert.equal(robot.fanOn, false);
+    assert.equal(robot.left.targetRpm, 0);
+  };
+
+  // the time is up
+  let log: string[] = [];
+  const timed = setup(busy, { referee: makeReferee(log), duration: 1 }, FAN_ROBOT);
+  timed.sim.start();
+  timed.sim.step(99);
+  assert.deepEqual(log, [], 'not before the end');
+  timed.sim.step(500);
+  assert.deepEqual(log, ['time at tick 100: M1 80, fan true, left wheel 30 RPM']);
+  stopped(timed.robot);
+
+  // the team says "Finished"
+  log = [];
+  const declared = setup(busy, { referee: makeReferee(log) }, FAN_ROBOT);
+  declared.sim.start();
+  declared.sim.step(50);
+  declared.sim.declareFinished();
+  declared.sim.declareFinished();
+  declared.sim.step(50);
+  assert.deepEqual(log, ['declared at tick 50: M1 80, fan true, left wheel 30 RPM'], 'once');
+  stopped(declared.robot);
+
+  // the referee itself ends the match
+  log = [];
+  const called = setup(busy, { referee: makeReferee(log, 20) }, FAN_ROBOT);
+  called.sim.start();
+  called.sim.step(500);
+  assert.deepEqual(log, ['mission-complete at tick 20: M1 80, fan true, left wheel 30 RPM']);
+  assert.equal(called.sim.finishDetail, 'Done.');
+  stopped(called.robot);
+
+  // the program has ended (it switched everything off itself)
+  log = [];
+  const ended = setup(function* (io) { yield* sleep(5); io.setDcMotor('M1', 0); }, { referee: makeReferee(log) }, FAN_ROBOT);
+  ended.sim.start();
+  ended.sim.step(500);
+  assert.equal(log.length, 1);
+  assert.match(log[0], /^program-ended at tick \d+: M1 0, fan false, left wheel 0 RPM$/);
+
+  // a referee without finished() and begin() is as good as before (the first tests of this file)
 });
 
 test('referee: runMatch reports the referee\'s sentence and the time of the score', () => {

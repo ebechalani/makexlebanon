@@ -24,12 +24,21 @@
  * is simply taken back: the robot is stuck and its wheels spin, like on a real table.
  *
  * A game can also put up fixed walls (a maze). They never move: the robot, and whatever it
- * pushes, is stopped by them and slides along them.
+ * pushes, is stopped by them and slides along them. These walls are perfectly smooth: they stop
+ * the robot from going THROUGH them, never from turning or from sliding along them - a robot
+ * that turns right beside a wall completes its turn and is pushed away from the wall. A real
+ * robot would catch on the wall there.
  *
  * Plain TypeScript, no DOM: it runs in the browser and headless under Node.
  * Use createSimulation() from ./simulation.ts unless you want to plug in your own VM.
  */
-import { boxesOverlap, makeContact, pointInBox, rayBoxDistance, type Contact } from './engine-collide';
+import {
+  boxesOverlap as importedBoxesOverlap,
+  makeContact,
+  pointInBox as importedPointInBox,
+  rayBoxDistance as importedRayBoxDistance,
+  type Contact,
+} from './engine-collide';
 import { fastVectorSampler, flameSignal, hashNoise, lineOffsetOf, lineStatusOf, makeProbeReading } from './engine-sensors';
 import { clamp, DEG, makeRng, wrapAngle, type OBB } from './geometry';
 import type { RobotIO } from './io';
@@ -46,8 +55,8 @@ import {
   widestClawGap,
 } from './robot';
 import {
-  DC_MOTOR_PORTS,
-  SERVO_PORTS,
+  DC_MOTOR_PORTS as IMPORTED_DC_MOTOR_PORTS,
+  SERVO_PORTS as IMPORTED_SERVO_PORTS,
   type Body,
   type ButtonName,
   type DcMotorPort,
@@ -79,6 +88,18 @@ import {
   type WheelState,
   type World,
 } from './types';
+
+/**
+ * The collision helpers and the two port lists are used thousands of times per simulated second.
+ * Used through the import, every use is a look-up in the other module (how much that costs
+ * depends on how the code is bundled: under Node with tsx it was 5 % of a whole Fire Rescue
+ * match). So they are read once, here, into constants of this file.
+ */
+const boxesOverlap = importedBoxesOverlap;
+const pointInBox = importedPointInBox;
+const rayBoxDistance = importedRayBoxDistance;
+const DC_MOTOR_PORTS = IMPORTED_DC_MOTOR_PORTS;
+const SERVO_PORTS = IMPORTED_SERVO_PORTS;
 
 /** Builds the interpreter that runs the student's program against the engine's RobotIO. */
 export type VMFactory = (program: ProgramJson, io: RobotIO) => VM;
@@ -405,6 +426,8 @@ class EngineSimulation<S> implements Simulation<S> {
   private readonly rayCos = new Float64Array(ULTRASONIC_RAYS);
   private readonly rayDirX = new Float64Array(ULTRASONIC_RAYS);
   private readonly rayDirY = new Float64Array(ULTRASONIC_RAYS);
+  /** cosine of the half opening angle of the ultrasonic beam */
+  private readonly beamCos: number;
   /** indices of the bodies that carry an infrared emitter (what the flame sensor can see) */
   private readonly emitters: number[] = [];
   private flameTick = -1;
@@ -531,6 +554,7 @@ class EngineSimulation<S> implements Simulation<S> {
 
     // ultrasonic beam: a fan of rays from -halfAngle to +halfAngle
     const half = Math.max(0, finite(cfg.ultrasonic.halfAngleDeg)) * DEG;
+    this.beamCos = Math.cos(half);
     for (let k = 0; k < ULTRASONIC_RAYS; k++) {
       const offset = -half + (2 * half * k) / (ULTRASONIC_RAYS - 1);
       this.raySin[k] = Math.sin(offset);
@@ -546,6 +570,8 @@ class EngineSimulation<S> implements Simulation<S> {
         time: 0,
       });
     }
+
+    this.warnIfStartsInWall();
 
     this.referee = opts.game.createReferee ? opts.game.createReferee(opts.scenario) : null;
     this.refereeView = this.referee
@@ -589,6 +615,22 @@ class EngineSimulation<S> implements Simulation<S> {
     this.currentStatus = 'running';
     this.timerStart = this.world.time;
     this.vmCrashed = false;
+    // the referee looks at the robot where the team put it, before anything moves
+    if (this.referee?.begin) this.referee.begin(this.scoreContext());
+    // In a game with fixed walls nothing starts inside a wall: what was put into one is moved
+    // out of it now, however deep it is - the same settling as after a restart. (Left to the
+    // first tick, a robot that drives off at once would stay stuck: a step that ends in a jam
+    // is taken back, and so is the push out of the wall that came with it.)
+    if (this.wallCount > 0) {
+      this.robotMoving = false;
+      for (let k = 0; k < 10 && (this.unsettled || this.leftover); k++) {
+        this.resolveContacts();
+        if (this.bodiesShifted) this.dropUnsupported();
+      }
+      this.robot.touching = false;
+      // (the robot may stand somewhere else now: no sensor value from before the start is kept)
+      this.epoch++;
+    }
     this.vm.start();
   }
 
@@ -787,6 +829,9 @@ class EngineSimulation<S> implements Simulation<S> {
   }
 
   private finish(reason: FinishReason, detail?: string): void {
+    // The referee hears about the end first, while the field still is as the match left it:
+    // below, the program is stopped, and with it the wheels and the DC motors (a fan).
+    if (this.referee?.finished) this.referee.finished(this.scoreContext(), reason);
     this.currentStatus = 'finished';
     this.currentFinishReason = reason;
     this.currentFinishDetail = detail ?? null;
@@ -1668,6 +1713,55 @@ class EngineSimulation<S> implements Simulation<S> {
   // ---- fixed walls
 
   /**
+   * A robot can drive into a wall only by a hair, and is pushed back out. But a caller can put
+   * it anywhere at the start (SimulationOptions.startPose is not checked; setStartPose() is).
+   * At the start signal it is moved out of the wall (see start()) - towards the side on which
+   * the larger part of it stands, which need not be the side the caller meant. So when it
+   * stands deeper in a wall than it could ever have driven (MAX_PUSH_BACK), the log says so.
+   */
+  private warnIfStartsInWall(): void {
+    const hit = this.contact;
+    const data = this.wallData;
+    let depth = 0;
+    let deepest: FixedWall | null = null;
+    for (let w = 0, at = 0; w < this.wallCount; w++, at += WALL_STRIDE) {
+      for (let k = 0; k < SHAPE_COUNT; k++) {
+        if (!this.shapeActive[k]) continue;
+        const sh = this.shapes[k];
+        if (sh.zmin >= data[at + WALL_H] - Z_EPS) continue;
+        if (
+          boxesOverlap(
+            data[at + WALL_X],
+            data[at + WALL_Y],
+            data[at + WALL_HW],
+            data[at + WALL_HL],
+            data[at + WALL_SIN],
+            data[at + WALL_COS],
+            sh.x,
+            sh.y,
+            sh.hw,
+            sh.hl,
+            sh.sin,
+            sh.cos,
+            hit,
+          ) &&
+          hit.depth > depth
+        ) {
+          depth = hit.depth;
+          deepest = this.walls[w];
+        }
+      }
+    }
+    if (deepest === null || depth <= MAX_PUSH_BACK) return;
+    this.pushEvent({
+      type: 'log',
+      level: 'warn',
+      text: `The robot stands ${Math.round(depth * 10) / 10} mm inside a wall (${deepest.label}) at its start position. At the start it is moved out of that wall.`,
+      time: 0,
+    });
+  }
+
+  /**
    * The robot (or what it carries) has driven a little into a fixed wall: slide it back out.
    * Only the DEEPEST overlap is undone here; the next pass of resolveContacts() looks again.
    * (Deepest first matters where two wall pieces meet: once the robot is out of the wall it
@@ -2375,6 +2469,12 @@ class EngineSimulation<S> implements Simulation<S> {
    * one of the rays of the beam (rayDirX / rayDirY) hits before `best` mm, or `best` when there
    * is none. Walls lower than `beamHeight` are not seen.
    *
+   * The rays are 2 degrees apart, and a maze wall is only 3 mm thick: seen from its end, a wall
+   * can stand between two rays. So the corners of a wall count as well: a corner that lies
+   * inside the beam is seen at its distance. (Rays and corners together never read nearer than
+   * the truth: what hides a corner is either hit by a ray, or it lies between two rays - then
+   * it has a corner of its own inside the beam, and that one is nearer.)
+   *
    * A maze has dozens of walls and the beam is narrow, so most walls are sorted out by a quick
    * look at the box around the beam; only the few that remain are tested ray by ray.
    */
@@ -2382,6 +2482,7 @@ class EngineSimulation<S> implements Simulation<S> {
     const data = this.wallData;
     const dirX = this.rayDirX;
     const dirY = this.rayDirY;
+    const beamCos = this.beamCos;
 
     // First the middle ray alone: it usually finds the wall straight ahead, and everything
     // further away than that wall no longer matters.
@@ -2438,6 +2539,18 @@ class EngineSimulation<S> implements Simulation<S> {
       for (let k = 0; k < ULTRASONIC_RAYS; k++) {
         const d = rayBoxDistance(ox, oy, dirX[k], dirY[k], wx, wy, hw, hl, ws, wc);
         if (d >= 0 && d < best) best = d;
+      }
+      // its four corners: `f` mm along the wall and `r` mm across it from its middle
+      for (let corner = 0; corner < 4; corner++) {
+        const f = corner & 1 ? hl : -hl;
+        const r = corner & 2 ? hw : -hw;
+        const cx = wx + f * ws + r * wc - ox;
+        const cy = wy - f * wc + r * ws - oy;
+        const d2 = cx * cx + cy * cy;
+        if (d2 >= best * best) continue;
+        // inside the beam: at most the half opening angle away from straight ahead (the middle ray)
+        const d = Math.sqrt(d2);
+        if (cx * mx + cy * my >= beamCos * d) best = d;
       }
     }
     return best;
@@ -2508,6 +2621,8 @@ class EngineSimulation<S> implements Simulation<S> {
       if (!e) continue;
       const ex = b.x + e.forward * Math.sin(b.angle);
       const ey = b.y - e.forward * Math.cos(b.angle);
+      // (how much the emitter is turned towards the robot is judged from the point the robot
+      // turns around, not from the sensor on its nose: see flameSignal)
       const signal = flameSignal(
         sx,
         sy,
@@ -2519,6 +2634,8 @@ class EngineSimulation<S> implements Simulation<S> {
         b.angle,
         e.halfAngleDeg,
         f.distancePower,
+        pose.x,
+        pose.y,
       );
       if (signal <= best) continue;
       if (this.sightBlocked(sx, sy, f.height, ex, ey, b.z + e.height, i)) continue;

@@ -35,6 +35,7 @@ import { createSimulation } from '../core/simulation';
 import type { BlockJson, MatSampler, ProgramJson, RGB, ScoreLine, SimEvent, Simulation } from '../core/types';
 import { SAMPLE_CATALOG as FIRE_RESCUE_CATALOG } from '../fire-rescue/sample-catalog';
 import { supportsBlock } from '../vm';
+import { changeVar, forever, move, probeDetects, program, script, setVar, waitUntil, whenStart } from '../vm/builder';
 import {
   FIELD_SIZE,
   FIRE_SPOTS,
@@ -60,6 +61,7 @@ import {
   FIRST_WALL_STOP_CM,
   FLAME_SEEN,
   LINE_COUNTER_CELLS,
+  LINE_COUNTER_RPM,
   LOOK_AROUND_RPM,
   LOOK_STEPS,
   LOOK_STEP_DEG,
@@ -381,10 +383,21 @@ describe('the list of the examples', () => {
       'chief-full-mission': /scored 100 points in every maze it was tested on/,
     };
     for (const s of SAMPLE_PROGRAMS) assert.match(s.description, promised[s.id], s.id);
-    // a program that counts cells by distance says that it needs the robot where the simulator puts it
-    for (const id of ['chief-count-lines', 'chief-wall-follow', 'chief-face-flame', 'chief-full-mission']) {
-      assert.match(sample(id).description, /needs the robot at its default start position/, id);
+    // a program that drives by distance, or that promises never to touch a wall, says that it
+    // needs the robot where the simulator puts it (moved inside START, or turned, it can touch one)
+    for (const id of ['chief-first-wall', 'chief-count-lines', 'chief-wall-follow', 'chief-face-flame', 'chief-full-mission']) {
+      assert.match(sample(id).description, /It needs the robot at its default start position\./, id);
     }
+    // the starter that only turns on the spot and promises nothing about walls does not need it
+    assert.doesNotMatch(sample('chief-flame-fan').description, /default start position/);
+    // what the simulator does differently from a real field is said where a student meets walls first
+    assert.match(
+      sample('chief-first-wall').description,
+      /Walls in the simulator are perfectly smooth: a robot that touches one slides along it, also while it turns\. A real robot gets stuck there, so keep away from the walls\./,
+    );
+    // only a target that is moved ends the attempt (a touch that does not move it costs nothing: game.test.ts)
+    assert.match(sample('chief-full-mission').description, /moving the fire target would end the attempt/);
+    assert.doesNotMatch(sample('chief-full-mission').description, /pushing the fire target/);
   });
 });
 
@@ -635,6 +648,39 @@ describe('chief-first-wall: stop in front of the first wall', () => {
 // 2. chief-count-lines
 // =============================================================================================
 
+/**
+ * The counting loop of the line counter alone, at any speed: straight up the middle column of
+ * the open field from the cell above START, over three grid lines. `runs` matches, each begun
+ * 0.05 mm further up. Returns how many crossings were not counted, and how many were counted twice.
+ */
+function linesMissed(rpm: number, runs: number, sampler?: MatSampler): { missed: number; extra: number } {
+  const counter = program([
+    script(whenStart(), [
+      setVar('lines', 0),
+      move('forward', rpm),
+      forever([waitUntil(probeDetects('L1', 'line')), waitUntil(probeDetects('L1', 'background')), changeVar('lines', 1)]),
+    ]),
+  ]);
+  let missed = 0;
+  let extra = 0;
+  for (let k = 0; k < runs; k++) {
+    const sim = createSimulation({
+      game: fireChiefGame,
+      scenario: NAMED_MAZES[0].scenario,
+      program: counter,
+      sampler,
+      startPose: { x: START_POSE.x, y: 1150 + k * 0.05, heading: 0 },
+    });
+    sim.start();
+    // until the probes are in the middle of the top row, well past the third line
+    while (sim.status === 'running' && sim.world.robot.pose.y > 240) sim.step(1);
+    const lines = sim.vm.variables().lines as number;
+    if (lines < 3) missed += 3 - lines;
+    if (lines > 3) extra += lines - 3;
+  }
+  return { missed, extra };
+}
+
 describe('chief-count-lines: count grid lines to drive two cells', () => {
   const blocks = sample('chief-count-lines').program;
 
@@ -679,6 +725,17 @@ describe('chief-count-lines: count grid lines to drive two cells', () => {
     assert.equal(AFTER_LINE_CM * 10, fireChiefGame.robotConfig!.quadRgb.forward + 150);
     const { sim } = check(defaultScenario());
     assert.ok(offCentre(sim, { col: 0, row: 3 }) < 1.5, `${offCentre(sim, { col: 0, row: 3 }).toFixed(2)} mm`);
+  });
+
+  test('the speed of the line counter: up to 170 RPM every grid line is seen, at the full 180 RPM one is missed now and then', () => {
+    assert.equal(LINE_COUNTER_RPM, 50);
+    assert.match(sample('chief-count-lines').description, /Do not count lines at full speed: a line can be missed\./);
+    for (const rpm of [LINE_COUNTER_RPM, 120, 170]) {
+      assert.deepEqual(linesMissed(rpm, 100), { missed: 0, extra: 0 }, `${rpm} RPM`);
+    }
+    const full = linesMissed(180, 400);
+    assert.ok(full.missed > 0 && full.missed < 20, `180 RPM: ${full.missed} of 1200 crossings missed`);
+    assert.equal(full.extra, 0);
   });
 
   test('named mazes and 300 random mazes: 10 points in every one; it stops counting where a wall closes the way', () => {
@@ -1250,5 +1307,15 @@ describe('the examples on the real mat picture', () => {
       counted += onPicture.sim.vm.variables().cells as number;
     }
     assert.ok(counted > 60, `${counted} cells counted on the picture`);
+  });
+
+  test('the speed of the line counter is the same on the picture: nothing missed up to 170 RPM, a line now and then at 180 RPM', async (t) => {
+    const mat = await picture;
+    if (!mat) return t.skip('the mat picture could not be decoded (sharp is not installed)');
+    for (const rpm of [LINE_COUNTER_RPM, 120, 170]) {
+      assert.deepEqual(linesMissed(rpm, 100, mat), { missed: 0, extra: 0 }, `${rpm} RPM`);
+    }
+    const full = linesMissed(180, 400, mat);
+    assert.ok(full.missed > 0 && full.missed < 20, `180 RPM: ${full.missed} of 1200 crossings missed`);
   });
 });

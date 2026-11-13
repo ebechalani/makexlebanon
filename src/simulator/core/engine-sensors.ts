@@ -137,10 +137,17 @@ const EMITTER_FADE = 0.25;
  *  - emitter part: the emitter shines forward, into a cone. 1 in the inner three quarters of
  *    the cone, fading to 0 at its edge; 0 beside and behind the emitter.
  *
- * The value has one single peak when the sensor is turned: exactly where it points at the
- * emitter. A robot that turns on the spot points at the flame when the value is highest (its
- * sensor is then also nearest to the flame, so both parts agree). Only in the fading edge of the
- * emitter's cone can the highest value be a few degrees beside the flame.
+ * The emitter part is judged from the point (pivotX, pivotY), when one is given: the point the
+ * robot turns around (the middle of its wheel axle), not the sensor on its nose. The sensor
+ * swings on an arm while the robot turns on the spot; judged from the sensor, the emitter part
+ * would change during the turn - near the edge of the emitter's cone so quickly that the
+ * highest value of the turn was up to 10 degrees beside the flame. Judged from the pivot it
+ * stays the same for the whole turn. (Left out, the sensor itself is that point.)
+ *
+ * So the value has one single peak when a robot turns on the spot: exactly where it points at
+ * the emitter. There the sensor looks straight at the emitter (direction part 1) and is nearest
+ * to it (the distance part is at its highest), and the emitter part does not change. Only a
+ * wall end that hides the emitter at that very heading can move the peak.
  *
  * Headings are simulator headings (radians, 0 = up the mat, clockwise positive).
  */
@@ -155,6 +162,8 @@ export function flameSignal(
   emitterHeading: number,
   emitterHalfAngleDeg: number,
   distancePower: number = FLAME_DISTANCE_POWER,
+  pivotX: number = sensorX,
+  pivotY: number = sensorY,
 ): number {
   const half = halfAngleDeg * DEG;
   const cone = emitterHalfAngleDeg * DEG;
@@ -165,16 +174,20 @@ export function flameSignal(
   if (distance >= rangeMm) return 0;
 
   // off: the emitter seen from the sensor, as an angle away from straight ahead
-  // side: the sensor seen from the emitter, as an angle away from where the emitter faces
+  // side: the pivot seen from the emitter, as an angle away from where the emitter faces
   let off = 0;
   let side = 0;
   if (distance > 1e-6) {
     const fx = Math.sin(sensorHeading);
     const fy = -Math.cos(sensorHeading);
     off = Math.abs(Math.atan2(fx * dy - fy * dx, fx * dx + fy * dy));
+  }
+  const px = pivotX - emitterX;
+  const py = pivotY - emitterY;
+  if (px * px + py * py > 1e-12) {
     const gx = Math.sin(emitterHeading);
     const gy = -Math.cos(emitterHeading);
-    side = Math.abs(Math.atan2(gx * -dy - gy * -dx, gx * -dx + gy * -dy));
+    side = Math.abs(Math.atan2(gx * py - gy * px, gx * px + gy * py));
   }
   if (off >= half || side >= cone) return 0;
 

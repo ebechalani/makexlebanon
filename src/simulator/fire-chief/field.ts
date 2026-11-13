@@ -1,10 +1,13 @@
 /**
  * MakeX Lebanon 2027 - Fire Chief (Dynamic Maze Challenge, ages 14-17): the field.
  *
- * Every measure of the game is in this one file. Some of them come from the print file of the
- * map ("Maze 14-17yo makex 2027", page 2) and from the draft rules; the others are ASSUMPTIONS,
- * because the organiser has not published them yet. Each assumption says so in its comment, and
- * changing it here changes it everywhere.
+ * Every measure of the field, of its walls and of the fire target is in this one file. (The
+ * measures of the robot's flame sensor and fan are in ./robot.ts, the limits of the referee in
+ * ./game.ts.) Some of them come from the print file of the map ("Maze 14-17yo makex 2027",
+ * page 2) and from the draft rules; the others are ASSUMPTIONS, because the organiser has not
+ * published them yet. Each assumption says so in its comment, and changing it here changes it
+ * everywhere. The ONE list of all assumptions and decisions of this game - the ones of this
+ * file, of the robot, of the referee and of the engine - is at the top of ./game.ts.
  *
  * Everything is in millimetres, origin at the top-left corner of the mat (the two rooms are at
  * the top, START is at the bottom), +x to the right, +y DOWN. A direction ("angle", "heading")
@@ -296,11 +299,18 @@ export const TARGET_WIDTH = 60;
 export const TARGET_DEPTH = 20;
 /** ... and 120 mm high. */
 export const TARGET_HEIGHT = 120;
-/** ASSUMPTION: it is light (as light as a bucket of Fire Rescue): the robot can push it away. */
+/**
+ * ASSUMPTION: it is light (as light as a bucket of Fire Rescue): the robot can push it away.
+ * It cannot fall over in the simulator: where it stands flat against its wall, a robot that
+ * drives squarely into it does not move it at all (the wall holds it).
+ */
 export const TARGET_MASS = 1;
 /** ASSUMPTION: the infrared emitter sits in the middle of the front face, 60 mm above the mat ... */
 export const EMITTER_HEIGHT = 60;
-/** ... and shines forward into a cone of 70 degrees to each side. */
+/**
+ * ... and shines forward into a cone of 70 degrees to each side. (In the outer quarter of the
+ * cone the light fades out: EMITTER_FADE in core/engine-sensors.ts.)
+ */
 export const EMITTER_HALF_ANGLE_DEG = 70;
 
 /**

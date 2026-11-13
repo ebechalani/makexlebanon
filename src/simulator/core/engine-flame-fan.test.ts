@@ -358,6 +358,69 @@ test('flame sensor: turning on the spot until the value is highest points the ro
   }
 });
 
+test('flame sensor: near the edge of the emitter\'s cone the highest value of a turn still points at the flame', () => {
+  // The robot stands 300 mm from the emitter, more and more to its side (the cone ends at 70
+  // degrees; from 52.5 degrees on the light fades). The sensor swings on a 105 mm arm while
+  // the robot turns: if "how much the emitter is turned towards the robot" were judged from the
+  // sensor, the value would be highest up to 10 degrees beside the flame here.
+  for (const side of [-66, -62, -58, -55, 55, 58, 62, 66]) {
+    const x = EMITTER.x + 300 * Math.sin(side * DEG);
+    const y = EMITTER.y + 300 * Math.cos(side * DEG);
+    const readings: Array<{ heading: number; value: number }> = [];
+    const { sim, robot } = setup(
+      function* (io) {
+        const run = turn(io, 360, 12);
+        for (;;) {
+          readings.push({ heading: robot.pose.heading, value: io.flameValue() });
+          if (run.next().done) break;
+          yield;
+        }
+      },
+      { bodies: [FLAME_BODY], startPose: { x, y, heading: 90 * DEG } },
+    );
+    sim.start();
+    sim.step(20000);
+    assert.equal(sim.finishReason, 'program-ended');
+    const top = Math.max(...readings.map((r) => r.value));
+    assert.ok(top > 2, `${side} degrees to the side: the highest value is ${top}`);
+    // (the value is rounded to 0.1: near the top several headings read the same - take the middle of them)
+    const highest = readings.filter((r) => r.value === top);
+    const middle = highest[Math.floor(highest.length / 2)].heading;
+    const bearing = Math.atan2(EMITTER.x - x, y - EMITTER.y);
+    const error = Math.abs(wrapAngle(middle - bearing)) / DEG;
+    assert.ok(error <= 1.5, `${side} degrees to the side: highest value ${top} at ${error.toFixed(2)} degrees from the flame`);
+    // and while it turns the value does not depend on where the sensor swings to: it is the
+    // value of "straight at the flame" times how far the flame is from straight ahead
+    const straightAt = flameAt({ x, y, heading: bearing });
+    near(top, straightAt, 0.11, `${side} degrees to the side: the top is the value when pointing at the flame`);
+  }
+  // judged from the turning point: a robot whose turning point is beside the emitter's cone
+  // reads nothing, also when its nose reaches into the cone
+  const beside = { x: EMITTER.x + 150 * Math.sin(75 * DEG), y: EMITTER.y + 150 * Math.cos(75 * DEG) };
+  const bearing = Math.atan2(EMITTER.x - beside.x, beside.y - EMITTER.y);
+  for (let turnBy = -40; turnBy <= 40; turnBy += 5) {
+    assert.equal(flameAt({ ...beside, heading: bearing + turnBy * DEG }), 0, `75 degrees to the side, turned by ${turnBy}`);
+  }
+});
+
+test('flame value: the emitter part can be judged from another point than the sensor (the point a robot turns around)', () => {
+  // emitter at the origin looking down the mat (heading 180); sensor 200 mm below it, 60 degrees to its side
+  const sx = 200 * Math.sin(60 * DEG);
+  const sy = 200 * Math.cos(60 * DEG);
+  const heading = Math.atan2(-sx, sy); // looking straight at the emitter
+  const fromSensor = flameSignal(sx, sy, heading, 30, 1000, 0, 0, Math.PI, 70);
+  // a pivot on the same line through the emitter: seen from the emitter in the same direction - the same value
+  near(flameSignal(sx, sy, heading, 30, 1000, 0, 0, Math.PI, 70, 2, sx * 1.5, sy * 1.5), fromSensor, 1e-9);
+  // a pivot straight in front of the emitter: full emitter part, whatever the sensor's own place
+  near(flameSignal(sx, sy, heading, 30, 1000, 0, 0, Math.PI, 70, 2, 0, 300), 100 * 0.8 * 0.8, 1e-9);
+  assert.ok(fromSensor < 64 && fromSensor > 0);
+  // a pivot beside or behind the emitter: nothing
+  assert.equal(flameSignal(sx, sy, heading, 30, 1000, 0, 0, Math.PI, 70, 2, 300, 0), 0);
+  assert.equal(flameSignal(sx, sy, heading, 30, 1000, 0, 0, Math.PI, 70, 2, 0, -300), 0);
+  // a pivot exactly at the emitter: no direction to judge - full
+  near(flameSignal(sx, sy, heading, 30, 1000, 0, 0, Math.PI, 70, 2, 0, 0), 64, 1e-9);
+});
+
 test('flame sensor: "flame detected" means the value is above the threshold', () => {
   const detected = (pose: Pose, config: RobotConfig = MAZE_ROBOT): boolean => {
     const { sim, harness } = setup(function* () {}, { bodies: [FLAME_BODY], startPose: pose, config });

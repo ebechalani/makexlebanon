@@ -12,7 +12,8 @@
  * The chassis is 175 mm long and 130 mm wide: inside the 180 x 130 mm limit of the rules.
  *
  * The numbers of the flame sensor and of the fan are ASSUMPTIONS (the organiser has not
- * published a sensor or a fan). They are all here, in one place.
+ * published a sensor or a fan). They are all here, in one place; the list of every assumption
+ * of this game is at the top of ./game.ts.
  */
 import { DEFAULT_ROBOT_CONFIG } from '../core/robot';
 import type { FanConfig, FlameSensorConfig, Pose, RobotConfig } from '../core/types';
@@ -28,6 +29,11 @@ import { START_CELL, cellCenter } from './field';
  * With these numbers a flame straight ahead reads about 81 at 100 mm, 49 at 300 mm (one cell),
  * 16 at 600 mm and 0 from 1000 mm on; at 15 degrees to the side it reads half of that, at 30
  * degrees nothing. Behind a wall it always reads 0.
+ *
+ * "How much the flame is turned towards the sensor" is judged from the point the robot turns
+ * around (the middle of its wheel axle), not from the sensor on its nose. So a robot that turns
+ * on the spot reads its highest value exactly when it points at the flame - unless the end of a
+ * wall hides the flame at that very heading.
  */
 export const FLAME_SENSOR: FlameSensorConfig = {
   enabled: true,
@@ -46,8 +52,10 @@ export const FLAME_SENSOR: FlameSensorConfig = {
 };
 
 /**
- * The fan. The referee counts a fan action only when the target is inside this cone and reach,
- * with no wall between (rules §7: "the fan must be directed towards the wooden flame").
+ * The fan. The referee counts a fan action only when the fan is directed at the target - its
+ * straight-ahead line hits the target, or the middle of the target is inside this cone - and
+ * the target is in reach, with no wall between (rules §7: "the fan must be directed towards the
+ * wooden flame"; lookAtFan() in ./game.ts).
  */
 export const FAN: FanConfig = {
   enabled: true,
@@ -56,7 +64,8 @@ export const FAN: FanConfig = {
   forward: 105,
   // it blows from 20 % power on, forwards or backwards
   minPower: 20,
-  // "directed": the target is at most 20 degrees away from straight ahead ...
+  // "directed": the middle of the target is at most 20 degrees away from straight ahead
+  // (or the fan points straight at some other part of the target) ...
   coneHalfAngleDeg: 20,
   // ... and at most 300 mm from the fan (ASSUMPTION: about one cell)
   reachMm: 300,

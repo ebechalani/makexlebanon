@@ -24,7 +24,89 @@
  * Referee).
  *
  * Plain TypeScript only (no DOM, no React), so it also runs headless under Node.
+ *
+ * =====================================================================================
+ *  ASSUMPTIONS AND DECISIONS - the one list of everything the draft rules do not say
+ * =====================================================================================
+ * The organiser has to confirm each of them. Behind every line: the constant (or the function)
+ * that holds it, so that a changed answer is changed in one place.
+ *
+ * A. The field (./field.ts)
+ *   1. The outer edge of the field is always walled.                       OUTER_WALLS
+ *   2. A wall panel is one cell + one thickness long, so that panels close the corners
+ *      without a gap (the 3 mm thickness itself is the organiser's figure).     WALL_LENGTH
+ *   3. The target: 60 mm wide, 20 mm deep, 120 mm high, light enough to be pushed.
+ *                                TARGET_WIDTH, TARGET_DEPTH, TARGET_HEIGHT, TARGET_MASS
+ *   4. Its emitter: in the middle of the front face, 60 mm above the mat, shining 70 degrees
+ *      to each side; in the outer quarter of that cone the light fades out.
+ *            EMITTER_HEIGHT, EMITTER_HALF_ANGLE_DEG; EMITTER_FADE in core/engine-sensors.ts
+ *   5. Three spots per room, against the outer walls, facing into the room.
+ *                                                                 FIRE_SPOTS, targetPose()
+ *
+ * B. The robot (./robot.ts)
+ *   6. The flame sensor: at the front, 60 mm high, 30 degrees to each side, 1000 mm far,
+ *      "detected" above 10.                                                    FLAME_SENSOR
+ *      Whether the robot is "in front of the target" is judged from the point the robot turns
+ *      around, not from the sensor: then the highest value of a turn on the spot points at the
+ *      target (flameSignal() in core/engine-sensors.ts).
+ *   7. The fan: on port M1, blowing from 20 % power, 20 degrees to each side, 300 mm far.   FAN
+ *
+ * C. The referee (this file)
+ *   8. "Displaced" (§11) = one corner of the target is more than 5 mm from where it stood.
+ *                                                                       TARGET_DISPLACED_MM
+ *   9. The target cannot fall over in the simulator. A robot that hits it squarely, where it
+ *      stands flat against its wall, does not move it - so that costs nothing here ("must not
+ *      knock over", §7, is not modelled). The referee says a sentence when the robot touches
+ *      the target; only sliding or turning it by more than 5 mm ends the attempt.
+ *  10. "Touching" (§7) = closer than half a millimetre.                               TOUCH_MM
+ *  11. "Stationary" (§7) = both wheel speeds are 0 and the robot is exactly where it was one
+ *      tick (1/100 s) before. Wheels that spin against a wall are not stationary.   observe()
+ *  12. "Directed towards the wooden flame" (§7) = the straight-ahead line of the fan hits the
+ *      target, or the middle of the target is at most 20 degrees away from that line. "In
+ *      reach" = at most 300 mm from the fan to the middle of the target. "No wall between" =
+ *      no wall on the straight line from the fan to the middle of the target.
+ *                                                                  lookAtFan(), checkFan()
+ *  13. The fan action needs neither the room nor a flame reading: "facing the target" is
+ *      geometry, the referee does not ask what the flame sensor shows (§4, §5 "use a flame
+ *      sensor" are not checked). So a robot can blow from just outside the room; the attempt
+ *      then ends "mission complete" with 80 points, without the 20 points for a room.
+ *  14. A fan action begins at the beginning of the first tick in which everything was right;
+ *      that moment is the time written on the 30 points.                           observe()
+ *  15. What is earned on the tick that ends at exactly 180.00 s still counts, and "mission
+ *      complete" on that tick wins over "time".              tick() in core/engine.ts
+ *  16. ScoreReport.complete is true only with all four achievements (100 points). An attempt
+ *      can end with the reason 'mission-complete' and complete = false (see 13).      score()
+ *  17. Restart (§10): the robot is put back exactly where and how it started; a nudged target
+ *      is put back.                                                   fireChiefGame.restartRules
+ *  18. A fifth end that §8 does not name: the program has ended, the robot stands still and no
+ *      DC motor runs ('program-ended'). It is the simulator's way to say "nothing more will
+ *      happen". A program that ends with a DC motor left on runs to 180 s.   core/engine.ts
+ *  19. The start (§6.1, §8): the screen puts the robot only where the whole robot is inside
+ *      START (Simulation.setStartPose refuses everything else). A start pose handed over in
+ *      SimulationOptions is NOT held to START - tests use it to begin next to the target. The
+ *      referee notes it at the start signal and writes it on the sheet (line 'start-position').
+ *      (A robot that such a pose puts into a wall is moved out of the wall at the start signal,
+ *      with a sentence in the log: core/engine.ts.)
+ *
+ * D. The engine (core/engine.ts)
+ *  20. Walls cannot be moved, are perfectly smooth and never stop a turn: a robot that touches
+ *      one while it drives or turns slides along it. "Minor accidental contact with a wall"
+ *      (§11) is therefore any contact, for any time; "must not deliberately push walls" is not
+ *      judged.
+ *
+ * E. Rule sentences that are NOT implemented
+ *      §4, §6.2  "operate autonomously, no remote control": the CyberPi buttons work during an
+ *                attempt, so a program that reads them can be steered by hand.
+ *      §6.6      "stop to indicate mission completion": at "mission complete" the simulator
+ *                stops the robot and its fan itself.
+ *      §8        "the referee checks the robot's dimensions and sensor heights": the robot of
+ *                this game is fixed (./robot.ts) and inside the limits.
+ *      §8        "the referee stops the attempt because of a rule violation": only for the
+ *                displaced target.
+ *      §10       "touching the robot without authorisation ends the attempt": there is no hand
+ *                in the simulator.
  */
+import { boxesOverlap, makeContact, rayBoxDistance } from '../core/engine-collide';
 import {
   localToWorld,
   obbCorners,
@@ -34,12 +116,14 @@ import {
   rectContainsOBB,
   type OBB,
 } from '../core/geometry';
+import { widestClawGap } from '../core/robot';
 import type {
   Body,
   FixedWall,
   Game,
   Referee,
   RefereeCall,
+  RobotConfig,
   ScoreContext,
   ScoreLine,
   ScoreReport,
@@ -102,8 +186,10 @@ export const MAX_RESTARTS = 1;
  * where it stood. ASSUMPTION - the rules only say "displaces".
  */
 export const TARGET_DISPLACED_MM = 5;
-/** Two things closer than this (mm) count as touching. */
-const TOUCH_EPS = 0.5;
+/** ASSUMPTION: the robot "touches" the target when the two are closer than this (mm). */
+export const TOUCH_MM = 0.5;
+/** The referee says "the robot touches the target" once per touch; touches less than this (seconds) apart are one touch. */
+const TOUCH_QUIET_SECONDS = 0.5;
 
 // =============================================================================================
 // The field at the start of an attempt
@@ -212,9 +298,11 @@ export interface FanView {
   fanOn: boolean;
   /** mm from the fan to the middle of the target */
   distance: number;
-  /** degrees between "straight ahead" of the fan and the direction of the target */
+  /** degrees between "straight ahead" of the fan and the direction of the middle of the target */
   offDeg: number;
-  /** the wall that stands between the fan and the target, if any */
+  /** the straight-ahead line of the fan hits the target (some part of it, not only its middle) */
+  pointsAt: boolean;
+  /** the wall that stands between the fan and the middle of the target, if any */
   wall: FixedWall | null;
   /** the robot touches the target */
   touching: boolean;
@@ -229,40 +317,173 @@ export function lookAtFan(ctx: ScoreContext<FireChiefScenario>): FanView | null 
   const dx = target.x - from.x;
   const dy = target.y - from.y;
   // the direction of the target in the robot's frame: `ahead` mm in front of the fan, `aside` mm beside it
-  const ahead = dx * Math.sin(pose.heading) - dy * Math.cos(pose.heading);
-  const aside = dx * Math.cos(pose.heading) + dy * Math.sin(pose.heading);
+  const sin = Math.sin(pose.heading);
+  const cos = Math.cos(pose.heading);
+  const ahead = dx * sin - dy * cos;
+  const aside = dx * cos + dy * sin;
   const targetShape = footprint(target);
   return {
     fanOn: ctx.world.robot.fanOn === true,
     distance: Math.hypot(dx, dy),
     offDeg: (Math.abs(Math.atan2(aside, ahead)) * 180) / Math.PI,
+    // (a ray from the fan straight ahead against the footprint of the target; -1 = it misses)
+    pointsAt:
+      rayBoxDistance(from.x, from.y, sin, -cos, target.x, target.y, target.w / 2, target.l / 2, Math.sin(target.angle), Math.cos(target.angle)) >= 0,
     wall: wallBetween(ctx.world.walls, from, { x: target.x, y: target.y }),
-    touching: ctx.robotShapes.some((shape) => obbTouches(targetShape, shape, TOUCH_EPS)),
+    touching: ctx.robotShapes.some((shape) => obbTouches(targetShape, shape, TOUCH_MM)),
   };
 }
 
+/** The reasons why a fan action does not count. */
+type FanIssueKind = 'no-fan' | 'off' | 'moving' | 'no-target' | 'touching' | 'wall' | 'far' | 'aim';
+
+/** One reason, with the measure that is over its limit ('far': mm, 'aim': degrees). */
+interface FanIssue {
+  kind: FanIssueKind;
+  value: number;
+  limit: number;
+}
+
 /**
- * Why the fan action does not count right now, in student words - or null when it counts:
- * the robot stands still, the fan is on, the target is in front of the fan (inside its cone and
- * its reach), no wall is between them and the robot does not touch the target.
+ * A measure that is over its limit, written so that it never reads like the limit itself:
+ * 301.2 -> "301", but 300.3 -> "300.3" (not "300 mm, at most 300 mm").
+ */
+function overLimit(value: number, limit: number): string {
+  const whole = Math.round(value);
+  if (whole > limit) return String(whole);
+  return (Math.ceil(value * 10 - 1e-9) / 10).toFixed(1);
+}
+
+/**
+ * A reason in student words. `past` = for the sheet of an attempt that is over ("the fan was
+ * off" instead of "the fan is off").
+ */
+function issueText(issue: FanIssue, past = false): string {
+  switch (issue.kind) {
+    case 'no-fan':
+      return 'this robot has no fan';
+    case 'off':
+      return past ? 'the fan was off' : 'the fan is off';
+    case 'moving':
+      return past ? 'the robot was moving - it must stand still' : 'the robot is moving - it must stand still';
+    case 'no-target':
+      return past ? 'there was no fire target on the field' : 'there is no fire target on the field';
+    case 'touching':
+      return past ? 'the robot touched the fire target' : 'the robot touches the fire target - move back a little';
+    case 'wall':
+      return past ? 'there was a wall between the fan and the fire' : 'there is a wall between the fan and the fire';
+    case 'far':
+      return `the fire ${past ? 'was' : 'is'} too far from the fan (${overLimit(issue.value, issue.limit)} mm, at most ${issue.limit} mm)`;
+    case 'aim':
+      return `the fan ${past ? 'did not point' : 'does not point'} at the fire (${overLimit(issue.value, issue.limit)} degrees off, at most ${issue.limit})`;
+  }
+}
+
+/**
+ * Does the fan action count right now? It does when the robot stands still, the fan is on, the
+ * fan is directed at the target (its straight-ahead line hits the target, or the middle of the
+ * target is inside its cone), the target is in reach, no wall is between them and the robot
+ * does not touch the target. Otherwise the reason is written into `issue`.
+ * (The referee asks on every tick: nothing is built here unless the fan is on and the robot stands.)
+ */
+function checkFan(ctx: ScoreContext<FireChiefScenario>, still: boolean, issue: FanIssue): boolean {
+  const fan = ctx.robotConfig.fan;
+  issue.value = 0;
+  issue.limit = 0;
+  if (!fan || !fan.enabled) {
+    issue.kind = 'no-fan';
+    return false;
+  }
+  // (the two quick questions first: mostly the fan is off)
+  if (ctx.world.robot.fanOn !== true) {
+    issue.kind = 'off';
+    return false;
+  }
+  if (!still) {
+    issue.kind = 'moving';
+    return false;
+  }
+  const view = lookAtFan(ctx);
+  if (!view) {
+    issue.kind = 'no-target';
+    return false;
+  }
+  if (view.touching) {
+    issue.kind = 'touching';
+    return false;
+  }
+  if (view.wall) {
+    issue.kind = 'wall';
+    return false;
+  }
+  if (view.distance > fan.reachMm) {
+    issue.kind = 'far';
+    issue.value = view.distance;
+    issue.limit = fan.reachMm;
+    return false;
+  }
+  // A robot that stands squarely in front of any part of the target points at it, however
+  // close it is: the middle of a 60 mm wide target is easily more than 20 degrees away then.
+  if (!view.pointsAt && view.offDeg > fan.coneHalfAngleDeg) {
+    issue.kind = 'aim';
+    issue.value = view.offDeg;
+    issue.limit = fan.coneHalfAngleDeg;
+    return false;
+  }
+  return true;
+}
+
+const newIssue = (): FanIssue => ({ kind: 'off', value: 0, limit: 0 });
+
+/**
+ * Why the fan action does not count right now, in student words - or null when it counts
+ * (see checkFan). `still`: the robot stands still.
  */
 export function fanProblem(ctx: ScoreContext<FireChiefScenario>, still: boolean): string | null {
-  const fan = ctx.robotConfig.fan;
-  if (!fan || !fan.enabled) return 'this robot has no fan';
-  // (the two quick questions first: the referee asks on every tick, and mostly the fan is off)
-  if (ctx.world.robot.fanOn !== true) return 'the fan is off';
-  if (!still) return 'the robot is moving - it must stand still';
-  const view = lookAtFan(ctx);
-  if (!view) return 'there is no fire target on the field';
-  if (view.touching) return 'the robot touches the fire target - move back a little';
-  if (view.wall) return 'there is a wall between the fan and the fire';
-  if (view.distance > fan.reachMm) {
-    return `the fire is too far from the fan (${Math.round(view.distance)} mm, at most ${fan.reachMm} mm)`;
+  const issue = newIssue();
+  return checkFan(ctx, still, issue) ? null : issueText(issue);
+}
+
+const scratchContact = makeContact();
+
+/**
+ * A quick "could the robot be touching the target?" with plain numbers, for the referee's look
+ * on every tick while the robot is near the target (in the middle of the fire room it is). It
+ * may say yes too often, never no when they touch: the exact test follows a yes.
+ */
+function mayTouch(config: RobotConfig, pose: { x: number; y: number; heading: number }, target: Body): boolean {
+  // (a robot with fingers has more parts than its chassis: no shortcut for it)
+  if (config.gripper.enabled) return true;
+  const sin = Math.sin(pose.heading);
+  const cos = Math.cos(pose.heading);
+  const middle = (config.chassisFront - config.chassisRear) / 2;
+  const margin = TOUCH_MM + 0.01;
+  return boxesOverlap(
+    pose.x + middle * sin,
+    pose.y - middle * cos,
+    config.chassisWidth / 2 + margin,
+    (config.chassisFront + config.chassisRear) / 2 + margin,
+    sin,
+    cos,
+    target.x,
+    target.y,
+    target.w / 2,
+    target.l / 2,
+    Math.sin(target.angle),
+    Math.cos(target.angle),
+    scratchContact,
+  );
+}
+
+/** Everything of the robot lies within this distance (mm) of the middle of its wheel axle. */
+function robotReach(config: RobotConfig): number {
+  const half = config.chassisWidth / 2;
+  let reach = Math.max(Math.hypot(config.chassisFront, half), Math.hypot(config.chassisRear, half));
+  const g = config.gripper;
+  if (g.enabled) {
+    reach = Math.max(reach, Math.hypot(g.gripForward + g.fingerLength / 2, widestClawGap(config) / 2 + g.fingerThickness));
   }
-  if (view.offDeg > fan.coneHalfAngleDeg) {
-    return `the fan does not point at the fire (${Math.round(view.offDeg)} degrees off, at most ${fan.coneHalfAngleDeg})`;
-  }
-  return null;
+  return reach;
 }
 
 // =============================================================================================
@@ -278,6 +499,9 @@ const ACHIEVEMENTS: Record<AchievementId, { label: string; points: number }> = {
   'fan-start': { label: 'Stand still, face the fire and start the fan', points: POINTS_FAN_START },
   'fan-complete': { label: `Keep the fan on the fire for ${FAN_ACTION_SECONDS} seconds`, points: POINTS_FAN_COMPLETE },
 };
+
+/** The extra line of the sheet for a robot that did not start inside START (see assumption 19 at the top). */
+export const START_POSITION_LINE_ID = 'start-position';
 
 /** Match time as the referee writes it down: 83.42 -> "1:23.4" (tenths are cut off, never rounded up). */
 export function clock(seconds: number): string {
@@ -302,6 +526,29 @@ function createReferee(_scenario: FireChiefScenario): Referee<FireChiefScenario>
   let still = false;
   /** match time of the restart, if the team used it */
   let restartAt: number | null = null;
+  /** rules §6.1: the whole robot was inside START at the start signal (`begun`: the signal was given) */
+  let startedInside = true;
+  let begun = false;
+
+  // ---- what the final sheet needs to say why something was NOT earned
+  /** why the fan action does not count on this tick (one object, filled again on every tick) */
+  const issue = newIssue();
+  /** the last time the fan blew without counting: when, and why */
+  const miss = { seen: false, time: 0, issue: newIssue() };
+  /** the last fan action that broke before its 3 seconds were over: how long it had lasted, and why it broke */
+  const broke = { seen: false, seconds: 0, issue: newIssue() };
+  /** match time of the last tick in which the robot touched the target */
+  let lastTouch = -Infinity;
+  /** set when the attempt is over: how long the fan action that was going on had lasted (null = none was) */
+  let over: { actionSeconds: number | null } | null = null;
+  /** the robot is nearer to the target than this (mm, middle of the axle to middle of the target) when it can touch it */
+  let touchRange = -1;
+
+  const copyIssue = (to: FanIssue): void => {
+    to.kind = issue.kind;
+    to.value = issue.value;
+    to.limit = issue.limit;
+  };
 
   /** what the referee says on this tick (almost always nothing) */
   let say: string[] | null = null;
@@ -313,6 +560,19 @@ function createReferee(_scenario: FireChiefScenario): Referee<FireChiefScenario>
     earned.set(id, time);
     speak(`+${ACHIEVEMENTS[id].points} points at ${clock(time)}: ${what}`);
   };
+
+  /** The attempt is over: from now on the sheet is final. */
+  const close = (time: number): void => {
+    if (over !== null) return;
+    over = { actionSeconds: actionSince === null ? null : time - actionSince };
+    actionSince = null;
+  };
+
+  /** Rules §8: before the start the referee checks the starting position. */
+  function begin(ctx: ScoreContext<FireChiefScenario>): void {
+    begun = true;
+    startedInside = ctx.robotShapes.every((shape) => rectContainsOBB(START_RECT, shape));
+  }
 
   function observe(ctx: ScoreContext<FireChiefScenario>): RefereeCall | null {
     const world = ctx.world;
@@ -337,20 +597,38 @@ function createReferee(_scenario: FireChiefScenario): Referee<FireChiefScenario>
     last.heading = pose.heading;
     last.time = time;
 
-    // ---- rules §11: a displaced target ends the attempt; what was earned before stays
     const target = targetOf(world);
     if (target) {
+      // ---- rules §11: a displaced target ends the attempt; what was earned before stays
       const shift = targetShift(target);
       if (shift > TARGET_DISPLACED_MM) {
-        actionSince = null;
+        close(time);
         return {
           end: {
             reason: 'target-displaced',
             detail:
-              `The robot pushed the fire target out of its place (by ${Math.round(shift)} mm). ` +
+              `The robot pushed the fire target out of its place (by ${overLimit(shift, TARGET_DISPLACED_MM)} mm). ` +
               'The attempt ends here; the points earned before stay.',
           },
         };
+      }
+
+      // ---- a touch that does not displace the target costs nothing here (assumption 9 at the
+      // top), but the team should know about it. (Only looked at when the robot is near enough.)
+      if (touchRange < 0) touchRange = robotReach(ctx.robotConfig) + Math.hypot(target.w, target.l) / 2 + TOUCH_MM;
+      const dx = target.x - pose.x;
+      const dy = target.y - pose.y;
+      if (dx * dx + dy * dy <= touchRange * touchRange && mayTouch(ctx.robotConfig, pose, target)) {
+        const targetShape = footprint(target);
+        if (ctx.robotShapes.some((shape) => obbTouches(targetShape, shape, TOUCH_MM))) {
+          if (time - lastTouch > TOUCH_QUIET_SECONDS) {
+            speak(
+              'The robot touches the fire target. A fan action does not count while it touches, and the attempt ends ' +
+                'if the target is pushed out of its place. Keep a distance: a real target can also fall over.',
+            );
+          }
+          lastTouch = time;
+        }
       }
     }
 
@@ -375,30 +653,46 @@ function createReferee(_scenario: FireChiefScenario): Referee<FireChiefScenario>
     // fan on at the beginning of a tick. So an action begins at the BEGINNING of the first tick
     // that was right - the moment the program switched the fan on (or the robot came to rest) -
     // and a fan that blows for 300 ticks ("fan on, wait 3 seconds, fan off") has blown for 3 s.
-    const problem = fanProblem(ctx, still);
-    if (problem === null) {
+    if (robot.fanOn !== true && actionSince === null) {
+      // (almost every tick of an attempt: the fan is off and no action is going on - nothing to look at)
+    } else if (checkFan(ctx, still, issue)) {
       if (actionSince === null) actionSince = tickBegan;
       if (!earned.has('fan-start')) {
         award('fan-start', actionSince, 'the robot stands still, faces the fire and the fan is on.');
       }
       if (time - actionSince >= FAN_ACTION_SECONDS - 1e-9) {
         award('fan-complete', time, `the fan blew at the fire for ${FAN_ACTION_SECONDS} seconds.`);
-        return {
-          say: say ?? undefined,
-          end: {
-            reason: 'mission-complete',
-            detail: `Mission complete at ${clock(time)}: the fan blew at the fire for ${FAN_ACTION_SECONDS} seconds.`,
-          },
-        };
+        close(time);
+        // (with fewer than 100 points the sentence says what is missing: see assumption 13 at the top)
+        const total = [...earned.keys()].reduce((sum, id) => sum + ACHIEVEMENTS[id].points, 0);
+        const missing = ACHIEVEMENT_IDS.filter((id) => !earned.has(id));
+        const detail =
+          missing.length === 0
+            ? `Mission complete at ${clock(time)}: the fan blew at the fire for ${FAN_ACTION_SECONDS} seconds.`
+            : `Mission complete at ${clock(time)} with ${total} of ${MAX_SCORE} points: the fan blew at the fire for ` +
+              `${FAN_ACTION_SECONDS} seconds. Not earned: ` +
+              `${missing.map((id) => `${ACHIEVEMENTS[id].label} (${ACHIEVEMENTS[id].points} points)`).join(', ')}.`;
+        return { say: say ?? undefined, end: { reason: 'mission-complete', detail } };
       }
-    } else if (actionSince !== null) {
-      // The action broke during this tick (it was still right when the tick began): the 30
-      // points stay, the 3 seconds start again with the next action.
-      speak(
-        `The fan action stopped after ${oneDecimal(tickBegan - actionSince)} s: ${problem}. ` +
-          `The ${FAN_ACTION_SECONDS} seconds start again.`,
-      );
-      actionSince = null;
+    } else {
+      if (issue.kind !== 'off' && issue.kind !== 'no-fan') {
+        // the fan blows, but not so that it counts: the final sheet says when and why
+        miss.seen = true;
+        miss.time = time;
+        copyIssue(miss.issue);
+      }
+      if (actionSince !== null) {
+        // The action broke during this tick (it was still right when the tick began): the 30
+        // points stay, the 3 seconds start again with the next action.
+        broke.seen = true;
+        broke.seconds = tickBegan - actionSince;
+        copyIssue(broke.issue);
+        speak(
+          `The fan action stopped after ${oneDecimal(broke.seconds)} s: ${issueText(issue)}. ` +
+            `The ${FAN_ACTION_SECONDS} seconds start again.`,
+        );
+        actionSince = null;
+      }
     }
 
     return say === null ? null : { say };
@@ -413,10 +707,64 @@ function createReferee(_scenario: FireChiefScenario): Referee<FireChiefScenario>
     last.time = ctx.world.time;
     still = false;
     restartAt = ctx.world.time;
+    miss.seen = false;
+    broke.seen = false;
+    lastTouch = -Infinity;
+  }
+
+  /**
+   * The attempt has ended (time, "Finished", the end of the program - or this referee ended it
+   * and has closed its book already). The simulation calls this before it switches the fan
+   * off, so what was going on at the last moment is still known here.
+   */
+  function finished(ctx: ScoreContext<FireChiefScenario>): void {
+    close(ctx.world.time);
+  }
+
+  /** A line that was not earned, on the sheet of an attempt that is still running. */
+  function notYet(id: AchievementId, ctx: ScoreContext<FireChiefScenario>): string {
+    if (id === 'leave-start') return 'not yet - the whole robot must be outside the START cell';
+    if (id === 'enter-room') return 'not yet - the whole robot must be inside the living room or the bedroom';
+    if (id === 'fan-start') return `not yet - ${fanProblem(ctx, still) ?? 'stand still in front of the fire and switch the fan on'}`;
+    // fan-complete
+    if (actionSince !== null) {
+      return `the fan is on the fire: ${oneDecimal(ctx.world.time - actionSince)} of ${FAN_ACTION_SECONDS} seconds - keep still`;
+    }
+    if (broke.seen) {
+      // (why it broke then - not what the robot is doing now)
+      return (
+        `the fan action stopped after ${oneDecimal(broke.seconds)} of ${FAN_ACTION_SECONDS} seconds (${issueText(broke.issue, true)}) - ` +
+        `hold it for ${FAN_ACTION_SECONDS} seconds without a break`
+      );
+    }
+    return `not yet - the fan must blow at the fire for ${FAN_ACTION_SECONDS} seconds without a break`;
+  }
+
+  /**
+   * A line that was not earned, on the final sheet. Nothing here looks at the field as it is
+   * now (the simulation has stopped the robot and its fan): it says what the referee saw.
+   */
+  function notEarned(id: AchievementId, ctx: ScoreContext<FireChiefScenario>, actionSeconds: number | null): string {
+    if (id === 'leave-start') return 'not earned - the robot never left the START cell completely';
+    if (id === 'enter-room') return 'not earned - the robot was never completely inside the living room or the bedroom';
+    if (id === 'fan-start') {
+      const fan = ctx.robotConfig.fan;
+      if (!fan || !fan.enabled) return 'not earned - this robot has no fan';
+      if (!miss.seen) return 'not earned - the fan never blew';
+      return `not earned - the fan blew, but it did not count. The last time, at ${clock(miss.time)}: ${issueText(miss.issue, true)}`;
+    }
+    // fan-complete
+    if (actionSeconds !== null) {
+      return `not earned - the fan action was ${oneDecimal(actionSeconds)} of ${FAN_ACTION_SECONDS} seconds long when the attempt ended`;
+    }
+    if (broke.seen) {
+      return `not earned - the fan action stopped after ${oneDecimal(broke.seconds)} of ${FAN_ACTION_SECONDS} seconds: ${issueText(broke.issue, true)}`;
+    }
+    return `not earned - the fan never blew at the fire for ${FAN_ACTION_SECONDS} seconds without a break`;
   }
 
   function score(ctx: ScoreContext<FireChiefScenario>): ScoreReport {
-    const time = ctx.world.time;
+    const ended = over;
     const detailOf = (id: AchievementId): string => {
       const at = earned.get(id);
       if (at !== undefined) {
@@ -424,17 +772,7 @@ function createReferee(_scenario: FireChiefScenario): Referee<FireChiefScenario>
         if (id === 'fan-complete') return `done at ${clock(at)}: mission complete`;
         return `done at ${clock(at)}`;
       }
-      if (id === 'leave-start') return 'not yet - the whole robot must be outside the START cell';
-      if (id === 'enter-room') return 'not yet - the whole robot must be inside the living room or the bedroom';
-      if (id === 'fan-start') return `not yet - ${fanProblem(ctx, still) ?? 'stand still in front of the fire and switch the fan on'}`;
-      // fan-complete
-      if (actionSince !== null) {
-        return `the fan is on the fire: ${oneDecimal(time - actionSince)} of ${FAN_ACTION_SECONDS} seconds - keep still`;
-      }
-      if (earned.has('fan-start')) {
-        return `the fan action stopped too early (${fanProblem(ctx, still) ?? 'it broke'}) - hold it for ${FAN_ACTION_SECONDS} seconds without a break`;
-      }
-      return `not yet - the fan must blow at the fire for ${FAN_ACTION_SECONDS} seconds without a break`;
+      return ended === null ? notYet(id, ctx) : notEarned(id, ctx, ended.actionSeconds);
     };
 
     const lines: ScoreLine[] = ACHIEVEMENT_IDS.map((id) => {
@@ -461,15 +799,31 @@ function createReferee(_scenario: FireChiefScenario): Referee<FireChiefScenario>
           ? 'no restart used (one is allowed; it clears the points, the clock keeps running)'
           : `restart used at ${clock(restartAt)}: the points earned before it were cleared`,
     });
+    // before the start signal the robot still stands where it will start: look at it now
+    const inside =
+      begun || ctx.world.tick > 0 ? startedInside : ctx.robotShapes.every((shape) => rectContainsOBB(START_RECT, shape));
+    if (!inside) {
+      // (only a start pose from SimulationOptions can do this: see assumption 19 at the top)
+      lines.push({
+        id: START_POSITION_LINE_ID,
+        label: 'Start completely inside START',
+        points: 0,
+        max: 0,
+        ok: false,
+        detail:
+          'the robot did not start completely inside the START cell - on the real field the referee does not start such an attempt',
+      });
+    }
 
     const total = lines.reduce((sum, line) => sum + line.points, 0);
+    // complete = all four achievements (an attempt can end "mission complete" with fewer: assumption 13 at the top)
     const report: ScoreReport = { total, max: MAX_SCORE, lines, complete: earned.size === ACHIEVEMENT_IDS.length };
     // the ranking uses "the time at which this score was reached": the time of the last achievement
     if (earned.size > 0) report.time = Math.max(...earned.values());
     return report;
   }
 
-  return { observe, restart, score };
+  return { begin, observe, restart, finished, score };
 }
 
 // =============================================================================================
