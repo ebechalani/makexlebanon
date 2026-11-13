@@ -9,8 +9,14 @@
  * What an example should do in a maze is worked out here a second time, on squared paper so to
  * say (which sides of a cell are open), without the engine: the two must agree.
  *
+ * A hand on the wall nearly always finds the room on its own side first (the right hand the
+ * bedroom, the left hand the living room). So the two examples that stop in the first room are
+ * also played on 60 more random mazes each, picked because the hand leads to the OTHER room
+ * there: both rooms and all three spots of the fire are then seen from the inside.
+ *
  * The full mission is also played on the mazes it finds hardest: mazes with one way only
- * ("perfect" mazes), mazes that no generator of the game would draw, and the slowest maze found.
+ * ("perfect" mazes), mazes that no generator of the game would draw, and the slowest kind of
+ * maze there is.
  */
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -41,6 +47,7 @@ import {
   cellName,
   isCell,
   sameCell,
+  targetPose,
   type Cell,
   type RoomId,
 } from './field';
@@ -53,6 +60,9 @@ import {
   FIRST_WALL_STOP_CM,
   FLAME_SEEN,
   LINE_COUNTER_CELLS,
+  LOOK_AROUND_RPM,
+  LOOK_STEPS,
+  LOOK_STEP_DEG,
   SAMPLE_PROGRAMS,
   WALL_NEAR_CM,
   getSampleProgram,
@@ -86,6 +96,7 @@ const RANDOM: FireChiefScenario[] = Array.from({ length: RANDOM_MAZES }, (_, i) 
 /** The default maze and the five named ones. */
 const NAMED: FireChiefScenario[] = [defaultScenario(), ...NAMED_MAZES.map((maze) => maze.scenario)];
 
+/** The mazes every example is played on: 6 + 300. */
 const ALL_MAZES: FireChiefScenario[] = [...NAMED, ...RANDOM];
 
 /** Mazes with one way only (16 walls), the fire once in each room: the longest ways along the wall. */
@@ -115,10 +126,15 @@ const ODD: FireChiefScenario[] = (() => {
 })();
 
 /**
- * The slowest kind of maze for the full mission: one way only, and the left hand reaches the
- * fire room after 42 cells and 84 quarter turns - no maze of 300 000 one-way mazes needed more.
+ * The slowest kind of maze for the full mission: one way only, the fire in the bedroom, and the
+ * left hand leads through all the rest of the field first - 42 cells and 84 quarter turns.
+ * No maze should need more cells: a hand on the wall drives through at most 48 openings before
+ * it is back where it began (a maze with one way only has exactly 48), and from the fire room
+ * back to START it needs at least 6 of them. A search through 400 000 mazes of four kinds (the
+ * fire once in each room), and a search that changed mazes wall by wall to make them slower,
+ * found none that needs more - and in none of them did the hand fail to reach the fire room.
  */
-const SLOWEST_MAZE = 'BC-B9CG-2CPC';
+const SLOWEST_MAZE = 'BC-KQDM-42C0';
 
 // =============================================================================================
 // On squared paper: what the hand on the wall does, without the engine
@@ -164,6 +180,26 @@ function handOnTheWall(s: FireChiefScenario, hand: 'left' | 'right', until: (cel
 }
 
 const lastOf = <T>(list: readonly T[]): T => list[list.length - 1];
+
+/**
+ * More random mazes (seeds 301, 302, ... of the game's generator), kept when the hand on the
+ * wall leads to `room` first: 12 with the fire in that room at each of its three spots, and 24
+ * with the fire in the other room - 60 mazes. (Such mazes are rare: about 3 in 100.)
+ */
+function mazesWhereTheHandFinds(hand: 'left' | 'right', room: RoomId): FireChiefScenario[] {
+  const wanted: Record<string, number> = { corner: 12, back: 12, side: 12, elsewhere: 24 };
+  const out: FireChiefScenario[] = [];
+  for (let seed = RANDOM_MAZES + 1; out.length < 60; seed++) {
+    assert.ok(seed < 100_000, 'enough mazes are found long before');
+    const s = randomScenario(makeRng(seed));
+    if (roomOf(lastOf(handOnTheWall(s, hand))) !== room) continue;
+    const kind = s.fireRoom === room ? s.fireSpot : 'elsewhere';
+    if (wanted[kind] === 0) continue;
+    wanted[kind]--;
+    out.push(s);
+  }
+  return out;
+}
 
 // =============================================================================================
 // Playing an example
@@ -325,13 +361,29 @@ describe('the list of the examples', () => {
 
   test('every description says, in plain sentences, what the program does, what it scores and what to try', () => {
     for (const s of SAMPLE_PROGRAMS) {
-      assert.ok(s.description.length >= 250 && s.description.length <= 850, `${s.id}: ${s.description.length} characters`);
+      assert.ok(s.description.length >= 250 && s.description.length <= 900, `${s.id}: ${s.description.length} characters`);
       assert.match(s.description, /\bpoints\b/, `${s.id} says what it scores`);
+      assert.match(s.description, /\bTry\b/, `${s.id} says what to try next`);
       assert.ok(!/\s{2,}|\n/.test(s.description), `${s.id}: one paragraph, single blanks`);
       assert.match(s.description, /[.?]$/, `${s.id} ends with a full sentence`);
+      // short sentences: students read them in a second language
+      for (const sentence of s.description.split(/(?<=[.?!])\s+/)) {
+        assert.ok(sentence.length <= 230, `${s.id}: a sentence of ${sentence.length} characters ("${sentence.slice(0, 40)}...")`);
+      }
     }
-    for (const id of ['chief-first-wall', 'chief-count-lines', 'chief-flame-fan', 'chief-wall-follow', 'chief-face-flame']) {
-      assert.match(sample(id).description, /\bTry\b/, `${id} says what to try next`);
+    // the points each one promises, as its tests below measure them
+    const promised: Record<string, RegExp> = {
+      'chief-first-wall': /scores 10 points .* in every maze that can be played/,
+      'chief-count-lines': /scores 10 points .* in every maze that can be played/,
+      'chief-flame-fan': /scores no points/,
+      'chief-wall-follow': /scores 30 points .* in every maze that can be played/,
+      'chief-face-flame': /scores 30 points in every maze that can be played/,
+      'chief-full-mission': /scored 100 points in every maze it was tested on/,
+    };
+    for (const s of SAMPLE_PROGRAMS) assert.match(s.description, promised[s.id], s.id);
+    // a program that counts cells by distance says that it needs the robot where the simulator puts it
+    for (const id of ['chief-count-lines', 'chief-wall-follow', 'chief-face-flame', 'chief-full-mission']) {
+      assert.match(sample(id).description, /needs the robot at its default start position/, id);
     }
   });
 });
@@ -423,6 +475,24 @@ function blocksOf(blocks: ProgramJson): BlockJson[] {
   return out;
 }
 
+/**
+ * The same program with the other hand on the wall: "turn right" and "turn left" swapped in the
+ * loop of its start script - what two descriptions suggest to try. `first` is the turn the
+ * loop begins with as the example is written.
+ */
+function withTheOtherHand(blocks: ProgramJson, first: 'turn right' | 'turn left'): ProgramJson {
+  const second = first === 'turn right' ? 'turn left' : 'turn right';
+  const swapped = JSON.parse(JSON.stringify(blocks)) as ProgramJson;
+  const start = (swapped.blocks?.blocks ?? []).find((block) => block.type === 'event_cyberpi_start');
+  assert.ok(start);
+  const calls = blocksOf({ blocks: { blocks: [start] } }).filter((block) => block.type === 'procedures_callnoreturn');
+  const names = calls.map((block) => block.extraState as { name: string });
+  assert.deepEqual(names.slice(0, 3).map((state) => state.name), [first, second, 'one cell forward'], 'the loop: look to the hand, turn away while there is a wall, drive');
+  names[0].name = second;
+  names[1].name = first;
+  return swapped;
+}
+
 describe('the blocks of the examples', () => {
   test('only blocks of the Fire Chief palette: nothing mBlock does not have, no gripper, no servo', () => {
     const allowed = new Set([...paletteBlockTypes('fire-chief'), ...BUILTIN_BLOCK_TYPES]);
@@ -441,20 +511,31 @@ describe('the blocks of the examples', () => {
     const uses = (id: string): Set<string> => new Set(blocksOf(sample(id).program).map((block) => block.type));
     assert.ok(uses('chief-first-wall').has('sensing_ultrasonic_distance'));
     assert.ok(uses('chief-count-lines').has('sensing_quadrgb_probe_detects'));
-    for (const type of ['sensing_flame_detected', 'sensing_flame_size', 'mbot2_dc_motor_power', 'mbot2_dc_motor_stop', 'cyberpi_rotation_z']) {
+    for (const type of ['sensing_flame_detected', 'sensing_flame_size', 'mbot2_dc_motor_power', 'mbot2_dc_motor_stop']) {
       assert.ok(uses('chief-flame-fan').has(type), type);
     }
     assert.ok(uses('chief-wall-follow').has('sensing_ultrasonic_distance') && !uses('chief-wall-follow').has('sensing_flame_size'));
-    assert.ok(uses('chief-face-flame').has('sensing_flame_size') && !uses('chief-face-flame').has('mbot2_dc_motor_power'));
-    for (const type of ['sensing_ultrasonic_distance', 'sensing_flame_size', 'mbot2_dc_motor_power', 'cyberpi_rotation_z']) {
+    assert.ok(uses('chief-face-flame').has('sensing_flame_size') && uses('chief-face-flame').has('cyberpi_rotation_z'));
+    assert.ok(!uses('chief-face-flame').has('mbot2_dc_motor_power'));
+    for (const type of ['sensing_ultrasonic_distance', 'sensing_flame_size', 'mbot2_dc_motor_power', 'mbot2_dc_motor_stop', 'cyberpi_rotation_z']) {
       assert.ok(uses('chief-full-mission').has(type), type);
     }
-    // a starter program is short; the full mission is the longest
+    // a starter program is short (the line follower of Fire Rescue, a starter too, has 26 blocks); the full mission is the longest
     const size = (id: string): number => blocksOf(sample(id).program).filter((block) => block.type !== 'math_number' && block.type !== 'text').length;
     for (const card of SAMPLE_CATALOG) {
-      if (card.level === 'starter') assert.ok(size(card.id) <= 22, `${card.id}: ${size(card.id)} blocks`);
+      if (card.level === 'starter') assert.ok(size(card.id) <= 26, `${card.id}: ${size(card.id)} blocks`);
       assert.ok(size(card.id) <= size('chief-full-mission'), card.id);
     }
+  });
+
+  test('no program sets the gyro back: a turn is measured from an angle the program wrote down', () => {
+    // ("reset yaw angle" sets "rotated angle around z axis" back in this simulator; real mBlock has
+    // another block for that. A program that works with the difference is right in both.)
+    for (const s of SAMPLE_PROGRAMS) {
+      assert.ok(!blocksOf(s.program).some((block) => block.type === 'cyberpi_reset_yaw'), s.id);
+    }
+    const lookAround = blocksOf(sample('chief-full-mission').program).filter((block) => block.type === 'data_setvariableto');
+    assert.ok(lookAround.some((block) => block.inputs?.VALUE?.block?.type === 'cyberpi_rotation_z'), 'the start angle is written down');
   });
 });
 
@@ -464,6 +545,7 @@ describe('the blocks of the examples', () => {
 
 test('the 300 random mazes can all be played and cover both rooms, the three spots and 4 to 16 walls', () => {
   assert.equal(RANDOM.length, 300);
+  assert.equal(ALL_MAZES.length, 306);
   for (const s of [...ALL_MAZES, ...PERFECT, ...ODD]) assert.ok(isValidScenario(s), label(s));
   assert.equal(new Set(RANDOM.map(encodeScenario)).size, 300, 'no maze twice');
   for (const room of ROOM_IDS) {
@@ -474,8 +556,13 @@ test('the 300 random mazes can all be played and cover both rooms, the three spo
   }
   const counts = new Set(RANDOM.map(wallCount));
   for (let walls = 4; walls <= PERFECT_MAZE_WALLS; walls++) assert.ok(counts.has(walls), `a maze with ${walls} walls`);
-  // START is closed upwards in some of them, and to the left and right in others
-  for (const dir of [0, 1, 3]) assert.ok(RANDOM.filter((s) => freeWayOutOfStart(s) === dir).length >= 10, `way out ${dir}`);
+  // START is open upwards in most of them, closed upwards in the others: the way out is then to the right or to the left
+  const wayOut = (mazes: FireChiefScenario[], dir: number): number => mazes.filter((s) => freeWayOutOfStart(s) === dir).length;
+  assert.deepEqual([wayOut(RANDOM, 0), wayOut(RANDOM, 1), wayOut(RANDOM, 2), wayOut(RANDOM, 3)], [209, 84, 0, 7]);
+  // a hand on the wall nearly always finds the room on its own side first
+  const firstRoom = (hand: 'left' | 'right', room: RoomId): number => RANDOM.filter((s) => roomOf(lastOf(handOnTheWall(s, hand))) === room).length;
+  assert.deepEqual([firstRoom('right', 'bedroom'), firstRoom('right', 'living')], [291, 9]);
+  assert.deepEqual([firstRoom('left', 'living'), firstRoom('left', 'bedroom')], [292, 8]);
   for (const s of PERFECT) assert.equal(wallCount(s), PERFECT_MAZE_WALLS);
   assert.ok(Math.max(...ODD.map(wallCount)) > PERFECT_MAZE_WALLS, 'mazes with closed-off cells');
   assert.ok(decodeScenario(SLOWEST_MAZE));
@@ -508,7 +595,9 @@ describe('chief-first-wall: stop in front of the first wall', () => {
     // it stands in front of the wall: nearer than the 8 cm of the program, and not more than 1 cm nearer
     const gap = sim.readSensors().ultrasonicCm;
     assert.ok(gap < FIRST_WALL_STOP_CM && gap > FIRST_WALL_STOP_CM - 1, `${what}: ${gap} cm from the wall`);
-    assert.deepEqual(screen(sim), ['To the first wall', `Wall ahead, cm: ${Math.round(gap * 10) / 10}`], what);
+    // the screen shows the distance at which it stands (it was measured after the robot had come to rest)
+    assert.deepEqual(screen(sim), [`Wall ahead, cm: ${Math.round(gap * 10) / 10}`], what);
+    assert.equal(sim.world.robot.left.rpm, 0, what);
     assert.ok(ledsAre(sim, GREEN), `${what}: LEDs green`);
     // 10 points: the robot has left START completely - in every maze
     assert.deepEqual(points(sim), [10, 0, 0, 0], what);
@@ -528,12 +617,17 @@ describe('chief-first-wall: stop in front of the first wall', () => {
   });
 
   test('a wall right in front of START: the robot turns to the free way first', () => {
-    const closed = RANDOM.filter((s) => !isOpen(s, START_CELL, 0));
-    assert.ok(closed.length >= 30, `${closed.length} mazes with START closed upwards`);
-    for (const s of closed.slice(0, 5)) {
+    const closed = ALL_MAZES.filter((s) => !isOpen(s, START_CELL, 0));
+    assert.ok(closed.length >= 90, `${closed.length} mazes with START closed upwards`);
+    const sides = new Set<number>();
+    for (const s of closed) {
+      // (check() has played every one of them in the test above; here a few are looked at again)
+      if (sides.size === 2 && sides.has(freeWayOutOfStart(s))) continue;
       const { sim } = check(s);
       assert.ok(cellOf(sim).row === START_CELL.row && cellOf(sim).col !== START_CELL.col, 'it left START sideways');
+      sides.add(freeWayOutOfStart(s));
     }
+    assert.deepEqual([...sides].sort(), [1, 3], 'to the right in some mazes, to the left in others');
   });
 });
 
@@ -591,7 +685,7 @@ describe('chief-count-lines: count grid lines to drive two cells', () => {
     const counted = [0, 0, 0];
     for (const s of ALL_MAZES) counted[check(s).sim.vm.variables().cells as number]++;
     // all three endings happen: no cell (a wall at once), one cell, two cells
-    for (const [cells, mazes] of counted.entries()) assert.ok(mazes >= 20, `${mazes} mazes with ${cells} cells counted`);
+    for (const [cells, mazes] of counted.entries()) assert.ok(mazes >= 50, `${mazes} mazes with ${cells} cells counted`);
   });
 });
 
@@ -608,9 +702,10 @@ describe('chief-flame-fan: a first look at the flame sensor and the fan', () => 
     const { sim } = played;
     assertCleanRun(played, what);
     assert.equal(sim.finishReason, 'program-ended', what);
-    // it stands where it stood, after one full turn (it overshoots by a degree or two while it stops)
+    // it stands where it stood and faces up again, after one full turn in 36 steps of 10 degrees
     assert.ok(offCentre(sim, START_CELL) < 0.01, what);
-    assert.ok(sim.readSensors().yawDeg > 360 && sim.readSensors().yawDeg < 363, `${what}: turned ${sim.readSensors().yawDeg} degrees`);
+    assert.ok(Math.abs(sim.readSensors().yawDeg - 360) < 0.01, `${what}: turned ${sim.readSensors().yawDeg} degrees`);
+    assert.ok(offDirection(sim, 0) < 0.01, what);
     // the fan blew for one second
     assert.ok(Math.abs(played.fanSeconds - 1) < 0.02, `${what}: fan on for ${played.fanSeconds} s`);
     assert.equal(sim.readSensors().fanOn, false, what);
@@ -628,21 +723,26 @@ describe('chief-flame-fan: a first look at the flame sensor and the fan', () => 
 
   test('default maze: one turn on the spot, flame value 0, fan for one second, no points', () => {
     const { sim } = check(defaultScenario());
-    assert.ok(sim.world.time > 6 && sim.world.time < 7, `${sim.world.time} s`);
+    assert.ok(sim.world.time > 5 && sim.world.time < 6, `${sim.world.time} s`);
+    assert.equal(LOOK_STEPS * LOOK_STEP_DEG, 360);
   });
 
   test('named mazes and 300 random mazes: the same everywhere - START is too far from the fire', () => {
     for (const s of ALL_MAZES) check(s);
-    // why: the sensor sees one metre, and no place of the target is nearer to START than that
+    // why: the sensor sees one metre, and none of the six places of the target is nearer to START than that
     assert.equal(FLAME_SENSOR.rangeMm, 1000);
-    for (const s of NAMED) {
-      const target = targetOf(play({}, s).sim.world)!;
-      assert.ok(Math.hypot(target.x - START_POSE.x, target.y - START_POSE.y) - FLAME_SENSOR.forward > FLAME_SENSOR.rangeMm);
+    for (const room of ROOM_IDS) {
+      for (const spot of FIRE_SPOTS) {
+        const target = targetPose(room, spot);
+        const away = Math.hypot(target.x - START_POSE.x, target.y - START_POSE.y) - FLAME_SENSOR.forward;
+        assert.ok(away > FLAME_SENSOR.rangeMm + 200, `${room} ${spot}: ${Math.round(away)} mm`);
+      }
     }
   });
 
   test('the same blocks next to the fire: the value goes up and the LEDs turn red', () => {
-    // (what the description suggests to try: driving blocks in front - here the way of the open field into the living room)
+    // (what the description suggests to try: on the open field, 120 cm forward, a quarter turn to the left, 60 cm forward)
+    assert.match(sample('chief-flame-fan').description, /open field .* 120 cm forward, a quarter turn to the left, 60 cm forward/);
     const s = NAMED_MAZES.find((maze) => maze.id === 'open')!.scenario;
     const original = sample('chief-flame-fan').program.blocks!.blocks![0];
     const inFront: ProgramJson = JSON.parse(JSON.stringify(sample('chief-flame-fan').program)) as ProgramJson;
@@ -662,6 +762,9 @@ describe('chief-flame-fan: a first look at the flame sensor and the fan', () => 
     assert.equal(roomAround(played.sim.robotShapes()), 'living');
     assert.ok(played.maxFlame > 80, `flame value up to ${played.maxFlame}`);
     assert.equal(played.ledsWereRed, true);
+    assert.equal(played.touched, false, 'the robot turns in the room without touching the target');
+    // the fan blows away from the fire there (the turn ends where it began, facing the side wall): still no fan points
+    assert.deepEqual(points(played.sim), [10, 20, 0, 0]);
   });
 });
 
@@ -700,11 +803,14 @@ describe('chief-wall-follow: follow the right-hand wall to a room', () => {
     const { sim } = check(s);
     assert.equal(roomAround(sim.robotShapes()), 'bedroom');
     assert.equal(s.fireRoom, 'living', 'the fire is in the other room: this example does not look for it');
-    assert.equal(handOnTheWall(s, 'right').length, 13, 'thirteen cells along the wall');
+    assert.equal(handOnTheWall(s, 'right').length, 12, 'twelve cells along the wall');
     assert.ok(sim.world.time > 30 && sim.world.time < 40, `${sim.world.time} s`);
   });
 
-  test('named mazes and 300 random mazes: 30 points in every one, in the room the right hand reaches first', () => {
+  /** 60 more mazes in which the right hand leads to the living room first (it nearly always finds the bedroom). */
+  const TO_THE_LIVING_ROOM = mazesWhereTheHandFinds('right', 'living');
+
+  test('named mazes and 300 random mazes: 30 points in every one, in the room the right hand reaches first', (t) => {
     const rooms = { living: 0, bedroom: 0 };
     const times: number[] = [];
     for (const s of ALL_MAZES) {
@@ -712,15 +818,43 @@ describe('chief-wall-follow: follow the right-hand wall to a room', () => {
       rooms[roomAround(sim.robotShapes())!]++;
       times.push(sim.world.time);
     }
-    assert.ok(rooms.living >= 10 && rooms.bedroom >= 100, `living room ${rooms.living}, bedroom ${rooms.bedroom}`);
+    t.diagnostic(`${ALL_MAZES.length} mazes: 30 points in every one (bedroom ${rooms.bedroom}, living room ${rooms.living}), median ${median(times).toFixed(1)} s, slowest ${Math.max(...times).toFixed(1)} s`);
+    // the right hand nearly always leads to the bedroom, which is on the right
+    assert.deepEqual(rooms, { living: 9, bedroom: 297 });
     assert.ok(Math.max(...times) < 110, `slowest ${Math.max(...times)} s`);
   });
 
+  test('60 more random mazes in which the right hand leads to the living room: 30 points in every one', () => {
+    for (const s of TO_THE_LIVING_ROOM) {
+      const { sim } = check(s);
+      assert.equal(roomAround(sim.robotShapes()), 'living', label(s));
+    }
+  });
+
   test('it walks into the fire room without touching the target, wherever the target stands', () => {
-    const fireFirst = RANDOM.filter((s) => roomOf(lastOf(handOnTheWall(s, 'right'))) === s.fireRoom);
-    for (const spot of FIRE_SPOTS) assert.ok(fireFirst.some((s) => s.fireSpot === spot), spot);
+    const fireFirst = [...ALL_MAZES, ...TO_THE_LIVING_ROOM].filter((s) => roomOf(lastOf(handOnTheWall(s, 'right'))) === s.fireRoom);
+    for (const room of ROOM_IDS) {
+      for (const spot of FIRE_SPOTS) {
+        const count = fireFirst.filter((s) => s.fireRoom === room && s.fireSpot === spot).length;
+        assert.ok(count >= 12, `${count} mazes that end in the ${room} with the fire at its ${spot}`);
+      }
+    }
     // (check() has asserted for each of them that nothing was touched and the target did not move)
-    assert.ok(fireFirst.length >= 100, `${fireFirst.length} mazes where the first room is the fire room`);
+    assert.ok(fireFirst.length >= 200, `${fireFirst.length} mazes where the first room is the fire room`);
+  });
+
+  test('the left hand, as the description suggests to try: swap the two turns of the loop', () => {
+    const swapped = withTheOtherHand(blocks, 'turn right');
+    for (const s of [defaultScenario(), ...RANDOM.slice(0, 40)]) {
+      const played = play(swapped, s);
+      const room = roomOf(lastOf(handOnTheWall(s, 'left')));
+      assert.deepEqual(played.sim.vm.errors(), [], label(s));
+      assert.equal(roomAround(played.sim.robotShapes()), room, label(s));
+      assert.deepEqual(points(played.sim), [10, 20, 0, 0], label(s));
+      assert.equal(played.touched, false, label(s));
+    }
+    // in the default maze the left hand ends in the living room, the right hand in the bedroom
+    assert.equal(roomOf(lastOf(handOnTheWall(defaultScenario(), 'left'))), 'living');
   });
 });
 
@@ -743,7 +877,8 @@ describe('chief-face-flame: find the flame and turn to face it', () => {
     assert.ok(offCentre(sim, ROOMS[room].cell) < 0.1, what);
     assert.deepEqual(points(sim), [10, 20, 0, 0], what);
     assert.equal(played.fanSeconds, 0, what);
-    const best = sim.vm.variables().best as number;
+    const variables = sim.vm.variables();
+    const best = variables.best as number;
     if (room === s.fireRoom) {
       // the fire is here: the robot faces the target, LEDs red
       assert.ok(best > 80 && best === played.maxFlame, `${what}: highest flame value ${best}`);
@@ -751,12 +886,16 @@ describe('chief-face-flame: find the flame and turn to face it', () => {
       assert.ok(ledsAre(sim, RED), what);
       assert.deepEqual(screen(sim), [`Fire! Flame value ${best}`], what);
       assert.ok(sim.readSensors().flame > 80, `${what}: the sensor looks at the flame`);
+      assert.equal(sim.readSensors().flameDetected, true, what);
     } else {
-      // the fire is in the other room, more than a metre away: no flame, LEDs blue
+      // the fire is in the other room, more than a metre away: no flame, LEDs blue,
+      // and the robot faces again the way it came in ("look around" ends where it began)
       assert.equal(best, 0, what);
       assert.equal(played.maxFlame, 0, what);
       assert.ok(ledsAre(sim, BLUE), what);
       assert.deepEqual(screen(sim), ['No fire in this room'], what);
+      // (to a twentieth of a degree: the gyro block gives tenths)
+      assert.ok(offDirection(sim, variables.dir as number) < 0.06, `${what}: "dir" is the way it faces`);
     }
     return played;
   }
@@ -771,20 +910,47 @@ describe('chief-face-flame: find the flame and turn to face it', () => {
     assert.ok(sim.world.time > 30 && sim.world.time < 40, `${sim.world.time} s`);
   });
 
-  test('named mazes and 300 random mazes: 30 points in every one; it faces the fire whenever the fire is in that room', () => {
-    let faced = 0;
+  /** 60 more mazes in which the left hand leads to the bedroom first (it nearly always finds the living room). */
+  const TO_THE_BEDROOM = mazesWhereTheHandFinds('left', 'bedroom');
+
+  test('named mazes, 300 random mazes and 60 where the left hand leads to the bedroom: 30 points in every one; it faces the fire whenever the fire is in that room', (t) => {
     let empty = 0;
-    const spots = new Set<string>();
-    for (const s of ALL_MAZES) {
+    const faced: Record<string, number> = {};
+    const times: number[] = [];
+    let worstAim = 0;
+    for (const s of [...ALL_MAZES, ...TO_THE_BEDROOM]) {
       const { sim } = check(s);
+      times.push(sim.world.time);
       if (ledsAre(sim, RED)) {
-        faced++;
-        spots.add(`${s.fireRoom} ${s.fireSpot}`);
+        faced[`${s.fireRoom} ${s.fireSpot}`] = (faced[`${s.fireRoom} ${s.fireSpot}`] ?? 0) + 1;
+        worstAim = Math.max(worstAim, aimErrorDeg(sim));
       } else empty++;
     }
-    assert.ok(faced >= 100 && empty >= 100, `faced the fire in ${faced} mazes, found the room empty in ${empty}`);
-    assert.equal(spots.size, 6, 'both rooms, all three spots');
+    const facedTotal = Object.values(faced).reduce((sum, n) => sum + n, 0);
+    t.diagnostic(
+      `${times.length} mazes: 30 points in every one; faced the fire in ${facedTotal} (at most ${worstAim.toFixed(2)} degrees off), ` +
+        `found the room empty in ${empty}; median ${median(times).toFixed(1)} s, slowest ${Math.max(...times).toFixed(1)} s`,
+    );
+    assert.ok(facedTotal >= 150 && empty >= 150, `faced the fire in ${facedTotal} mazes, found the room empty in ${empty}`);
+    // both rooms, all three spots - each of the six in at least 12 mazes
+    for (const room of ROOM_IDS) {
+      for (const spot of FIRE_SPOTS) assert.ok((faced[`${room} ${spot}`] ?? 0) >= 12, `${faced[`${room} ${spot}`] ?? 0} mazes with the fire in the ${room}, ${spot}`);
+    }
     assert.equal(FLAME_SEEN, FLAME_SENSOR.threshold, 'the program uses the threshold of the "detects flame?" block');
+  });
+
+  test('"look around" measures its turn from the angle at which it began, and ends where it began', () => {
+    assert.equal(LOOK_AROUND_RPM, 30);
+    // default maze: the robot comes into the living room from the right, facing left: the gyro has
+    // counted a quarter turn to the left by then. The fire in the corner is 45 degrees to its right.
+    const inTheCorner = play(blocks, defaultScenario()).sim.vm.variables();
+    assert.equal(inTheCorner['start angle'], -90);
+    assert.ok(Math.abs((inTheCorner['best turn'] as number) - 45) < 1, `best turn ${inTheCorner['best turn']}`);
+    assert.equal(inTheCorner.dir, 3);
+    // open field: it comes in from below, and the fire at the back wall is straight ahead
+    const straightAhead = play(blocks, NAMED_MAZES.find((maze) => maze.id === 'open')!.scenario).sim.vm.variables();
+    assert.equal(straightAhead['start angle'], 0);
+    assert.equal(straightAhead['best turn'], 0);
   });
 });
 
@@ -794,6 +960,10 @@ describe('chief-face-flame: find the flame and turn to face it', () => {
 
 describe('chief-full-mission: the whole mission on any maze', () => {
   const blocks = sample('chief-full-mission').program;
+
+  /** Does the left hand lead through the room without fire before it reaches the fire room? */
+  const otherRoomFirst = (s: FireChiefScenario): boolean =>
+    handOnTheWall(s, 'left', (cell) => roomOf(cell) === s.fireRoom).some((cell) => roomOf(cell) !== null && roomOf(cell) !== s.fireRoom);
 
   function check(s: FireChiefScenario): Played {
     const what = label(s);
@@ -814,16 +984,23 @@ describe('chief-full-mission: the whole mission on any maze', () => {
     assert.ok(Math.abs(done.time! - fan.time! - 3) < 0.011, what);
     assert.ok(Math.abs(played.fanSeconds - 3) < 0.03, `${what}: fan on for ${played.fanSeconds} s`);
     assert.equal(sim.score().time, done.time, what);
-    // the room without fire, if the way led through it first, was looked at once and found empty
-    const emptyFirst = handOnTheWall(s, 'left', (cell) => roomOf(cell) === s.fireRoom).some((cell) => roomOf(cell) !== null && roomOf(cell) !== s.fireRoom);
-    assert.deepEqual(screen(sim), emptyFirst ? ['No fire here'] : [], what);
+    // the screen shows the highest flame value of every room it looked around in: the room without
+    // fire first (0), if the way along the wall led through it, then the fire room
+    const best = sim.vm.variables().best as number;
+    assert.ok(best > 80 && best === played.maxFlame, `${what}: highest flame value ${best}`);
+    assert.deepEqual(screen(sim), otherRoomFirst(s) ? ['Flame value in this room: 0', `Flame value in this room: ${best}`] : [`Flame value in this room: ${best}`], what);
     return played;
   }
 
-  test('default maze: 100 points in under 40 seconds', () => {
+  /** The times the description names: "The default maze takes 37 seconds, the slowest maze found 139 of the 180 seconds". */
+  const told = /The default maze takes (\d+) seconds, the slowest maze found (\d+) of the 180 seconds/.exec(sample('chief-full-mission').description);
+
+  test('default maze: 100 points after 37 seconds, as the description says', () => {
     const { sim } = check(defaultScenario());
     assert.ok(sim.world.time > 35 && sim.world.time < 40, `${sim.world.time} s`);
     assert.equal(sim.restarts, 0);
+    assert.ok(told, 'the description names the two times');
+    assert.equal(Number(told[1]), Math.round(sim.world.time), `${sim.world.time} s`);
   });
 
   test('the five named mazes, from the open field to the maze with one way only: 100 points', () => {
@@ -832,37 +1009,109 @@ describe('chief-full-mission: the whole mission on any maze', () => {
 
   test('300 random mazes: 100 points in every one, the slowest well inside the 180 seconds', (t) => {
     const times = RANDOM.map((s) => check(s).sim.world.time);
-    t.diagnostic(`300 random mazes: 300 complete, median ${median(times).toFixed(1)} s, slowest ${Math.max(...times).toFixed(1)} s`);
+    t.diagnostic(`300 random mazes: 300 of 300 complete with 100 points, median ${median(times).toFixed(1)} s, slowest ${Math.max(...times).toFixed(1)} s`);
     assert.ok(median(times) > 35 && median(times) < 55, `median ${median(times)} s`);
     assert.ok(Math.max(...times) < 145, `slowest ${Math.max(...times)} s`);
+    // the room without fire came first in about half of them
+    const through = RANDOM.filter(otherRoomFirst).length;
+    assert.ok(through >= 100 && through <= 200, `${through} mazes with the other room first`);
   });
 
   test('120 mazes with one way only (the longest ways), the fire once in each room: 100 points', (t) => {
     const times = PERFECT.map((s) => check(s).sim.world.time);
-    t.diagnostic(`120 one-way mazes: 120 complete, median ${median(times).toFixed(1)} s, slowest ${Math.max(...times).toFixed(1)} s`);
+    t.diagnostic(`120 one-way mazes: 120 of 120 complete with 100 points, median ${median(times).toFixed(1)} s, slowest ${Math.max(...times).toFixed(1)} s`);
     assert.ok(Math.max(...times) < 145, `slowest ${Math.max(...times)} s`);
   });
 
-  test('120 mazes no generator draws - closed-off cells, loose walls, up to 25 walls: 100 points', () => {
-    for (const s of ODD) check(s);
+  test('120 mazes no generator draws - closed-off cells, loose walls, up to 25 walls: 100 points', (t) => {
+    const times = ODD.map((s) => check(s).sim.world.time);
+    t.diagnostic(`120 odd mazes: 120 of 120 complete with 100 points, median ${median(times).toFixed(1)} s, slowest ${Math.max(...times).toFixed(1)} s`);
   });
 
-  test('the slowest maze found (42 cells and 84 quarter turns before the fire room): 100 points after 140 seconds', () => {
+  test('the slowest kind of maze (42 cells and 84 quarter turns before the fire room): 100 points after 139 seconds, as the description says', () => {
     const s = decodeScenario(SLOWEST_MAZE);
     assert.ok(s);
     const way = handOnTheWall(s, 'left', (cell) => roomOf(cell) === s.fireRoom);
     assert.equal(way.length, 42);
-    for (const fireSpot of FIRE_SPOTS) {
-      const { sim } = check({ ...s, fireSpot });
-      assert.ok(sim.world.time > 138 && sim.world.time < 141, `${fireSpot}: ${sim.world.time} s`);
+    assert.equal(otherRoomFirst(s), true, 'and the room without fire is on the way');
+    const times = FIRE_SPOTS.map((fireSpot) => check({ ...s, fireSpot }).sim.world.time);
+    for (const time of times) assert.ok(time > 136 && time < 140, `${time} s`);
+    assert.ok(told, 'the description names the two times');
+    assert.equal(Number(told[2]), Math.ceil(Math.max(...times)), `the slowest of the three spots: ${Math.max(...times)} s`);
+    // no maze of these tests is slower
+    for (const other of [...ALL_MAZES, ...PERFECT, ...ODD]) {
+      assert.ok(handOnTheWall(other, 'left', (cell) => roomOf(cell) === other.fireRoom).length <= 42, label(other));
     }
+  });
+
+  test('the description counts the mazes of these tests', () => {
+    // "... the default maze, 300 random mazes and 240 of the hardest kinds ..."
+    const counted = /the default maze, (\d+) random mazes and (\d+) of the hardest kinds/.exec(sample('chief-full-mission').description);
+    assert.ok(counted);
+    assert.equal(Number(counted[1]), RANDOM.length);
+    assert.equal(Number(counted[2]), PERFECT.length + ODD.length);
+  });
+
+  test('the right hand, as the description suggests to try: 100 points as well, faster in some mazes and slower in others', () => {
+    const swapped = withTheOtherHand(blocks, 'turn left');
+    let faster = 0;
+    let slower = 0;
+    for (const s of [defaultScenario(), ...RANDOM.slice(0, 60)]) {
+      const right = play(swapped, s);
+      assert.deepEqual(right.sim.vm.errors(), [], label(s));
+      assert.equal(right.sim.finishReason, 'mission-complete', label(s));
+      assert.deepEqual(points(right.sim), [10, 20, 30, 40], label(s));
+      assert.equal(right.touched, false, label(s));
+      const left = play(blocks, s).sim.world.time;
+      if (right.sim.world.time < left) faster++;
+      if (right.sim.world.time > left) slower++;
+    }
+    assert.ok(faster >= 10 && slower >= 10, `the right hand is faster in ${faster} mazes and slower in ${slower}`);
   });
 
   test('the fan blows a little longer than the 3 seconds of the rules, from the port of the fan', () => {
     assert.ok(FAN_SECONDS > 3 && FAN_SECONDS <= 4);
     const fanBlock = blocksOf(blocks).find((block) => block.type === 'mbot2_dc_motor_power');
     assert.equal(fanBlock?.fields?.PORT, FAN.port);
+    assert.equal(blocksOf(blocks).find((block) => block.type === 'mbot2_dc_motor_stop')?.fields?.PORT, FAN.port);
     assert.equal(WALL_NEAR_CM, 20);
+  });
+
+  test('with the one restart of the rules the program begins again at START and still completes the mission', () => {
+    // (the restart clears the points and the clock keeps running; the program must not rely on what it knew before)
+    const halfTurned = (sim: Sim): boolean => {
+      const began = sim.vm.variables()['start angle'];
+      return typeof began === 'number' && sim.readSensors().yawDeg - began > 150;
+    };
+    const cases: Array<[FireChiefScenario, (sim: Sim) => boolean]> = [
+      // on the way, after 20 seconds
+      [defaultScenario(), (sim) => sim.world.time >= 20],
+      // in the middle of "look around" in the room without fire: the robot is taken away half turned
+      [NAMED_MAZES.find((maze) => maze.id === 'two-doors')!.scenario, halfTurned],
+    ];
+    for (const [s, now] of cases) {
+      const sim = createSimulation({ game: fireChiefGame, scenario: s, program: blocks });
+      sim.start();
+      while (sim.status === 'running' && !now(sim)) sim.step(1);
+      assert.equal(sim.status, 'running', label(s));
+      const restartAt = sim.world.time;
+      const before = sim.score().total;
+      sim.restart();
+      assert.equal(sim.score().total, 0, 'the points are cleared');
+      let touched = false;
+      while (sim.status === 'running') {
+        sim.step(1);
+        if (sim.world.robot.touching) touched = true;
+      }
+      assert.ok(before >= 10, `${label(s)}: ${before} points before the restart`);
+      assert.equal(sim.restarts, 1, label(s));
+      assert.equal(sim.finishReason, 'mission-complete', label(s));
+      assert.deepEqual(points(sim), [10, 20, 30, 40], label(s));
+      assert.equal(touched, false, label(s));
+      // the whole way a second time: the time of the first try is lost, no more
+      const alone = play(blocks, s).sim.world.time;
+      assert.ok(Math.abs(sim.world.time - (restartAt + alone)) < 0.05, `${sim.world.time} s, alone ${alone} s after ${restartAt} s`);
+    }
   });
 
   test('the same maze twice plays the same match, tick for tick', () => {
