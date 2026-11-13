@@ -2,12 +2,18 @@
 
 /**
  * The match controls above the stage: the referee's start signal (green flag), Stop, Pause,
- * the rules "Restart" (-5 points), the team's "Finished" call, Reset field, the match clock,
- * the live score and the speed of the simulation.
+ * the rules "Restart", the team's "Finished" call, Reset field, the match clock, the live score
+ * and the speed of the simulation.
+ *
+ * What a restart costs, and how many a match allows, is the game's rule: the button shows it
+ * ("-5" in Fire Rescue, "1 left" in Fire Chief) and is off once none is left - see
+ * restartButton() in ./match-words.ts.
  */
-import type { ScoreReport } from '../core/types';
+import type { RestartRules, ScoreReport } from '../core/types';
 import { formatClock } from './format';
 import { FinishIcon, FlagIcon, PauseIcon, PlayIcon, ResetIcon, RestartIcon, StopIcon } from './icons';
+import { restartButton } from './match-words';
+import { capital, DEFAULT_WORDS, type ScreenWords } from './screen-words';
 import { SPEEDS, type RunState, type Speed } from './useSimulation';
 import { button } from './widgets';
 
@@ -17,7 +23,14 @@ export interface ControlBarProps {
   canStart: boolean;
   timeLeft: number;
   score: ScoreReport;
+  /** points one restart costs (Game.restartPenalty) */
   restartPenalty: number;
+  /** the game's own restart rules (Game.restartRules); left out = no limit, restartPenalty points each */
+  restartRules?: RestartRules;
+  /** restarts the team may still use in this match (Simulation.restartsLeft); left out = no limit */
+  restartsLeft?: number;
+  /** the game's words (left out: the words of Fire Rescue) */
+  words?: ScreenWords;
   speed: Speed;
   onSpeed: (speed: Speed) => void;
   onStart: () => void;
@@ -46,6 +59,12 @@ const SMALL = `${button.plain} px-2`;
 /** The same button when it is the natural next step (Reset field once the match is over). */
 const SMALL_NEXT = `${button.accent} px-2`;
 const SMALL_ICON = `hidden h-4 w-4 @[34rem]:block`;
+/**
+ * The same icons in a game whose "Restart" button counts the restarts that are left ("1 left"):
+ * that label is wider than a "-5", and at exactly 34rem the row would need a second line. So
+ * there the icons come a little later.
+ */
+const SMALL_ICON_LATER = `hidden h-4 w-4 @[36rem]:block`;
 
 function speedLabel(speed: Speed): string {
   return speed === 'max' ? 'Max' : `${speed}×`;
@@ -57,6 +76,10 @@ export function ControlBar(props: ControlBarProps) {
   /** the match was stopped or is over: the field shows the end of that run until it is reset */
   const over = runState === 'stopped' || runState === 'finished';
   const lowTime = active && timeLeft <= 30;
+  const words = props.words ?? DEFAULT_WORDS;
+  const { match } = words;
+  const restart = restartButton({ penalty: props.restartPenalty, rules: props.restartRules }, props.restartsLeft ?? Infinity, match);
+  const smallIcon = restart.tone === 'cost' ? SMALL_ICON : SMALL_ICON_LATER;
 
   const speedPicker = (
     <div className="flex items-center gap-2">
@@ -66,7 +89,7 @@ export function ControlBar(props: ControlBarProps) {
       <div
         role="radiogroup"
         aria-label="Speed of the simulation"
-        title="Speed of the simulation (the match clock runs at the same speed)"
+        title={`Speed of the simulation (the ${match} clock runs at the same speed)`}
         className="flex rounded-lg border border-slate-300"
       >
         {SPEEDS.map((option) => {
@@ -115,7 +138,7 @@ export function ControlBar(props: ControlBarProps) {
           onClick={props.onStop}
           disabled={!active}
           className={`${BIG} bg-rose-600 hover:bg-rose-700 active:bg-rose-800 @[34rem]:px-4`}
-          title="Stop the program and the robot where they are. The match is not scored; Reset field puts everything back."
+          title={`Stop the program and the robot where they are. The ${match} is not scored; Reset field puts everything back.`}
         >
           <StopIcon className="h-5 w-5" />
           Stop
@@ -125,7 +148,7 @@ export function ControlBar(props: ControlBarProps) {
           onClick={runState === 'paused' ? props.onResume : props.onPause}
           disabled={!active}
           aria-label={runState === 'paused' ? 'Continue' : 'Pause'}
-          title={runState === 'paused' ? 'Continue' : 'Pause (the match clock pauses too)'}
+          title={runState === 'paused' ? 'Continue' : `Pause (the ${match} clock pauses too)`}
           className={`${button.icon} h-11 w-11 rounded-xl @[34rem]:h-12 @[34rem]:w-12`}
         >
           {runState === 'paused' ? <PlayIcon className="h-5 w-5" /> : <PauseIcon className="h-5 w-5" />}
@@ -135,7 +158,7 @@ export function ControlBar(props: ControlBarProps) {
           <div
             className={`flex flex-col leading-none @[34rem]:flex-row @[34rem]:items-baseline @[34rem]:gap-1.5`}
             role="timer"
-            aria-label={`Match clock: ${formatClock(timeLeft)} left`}
+            aria-label={`${capital(match)} clock: ${formatClock(timeLeft)} left`}
           >
             <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-500">Time</span>
             <span className={`font-mono text-xl font-bold tabular-nums @[34rem]:text-2xl ${lowTime ? 'text-rose-600' : 'text-ink-900'}`}>
@@ -160,22 +183,34 @@ export function ControlBar(props: ControlBarProps) {
         <button
           type="button"
           onClick={props.onRestart}
-          disabled={!active}
+          disabled={!active || !restart.allowed}
           className={SMALL}
-          title={`Rules restart: the robot goes back into the start zone, whatever it carries goes back to where it came from, the clock keeps running. Costs ${props.restartPenalty} points.`}
+          title={restart.hint}
         >
-          <RestartIcon className={`${SMALL_ICON} text-amber-600`} />
+          <RestartIcon className={`${smallIcon} text-amber-600`} />
           Restart
-          <span className="rounded-md bg-amber-100 px-1.5 py-0.5 text-xs font-bold text-amber-800">-{props.restartPenalty}</span>
+          {restart.badge !== '' && (
+            <span
+              className={
+                // (none left: grey, like everything about a button that is off)
+                restart.tone === 'none'
+                  ? 'whitespace-nowrap rounded-md bg-slate-200 px-1.5 py-0.5 text-xs font-bold text-ink-700'
+                  : 'rounded-md bg-amber-100 px-1.5 py-0.5 text-xs font-bold text-amber-800' + (restart.tone === 'left' ? ' whitespace-nowrap' : '')
+              }
+            >
+              {/* (a cost is written as "-" and the number, two pieces of text, as it always was: see the note in ScoreSheet.tsx) */}
+              {restart.tone === 'cost' ? <>-{props.restartPenalty}</> : restart.badge}
+            </span>
+          )}
         </button>
         <button
           type="button"
           onClick={props.onFinished}
           disabled={!active}
           className={SMALL}
-          title='Tell the referee "Finished": the robot stops and the field is scored as it is'
+          title={words.finishedHint}
         >
-          <FinishIcon className={`${SMALL_ICON} text-ink-500`} />
+          <FinishIcon className={`${smallIcon} text-ink-500`} />
           Finished
         </button>
         <button
@@ -184,9 +219,9 @@ export function ControlBar(props: ControlBarProps) {
           disabled={runState === 'ready'}
           className={over ? SMALL_NEXT : SMALL}
           aria-label="Reset field"
-          title="Put every tower, bucket and person back and the robot into the start zone, ready for a new start. Works at any moment, also during a match."
+          title={`${words.resetHint} Works at any moment, also during ${/^[aeiou]/i.test(match) ? 'an' : 'a'} ${match}.`}
         >
-          <ResetIcon className={`${SMALL_ICON} ${over ? 'text-brand-700' : 'text-ink-500'}`} />
+          <ResetIcon className={`${smallIcon} ${over ? 'text-brand-700' : 'text-ink-500'}`} />
           Reset<span className={`hidden @[34rem]:inline`}>field</span>
         </button>
         <div className="ml-auto">{speedPicker}</div>

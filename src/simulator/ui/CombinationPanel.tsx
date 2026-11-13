@@ -8,17 +8,20 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
 import type { Game } from '../core/types';
 import { CopyIcon, DiceIcon } from './icons';
+import { DEFAULT_WORDS, type ScreenWords } from './screen-words';
 import { button } from './widgets';
 
 export interface CombinationPanelProps<S> {
   game: Game<S>;
   scenario: S;
   onChange: (scenario: S) => void;
+  /** the game's words for the two buttons "Random" and "Default" (left out: the words of Fire Rescue) */
+  words?: ScreenWords;
   /** the game's own editor for the combination */
   children?: ReactNode;
 }
 
-export function CombinationPanel<S>({ game, scenario, onChange, children }: CombinationPanelProps<S>) {
+export function CombinationPanel<S>({ game, scenario, onChange, words = DEFAULT_WORDS, children }: CombinationPanelProps<S>) {
   const code = game.encodeScenario(scenario);
   const [typed, setTyped] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -63,12 +66,12 @@ export function CombinationPanel<S>({ game, scenario, onChange, children }: Comb
           </span>
         )}
         <span className="ml-auto flex gap-2">
-          <button type="button" onClick={() => onChange(game.randomScenario(Math.random))} className={button.plain} title="Draw a random combination, like the referee does">
+          <button type="button" onClick={() => onChange(game.randomScenario(Math.random))} className={button.plain} title={words.randomHint}>
             <DiceIcon className="h-4 w-4 text-brand-600" />
-            Random
+            {words.randomLabel}
           </button>
-          <button type="button" onClick={() => onChange(game.defaultScenario())} className={button.plain} title="The combination drawn in the rule book">
-            Default
+          <button type="button" onClick={() => onChange(game.defaultScenario())} className={button.plain} title={words.defaultHint}>
+            {words.defaultLabel}
           </button>
         </span>
       </div>

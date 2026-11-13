@@ -1,6 +1,10 @@
 /**
- * Drawing the stage: the mat seen from above, the game elements, the robot, and the optional
- * helpers (zones, sensor view, driven path, ruler).
+ * Drawing the stage: the mat seen from above, the fixed walls, the game elements, the robot, and
+ * the optional helpers (zones, sensor view, driven path, ruler).
+ *
+ * What is drawn follows from the simulation, not from the name of a game: the walls it has
+ * (World.walls), a body that glows in infrared (Body.infrared - "the flame"), and the parts of
+ * the robot (RobotConfig: gripper, fan, flame sensor).
  *
  * Everything is drawn in MILLIMETRES: drawStage() first sets a transform that maps mat
  * millimetres to screen pixels, so the numbers below are real sizes (a 70 mm tower is drawn 70
@@ -10,11 +14,13 @@
  * heading 0 faces up the mat and grows clockwise - exactly how a canvas rotates, so a body is
  * drawn by translate(x, y) + rotate(heading) and then "forward" is the canvas direction -y.
  */
-import { DEG, localRectToOBB, localToWorld, obbCorners, pointInOBB, type OBB, type Vec2 } from '../core/geometry';
+import { rayBoxDistance } from '../core/engine-collide';
+import { DEG, localRectToOBB, localToWorld, obbCorners, pointInOBB, type OBB, type Rect, type Vec2 } from '../core/geometry';
 import { mmPerWheelDegree, robotShapesAt, widestClawGap } from '../core/robot';
 import {
   PROBE_NAMES,
   type Body,
+  type FixedWall,
   type MatVector,
   type Pose,
   type RobotConfig,
@@ -212,11 +218,181 @@ function haloText(ctx: CanvasRenderingContext2D, text: string, x: number, y: num
 const FONT = 'Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
 
 // =============================================================================================
+// Fixed walls
+// =============================================================================================
+
+/**
+ * A wall is never drawn thinner than this many screen pixels. The walls of Fire Chief are 3 mm
+ * thick: less than one pixel on a small stage, and thinner than the printed grid lines beside
+ * them. So a thin wall is drawn thicker than it is - around its true middle line, where it
+ * really stands - and what stops the robot is still the true wall of the engine.
+ */
+export const WALL_MIN_PIXELS = 6;
+
+/**
+ * The box a wall is drawn as: its own footprint, grown by the same amount on every side until
+ * it is at least `minThickness` mm thick. The middle of the wall and its direction stay as they
+ * are. (It grows at its ends too: two walls that meet at a corner then still close the corner.)
+ */
+export function wallDrawBox(wall: Pick<FixedWall, 'x' | 'y' | 'w' | 'l' | 'angle'>, minThickness: number): OBB {
+  const grow = Math.max(0, minThickness - Math.min(wall.w, wall.l));
+  return { x: wall.x, y: wall.y, w: wall.w + grow, l: wall.l + grow, angle: wall.angle };
+}
+
+/**
+ * The picture of all walls, kept at the size of the stage: walls never move during a match, and
+ * their soft shadows are slow to draw sixty times a second. It is drawn again when the walls
+ * are other ones (the engine makes a new list for every new match and every new maze) or the
+ * stage has another size (a new view for every new size).
+ */
+let wallPicture: { walls: readonly FixedWall[]; view: StageView; canvas: HTMLCanvasElement } | null = null;
+
+function paintWalls(ctx: CanvasRenderingContext2D, walls: readonly FixedWall[], view: StageView): void {
+  const devicePerMm = view.scale * view.dpr;
+  const px = 1 / view.scale;
+  const boxes = walls.map((wall) => ({ wall, corners: obbCorners(wallDrawBox(wall, WALL_MIN_PIXELS * px)), inner: obbCorners(wallDrawBox(wall, (WALL_MIN_PIXELS - 2) * px)) }));
+  // 1. every wall with its shadow: the walls are tall (150 mm in Fire Chief), so the shadow is long
+  for (const { wall, corners } of boxes) {
+    castShadow(ctx, wall.h, devicePerMm);
+    polygon(ctx, corners);
+    ctx.fillStyle = rgbCss(shade(parseHex(wall.fill), -0.55));
+    ctx.fill();
+  }
+  noShadow(ctx);
+  // 2. the dark edge of every wall, over the shadows of its neighbours ...
+  for (const { wall, corners } of boxes) {
+    polygon(ctx, corners);
+    ctx.fillStyle = rgbCss(shade(parseHex(wall.fill), -0.55));
+    ctx.fill();
+  }
+  // 3. ... and then every top, one pixel in from the edge: walls that meet look like one piece
+  for (const { wall, inner } of boxes) {
+    polygon(ctx, inner);
+    ctx.fillStyle = wall.fill;
+    ctx.fill();
+  }
+}
+
+/** Draw the fixed walls (from their kept picture). `ctx` may have any transform: it is put back. */
+function drawWalls(ctx: CanvasRenderingContext2D, walls: readonly FixedWall[], view: StageView): void {
+  if (walls.length === 0) return;
+  const width = ctx.canvas.width;
+  const height = ctx.canvas.height;
+  if (!wallPicture || wallPicture.walls !== walls || wallPicture.view !== view || wallPicture.canvas.width !== width || wallPicture.canvas.height !== height) {
+    const canvas = wallPicture?.canvas ?? document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const g = canvas.getContext('2d');
+    if (g) {
+      const devicePerMm = view.scale * view.dpr;
+      g.setTransform(devicePerMm, 0, 0, devicePerMm, view.originX * view.dpr, view.originY * view.dpr);
+      paintWalls(g, walls, view);
+    }
+    wallPicture = { walls, view, canvas };
+  }
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(wallPicture.canvas, 0, 0);
+  ctx.restore();
+}
+
+/**
+ * What can be reached in a straight line from `origin` inside a cone: the cone is `halfAngle`
+ * (radians) wide to each side of `heading` and `range` mm long, and every ray of it ends at the
+ * first wall it meets. Returns the outline, starting at `origin` - for the air of a fan and for
+ * what a sensor sees, neither of which goes through a wall.
+ */
+export function sightPolygon(origin: Vec2, heading: number, halfAngle: number, range: number, walls: readonly FixedWall[] | undefined, rays = 41): Vec2[] {
+  const points: Vec2[] = [{ x: origin.x, y: origin.y }];
+  const list = walls ?? [];
+  const sin = list.map((wall) => Math.sin(wall.angle));
+  const cos = list.map((wall) => Math.cos(wall.angle));
+  const count = Math.max(2, Math.floor(rays));
+  for (let k = 0; k < count; k++) {
+    const angle = heading - halfAngle + (2 * halfAngle * k) / (count - 1);
+    const dx = Math.sin(angle);
+    const dy = -Math.cos(angle);
+    let reach = range;
+    for (let i = 0; i < list.length; i++) {
+      const wall = list[i];
+      const at = rayBoxDistance(origin.x, origin.y, dx, dy, wall.x, wall.y, wall.w / 2, wall.l / 2, sin[i], cos[i]);
+      if (at >= 0 && at < reach) reach = at;
+    }
+    points.push({ x: origin.x + dx * reach, y: origin.y + dy * reach });
+  }
+  return points;
+}
+
+// =============================================================================================
 // Game elements
 // =============================================================================================
 
-/** Draw one tower, bucket or person where it stands (or where the claw holds it). */
-export function drawBody(ctx: CanvasRenderingContext2D, body: Body, devicePerMm: number): void {
+/**
+ * The outline of a flame, `height` mm tall, standing upright on the screen around (cx, cy).
+ * (Numbers are parts of the height: the tip is at -0.5, the round base at +0.5.)
+ */
+function flamePath(ctx: CanvasRenderingContext2D, cx: number, cy: number, height: number): void {
+  const x = (u: number): number => cx + u * height;
+  const y = (v: number): number => cy + v * height;
+  ctx.beginPath();
+  ctx.moveTo(x(0.03), y(-0.5));
+  ctx.bezierCurveTo(x(0.08), y(-0.26), x(0.37), y(-0.12), x(0.37), y(0.17));
+  ctx.bezierCurveTo(x(0.37), y(0.37), x(0.21), y(0.5), x(0), y(0.5));
+  ctx.bezierCurveTo(x(-0.21), y(0.5), x(-0.37), y(0.37), x(-0.37), y(0.17));
+  ctx.bezierCurveTo(x(-0.37), y(0.03), x(-0.29), y(-0.08), x(-0.22), y(-0.2));
+  ctx.bezierCurveTo(x(-0.2), y(-0.1), x(-0.16), y(-0.05), x(-0.1), y(-0.03));
+  ctx.bezierCurveTo(x(-0.13), y(-0.22), x(-0.07), y(-0.39), x(0.03), y(-0.5));
+  ctx.closePath();
+}
+
+/** A body that glows in infrared is "the fire": the smallest size (screen pixels) its flame sign is drawn at. */
+const FLAME_SIGN_MIN_PIXELS = 24;
+/** ... and its size on a large stage (mm). */
+const FLAME_SIGN_MM = 90;
+
+/**
+ * The sign of a body that glows in infrared: a flame, drawn around the middle of the body.
+ *
+ * The body itself is small (the fire target of Fire Chief is 60 x 20 mm seen from above: a few
+ * pixels on a phone) and it stands in a room whose printed picture shows a fireplace or a candle
+ * that is NOT the fire. The sign makes the real one easy to find at every size. It is only a
+ * sign: what the robot can touch is the body itself, which is drawn on top of it at its true
+ * size (drawBody).
+ */
+function drawFlameSign(ctx: CanvasRenderingContext2D, body: Body, view: StageView): void {
+  const height = Math.max(FLAME_SIGN_MM, FLAME_SIGN_MIN_PIXELS / view.scale);
+  const px = 1 / view.scale;
+  ctx.save();
+  // a warm glow and a white edge keep it visible on the white mat and on the room pictures
+  ctx.shadowColor = 'rgba(234, 88, 12, 0.85)';
+  ctx.shadowBlur = 9 * view.dpr;
+  flamePath(ctx, body.x, body.y, height);
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 3.5 * px;
+  ctx.strokeStyle = '#ffffff';
+  ctx.stroke();
+  noShadow(ctx);
+  const fire = ctx.createLinearGradient(body.x, body.y - height / 2, body.x, body.y + height / 2);
+  fire.addColorStop(0, '#dc2626');
+  fire.addColorStop(0.45, '#f97316');
+  fire.addColorStop(1, '#fbbf24');
+  ctx.fillStyle = fire;
+  ctx.fill();
+  ctx.lineWidth = 1.2 * px;
+  ctx.strokeStyle = '#7c2d12';
+  ctx.stroke();
+  // the bright heart of the flame (the body itself is drawn on it, and shows best on something light)
+  flamePath(ctx, body.x, body.y + height * 0.14, height * 0.62);
+  ctx.fillStyle = '#fef3c7';
+  ctx.fill();
+  ctx.restore();
+}
+
+/**
+ * Draw one tower, bucket, person or fire target where it stands (or where the claw holds it).
+ * `minEdge`: the thinnest its outline is drawn (mm), for a small body that must still be seen.
+ */
+export function drawBody(ctx: CanvasRenderingContext2D, body: Body, devicePerMm: number, minEdge = 0): void {
   const fill = parseHex(body.fill);
   const edge = rgbCss(shade(fill, -0.45));
   const { w, l } = body;
@@ -232,7 +408,7 @@ export function drawBody(ctx: CanvasRenderingContext2D, body: Body, devicePerMm:
   ctx.fillStyle = body.fill;
   ctx.fill();
   noShadow(ctx);
-  ctx.lineWidth = 1.6;
+  ctx.lineWidth = Math.max(1.6, minEdge);
   ctx.strokeStyle = edge;
   ctx.stroke();
 
@@ -261,6 +437,16 @@ export function drawBody(ctx: CanvasRenderingContext2D, body: Body, devicePerMm:
     ctx.strokeStyle = edge;
     ctx.stroke();
     ink = rgbCss(shade(fill, -0.2));
+  } else if (body.infrared) {
+    // fire target: a wooden board seen from above, with the infrared light in the middle of the side it faces
+    const forward = Math.max(-l / 2, Math.min(l / 2, body.infrared.forward));
+    ctx.beginPath();
+    ctx.arc(0, -forward, Math.min(4.5, size * 0.3), 0, Math.PI * 2);
+    ctx.fillStyle = '#fef08a';
+    ctx.fill();
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = edge;
+    ctx.stroke();
   } else if (body.grippable) {
     // bucket: an open container, darker inside
     ctx.beginPath();
@@ -274,7 +460,8 @@ export function drawBody(ctx: CanvasRenderingContext2D, body: Body, devicePerMm:
   }
 
   // label, always upright so it can be read whichever way the element is turned
-  if (body.label) {
+  // (a body that glows has its flame sign instead: a letter on a 20 mm board could not be read)
+  if (body.label && !body.infrared) {
     ctx.rotate(-body.angle);
     const fontSize = body.platform ? size * 0.34 : size * 0.44;
     ctx.font = `700 ${fontSize}px ${FONT}`;
@@ -428,6 +615,44 @@ function drawRobot(ctx: CanvasRenderingContext2D, sim: StageSim, devicePerMm: nu
     ctx.fill();
   }
 
+  // fan (a robot that has one): a round guard behind the ultrasonic sensor; the blades turn while it blows
+  if (c.fan && c.fan.enabled) {
+    const fanY = -front + 40;
+    const fanRadius = Math.min(17, innerHalf - 4);
+    ctx.beginPath();
+    ctx.arc(0, fanY, fanRadius, 0, Math.PI * 2);
+    ctx.fillStyle = '#0f172a';
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#cbd5e1';
+    ctx.stroke();
+    const blowing = robot.fanOn === true;
+    // (one turn in 0.3 s of match time: fast enough to look like a fan, slow enough to be seen turning)
+    const spin = blowing ? ((sim.world.time / 0.3) % 1) * Math.PI * 2 : 0.5;
+    ctx.fillStyle = blowing ? '#7dd3fc' : '#94a3b8';
+    for (let blade = 0; blade < 3; blade++) {
+      const a = spin + (blade * Math.PI * 2) / 3;
+      ctx.beginPath();
+      ctx.ellipse(Math.cos(a) * fanRadius * 0.5, fanY + Math.sin(a) * fanRadius * 0.5, fanRadius * 0.42, fanRadius * 0.2, a, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.beginPath();
+    ctx.arc(0, fanY, fanRadius * 0.18, 0, Math.PI * 2);
+    ctx.fillStyle = '#e2e8f0';
+    ctx.fill();
+  }
+
+  // flame sensor (a robot that has one): a small dark module with a red eye, beside the ultrasonic sensor
+  if (c.flameSensor && c.flameSensor.enabled) {
+    roundRect(ctx, 37, -front + 1.5, 17, 13, 3);
+    ctx.fillStyle = '#111827';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(45.5, -front + 7, 3.6, 0, Math.PI * 2);
+    ctx.fillStyle = '#ef4444';
+    ctx.fill();
+  }
+
   // gripper arm: neck and palm (the fingers come later, on top of whatever they hold)
   const lift = liftFraction(c, robot.gripper.height);
   const armColor = rgbCss(shade({ r: 51, g: 65, b: 85 }, lift * 0.45));
@@ -544,13 +769,135 @@ function drawUltrasonicLabel(ctx: CanvasRenderingContext2D, sim: StageSim, senso
   const pose = sim.world.robot.pose;
   // to the right of where the beam ends, so that it covers neither the beam nor what it hit
   const aside = beam.range * Math.tan(beam.half) + 24 / view.scale;
-  const at = localToWorld(pose, u.forward + beam.range, aside);
+  let at = localToWorld(pose, u.forward + beam.range, aside);
   const fontSize = 11 / view.scale;
+  const label = `${Math.round(sensors.ultrasonicCm)} cm`;
   ctx.save();
   ctx.font = `700 ${fontSize}px ${FONT}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  haloText(ctx, `${Math.round(sensors.ultrasonicCm)} cm`, at.x, at.y, '#075985', 'rgba(255, 255, 255, 0.95)', 3.5 / view.scale);
+  // On a field with walls around it the beam very often ends on a wall at the edge of the
+  // picture, and the number would be cut off there: it is moved until all of it is on the stage.
+  // (On a field without walls the number stands where it always stood.)
+  if ((sim.world.walls?.length ?? 0) > 0) at = keptOnStage(at, ctx.measureText(label).width, fontSize, view);
+  haloText(ctx, label, at.x, at.y, '#075985', 'rgba(255, 255, 255, 0.95)', 3.5 / view.scale);
+  ctx.restore();
+}
+
+/** The middle of a number written beside the robot, moved (if need be) until the whole number is on the stage. */
+function keptOnStage(at: Vec2, textWidth: number, fontSize: number, view: StageView): Vec2 {
+  const half = textWidth / 2 + 4 / view.scale;
+  const corner = viewToMat(view, 0, 0);
+  return {
+    x: Math.max(corner.x + half, Math.min(corner.x + view.cssWidth / view.scale - half, at.x)),
+    y: Math.max(corner.y + fontSize, Math.min(corner.y + view.cssHeight / view.scale - fontSize, at.y)),
+  };
+}
+
+/** The colour of everything the flame sensor shows on the stage: infrared is drawn red. */
+const FLAME_VIEW_RGB = '225, 29, 72';
+
+/**
+ * What the flame sensor can see, drawn under the game elements like the cone of the ultrasonic
+ * sensor: its field of view, cut off at the walls (infrared light does not pass a wall) and
+ * fading out with the distance as its value does. The stronger the reading, the stronger the
+ * colour. It shows where the sensor looks, not where the flame is - a real flame sensor does not
+ * know that either.
+ */
+function drawFlameView(ctx: CanvasRenderingContext2D, sim: StageSim, sensors: SensorSnapshot, view: StageView): void {
+  const f = sim.robotConfig.flameSensor;
+  if (!f || !f.enabled || !(f.rangeMm > 0)) return;
+  const pose = sim.world.robot.pose;
+  const origin = localToWorld(pose, f.forward, 0);
+  const outline = sightPolygon(origin, pose.heading, f.halfAngleDeg * DEG, f.rangeMm, sim.world.walls, 61);
+  const strength = Math.max(0, Math.min(1, sensors.flame / 100));
+  const near = 0.16 + 0.3 * strength;
+  ctx.save();
+  polygon(ctx, outline);
+  const fade = ctx.createRadialGradient(origin.x, origin.y, 0, origin.x, origin.y, f.rangeMm);
+  // (the value of the sensor falls with the distance like this: see flameSignal in core/engine-sensors.ts)
+  const power = f.distancePower !== undefined && f.distancePower > 0 ? f.distancePower : 2;
+  for (const t of [0, 0.15, 0.3, 0.5, 0.7, 1]) fade.addColorStop(t, `rgba(${FLAME_VIEW_RGB}, ${(near * Math.pow(1 - t, power)).toFixed(3)})`);
+  ctx.fillStyle = fade;
+  ctx.fill();
+  if (sensors.flameDetected) {
+    // "a flame is detected": the two edges of the field of view are drawn, like the arc of the ultrasonic beam
+    ctx.beginPath();
+    ctx.moveTo(outline[1].x, outline[1].y);
+    ctx.lineTo(origin.x, origin.y);
+    ctx.lineTo(outline[outline.length - 1].x, outline[outline.length - 1].y);
+    const edge = ctx.createRadialGradient(origin.x, origin.y, 0, origin.x, origin.y, f.rangeMm);
+    edge.addColorStop(0, `rgba(${FLAME_VIEW_RGB}, 0.9)`);
+    edge.addColorStop(0.6, `rgba(${FLAME_VIEW_RGB}, 0)`);
+    ctx.strokeStyle = edge;
+    ctx.lineWidth = 2 / view.scale;
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/** The value of the flame sensor, written beside the robot's nose (to the left; the ultrasonic distance is on the right). */
+function drawFlameLabel(ctx: CanvasRenderingContext2D, sim: StageSim, sensors: SensorSnapshot, view: StageView): void {
+  const f = sim.robotConfig.flameSensor;
+  if (!f || !f.enabled || !(sensors.flame >= 0.05)) return;
+  const pose = sim.world.robot.pose;
+  const at = localToWorld(pose, f.forward + 22 / view.scale, -(sim.robotConfig.chassisWidth / 2 + 20 / view.scale));
+  const fontSize = 11 / view.scale;
+  const label = `flame ${sensors.flame < 10 ? sensors.flame.toFixed(1) : Math.round(sensors.flame)}`;
+  ctx.save();
+  ctx.font = `700 ${fontSize}px ${FONT}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  // The fire stands at the edge of the field, so a robot that looks at it is often in a corner
+  // of the picture: the number is moved until all of it is on the stage.
+  const shown = keptOnStage(at, ctx.measureText(label).width, fontSize, view);
+  haloText(ctx, label, shown.x, shown.y, '#9f1239', 'rgba(255, 255, 255, 0.95)', 3.5 / view.scale);
+  ctx.restore();
+}
+
+/**
+ * The air of the fan while it blows: a cone in front of the fan, as wide and as long as the
+ * robot's configuration says, cut off at the walls, with a few curved lines that move away from
+ * the robot. (It is drawn for every robot that has a fan, whatever is switched on under the mat.)
+ */
+function drawFanAir(ctx: CanvasRenderingContext2D, sim: StageSim, view: StageView): void {
+  const fan = sim.robotConfig.fan;
+  if (!fan || !fan.enabled || sim.world.robot.fanOn !== true || !(fan.reachMm > 0)) return;
+  const pose = sim.world.robot.pose;
+  const origin = localToWorld(pose, fan.forward, 0);
+  const half = fan.coneHalfAngleDeg * DEG;
+  const outline = sightPolygon(origin, pose.heading, half, fan.reachMm, sim.world.walls, 21);
+  const centre = pose.heading - Math.PI / 2;
+  ctx.save();
+  polygon(ctx, outline);
+  const fade = ctx.createRadialGradient(origin.x, origin.y, 0, origin.x, origin.y, fan.reachMm);
+  fade.addColorStop(0, 'rgba(100, 116, 139, 0.42)');
+  fade.addColorStop(1, 'rgba(100, 116, 139, 0.1)');
+  ctx.fillStyle = fade;
+  ctx.fill();
+  ctx.lineWidth = 1 / view.scale;
+  ctx.strokeStyle = 'rgba(71, 85, 105, 0.55)';
+  ctx.stroke();
+  // the moving lines stay inside the cone (and in front of the walls)
+  ctx.clip();
+  const waves = 4;
+  // (one line needs 0.6 s of match time from the fan to the end of its reach)
+  const phase = (sim.world.time / 0.6) % 1;
+  ctx.lineCap = 'round';
+  for (let k = 0; k < waves; k++) {
+    const t = (k + phase) / waves;
+    const radius = fan.reachMm * t;
+    if (radius < 6) continue;
+    ctx.beginPath();
+    ctx.arc(origin.x, origin.y, radius, centre - half * 0.8, centre + half * 0.8);
+    ctx.globalAlpha = 1 - 0.75 * t;
+    ctx.lineWidth = 4 / view.scale;
+    ctx.strokeStyle = '#ffffff';
+    ctx.stroke();
+    ctx.lineWidth = 1.8 / view.scale;
+    ctx.strokeStyle = '#334155';
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
@@ -600,12 +947,19 @@ export interface ZoneLabelPlace {
  *
  * `textWidth` measures a name, `fontSize` is the height of the letters and `gap` the distance
  * between an area and its name - all in the same unit as the zone rectangles (mm).
+ *
+ * An area that begins at the top edge of the mat (a room of Fire Chief) has no room for a name
+ * above it: the name would be written on the table, and on a small stage beyond the edge of the
+ * picture. Its name is written below the area, and - `stage` is what the picture shows, the mat
+ * and the strip of table around it - moved sideways until all of it is on the stage.
+ * (Only such areas are treated this way: every other name stands where it always stood.)
  */
 export function placeZoneLabels(
   zones: ReadonlyArray<Pick<ZoneOverlay, 'label' | 'rect'>>,
   textWidth: (label: string) => number,
   fontSize: number,
   gap: number,
+  stage?: Rect,
 ): ZoneLabelPlace[] {
   interface Box {
     left: number;
@@ -621,11 +975,13 @@ export function placeZoneLabels(
 
   return zones.map((zone) => {
     const { x, y, w, h } = zone.rect;
-    const centre = x + w / 2;
     const half = textWidth(zone.label) / 2;
+    const atTopEdge = y <= 0;
+    let centre = x + w / 2;
+    if (atTopEdge && stage && 2 * half <= stage.w) centre = Math.max(stage.x + half, Math.min(stage.x + stage.w - half, centre));
     const above: Box = { left: centre - half, right: centre + half, top: y - gap - fontSize, bottom: y - gap };
     const under: Box = { left: centre - half, right: centre + half, top: y + h + gap, bottom: y + h + gap + fontSize };
-    const below = !free(above) && free(under);
+    const below = (atTopEdge || !free(above)) && free(under);
     const box = below ? under : above;
     taken.push(box);
     // the letters stand on the baseline; capital letters are about 0.72 of the font size tall
@@ -651,8 +1007,12 @@ function drawOverlays(ctx: CanvasRenderingContext2D, overlays: ZoneOverlay[], vi
     ctx.strokeRect(x, y, w, h);
     ctx.setLineDash([]);
   }
-  // the names go on top of all the areas, each where it does not run into another name
-  const places = placeZoneLabels(overlays, (label) => ctx.measureText(label).width, fontSize, 5 / view.scale);
+  // the names go on top of all the areas, each where it does not run into another name and all of it is on the stage
+  const corner = viewToMat(view, 0, 0);
+  // (the halo of the letters needs a little room too)
+  const edge = 3 / view.scale;
+  const stage: Rect = { x: corner.x + edge, y: corner.y + edge, w: view.cssWidth / view.scale - 2 * edge, h: view.cssHeight / view.scale - 2 * edge };
+  const places = placeZoneLabels(overlays, (label) => ctx.measureText(label).width, fontSize, 5 / view.scale, stage);
   overlays.forEach((zone, i) => {
     haloText(ctx, zone.label, places[i].x, places[i].y, '#0f172a', 'rgba(255, 255, 255, 0.92)', 3 / view.scale);
   });
@@ -837,7 +1197,7 @@ function drawRuler(ctx: CanvasRenderingContext2D, ruler: Ruler, view: StageView)
 export interface StageOptions {
   /** coloured zones of the game (start, pick-up, delivery, tower areas) */
   overlays: boolean;
-  /** what the sensors see: line sensor dots and the ultrasonic beam */
+  /** what the sensors see: line sensor dots, the ultrasonic beam and (a robot that has one) the view of the flame sensor */
   sensors: boolean;
   /** the path the robot has driven */
   trail: boolean;
@@ -884,6 +1244,8 @@ export function drawStage(ctx: CanvasRenderingContext2D, scene: StageScene): voi
   if (options.overlays) drawOverlays(ctx, scene.overlays, view);
   if (scene.placing) drawStartZone(ctx, sim, view, scene.ghost !== null);
   if (options.trail) drawTrail(ctx, scene.trail, view);
+  // the fixed walls of the match (a game without walls has none)
+  drawWalls(ctx, sim.world.walls ?? [], view);
 
   // game elements, lowest first, so that what stands on a tower is drawn over the tower
   const holding = sim.world.robot.gripper.holding;
@@ -892,12 +1254,23 @@ export function drawStage(ctx: CanvasRenderingContext2D, scene: StageScene): voi
 
   const sensors = options.sensors ? sim.readSensors() : null;
   const beam = sensors ? beamOf(sim, sensors) : null;
+  if (sensors) drawFlameView(ctx, sim, sensors, view);
   if (beam) drawUltrasonicBeam(ctx, beam, view);
 
-  for (const body of standing) drawBody(ctx, body, devicePerMm);
+  for (const body of standing) {
+    if (body.infrared) {
+      // the fire: its sign first, then the body itself on top, with an outline that shows on a small stage too
+      drawFlameSign(ctx, body, view);
+      drawBody(ctx, body, devicePerMm, 1.25 / view.scale);
+    } else {
+      drawBody(ctx, body, devicePerMm);
+    }
+  }
   drawRobot(ctx, sim, devicePerMm);
+  drawFanAir(ctx, sim, view);
   if (sensors) drawProbes(ctx, sim, sensors);
   if (sensors && beam) drawUltrasonicLabel(ctx, sim, sensors, beam, view);
+  if (sensors) drawFlameLabel(ctx, sim, sensors, view);
   if (scene.ghost) drawGhost(ctx, sim.robotConfig, scene.ghost, view);
   if (scene.ruler) drawRuler(ctx, scene.ruler, view);
 }

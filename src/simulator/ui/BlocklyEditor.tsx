@@ -45,6 +45,11 @@ export interface EditorStatus {
 export interface BlocklyEditorProps {
   /** localStorage key the workspace is saved under */
   storageKey: string;
+  /**
+   * The game whose block palette the editor shows: Game.id (see ../blocks/palettes.ts).
+   * Left out: the palette of Fire Rescue. It is read once, when the editor is made.
+   */
+  palette?: string;
   /** what to show when nothing has been saved yet */
   initialProgram: () => ProgramJson;
   /** folder with Blockly's own pictures (sprites, cursors), ending with a slash */
@@ -107,7 +112,7 @@ function BlocklyEditorImpl(props: BlocklyEditorProps) {
     propsRef.current = props;
   });
   const [phase, setPhase] = useState<'loading' | 'ready' | 'failed'>('loading');
-  const { storageKey, mediaPath } = props;
+  const { storageKey, mediaPath, palette } = props;
 
   useEffect(() => {
     let disposed = false;
@@ -130,8 +135,11 @@ function BlocklyEditorImpl(props: BlocklyEditorProps) {
         media: mediaPath,
         // a classroom full of clicking robots is loud enough
         sounds: false,
-        // the button of the Gripper palette and the right-click entry of the Gripper blocks
-        onGripperCode: (at) => propsRef.current.onGripperCode?.(at),
+        // the blocks this game's robot can use
+        palette,
+        // The button of the Gripper palette and the right-click entry of the Gripper blocks. An
+        // editor that was given nobody to show that code gets neither: the entry would open nothing.
+        onGripperCode: propsRef.current.onGripperCode ? (at) => propsRef.current.onGripperCode?.(at) : undefined,
       });
       workspace = ws;
       const serializer = Blockly.serialization.workspaces;
@@ -254,7 +262,7 @@ function BlocklyEditorImpl(props: BlocklyEditorProps) {
       workspace?.dispose();
       workspace = null;
     };
-  }, [mediaPath, storageKey]);
+  }, [mediaPath, palette, storageKey]);
 
   return (
     <div className="relative h-full w-full">

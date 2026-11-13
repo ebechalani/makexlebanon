@@ -2,11 +2,14 @@
 
 /**
  * Live values of everything the robot can measure, as the blocks would report them:
- * the four probes of the Quad RGB line sensor, the ultrasonic distance, the colour in the claw,
- * the gyro, the wheel encoders, the timer and the student's own variables.
+ * the four probes of the Quad RGB line sensor, the ultrasonic distance, the gyro, the wheel
+ * encoders, the timer and the student's own variables - and the parts only some robots have
+ * (./robot-parts.ts): the colour in the claw and the two servos of the gripper, or the flame
+ * sensor, the DC motor ports and the fan.
  */
 import { PROBE_NAMES, type ProbeName, type ProbeReading, type RobotConfig, type Scalar, type SensorColor } from '../core/types';
 import { formatNumber, rgbCss } from './format';
+import { dcMotorUse, robotParts } from './robot-parts';
 import type { UiSnapshot } from './useSimulation';
 
 /** CSS colours for the colour names a sensor can report. */
@@ -84,6 +87,8 @@ export function SensorDashboard({ snapshot, robotConfig }: SensorDashboardProps)
   const sees = s.ultrasonicCm < robotConfig.ultrasonic.maxRangeCm - 1e-6;
   const variables = Object.entries(snapshot.variables);
   const g = robotConfig.gripper;
+  const parts = robotParts(robotConfig);
+  const flame = parts.flameSensor;
 
   return (
     <div className="flex flex-col gap-3">
@@ -106,20 +111,42 @@ export function SensorDashboard({ snapshot, robotConfig }: SensorDashboardProps)
       </div>
 
       <dl className="grid grid-cols-2 gap-x-4">
+        {flame && (
+          <div
+            // (over the full width: the value and the "flame detected" label need more room than half a row)
+            className="col-span-2 flex items-center justify-between gap-2 border-b border-slate-100 py-1"
+            title={`Infrared light the flame sensor sees, 0 (none) to 100 (very strong). "Flame detected" above ${formatNumber(flame.threshold)}.`}
+          >
+            <dt className="truncate text-xs text-ink-500">Flame sensor</dt>
+            <dd className="flex shrink-0 items-center gap-1.5 font-mono text-sm font-semibold tabular-nums text-ink-900">
+              {formatNumber(s.flame, 1)}
+              <span
+                className={
+                  'rounded px-1.5 py-0.5 font-sans text-[11px] font-bold leading-none ' +
+                  (s.flameDetected ? 'bg-orange-600 text-white' : 'bg-white text-ink-500 ring-1 ring-slate-300')
+                }
+              >
+                {s.flameDetected ? 'flame detected' : 'no flame'}
+              </span>
+            </dd>
+          </div>
+        )}
         <Value
           label="Ultrasonic"
           value={sees ? formatNumber(s.ultrasonicCm, 1) : `${formatNumber(robotConfig.ultrasonic.maxRangeCm)}`}
           unit={sees ? 'cm' : 'cm (nothing seen)'}
         />
-        <div className="flex items-center justify-between gap-2 border-b border-slate-100 py-1">
-          <dt className="text-xs text-ink-500">Claw colour</dt>
-          <dd className="flex items-center gap-1.5 text-sm font-semibold capitalize text-ink-900">
-            {s.frontColor !== 'none' && (
-              <span className="h-3.5 w-3.5 rounded-full ring-1 ring-slate-400" style={{ background: SENSOR_COLOR_CSS[s.frontColor] }} aria-hidden="true" />
-            )}
-            {s.frontColor === 'none' ? 'nothing' : s.frontColor}
-          </dd>
-        </div>
+        {parts.clawColour && (
+          <div className="flex items-center justify-between gap-2 border-b border-slate-100 py-1">
+            <dt className="text-xs text-ink-500">Claw colour</dt>
+            <dd className="flex items-center gap-1.5 text-sm font-semibold capitalize text-ink-900">
+              {s.frontColor !== 'none' && (
+                <span className="h-3.5 w-3.5 rounded-full ring-1 ring-slate-400" style={{ background: SENSOR_COLOR_CSS[s.frontColor] }} aria-hidden="true" />
+              )}
+              {s.frontColor === 'none' ? 'nothing' : s.frontColor}
+            </dd>
+          </div>
+        )}
         <Value label="Yaw (turned)" value={formatNumber(s.yawDeg, 1)} unit="°" hint="How far the robot has turned since the gyro was reset; clockwise is positive" />
         <Value label="Timer" value={formatNumber(s.timer, 1)} unit="s" />
         <Value
@@ -136,11 +163,40 @@ export function SensorDashboard({ snapshot, robotConfig }: SensorDashboardProps)
         />
         <Value label="EM1 speed" value={formatNumber(s.leftRpm)} unit="RPM" />
         <Value label="EM2 speed" value={formatNumber(-s.rightRpm)} unit="RPM" hint="Negative while the robot drives forward (mirrored motor)" />
-        {g.enabled && (
+        {parts.gripper && (
           <>
             <Value label={`Arm (${g.liftServo})`} value={formatNumber(snapshot.servos[g.liftServo])} unit="°" hint={`Claw is ${formatNumber(snapshot.gripper.height)} mm above the mat`} />
             <Value label={`Claw (${g.clawServo})`} value={formatNumber(snapshot.servos[g.clawServo])} unit="°" hint={`Opening: ${formatNumber(snapshot.gripper.gap)} mm`} />
           </>
+        )}
+        {parts.dcMotors.map((port) => {
+          const use = dcMotorUse(parts, port);
+          return (
+            <Value
+              key={port}
+              label={use ? `DC motor ${port} (${use})` : `DC motor ${port}`}
+              value={formatNumber(s.dcMotorPower[port])}
+              unit="%"
+              hint={`Power of DC motor port ${port}, -100 to 100 %${use ? '' : '. Nothing is connected to this port on this robot.'}`}
+            />
+          );
+        })}
+        {parts.fan && (
+          <div
+            className="flex items-center justify-between gap-2 border-b border-slate-100 py-1"
+            title={`The fan blows while DC motor ${parts.fan.port} runs at ${formatNumber(parts.fan.minPower)} % power or more, forwards or backwards.`}
+          >
+            <dt className="text-xs text-ink-500">Fan</dt>
+            <dd>
+              <span
+                className={
+                  'rounded px-1.5 py-0.5 text-[11px] font-bold leading-none ' + (s.fanOn ? 'bg-brand-600 text-white' : 'bg-white text-ink-500 ring-1 ring-slate-300')
+                }
+              >
+                {s.fanOn ? 'fan on' : 'fan off'}
+              </span>
+            </dd>
+          </div>
         )}
       </dl>
 

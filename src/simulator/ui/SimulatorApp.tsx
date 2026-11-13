@@ -3,8 +3,19 @@
 /**
  * The simulator screen: block workspace on the left, stage with its controls and panels on the
  * right (stacked on narrow screens). It works for any Game; what is special about one category
- * (its examples, rules, combination editor) is passed in as props - see
- * ./fire-rescue/FireRescueSimulator.tsx.
+ * (its examples, rules, combination editor, a few words) is passed in as props - see
+ * ./fire-rescue/FireRescueSimulator.tsx and ./fire-chief/FireChiefSimulator.tsx.
+ *
+ * Everything else the screen asks the game, the robot and the simulation:
+ *   game.id                 the block palette (../blocks/palettes.ts), the saved work, the program files
+ *   game.restartRules,      what the "Restart" button says and when it is off
+ *     game.restartPenalty   (with Simulation.restartsLeft)
+ *   game.overlays()         the zones of the "Zones" view
+ *   robotConfig             which sensors and motors the Sensors panel and the stage show (./robot-parts.ts)
+ *   Simulation.world.walls  the walls on the stage
+ *   Simulation.finishDetail the referee's own sentence about the end of a match
+ *   ScoreLine.time,         the times on the score sheet
+ *     ScoreReport.time
  *
  * The screen is a page of the website: it starts under the site's header and fills the rest of
  * the window (its frame is in ./page-frame.ts, the sizes that follow from it in ./simulator.css).
@@ -12,6 +23,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { DEG } from '../core/geometry';
 import type { GripperVariantId } from '../blocks/gripper-original';
+import { paletteCategories } from '../blocks/palettes';
 import type { Game, Pose, ProgramJson, RobotConfig, Simulation } from '../core/types';
 import { BatchDialog, type BatchPreset } from './BatchDialog';
 import { BlocklyEditor, type BlocklyEditorHandle, type EditorStatus } from './BlocklyEditor';
@@ -20,14 +32,16 @@ import { ConsolePanel } from './ConsolePanel';
 import { ControlBar } from './ControlBar';
 import { CyberPiPanel, HoldButton } from './CyberPiPanel';
 import { EditorToolbar } from './EditorToolbar';
-import { formatNumber } from './format';
+import { timeTextOf } from './format';
 import { GripperCodeDialog } from './GripperCodeDialog';
 import { CentreIcon, EnlargeIcon, RotateLeftIcon, RotateRightIcon, RulerIcon, RulesIcon, SensorsIcon, ShrinkIcon, TestIcon, TrailIcon, ZonesIcon } from './icons';
 import type { ExampleProgram } from './member-unlock';
-import { blankProgram, hasRunnableScript, parseProgramFile, programFileName, serializeProgramFile } from './program-file';
+import { blankProgram, hasRunnableScript, otherGameNote, parseProgramFile, programFileName, serializeProgramFile } from './program-file';
 import type { StageOptions } from './render';
+import { robotParts, sensorSummary, sensorsViewHint } from './robot-parts';
 import { EMPTY_RULER, followRobot, removeLastRulerPoint, rulerText, startsOnRobot, type Ruler } from './ruler';
 import { ScoreSheet, StatusLine } from './ScoreSheet';
+import { screenWords, type ScreenWords } from './screen-words';
 import { SensorDashboard } from './SensorDashboard';
 import { StageCanvas } from './StageCanvas';
 import { escapeAction, readyHint, sizeButtonHint, tabStop } from './stage-view';
@@ -64,8 +78,26 @@ export interface SimulatorAppProps<S> {
    */
   examples: ExamplesConfig;
   rules: RulesSection[];
+  /** one sentence under the heading of the rules, e.g. that they are a draft (left out: no sentence) */
+  rulesNote?: string;
+  /**
+   * The sentences of the screen that are different in this category (see ./screen-words.ts).
+   * Left out, or what is left out of it: the words of Fire Rescue.
+   * Pass one object that stays the same between renders.
+   */
+  words?: Partial<ScreenWords>;
   /** where the robot stands when nothing was saved (must fit the start zone) */
   initialStartPose: Pose;
+  /**
+   * The corner of the mat that the "Enlarge" button lies on (always on the right): 'top' (left
+   * out) or 'bottom'. The button covers a little of the mat, so a category picks the corner
+   * where nothing has to be seen - in Fire Rescue the roof of a building at the top, in Fire
+   * Chief the bottom (the fire can stand in the top corners).
+   * A message of the simulator that is shown on the enlarged mat goes to the other edge: the
+   * lower one for 'top', the upper one for 'bottom' (where the button is at the bottom the robot
+   * starts at the bottom too, and the message would lie on it).
+   */
+  enlargeButtonCorner?: 'top' | 'bottom';
   /** the category's own editor for a combination */
   renderCombinationEditor: (scenario: S, onChange: (next: S) => void) => ReactNode;
   batchPresets?: BatchPreset<S>[];
@@ -137,6 +169,15 @@ function readSettings<S>(game: Game<S>, robotConfig: RobotConfig, fallbackPose: 
 
 export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
   const { game, robotConfig, startZoneName } = props;
+  const words = useMemo(() => screenWords(props.words), [props.words]);
+  // how this game writes a moment of a match (as its referee does, where the referee writes times down)
+  const timeText = useMemo(() => timeTextOf(game), [game]);
+  // what this robot has: the Sensors panel and the stage show only that
+  const parts = useMemo(() => robotParts(robotConfig), [robotConfig]);
+  // The Gripper blocks are shortcuts mBlock does not have, and the window that shows the real
+  // mBlock code behind them belongs to them: a game whose palette has no Gripper group gets
+  // neither the button nor the right-click entry nor the window.
+  const hasGripperBlocks = useMemo(() => paletteCategories(game.id).includes('gripper'), [game.id]);
 
   const [saved] = useState(() => readSettings(game, robotConfig, props.initialStartPose));
   const [scenario, setScenario] = useState<S>(saved.scenario);
@@ -180,6 +221,7 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
     initialStartPose: saved.startPose,
     getProgram,
     onActiveBlocks: highlightBlocks,
+    matchWord: words.match,
   });
   const { snapshot, setSpeed, setSoundOn, setStartPose } = sim;
   const runState = snapshot.runState;
@@ -207,10 +249,10 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
 
   // ------------------------------------------------------------------ small messages at the bottom of the screen
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const say = useCallback((text: string, tone: Notice['tone'] = 'info') => {
+  const say = useCallback((text: string, tone: Notice['tone'] = 'info', showFor: number = tone === 'error' ? 6000 : 3500) => {
     if (noticeTimer.current) clearTimeout(noticeTimer.current);
     setNotice({ text, tone });
-    noticeTimer.current = setTimeout(() => setNotice(null), tone === 'error' ? 6000 : 3500);
+    noticeTimer.current = setTimeout(() => setNotice(null), showFor);
   }, []);
   const hush = useCallback(() => {
     if (noticeTimer.current) clearTimeout(noticeTimer.current);
@@ -443,7 +485,12 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
       say(parsed.error, 'error');
       return;
     }
-    if (replaceProgram(parsed.program, `the program from "${fileName}"`)) say(`Opened ${fileName}.`);
+    if (!replaceProgram(parsed.program, `the program from "${fileName}"`)) return;
+    // A program made in another game opens here too, but its blocks for parts this robot does
+    // not have do nothing: say so now, in plain words (and long enough to be read).
+    const note = otherGameNote(parsed.program, parsed.game, game.id);
+    if (note) say(`Opened ${fileName}. ${note}`, 'info', 12000);
+    else say(`Opened ${fileName}.`);
   };
 
   const onSave = () => {
@@ -507,7 +554,8 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
         place === 'mat'
           ? // small and tight in the corner: even on the smallest mat (17rem) it covers only the roof of the building there.
             // For a finger the area that answers is larger than the button looks (the "before:" classes).
-            "absolute right-0.5 top-0.5 inline-flex h-6 select-none items-center gap-1 rounded-lg bg-ink-950/80 px-2 text-xs font-bold text-white shadow-md ring-1 ring-inset ring-white/30 transition hover:bg-ink-950 pointer-coarse:before:absolute pointer-coarse:before:-inset-2 pointer-coarse:before:content-['']"
+            // (which corner: see `enlargeButtonCorner`)
+            `absolute right-0.5 ${props.enlargeButtonCorner === 'bottom' ? 'bottom-0.5' : 'top-0.5'} inline-flex h-6 select-none items-center gap-1 rounded-lg bg-ink-950/80 px-2 text-xs font-bold text-white shadow-md ring-1 ring-inset ring-white/30 transition hover:bg-ink-950 pointer-coarse:before:absolute pointer-coarse:before:-inset-2 pointer-coarse:before:content-['']`
           : 'inline-flex h-9 min-w-9 shrink-0 select-none items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2 text-xs font-bold text-ink-700 transition hover:bg-slate-50 active:bg-slate-100'
       }
     >
@@ -557,6 +605,7 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
               className="mbot2-rules-panel absolute right-0 top-full z-40 mt-2 w-[min(30rem,calc(100vw-1.5rem))] overflow-y-auto rounded-card border border-slate-200 bg-white p-4 text-ink-800 shadow-2xl"
             >
               <p className="text-base font-bold text-ink-900">{props.title}: the rules in short</p>
+              {props.rulesNote && <p className="mt-1 rounded-md bg-amber-100 px-2 py-1 text-xs font-semibold leading-snug text-amber-900">{props.rulesNote}</p>}
               {props.rules.map((section) => (
                 <div key={section.title} className="mt-3">
                   <p className="text-xs font-bold uppercase tracking-wide text-brand-700">{section.title}</p>
@@ -593,11 +642,12 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
           <div className="relative isolate min-h-0 flex-1">
             <BlocklyEditor
               storageKey={storageKey(game.id, 'workspace')}
+              palette={game.id}
               initialProgram={blankProgram}
               mediaPath={BLOCKLY_MEDIA}
               onReady={onEditorReady}
               onStatus={setEditorStatus}
-              onGripperCode={showGripperCode}
+              onGripperCode={hasGripperBlocks ? showGripperCode : undefined}
             />
             {/* An empty workspace says how to begin. The note lies under the open block palette
                 (which has z-index 20) and lets clicks and drags through; it goes away with the
@@ -646,6 +696,9 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
             timeLeft={snapshot.timeLeft}
             score={snapshot.score}
             restartPenalty={game.restartPenalty}
+            restartRules={game.restartRules}
+            restartsLeft={snapshot.restartsLeft}
+            words={words}
             speed={sim.speed}
             onSpeed={sim.setSpeed}
             onStart={start}
@@ -660,10 +713,15 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
           <StatusLine
             runState={runState}
             finishReason={snapshot.finishReason}
+            finishDetail={snapshot.finishDetail}
             score={snapshot.score}
             time={snapshot.time}
             restarts={snapshot.restarts}
             restartPenalty={game.restartPenalty}
+            restartRules={game.restartRules}
+            restartsLeft={snapshot.restartsLeft}
+            words={words}
+            timeText={timeText}
             readyHint={readyHint(startZoneName, rulerOn, isEnlarged)}
             placingProblem={placing && ghost ? `Not allowed: ${notAllowed.charAt(0).toLowerCase()}${notAllowed.slice(1)} It stays where it was.` : null}
             onShowSheet={showScoreSheet}
@@ -690,7 +748,10 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
             {!rulerOn && sizeButton('mat')}
             {/* In the enlarged stage a message of the simulator is shown on the lower edge of the mat:
                 at the bottom of the window it would lie on the buttons under the mat. */}
-            {isEnlarged && message && <div className="pointer-events-none absolute inset-x-0 bottom-3 z-10 flex justify-center px-3">{message}</div>}
+            {/* (where the "Enlarge" button lies on the lower edge, the message is shown on the upper edge: see `enlargeButtonCorner`) */}
+            {isEnlarged && message && (
+              <div className={`pointer-events-none absolute inset-x-0 ${props.enlargeButtonCorner === 'bottom' ? 'top-3' : 'bottom-3'} z-10 flex justify-center px-3`}>{message}</div>
+            )}
           </div>
           </div>
 
@@ -726,11 +787,11 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
           <div className="@container">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <div className="flex items-center gap-1.5" role="group" aria-label="Show on the stage">
-              <button type="button" aria-pressed={view.overlays} onClick={toggleView('overlays')} className={toggleClass(view.overlays)} title="Colour the zones of this combination: start, people, water squares, tower areas">
+              <button type="button" aria-pressed={view.overlays} onClick={toggleView('overlays')} className={toggleClass(view.overlays)} title={words.zonesHint}>
                 <ZonesIcon className={VIEW_ICON} />
                 Zones
               </button>
-              <button type="button" aria-pressed={view.sensors} onClick={toggleView('sensors')} className={toggleClass(view.sensors)} title="Show what the line sensor and the ultrasonic sensor see">
+              <button type="button" aria-pressed={view.sensors} onClick={toggleView('sensors')} className={toggleClass(view.sensors)} title={sensorsViewHint(parts)}>
                 <SensorsIcon className={VIEW_ICON} />
                 Sensors
               </button>
@@ -807,23 +868,23 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
           <div ref={scoreSheetRef} className="scroll-mb-3 scroll-mt-24 lg:scroll-mt-3">
           <Section
             title="Score sheet"
-            summary={`${snapshot.score.total} / ${snapshot.score.max} points · ${missionsDone} of ${missions.length} missions`}
+            summary={`${snapshot.score.total} / ${snapshot.score.max} points · ${missionsDone} of ${missions.length} ${words.goals}`}
             open={open.score}
             onToggle={toggleSection('score')}
           >
-            <ScoreSheet score={snapshot.score} />
+            <ScoreSheet score={snapshot.score} words={words} />
           </Section>
           </div>
 
           <Section title="Combination" summary={<span className="font-mono">{game.encodeScenario(scenario)}</span>} open={open.combination} onToggle={toggleSection('combination')}>
-            <CombinationPanel game={game} scenario={scenario} onChange={changeScenario}>
+            <CombinationPanel game={game} scenario={scenario} onChange={changeScenario} words={words}>
               {props.renderCombinationEditor(scenario, changeScenario)}
             </CombinationPanel>
           </Section>
 
           <Section
             title="Sensors"
-            summary={`line ${snapshot.sensors.lineStatus} · ${formatNumber(snapshot.sensors.ultrasonicCm)} cm · claw ${snapshot.sensors.frontColor === 'none' ? 'empty' : snapshot.sensors.frontColor}`}
+            summary={sensorSummary(parts, snapshot.sensors)}
             open={open.sensors}
             onToggle={toggleSection('sensors')}
           >
@@ -860,7 +921,7 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
             open={open.console}
             onToggle={toggleSection('console')}
           >
-            <ConsolePanel logs={sim.logs} onClear={sim.clearLogs} onSelectBlock={selectBlock} />
+            <ConsolePanel logs={sim.logs} onClear={sim.clearLogs} onSelectBlock={selectBlock} timeText={timeText} />
           </Section>
         </section>
       </div>
@@ -880,6 +941,7 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
           getSampler={sim.getSampler}
           currentScenario={scenario}
           presets={props.batchPresets}
+          words={words}
           onPick={(picked) => {
             setBatchOpen(false);
             changeScenario(picked);
@@ -889,7 +951,7 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
         />
       )}
 
-      {gripperCode && (
+      {hasGripperBlocks && gripperCode && (
         <GripperCodeDialog
           robotConfig={robotConfig}
           at={gripperCode.at}

@@ -12,8 +12,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { runMatch, summarize, type BatchResult } from '../core/batch';
 import { makeRng } from '../core/geometry';
 import type { Game, MatSampler, Pose, ProgramJson, RobotConfig } from '../core/types';
-import { finishText, formatStamp } from './format';
+import { finishText, timeTextOf } from './format';
 import { DiceIcon, TestIcon } from './icons';
+import { capital, DEFAULT_WORDS, type ScreenWords } from './screen-words';
 import { button, Modal } from './widgets';
 
 /** A ready-made list of combinations offered next to the random draws. */
@@ -35,6 +36,8 @@ export interface BatchDialogProps<S> {
   getSampler: () => MatSampler | undefined;
   currentScenario: S;
   presets?: BatchPreset<S>[];
+  /** the game's words (left out: the words of Fire Rescue) */
+  words?: ScreenWords;
   /** the student wants to watch this combination on the stage */
   onPick: (scenario: S) => void;
   onClose: () => void;
@@ -81,7 +84,7 @@ function StatTile({ label, value, note }: { label: string; value: string; note?:
 }
 
 export function BatchDialog<S>(props: BatchDialogProps<S>) {
-  const { game, robotConfig, getProgram, startPose, getSampler, currentScenario, presets = [], onPick, onClose } = props;
+  const { game, robotConfig, getProgram, startPose, getSampler, currentScenario, presets = [], words = DEFAULT_WORDS, onPick, onClose } = props;
 
   const [choice, setChoice] = useState<string>('random-50');
   const [seed, setSeed] = useState(1);
@@ -171,6 +174,8 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
 
   const running = phase === 'running';
   const done = rows.length;
+  // (how this game writes a moment of a match: see timeTextOf)
+  const timeText = useMemo(() => timeTextOf(game), [game]);
 
   return (
     <Modal title="Test on many combinations" onClose={onClose} widthClass="max-w-4xl">
@@ -295,7 +300,7 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
               <StatTile label="Best run" value={String(summary.best)} />
               <StatTile label="Worst run" value={String(summary.worst)} />
               <StatTile
-                label="Every mission complete"
+                label={`Every ${words.goal} complete`}
                 value={percent(summary.completeCount / summary.runs)}
                 note={`${summary.completeCount} of ${summary.runs} runs`}
               />
@@ -342,7 +347,7 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
                       <th scope="col" className="px-2.5 py-2 font-semibold">#</th>
                       <th scope="col" className="px-2.5 py-2 font-semibold">Combination</th>
                       <th scope="col" className="px-2.5 py-2 text-right font-semibold">Score</th>
-                      <th scope="col" className="px-2.5 py-2 font-semibold">Missions</th>
+                      <th scope="col" className="px-2.5 py-2 font-semibold">{capital(words.goals)}</th>
                       <th scope="col" className="px-2.5 py-2 text-right font-semibold">Time</th>
                       <th scope="col" className="px-2.5 py-2 font-semibold">Ended</th>
                       <th scope="col" className="px-2.5 py-2">
@@ -377,7 +382,7 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
                               </span>
                             </span>
                           </td>
-                          <td className="px-2.5 py-1.5 text-right font-mono text-xs tabular-nums text-ink-600">{formatStamp(row.result.time)}</td>
+                          <td className="px-2.5 py-1.5 text-right font-mono text-xs tabular-nums text-ink-600">{timeText(row.result.time)}</td>
                           <td className="px-2.5 py-1.5 text-xs text-ink-600">
                             {finishText(row.result.finishReason)}
                             {row.result.restarts > 0 && `, ${row.result.restarts} restart${row.result.restarts === 1 ? '' : 's'}`}

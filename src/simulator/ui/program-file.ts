@@ -4,6 +4,8 @@
  *
  * Plain TypeScript (no DOM, no Blockly), so it can be unit-tested under Node.
  */
+import { getBlockDef, getCategory, type CategoryId } from '../blocks/catalog';
+import { paletteCategories } from '../blocks/palettes';
 import type { BlockJson, ProgramJson } from '../core/types';
 import { blockRole } from '../vm';
 import { isRecord } from './storage';
@@ -116,4 +118,81 @@ export function blankProgram(): ProgramJson {
 export function programFileName(gameId: string, now: Date = new Date()): string {
   const day = now.toISOString().slice(0, 10);
   return `${gameId.replace(/[^a-z0-9-]+/gi, '-')}-program-${day}.json`;
+}
+
+// =============================================================================================
+// A program that was made in another game
+// =============================================================================================
+// Every game has its own block palette (../blocks/palettes.ts): Fire Rescue has the Servos and
+// the Gripper, Fire Chief the DC motors and the flame sensor. A program file made in one game
+// opens in the other - every block of the simulator is known to every editor and to the
+// interpreter - but a block for a part this robot does not have does nothing when it runs. The
+// student has to be told, in plain words, at the moment the file is opened.
+
+/** The blocks of a program that this game's palette does not offer. */
+export interface ForeignBlocks {
+  /** how many such blocks the program holds */
+  count: number;
+  /** the names of the palette groups they come from, as the other game shows them: "Gripper", "Servos" */
+  groups: string[];
+}
+
+/** Every block of a program, the ones inside slots and inside C-shaped blocks included (white bubbles too). */
+function eachBlock(program: ProgramJson, visit: (block: BlockJson) => void): void {
+  const walk = (block: BlockJson | undefined): void => {
+    if (!block || typeof block.type !== 'string') return;
+    visit(block);
+    for (const slot of Object.values(block.inputs ?? {})) {
+      walk(slot?.block);
+      walk(slot?.shadow);
+    }
+    walk(block.next?.block);
+  };
+  for (const top of topBlocks(program)) walk(top);
+}
+
+/**
+ * Which blocks of `program` belong to a part the robot of game `gameId` does not have: blocks of
+ * the simulator's catalog whose palette group is not in this game's palette. (Blocks that are
+ * not in the catalog at all - Blockly's own number and text bubbles, My Blocks - are in every
+ * game.)
+ */
+export function foreignBlocks(program: ProgramJson, gameId: string): ForeignBlocks {
+  const own = new Set<CategoryId>(paletteCategories(gameId));
+  const groups: CategoryId[] = [];
+  let count = 0;
+  eachBlock(program, (block) => {
+    const def = getBlockDef(block.type);
+    if (!def || own.has(def.category)) return;
+    count++;
+    if (!groups.includes(def.category)) groups.push(def.category);
+  });
+  return { count, groups: groups.map((id) => getCategory(id).name) };
+}
+
+/** "fire-rescue" -> "Fire Rescue": the name of a game as far as its id tells it. */
+export function gameNameFromId(gameId: string): string {
+  return gameId
+    .split(/[^a-z0-9]+/i)
+    .filter((part) => part !== '')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+/**
+ * What to tell the student about a program that was just opened, when it comes from another
+ * game or holds blocks this game does not have. Null when there is nothing to say.
+ *
+ * `fileGame` is the game written in the file (null for a bare Blockly file), `gameId` the game
+ * on the screen.
+ */
+export function otherGameNote(program: ProgramJson, fileGame: string | null, gameId: string): string | null {
+  const foreign = foreignBlocks(program, gameId);
+  const from = fileGame !== null && fileGame !== gameId && gameNameFromId(fileGame) !== '' ? `This program was saved in the ${gameNameFromId(fileGame)} simulator. ` : '';
+  if (foreign.count === 0) return from === '' ? null : `${from}All its blocks work here too.`;
+  const one = foreign.count === 1;
+  return (
+    `${from}${foreign.count} of its blocks ${one ? 'is' : 'are'} for parts this robot does not have ` +
+    `(${foreign.groups.join(', ')}): ${one ? 'it does' : 'they do'} nothing here.`
+  );
 }
