@@ -50,6 +50,7 @@ function renderCombinationEditor(scenario: FireRescueScenario, onChange: (next: 
 /** The Examples window: the address that hands out the cards and the programs, and whose members they are for. */
 const EXAMPLES: ExamplesConfig = {
   unlockUrl: '/api/simulator/unlock',
+  game: 'fire-rescue',
   organisation: 'MakeX Lebanon',
 };
 

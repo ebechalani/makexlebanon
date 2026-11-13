@@ -15,6 +15,12 @@
  * left out, or that a second kind of code exists: the answer to a member code and the answer to
  * an advanced code are made of the very same fields.
  *
+ * The simulator has more than one game, and each game has examples of its own. They all leave
+ * the server through this one door, by the same rule and with the same codes: a request says
+ * which game it is about, and its answer holds the examples of that game and not a word about
+ * another one. The code is the same for every game - there is no code "for a game" - and so is
+ * the count of wrong codes (see AttemptLimiter): asking about another game gives no new tries.
+ *
  * It is written as one plain function, handleUnlockRequest(), that gets everything it needs as
  * arguments (the lists of fingerprints, the examples, the clock), so the tests can try every
  * case without a web server. The address of the website that calls it is
@@ -149,6 +155,10 @@ const FREE_TURN: Turn = { wait: 0, giveBack: NOTHING_TO_GIVE_BACK };
  *  - the count of an address starts again after `windowMs`;
  *  - a request whose address is not known is not limited at all (see handleUnlockRequest),
  *    rather than letting all such visitors share one count.
+ *
+ * The count belongs to an address and to nothing else. The simulator has several games behind
+ * the one address of the server, and a wrong code is a wrong code in all of them: whichever
+ * game a request is about, it draws on the same tries.
  */
 export class AttemptLimiter {
   private readonly clients = new Map<string, { tries: number; since: number; nextSlowTurn: number }>();
@@ -259,12 +269,15 @@ export interface UnlockedExample extends VisibleCard {
  * Why a request was refused. Deliberately few and vague:
  *
  *   invalid-code        the code is on neither list (never typed right, cancelled, or not a code at all)
- *   bad-request         the request is not `{ "code": "..." }` or `{}`, or it does not say that it is JSON
+ *   bad-request         the request is not `{ "game": "...", "code": "..." }` (each of the two may be left out), or it does not say that it is JSON
+ *   unknown-game        the request names a game, and it is not a game this server has examples for
  *   too-large           the request is larger than MAX_BODY_BYTES
  *   too-many-attempts   too many wrong codes from this address: wait a moment (see Retry-After) and try again
  *   method-not-allowed  anything but POST
+ *
+ * "unknown-game" says that much and no more: the answer does not list the games there are.
  */
-export type UnlockRefusal = 'invalid-code' | 'bad-request' | 'too-large' | 'too-many-attempts' | 'method-not-allowed';
+export type UnlockRefusal = 'invalid-code' | 'bad-request' | 'unknown-game' | 'too-large' | 'too-many-attempts' | 'method-not-allowed';
 
 export type UnlockAnswer =
   | {
@@ -297,54 +310,99 @@ export interface UnlockResponse {
   body: UnlockAnswer;
 }
 
-export interface UnlockSetup {
-  /** the list of member codes ("simulatorCodes" in content/simulator-codes.ts) */
-  codes: readonly CodeEntry[];
-  /** the list of advanced codes ("advancedSimulatorCodes") */
-  advancedCodes: readonly CodeEntry[];
-  /** every example with its description and its program, in the order of the Examples window */
+/** The examples of one game of the simulator, as the server holds them. */
+export interface GameExamples {
+  /** the name of the game, as a request writes it: "fire-rescue" */
+  game: string;
+  /** every example of the game with its description and its program, in the order of the Examples window */
   examples: readonly UnlockedExample[];
   /** the headings of the levels, in the order of the Examples window */
   levels: readonly LevelHeading[];
-  /** ids of the examples anyone may open without a code ("examplesOpenToEveryone"); ids that do not exist are ignored */
+}
+
+/**
+ * The game a request is about when it names none.
+ *
+ * While Fire Rescue was the only game, its page asked with `{}` or `{ "code": "..." }`. A page
+ * that was loaded then goes on asking like that for as long as its browser tab stays open - and
+ * it must go on getting the examples of Fire Rescue, not a refusal. Every page written since
+ * names its game, so this is never the way to ask for another game.
+ */
+export const GAME_WHEN_NONE_IS_NAMED = 'fire-rescue';
+
+export interface UnlockSetup {
+  /** the list of member codes ("simulatorCodes" in content/simulator-codes.ts): they work in every game */
+  codes: readonly CodeEntry[];
+  /** the list of advanced codes ("advancedSimulatorCodes"): they work in every game too */
+  advancedCodes: readonly CodeEntry[];
+  /**
+   * The examples of every game. A request names one of these games and is answered from its
+   * examples alone. The ids of the examples must be different across ALL games, because the
+   * two lists below name an example by its id and nothing else (see mistakesInSetup).
+   */
+  games: readonly GameExamples[];
+  /** ids of the examples anyone may open without a code ("examplesOpenToEveryone"), of any game; ids that do not exist are ignored */
   openToEveryone: readonly string[];
   /**
-   * ids of the examples that only an advanced code shows ("examplesForAdvancedCodesOnly"); ids
-   * that do not exist are ignored. An id that is also in `openToEveryone` stays hidden: the
-   * stricter rule wins.
+   * ids of the examples that only an advanced code shows ("examplesForAdvancedCodesOnly"), of
+   * any game; ids that do not exist are ignored. An id that is also in `openToEveryone` stays
+   * hidden: the stricter rule wins.
    */
   advancedOnly: readonly string[];
+  /** counts the wrong codes of an address - one count for all games */
   limiter?: AttemptLimiter;
   /** the clock, in milliseconds (the tests bring their own) */
   now?: () => number;
 }
 
 /**
- * What is wrong with the owner's lists in a way that must not go live: every line of
- * "examplesForAdvancedCodesOnly" that is not the id of an example.
+ * What is wrong with the lists in a way that must not go live:
  *
- * Answering a request, such a line simply hides nothing (see handleUnlockRequest). But that is
- * the dangerous direction: 'smart-buckett' instead of 'smart-bucket' - or an example whose id
- * was changed in sample-catalog.ts and not here - and the example the owner believes hidden is
- * shown to every visitor. So the website's address (src/app/api/simulator/unlock/route.ts)
- * asks this function once, when the site is built, and refuses to be built while it names
- * anything: the site then stays as it was until the line is put right.
+ *   - every line of "examplesForAdvancedCodesOnly" that is not the id of an example, of any game;
+ *   - two games that each have an example with the same id.
+ *
+ * Answering a request, a line of the first kind simply hides nothing (see handleUnlockRequest).
+ * But that is the dangerous direction: 'smart-buckett' instead of 'smart-bucket' - or an example
+ * whose id was changed in a sample-catalog.ts and not here - and the example the owner believes
+ * hidden is shown to every visitor. So the website's address
+ * (src/app/api/simulator/unlock/route.ts) asks this function once, when the site is built, and
+ * refuses to be built while it names anything: the site then stays as it was until the line is
+ * put right.
+ *
+ * The second kind is a slip of whoever writes examples, not of the owner. The owner's lists name
+ * an example by its id alone, so with one id in two games a single line would open - or hide -
+ * an example in each of them, and the owner would have decided about one only.
  *
  * (A misspelt id in "examplesOpenToEveryone" is harmless - the example stays locked - and an id
  * on both lists stays hidden; the tests point both out, the website is built all the same.)
  *
  * Gives the mistakes in plain words, one text each; none when all is well. The texts name only
- * what the owner wrote, never an example.
+ * what the owner wrote and the names of games, never an example: they end up in a build log.
  */
-export function mistakesInSetup(setup: Pick<UnlockSetup, 'examples' | 'advancedOnly'>): string[] {
-  const ids = new Set(setup.examples.map((example) => example.id));
+export function mistakesInSetup(setup: Pick<UnlockSetup, 'games' | 'advancedOnly'>): string[] {
   const mistakes: string[] = [];
-  if (!Array.isArray(setup.advancedOnly)) return ['"examplesForAdvancedCodesOnly" is not a list any more: it must be [ ... ] with one id per line.'];
+  /** every id there is, with the game it was seen in first */
+  const ids = new Map<string, string>();
+  const sharedBy = new Set<string>();
+  for (const { game, examples } of setup.games) {
+    for (const example of examples) {
+      const other = ids.get(example.id);
+      if (other === undefined) ids.set(example.id, game);
+      else if (other !== game) sharedBy.add(`"${other}" and "${game}"`);
+    }
+  }
+  for (const games of sharedBy) {
+    mistakes.push(
+      `The examples: the games ${games} each have an example with the same id. Every id must be different across all games, because content/simulator-codes.ts names an example by its id alone: ` +
+        'one line there would open or hide an example in both games. Give one of the two examples another id in its sample-catalog.ts (the tests in src/simulator/members/members.test.ts say which id it is).',
+    );
+  }
+  if (!Array.isArray(setup.advancedOnly)) return [...mistakes, 'content/simulator-codes.ts: "examplesForAdvancedCodesOnly" is not a list any more: it must be [ ... ] with one id per line.'];
   for (const id of setup.advancedOnly) {
     if (typeof id !== 'string' || !ids.has(id)) {
       mistakes.push(
-        `"examplesForAdvancedCodesOnly" holds ${typeof id === 'string' ? `'${id}'` : 'a line that is not an id in quotes'}, which is not the id of an example - so the example it was meant for would NOT be hidden. ` +
-          'Compare it, letter by letter, with the ids listed at the top of content/simulator-codes.ts.',
+        `content/simulator-codes.ts: "examplesForAdvancedCodesOnly" holds ${typeof id === 'string' ? `'${id}'` : 'a line that is not an id in quotes'}, which is not the id of an example of any game - so the example it was meant for would NOT be hidden. ` +
+          'Compare it, letter by letter, with the ids listed at the top of that file.',
       );
     }
   }
@@ -394,12 +452,17 @@ function saysJson(contentType: string | null): boolean {
   return contentType !== null && /^application\/json\s*(;|$)/i.test(contentType.trim());
 }
 
-/**
- * What was sent as the code: the text of the code; '' when there is none (no "code" at all,
- * null, an empty text or only blanks); or 'bad' when the request is not of the expected kind.
- */
-function sentCode(body: string): string | 'bad' {
-  if (body.trim() === '') return '';
+/** What a request asks: about which game, and with which code. */
+interface Sent {
+  /** what stands under "game", as it was sent - whatever it is; undefined when the request names no game */
+  game: unknown;
+  /** the text of the code; '' when there is none (no "code" at all, null, an empty text or only blanks) */
+  code: string;
+}
+
+/** What was sent: the game and the code (see Sent), or 'bad' when the request is not of the expected kind. */
+function sentRequest(body: string): Sent | 'bad' {
+  if (body.trim() === '') return { game: undefined, code: '' };
   let sent: unknown;
   try {
     sent = JSON.parse(body);
@@ -407,28 +470,34 @@ function sentCode(body: string): string | 'bad' {
     return 'bad';
   }
   if (typeof sent !== 'object' || sent === null || Array.isArray(sent)) return 'bad';
-  const code: unknown = (sent as Record<string, unknown>).code;
-  if (code === undefined || code === null) return '';
+  const { game, code } = sent as Record<string, unknown>;
+  if (code === undefined || code === null) return { game, code: '' };
   if (typeof code !== 'string') return 'bad';
-  return code.trim();
+  return { game, code: code.trim() };
 }
 
 /**
  * Answer one request to /api/simulator/unlock.
  *
- *   POST {}                               ->  200  { ok: true, member: false, levels, cards, examples }
- *                                                  cards: what a visitor may see; examples: the ones open to everyone
- *   POST { "code": "FIRE-7K2M-9QXD" }
- *     a member code of the list           ->  200  { ok: true, member: true, levels, cards, examples }
- *                                                  the same cards, and every one of them as an example
- *     an advanced code of its list        ->  200  { ok: true, member: true, levels, cards, examples }
- *                                                  every example there is
- *     a code on neither list              ->  403  { ok: false, reason: "invalid-code" }       never any example
- *     too many wrong codes just now       ->  429  { ok: false, reason: "too-many-attempts" }  the code was not looked at
- *   anything that is not such a request   ->  4xx  { ok: false, reason }                        never any example
+ *   POST { "game": "fire-chief" }                      ->  200  { ok: true, member: false, levels, cards, examples }
+ *                                                               cards: what a visitor may see; examples: the ones open to everyone
+ *   POST { "game": "fire-chief", "code": "FIRE-7K2M-9QXD" }
+ *     a member code of the list                        ->  200  { ok: true, member: true, levels, cards, examples }
+ *                                                               the same cards, and every one of them as an example
+ *     an advanced code of its list                     ->  200  { ok: true, member: true, levels, cards, examples }
+ *                                                               every example of that game
+ *     a code on neither list                           ->  403  { ok: false, reason: "invalid-code" }       never any example
+ *     too many wrong codes just now                    ->  429  { ok: false, reason: "too-many-attempts" }  the code was not looked at
+ *   a "game" that is not one of the setup's games      ->  400  { ok: false, reason: "unknown-game" }       the code was not looked at
+ *   anything that is not such a request                ->  4xx  { ok: false, reason }                        never any example
+ *
+ * "game" is the name of a game of the setup ("fire-rescue", "fire-chief"), written exactly like
+ * that. A request WITHOUT "game" is about Fire Rescue (see GAME_WHEN_NONE_IS_NAMED): `{}` and
+ * `{ "code": "..." }` are answered as they always were.
  *
  * A level is { id, title, about }, a card { id, title, level }, an example
- * { id, title, level, description, program }.
+ * { id, title, level, description, program }. Every one of them belongs to the game the
+ * request named: an answer never holds anything of another game.
  *
  * The examples kept for advanced codes only are in the third answer and in no other: the first
  * two do not hold their cards, and do not say that there are any. The second and the third
@@ -438,15 +507,24 @@ function sentCode(body: string): string | 'bad' {
 export async function handleUnlockRequest(request: UnlockRequest, setup: UnlockSetup): Promise<UnlockResponse> {
   if (request.method !== 'POST') return refuse(405, 'method-not-allowed', { Allow: 'POST' });
   if (request.body === null || Buffer.byteLength(request.body, 'utf8') > MAX_BODY_BYTES) return refuse(413, 'too-large');
-  // (an empty request - no code - has no text to describe)
+  // (an empty request - no game, no code - has no text to describe)
   if (request.body.trim() !== '' && !saysJson(request.contentType)) return refuse(415, 'bad-request');
 
-  const code = sentCode(request.body);
-  if (code === 'bad') return refuse(400, 'bad-request');
+  const sent = sentRequest(request.body);
+  if (sent === 'bad') return refuse(400, 'bad-request');
 
-  // what everybody without an advanced code may see: every example that is not kept for advanced codes
+  // ---- which game. Only a request that names NO game means Fire Rescue; whatever else stands
+  // there must be the name of a game, letter for letter (null, a number and 'Fire-Chief' are none).
+  // This comes before the code is looked at: a request about a game that does not exist costs
+  // no computing time, uses up no try, and is answered alike with a right code, a wrong one and none.
+  const name = sent.game === undefined ? GAME_WHEN_NONE_IS_NAMED : sent.game;
+  const game = setup.games.find((one) => one.game === name);
+  if (!game) return refuse(400, 'unknown-game');
+  const { code } = sent;
+
+  // what everybody without an advanced code may see: every example of this game that is not kept for advanced codes
   const hidden = new Set(setup.advancedOnly);
-  const forMembers = setup.examples.filter((example) => !hidden.has(example.id));
+  const forMembers = game.examples.filter((example) => !hidden.has(example.id));
 
   // ---- no code: the members' cards, and to open only what the owner has opened to everyone
   if (code === '') {
@@ -455,7 +533,7 @@ export async function handleUnlockRequest(request: UnlockRequest, setup: UnlockS
       false,
       forMembers,
       forMembers.filter((example) => open.has(example.id)),
-      setup.levels,
+      game.levels,
     );
   }
 
@@ -463,14 +541,16 @@ export async function handleUnlockRequest(request: UnlockRequest, setup: UnlockS
   // (text that cannot be a code needs no working out: the answer is the same "no")
   if (normalizeCode(code) === null) return refuse(403, 'invalid-code');
 
-  // the courtesy limit (an address that is not known is not limited: see AttemptLimiter)
+  // the courtesy limit (an address that is not known is not limited: see AttemptLimiter).
+  // The count belongs to the address, whatever game the request is about.
   const turn = setup.limiter && request.client !== null ? setup.limiter.admit(request.client, (setup.now ?? Date.now)()) : FREE_TURN;
   if (turn.wait > 0) return refuse(429, 'too-many-attempts', { 'Retry-After': String(turn.wait) });
 
+  // (a code is looked up in the two lists alone: what it is does not depend on the game)
   const kind = await kindOfCode(code, setup.codes, setup.advancedCodes);
   if (kind === null) return refuse(403, 'invalid-code');
   // a right code never counts
   turn.giveBack();
-  const theirs = kind === 'advanced' ? setup.examples : forMembers;
-  return hand(true, theirs, theirs, setup.levels);
+  const theirs = kind === 'advanced' ? game.examples : forMembers;
+  return hand(true, theirs, theirs, game.levels);
 }

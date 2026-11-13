@@ -153,7 +153,7 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
   const [editorStatus, setEditorStatus] = useState<EditorStatus>({ canUndo: false, canRedo: false, blocks: 0 });
   const rules = usePopover<HTMLDivElement>();
   // which examples this visitor may see and load: the website's server says so (more with a code than without)
-  const examples = useMemberExamples(storageKey(game.id, 'member-code'), props.examples);
+  const examples = useMemberExamples(props.examples);
   const canLoadExamples = Object.keys(examples.available).length > 0;
 
   // ------------------------------------------------------------------ the block editor

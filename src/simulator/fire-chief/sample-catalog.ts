@@ -21,11 +21,11 @@
  *  headings this visitor may see. Nothing that runs in the browser (src/simulator/ui, anything
  *  with 'use client', a page of the website) may import this file or ./samples.ts.
  *
- *  These examples are not handed out by the server yet: that comes with the screen of this
- *  game. Until then ./samples.test.ts checks that no other file imports the two files or holds
- *  one of the titles below. The guard test of the server (../members/client-guard.test.ts)
- *  already treats ./samples.ts as a file that must stay on the server, because it imports the
- *  program builder; ./samples.ts and these titles still have to be written into its lists.
+ *  The server hands these examples out through /api/simulator/unlock, to a request that names
+ *  this game (see ../members/all-examples.ts and ../members/unlock.ts). The guard test of the
+ *  server (../members/client-guard.test.ts) knows this file, ./samples.ts and the titles below,
+ *  and fails when a file the browser gets imports one of the two or holds one of the titles;
+ *  ./samples.test.ts checks the same for this game alone.
  * =====================================================================================
  *
  * To change the title or the level of an example, or the heading of a level, change it here:

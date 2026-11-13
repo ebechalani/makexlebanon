@@ -2,18 +2,28 @@
  * The browser's side of the Examples window (member-unlock.ts): reading the server's answer and
  * handling a code as it is typed, shown and remembered. The server is a pretend one here; its
  * real answers come from ../members/unlock.ts, so the two are also checked against each other.
+ *
+ * Every request names the game it is about. Most tests ask about Fire Rescue (RESCUE below);
+ * "two games behind one address" asks about both.
  */
 import assert from 'node:assert/strict';
 import { before, describe, test } from 'node:test';
 
-import { ALL_EXAMPLES, ALL_LEVELS } from '../members/all-examples';
+import { ALL_GAMES, FIRE_CHIEF, FIRE_RESCUE } from '../members/all-examples';
 import { fingerprintOf } from '../members/code-fingerprint.mjs';
 import { normalizeCode } from '../members/code-format.mjs';
 import { handleUnlockRequest, type UnlockSetup } from '../members/unlock';
 import { blankProgram } from './program-file';
-import { hiddenCode, isSavedCode, readUnlockAnswer, requestUnlock, tidyCode, CODE_LOOKS_LIKE, CODE_PLACEHOLDER } from './member-unlock';
+import { hiddenCode, isSavedCode, readUnlockAnswer, requestUnlock, requestUnlockPatiently, tidyCode, CODE_LOOKS_LIKE, CODE_PLACEHOLDER, EXAMPLES_GAMES, SAVED_CODE_KEY, type ExamplesSource } from './member-unlock';
+import { storageKey } from './storage';
 
 const CODE = 'FIRE-AAAA-2222';
+
+/** The seven examples of Fire Rescue, which most of these tests ask for. */
+const ALL_EXAMPLES = FIRE_RESCUE.examples;
+/** Where the simulator asks, and for which game: a made-up address, Fire Rescue - and the same address, Fire Chief. */
+const RESCUE: ExamplesSource = { unlockUrl: '/u', game: 'fire-rescue' };
+const CHIEF: ExamplesSource = { unlockUrl: '/u', game: 'fire-chief' };
 
 const STARTER = { id: 'starter', title: 'Starter', about: 'first steps' };
 const HARDER = { id: 'harder', title: 'Harder', about: 'one whole mission' };
@@ -137,6 +147,7 @@ describe('reading the server\'s answer', () => {
       [200, { ok: false, reason: 'invalid-code' }],
       [403, { ok: false }],
       [403, { ok: false, reason: 'something-new' }],
+      [400, { ok: false, reason: 'unknown-game' }], // the server has no examples for the game that was named: the code was not even looked at
       [405, { ok: false, reason: 'method-not-allowed' }],
       [404, { error: 'not found' }],
       [500, { ok: false, reason: 'invalid-code' }],
@@ -172,8 +183,7 @@ describe('asking the server', () => {
     setup = {
       codes: [{ no: 1, fingerprint: await fingerprintOf(normalizeCode(CODE) as string) }],
       advancedCodes: [{ no: 1, fingerprint: await fingerprintOf(normalizeCode(ADVANCED_CODE) as string) }],
-      examples: ALL_EXAMPLES,
-      levels: ALL_LEVELS,
+      games: ALL_GAMES,
       openToEveryone: [],
       advancedOnly: [],
     };
@@ -181,7 +191,7 @@ describe('asking the server', () => {
 
   test('with a code of the list: all seven examples arrive, each with its card and its program', async () => {
     const server = pretendServer(setup);
-    const outcome = await requestUnlock('/api/simulator/unlock', CODE, server.fetch);
+    const outcome = await requestUnlock({ unlockUrl: '/api/simulator/unlock', game: 'fire-rescue' }, CODE, server.fetch);
     assert.ok(outcome.kind === 'examples' && outcome.member);
     assert.equal(outcome.examples.length, 7);
     assert.deepEqual(
@@ -200,31 +210,31 @@ describe('asking the server', () => {
       assert.equal(e.description, ALL_EXAMPLES[i].description);
       assert.deepEqual(e.program, ALL_EXAMPLES[i].program);
     }
-    assert.deepEqual(server.asked, [{ url: '/api/simulator/unlock', body: { code: CODE }, method: 'POST' }]);
+    assert.deepEqual(server.asked, [{ url: '/api/simulator/unlock', body: { game: 'fire-rescue', code: CODE }, method: 'POST' }]);
   });
 
   test('without a code: every card but nothing to open while no example is open to everyone, then exactly the open ones', async () => {
-    const closed = await requestUnlock('/u', null, pretendServer(setup).fetch);
+    const closed = await requestUnlock(RESCUE, null, pretendServer(setup).fetch);
     assert.ok(closed.kind === 'examples' && !closed.member);
     assert.equal(closed.cards.length, 7);
     assert.deepEqual(closed.examples, []);
 
     const server = pretendServer({ ...setup, openToEveryone: ['hello'] });
-    const open = await requestUnlock('/u', null, server.fetch);
+    const open = await requestUnlock(RESCUE, null, server.fetch);
     assert.ok(open.kind === 'examples' && !open.member);
     assert.deepEqual(
       open.examples.map((e) => e.id),
       ['hello'],
     );
     assert.equal(open.cards.length, 7);
-    assert.deepEqual(server.asked[0].body, {}, 'no code is sent');
+    assert.deepEqual(server.asked[0].body, { game: 'fire-rescue' }, 'the game is named, and no code is sent');
   });
 
   test('examples for advanced codes only: the browser of a visitor and of a member never gets a word about them', async () => {
     const server = pretendServer({ ...setup, openToEveryone: ['hello', 'line-follow', 'gripper-demo'], advancedOnly: HIDDEN });
     const titles = (outcome: Awaited<ReturnType<typeof requestUnlock>>): string[] => (outcome.kind === 'examples' ? outcome.levels.map((level) => level.title) : []);
 
-    const visitor = await requestUnlock('/u', null, server.fetch);
+    const visitor = await requestUnlock(RESCUE, null, server.fetch);
     assert.ok(visitor.kind === 'examples' && !visitor.member);
     assert.deepEqual(
       visitor.cards.map((c) => c.id),
@@ -236,7 +246,7 @@ describe('asking the server', () => {
     );
     assert.deepEqual(titles(visitor), ['Starter', 'Intermediate']);
 
-    const member = await requestUnlock('/u', CODE, server.fetch);
+    const member = await requestUnlock(RESCUE, CODE, server.fetch);
     assert.ok(member.kind === 'examples' && member.member);
     assert.deepEqual(
       member.cards.map((c) => c.id),
@@ -256,7 +266,7 @@ describe('asking the server', () => {
       for (const secret of [...HIDDEN, 'Smart bucket', 'Full mission', 'dvanced', 'whole match']) assert.ok(!got.includes(secret), `${who} does not get "${secret}"`);
     }
 
-    const advanced = await requestUnlock('/u', ADVANCED_CODE, server.fetch);
+    const advanced = await requestUnlock(RESCUE, ADVANCED_CODE, server.fetch);
     assert.ok(advanced.kind === 'examples' && advanced.member);
     assert.equal(advanced.cards.length, 7);
     assert.equal(advanced.examples.length, 7);
@@ -266,36 +276,145 @@ describe('asking the server', () => {
   });
 
   test('a wrong code is rejected; too many wrong codes is "busy"', async () => {
-    assert.deepEqual(await requestUnlock('/u', 'FIRE-CCCC-4444', pretendServer(setup).fetch), { kind: 'rejected' });
+    assert.deepEqual(await requestUnlock(RESCUE, 'FIRE-CCCC-4444', pretendServer(setup).fetch), { kind: 'rejected' });
     const busy = (async () => Response.json({ ok: false, reason: 'too-many-attempts' }, { status: 429 })) as unknown as typeof fetch;
-    assert.deepEqual(await requestUnlock('/u', CODE, busy), { kind: 'busy' });
+    assert.deepEqual(await requestUnlock(RESCUE, CODE, busy), { kind: 'busy' });
   });
 
   test('an answer that does not fit the question is not trusted', async () => {
     const notAMember = (async () => Response.json(answer(false, [card('a')], []))) as unknown as typeof fetch;
-    assert.equal((await requestUnlock('/u', null, notAMember)).kind, 'examples', 'the right answer to "no code"');
-    assert.deepEqual(await requestUnlock('/u', CODE, notAMember), { kind: 'unreachable' }, 'a code was sent, "not a member" came back');
+    assert.equal((await requestUnlock(RESCUE, null, notAMember)).kind, 'examples', 'the right answer to "no code"');
+    assert.deepEqual(await requestUnlock(RESCUE, CODE, notAMember), { kind: 'unreachable' }, 'a code was sent, "not a member" came back');
     const member = (async () => Response.json(answer(true, [card('a')], [example('a')]))) as unknown as typeof fetch;
-    assert.equal((await requestUnlock('/u', CODE, member)).kind, 'examples', 'the right answer to a code');
-    assert.deepEqual(await requestUnlock('/u', null, member), { kind: 'unreachable' }, 'no code was sent, "member" came back');
+    assert.equal((await requestUnlock(RESCUE, CODE, member)).kind, 'examples', 'the right answer to a code');
+    assert.deepEqual(await requestUnlock(RESCUE, null, member), { kind: 'unreachable' }, 'no code was sent, "member" came back');
   });
 
   test('no connection, an error page, a timeout: "unreachable", and never an exception', async () => {
     const offline = (async () => {
       throw new TypeError('Failed to fetch');
     }) as unknown as typeof fetch;
-    assert.deepEqual(await requestUnlock('/u', CODE, offline), { kind: 'unreachable' });
+    assert.deepEqual(await requestUnlock(RESCUE, CODE, offline), { kind: 'unreachable' });
 
     const errorPage = (async () => new Response('<html>502 Bad Gateway</html>', { status: 502 })) as unknown as typeof fetch;
-    assert.deepEqual(await requestUnlock('/u', CODE, errorPage), { kind: 'unreachable' });
+    assert.deepEqual(await requestUnlock(RESCUE, CODE, errorPage), { kind: 'unreachable' });
 
     const never = ((_input: unknown, init?: RequestInit) =>
       new Promise<Response>((_resolve, reject) => {
         init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
       })) as unknown as typeof fetch;
     const started = Date.now();
-    assert.deepEqual(await requestUnlock('/u', CODE, never, 30), { kind: 'unreachable' });
+    assert.deepEqual(await requestUnlock(RESCUE, CODE, never, 30), { kind: 'unreachable' });
     assert.ok(Date.now() - started < 2000, 'given up after the timeout');
+  });
+});
+
+describe('two games behind one address', () => {
+  /** A pretend fetch that answers like the website's server, and notes the text of every request. */
+  function pretendServer(setup: UnlockSetup): { fetch: typeof fetch; sent: string[] } {
+    const sent: string[] = [];
+    const pretend = async (_input: Parameters<typeof fetch>[0], init?: RequestInit): Promise<Response> => {
+      const body = typeof init?.body === 'string' ? init.body : '';
+      sent.push(body);
+      const answer = await handleUnlockRequest({ method: init?.method ?? 'GET', body, contentType: new Headers(init?.headers).get('content-type'), client: 'test' }, setup);
+      return Response.json(answer.body, { status: answer.status, headers: answer.headers });
+    };
+    return { fetch: pretend as typeof fetch, sent };
+  }
+
+  const ADVANCED_CODE = 'FIRE-DDDD-5555';
+  const ids = (list: ReadonlyArray<{ id: string }>): string[] => list.map((item) => item.id);
+
+  /** The rule of both games: the starters open to everyone, the advanced examples for advanced codes only. One list of codes of each kind. */
+  let setup: UnlockSetup;
+  before(async () => {
+    setup = {
+      codes: [{ no: 1, fingerprint: await fingerprintOf(normalizeCode(CODE) as string) }],
+      advancedCodes: [{ no: 1, fingerprint: await fingerprintOf(normalizeCode(ADVANCED_CODE) as string) }],
+      games: ALL_GAMES,
+      openToEveryone: ALL_GAMES.flatMap((game) => game.examples.filter((example) => example.level === 'starter').map((example) => example.id)),
+      advancedOnly: ALL_GAMES.flatMap((game) => game.examples.filter((example) => example.level === 'advanced').map((example) => example.id)),
+    };
+  });
+
+  test('every request names its game, with the code when there is one - and nothing else', async () => {
+    const server = pretendServer(setup);
+    await requestUnlock(RESCUE, null, server.fetch);
+    await requestUnlock(RESCUE, CODE, server.fetch);
+    await requestUnlock(CHIEF, null, server.fetch);
+    await requestUnlock(CHIEF, CODE, server.fetch);
+    await requestUnlockPatiently(CHIEF, CODE, server.fetch);
+    assert.deepEqual(server.sent, [
+      '{"game":"fire-rescue"}',
+      `{"game":"fire-rescue","code":"${CODE}"}`,
+      '{"game":"fire-chief"}',
+      `{"game":"fire-chief","code":"${CODE}"}`,
+      `{"game":"fire-chief","code":"${CODE}"}`,
+    ]);
+    // the names a page can ask with are the names the server knows
+    assert.deepEqual(
+      [...EXAMPLES_GAMES],
+      ALL_GAMES.map((game) => game.game),
+    );
+  });
+
+  test('Fire Chief: a visitor gets 5 cards and 3 to open, a member code opens all 5, an advanced code shows 6 - and never a word of Fire Rescue', async () => {
+    const server = pretendServer(setup);
+    const visitor = await requestUnlock(CHIEF, null, server.fetch);
+    const member = await requestUnlock(CHIEF, CODE, server.fetch);
+    const advanced = await requestUnlock(CHIEF, ADVANCED_CODE, server.fetch);
+    assert.ok(visitor.kind === 'examples' && !visitor.member);
+    assert.ok(member.kind === 'examples' && member.member);
+    assert.ok(advanced.kind === 'examples' && advanced.member);
+    const all = ids(FIRE_CHIEF.examples);
+    assert.deepEqual(ids(visitor.cards), all.slice(0, 5));
+    assert.deepEqual(ids(visitor.examples), all.slice(0, 3));
+    assert.deepEqual(ids(member.cards), all.slice(0, 5));
+    assert.deepEqual(ids(member.examples), all.slice(0, 5));
+    assert.deepEqual(ids(advanced.cards), all);
+    assert.deepEqual(ids(advanced.examples), all);
+    assert.deepEqual(advanced.examples, [...FIRE_CHIEF.examples], 'every example arrives whole: its card, its description, its program');
+    assert.deepEqual(advanced.levels, [...FIRE_CHIEF.levels]);
+    for (const [who, outcome] of [
+      ['a visitor', visitor],
+      ['a member', member],
+    ] as const) {
+      assert.deepEqual(
+        outcome.levels.map((level) => level.title),
+        ['Starter', 'Intermediate'],
+        who,
+      );
+      const got = JSON.stringify(outcome);
+      for (const secret of ['chief-full-mission', FIRE_CHIEF.examples[5].title, 'dvanced', FIRE_CHIEF.levels[2].about]) assert.ok(!got.includes(secret), `${who} does not get "${secret}"`);
+    }
+    for (const outcome of [visitor, member, advanced]) {
+      const got = JSON.stringify(outcome);
+      for (const example of FIRE_RESCUE.examples) assert.ok(!got.includes(`"${example.id}"`) && !got.includes(example.title), `nothing about ${example.id} of Fire Rescue`);
+    }
+  });
+
+  test('Fire Rescue is answered as before: 5 cards and 3 to open, 5 and 5, 7 and 7 - and never a word of Fire Chief', async () => {
+    const server = pretendServer(setup);
+    const counts: string[] = [];
+    for (const code of [null, CODE, ADVANCED_CODE]) {
+      const outcome = await requestUnlock(RESCUE, code, server.fetch);
+      assert.ok(outcome.kind === 'examples');
+      counts.push(`${outcome.cards.length} / ${outcome.examples.length}`);
+      const got = JSON.stringify(outcome);
+      for (const example of FIRE_CHIEF.examples) assert.ok(!got.includes(`"${example.id}"`) && !got.includes(example.title), `nothing about ${example.id} of Fire Chief`);
+    }
+    assert.deepEqual(counts, ['5 / 3', '5 / 5', '7 / 7']);
+  });
+
+  test('a wrong code is rejected in both games; a server that does not know the game says nothing about the code', async () => {
+    const server = pretendServer(setup);
+    assert.deepEqual(await requestUnlock(CHIEF, 'FIRE-CCCC-4444', server.fetch), { kind: 'rejected' });
+    assert.deepEqual(await requestUnlock(RESCUE, 'FIRE-CCCC-4444', server.fetch), { kind: 'rejected' });
+    // a server that has the examples of Fire Rescue alone, asked about Fire Chief: "nothing is known",
+    // with a right code, a wrong one and none - never "your code is wrong", and never the examples of the other game
+    const rescueOnly = pretendServer({ ...setup, games: [FIRE_RESCUE] });
+    for (const code of [CODE, 'FIRE-CCCC-4444', null]) assert.deepEqual(await requestUnlock(CHIEF, code, rescueOnly.fetch), { kind: 'unreachable' }, String(code));
+    assert.deepEqual(readUnlockAnswer(400, { ok: false, reason: 'unknown-game' }), { kind: 'unreachable' });
   });
 });
 
@@ -318,6 +437,14 @@ describe('the code as it is typed, shown and remembered', () => {
     for (const value of [null, 'FIRE-7K2M-9QXD', {}, { code: 7 }, { code: 'FIRE-7K2M' }, { code: '<script>' }, []]) {
       assert.ok(!isSavedCode(value), JSON.stringify(value));
     }
+  });
+
+  test('the code is kept in one place for every game: the place where Fire Rescue has always kept it', () => {
+    // (a browser that saved a code before there was a second game has it under this very name: changing it would lose every saved code)
+    assert.equal(SAVED_CODE_KEY, 'mbot2-sim:fire-rescue:member-code');
+    assert.equal(SAVED_CODE_KEY, storageKey('fire-rescue', 'member-code'));
+    // it is not the place a game's own things are kept in, for any other game
+    assert.notEqual(SAVED_CODE_KEY, storageKey('fire-chief', 'member-code'));
   });
 
   test('the texts that show what a code looks like have the shape of a code', () => {

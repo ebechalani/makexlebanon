@@ -7,6 +7,9 @@
  *     a request that is too large, a cancelled code, examples that are open to everyone
  *   - who sees what: a visitor, a member code and an advanced code - and that an example kept
  *     for advanced codes only is in no answer but the one to an advanced code
+ *   - two games behind one address: each game's examples for each kind of visitor, nothing of
+ *     the other game in an answer, a request that names no game, one that names an unknown
+ *     one, and the count of wrong codes across the games
  *   - the courtesy limit on wrong codes
  *   - the owner's file (content/simulator-codes.ts) and the list of examples
  *   - the address of the website itself (src/app/api/simulator/unlock/route.ts), with the owner's lists
@@ -31,14 +34,46 @@ import {
 } from '../../../content/simulator-codes';
 import { addToListFile, emptyListFile, freshListFile, main as generateCodes, makeCodes, readListFile } from '../../../scripts/generate-simulator-codes.mjs';
 import { GET as routeGet, POST as routePost } from '../../app/api/simulator/unlock/route';
+import { fireChiefGame } from '../fire-chief/game';
+import { EXAMPLE_LEVELS as CHIEF_LEVELS, SAMPLE_CATALOG as CHIEF_CATALOG } from '../fire-chief/sample-catalog';
+import { SAMPLE_PROGRAMS as CHIEF_PROGRAMS } from '../fire-chief/samples';
+import { fireRescueGame } from '../fire-rescue/game';
 import { EXAMPLE_LEVELS, SAMPLE_CATALOG } from '../fire-rescue/sample-catalog';
 import { FULL_MISSION_SAMPLE, SAMPLE_PROGRAMS } from '../fire-rescue/samples';
-import { ALL_EXAMPLES, ALL_LEVELS } from './all-examples';
+import { EXAMPLES_GAMES } from '../ui/member-unlock';
+import { ALL_GAMES, FIRE_CHIEF, FIRE_RESCUE } from './all-examples';
 import { FINGERPRINT_BYTES, FINGERPRINT_PATTERN, FINGERPRINT_ROUNDS, FINGERPRINT_SALT, fingerprintOf } from './code-fingerprint.mjs';
 import { CODE_ALPHABET, CODE_EXAMPLE, CODE_LENGTH, CODE_PREFIX, formatCode, maskCode, normalizeCode } from './code-format.mjs';
-import { AttemptLimiter, handleUnlockRequest, isMemberCode, kindOfCode, MAX_BODY_BYTES, mistakesInSetup, type CodeEntry, type UnlockRequest, type UnlockResponse, type UnlockSetup } from './unlock';
+import {
+  AttemptLimiter,
+  GAME_WHEN_NONE_IS_NAMED,
+  handleUnlockRequest,
+  isMemberCode,
+  kindOfCode,
+  MAX_BODY_BYTES,
+  mistakesInSetup,
+  type CodeEntry,
+  type GameExamples,
+  type UnlockedExample,
+  type UnlockRequest,
+  type UnlockResponse,
+  type UnlockSetup,
+} from './unlock';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
+
+/**
+ * Most tests of this file were written while Fire Rescue was the only game, and they still try
+ * every rule on its seven examples: ALL_EXAMPLES, ALL_LEVELS, MENU_ORDER, ALL_CARDS and
+ * ALL_HEADINGS are Fire Rescue's, and a setup made with rescueOnly() knows no other game.
+ * What a second game changes is tried in "two games behind one address", further down, and in
+ * the tests of the owner's file and of the website's address, which go through both games.
+ */
+const ALL_EXAMPLES = FIRE_RESCUE.examples;
+const ALL_LEVELS = FIRE_RESCUE.levels;
+
+/** The "games" of a setup that has Fire Rescue alone - with all its examples, or with the ones given. */
+const rescueOnly = (examples: readonly UnlockedExample[] = ALL_EXAMPLES): GameExamples[] => [{ game: 'fire-rescue', examples, levels: ALL_LEVELS }];
 
 const MENU_ORDER = ['hello', 'line-follow', 'gripper-demo', 'one-bucket', 'one-person', 'smart-bucket', 'full-mission'];
 
@@ -211,6 +246,66 @@ describe('the list of examples', () => {
     assert.match(FULL_MISSION_SAMPLE.description, /complete solution/i);
     assert.match(FULL_MISSION_SAMPLE.description, /180 ONLY on the default combination/);
   });
+
+  test('the server holds the examples of two games, each under the name of its game', () => {
+    assert.deepEqual(ALL_GAMES, [FIRE_RESCUE, FIRE_CHIEF]);
+    assert.deepEqual(
+      ALL_GAMES.map((game) => game.game),
+      ['fire-rescue', 'fire-chief'],
+    );
+    // the name in a request is the id of the game (what its page is built around)
+    assert.equal(FIRE_RESCUE.game, fireRescueGame.id);
+    assert.equal(FIRE_CHIEF.game, fireChiefGame.id);
+    // the names a page of the website can ask with are exactly these
+    assert.deepEqual([...EXAMPLES_GAMES], ['fire-rescue', 'fire-chief']);
+    // a request that names no game is about Fire Rescue: pages loaded before there was a second game ask like that
+    assert.equal(GAME_WHEN_NONE_IS_NAMED, 'fire-rescue');
+    assert.ok(ALL_GAMES.some((game) => game.game === GAME_WHEN_NONE_IS_NAMED));
+  });
+
+  test('Fire Chief: its six examples in the order of its catalog, with program and description, under headings of its own', () => {
+    assert.deepEqual(
+      FIRE_CHIEF.examples.map((example) => example.id),
+      ['chief-first-wall', 'chief-count-lines', 'chief-flame-fan', 'chief-wall-follow', 'chief-face-flame', 'chief-full-mission'],
+    );
+    assert.deepEqual(
+      FIRE_CHIEF.examples.map((example) => example.level),
+      ['starter', 'starter', 'starter', 'intermediate', 'intermediate', 'advanced'],
+    );
+    assert.deepEqual(new Set(FIRE_CHIEF.examples), new Set(CHIEF_PROGRAMS), 'the six programs of samples.ts, nothing else');
+    FIRE_CHIEF.examples.forEach((example, i) => {
+      assert.equal(example.id, CHIEF_CATALOG[i].id);
+      assert.equal(example.title, CHIEF_CATALOG[i].title);
+      assert.equal(example.level, CHIEF_CATALOG[i].level);
+      assert.ok(example.description.length > 40, example.id);
+      assert.ok((example.program.blocks?.blocks ?? []).length > 0, example.id);
+    });
+    assert.equal(FIRE_CHIEF.levels, CHIEF_LEVELS, 'the server hands out the headings of Fire Chief');
+    assert.deepEqual(
+      CHIEF_LEVELS.map((level) => level.title),
+      ['Starter', 'Intermediate', 'Advanced'],
+    );
+    for (const level of CHIEF_LEVELS) assert.deepEqual(Object.keys(level).sort(), ['about', 'id', 'title'], level.id);
+    for (const card of CHIEF_CATALOG) {
+      assert.deepEqual(Object.keys(card).sort(), ['id', 'level', 'title'], `${card.id}: nothing but id, title and level`);
+      assert.ok(CHIEF_LEVELS.some((level) => level.id === card.level), `${card.id} stands under a heading`);
+    }
+  });
+
+  test('no id and no title is used twice across the games: the owner\'s lists name an example by its id alone', () => {
+    const seen = new Map<string, string>();
+    for (const { game, examples } of ALL_GAMES) {
+      for (const example of examples) {
+        for (const name of [`the id '${example.id}'`, `the title "${example.title.toLowerCase()}"`]) {
+          assert.equal(seen.get(name), undefined, `${name} is used in ${seen.get(name)} and in ${game}: one line of content/simulator-codes.ts would decide about both examples`);
+          seen.set(name, game);
+        }
+      }
+    }
+    assert.equal(seen.size, 2 * (7 + 6));
+    // (the website is not built with such a double either: see mistakesInSetup)
+    assert.deepEqual(mistakesInSetup({ games: ALL_GAMES, advancedOnly: [] }), []);
+  });
 });
 
 // =============================================================================================
@@ -237,11 +332,19 @@ function post(body: unknown, client: string | null = '10.0.0.1', contentType: st
   return { method: 'POST', body: typeof body === 'string' || body === null ? body : JSON.stringify(body), contentType, client };
 }
 
+/** What names an example or a heading, of any game: every title, every id, the headings and the words after them - and the names of the games. */
+const NAMES_OF_EVERYTHING = [
+  ...ALL_GAMES.flatMap((game) => game.examples.flatMap((example) => [example.title, `"${example.id}"`])),
+  ...ALL_GAMES.flatMap((game) => game.levels.flatMap((level) => [level.title, level.about])),
+  ...ALL_GAMES.map((game) => game.game),
+];
+
+/** A refusal: `{ ok: false, reason }` and not a word about an example, a heading or a game. */
 function assertNoExampleData(response: UnlockResponse, why: string): void {
   assert.equal(response.body.ok, false, why);
   assert.deepEqual(Object.keys(response.body).sort(), ['ok', 'reason'], `${why}: nothing but ok and reason`);
   const text = JSON.stringify(response);
-  for (const word of ['examples', 'cards', 'levels', 'description', 'program', 'blocks', ...SECRETS, ...SAMPLE_CATALOG.map((card) => card.title), ...SAMPLE_CATALOG.map((card) => `"${card.id}"`), ...EXAMPLE_LEVELS.map((level) => level.title)]) {
+  for (const word of ['examples', 'cards', 'levels', 'description', 'program', 'blocks', ...SECRETS, ...NAMES_OF_EVERYTHING]) {
     assert.ok(!text.includes(word), `${why}: the answer does not contain "${word}"`);
   }
   assert.equal(response.headers['Cache-Control'], 'no-store', why);
@@ -257,7 +360,7 @@ describe('POST /api/simulator/unlock (handleUnlockRequest)', () => {
       { no: 2, fingerprint: await fingerprintOf(normalizeCode(CODE_B) as string) },
     ];
     // (nothing is open to everyone and nothing is kept for advanced codes: the simplest case)
-    setup = { codes, advancedCodes: [], examples: ALL_EXAMPLES, levels: ALL_LEVELS, openToEveryone: [], advancedOnly: [] };
+    setup = { codes, advancedCodes: [], games: rescueOnly(), openToEveryone: [], advancedOnly: [] };
   });
 
   test('no code: 200, not a member, every card to see - and no example to open while nothing is open to everyone', async () => {
@@ -465,8 +568,7 @@ describe('who sees what: a visitor, a member code and an advanced code', () => {
     setup = {
       codes: [await entryFor(1, CODE_A), await entryFor(2, CODE_B)],
       advancedCodes: [await entryFor(1, CODE_ADVANCED), await entryFor(2, CODE_ADVANCED_2)],
-      examples: ALL_EXAMPLES,
-      levels: ALL_LEVELS,
+      games: rescueOnly(),
       openToEveryone: STARTERS,
       advancedOnly: HIDDEN,
     };
@@ -554,7 +656,7 @@ describe('who sees what: a visitor, a member code and an advanced code', () => {
 
   test('nothing in an answer says that examples were left out, or that another kind of code exists', async () => {
     // a website that simply HAS only the five examples answers a visitor and a member in exactly the same way
-    const onlyFive: Partial<UnlockSetup> = { examples: ALL_EXAMPLES.filter((e) => !HIDDEN.includes(e.id)), advancedOnly: [], advancedCodes: [] };
+    const onlyFive: Partial<UnlockSetup> = { games: rescueOnly(ALL_EXAMPLES.filter((e) => !HIDDEN.includes(e.id))), advancedOnly: [], advancedCodes: [] };
     assert.deepEqual(await ask(null), await ask(null, onlyFive), 'a visitor');
     assert.deepEqual(await ask(CODE_A), await ask(CODE_A, onlyFive), 'a member');
     // a member's answer and an advanced answer are made of the same fields, and say "member" alike
@@ -679,10 +781,10 @@ describe('who sees what: a visitor, a member code and an advanced code', () => {
     assert.equal(mistakesInSetup({ ...setup, advancedOnly: ['a', 'b', 'hello'] }).length, 2, 'every such line is named');
     // an example that was given a new id in the catalog, while the owner's list still has the old one
     const renamed = ALL_EXAMPLES.map((example) => (example.id === 'full-mission' ? { ...example, id: 'whole-match' } : example));
-    assert.equal(mistakesInSetup({ examples: renamed, advancedOnly: HIDDEN }).length, 1);
+    assert.equal(mistakesInSetup({ games: rescueOnly(renamed), advancedOnly: HIDDEN }).length, 1);
     // a list that is no list any more (a slip that TypeScript does not always see)
-    assert.equal(mistakesInSetup({ examples: ALL_EXAMPLES, advancedOnly: 'full-mission' as unknown as string[] }).length, 1);
-    assert.equal(mistakesInSetup({ examples: ALL_EXAMPLES, advancedOnly: [null as unknown as string] }).length, 1);
+    assert.equal(mistakesInSetup({ games: rescueOnly(), advancedOnly: 'full-mission' as unknown as string[] }).length, 1);
+    assert.equal(mistakesInSetup({ games: rescueOnly(), advancedOnly: [null as unknown as string] }).length, 1);
   });
 
   test('a heading is sent only together with a card of its level', async () => {
@@ -705,7 +807,7 @@ describe('who sees what: a visitor, a member code and an advanced code', () => {
     assert.deepEqual((await ask(CODE_A, all)).body, { ok: true, member: true, levels: [], cards: [], examples: [] });
     assert.deepEqual(ids(yes(await ask(CODE_ADVANCED, all)).examples), MENU_ORDER);
     // and with no example at all on the website, everybody does
-    assert.deepEqual((await ask(CODE_ADVANCED, { examples: [] })).body, { ok: true, member: true, levels: [], cards: [], examples: [] });
+    assert.deepEqual((await ask(CODE_ADVANCED, { games: rescueOnly([]) })).body, { ok: true, member: true, levels: [], cards: [], examples: [] });
   });
 
   test('an advanced code is a right code for the courtesy limit: it never counts, and it waits its turn like any other', async () => {
@@ -728,6 +830,543 @@ describe('who sees what: a visitor, a member code and an advanced code', () => {
 });
 
 // =============================================================================================
+// Two games behind one address
+// =============================================================================================
+
+describe('two games behind one address: Fire Rescue and Fire Chief', () => {
+  /**
+   * The rule, the same in both games: the starter examples are open to everyone, the
+   * intermediate ones open with a member code or an advanced code, and the advanced ones are
+   * shown to an advanced code only. Written out example by example, so that the test says
+   * what a visitor gets and does not work it out the way the server does.
+   */
+  const RULE = [
+    {
+      game: FIRE_RESCUE,
+      starters: ['hello', 'line-follow', 'gripper-demo'],
+      forMembers: ['hello', 'line-follow', 'gripper-demo', 'one-bucket', 'one-person'],
+      all: ['hello', 'line-follow', 'gripper-demo', 'one-bucket', 'one-person', 'smart-bucket', 'full-mission'],
+    },
+    {
+      game: FIRE_CHIEF,
+      starters: ['chief-first-wall', 'chief-count-lines', 'chief-flame-fan'],
+      forMembers: ['chief-first-wall', 'chief-count-lines', 'chief-flame-fan', 'chief-wall-follow', 'chief-face-flame'],
+      all: ['chief-first-wall', 'chief-count-lines', 'chief-flame-fan', 'chief-wall-follow', 'chief-face-flame', 'chief-full-mission'],
+    },
+  ] as const;
+
+  /** The owner's choice for both games, with made-up codes: one list of member codes and one of advanced codes, for all games. */
+  let setup: UnlockSetup;
+
+  before(async () => {
+    setup = {
+      codes: [await entryFor(1, CODE_A), await entryFor(2, CODE_B)],
+      advancedCodes: [await entryFor(1, CODE_ADVANCED), await entryFor(2, CODE_ADVANCED_2)],
+      games: ALL_GAMES,
+      openToEveryone: RULE.flatMap((rule) => rule.starters),
+      advancedOnly: RULE.flatMap((rule) => rule.all.filter((id) => !(rule.forMembers as readonly string[]).includes(id))),
+    };
+  });
+
+  /** A request about a game (`undefined`: the request names none), with a code or without one. */
+  const ask = (game: unknown, code: string | null, with_: Partial<UnlockSetup> = {}, client = '10.0.0.1') =>
+    handleUnlockRequest(post({ ...(game === undefined ? {} : { game }), ...(code === null ? {} : { code }) }, client), { ...setup, ...with_ });
+
+  const ids = (list: ReadonlyArray<{ id: string }>): string[] => list.map((item) => item.id);
+
+  /** The "yes" of an answer, or a failed test. */
+  function yes(response: UnlockResponse) {
+    assert.equal(response.status, 200);
+    assert.ok(response.body.ok);
+    assert.equal(response.headers['Cache-Control'], 'no-store');
+    assert.deepEqual(Object.keys(response.body).sort(), ['cards', 'examples', 'levels', 'member', 'ok'], 'the same five fields as ever, in every game');
+    return response.body;
+  }
+
+  /** A text as it stands inside an answer: with its quotes and line breaks written the JSON way. */
+  const asInJson = (text: string): string => JSON.stringify(text).slice(1, -1);
+
+  /** Every text of some length inside a program: the notes on its blocks, what it says and shows, its names. */
+  function textsIn(value: unknown, found: string[] = []): string[] {
+    if (typeof value === 'string') {
+      if (value.length >= 16) found.push(value);
+    } else if (Array.isArray(value)) value.forEach((item) => textsIn(item, found));
+    else if (typeof value === 'object' && value !== null) Object.values(value).forEach((item) => textsIn(item, found));
+    return found;
+  }
+
+  /**
+   * What would give an example away beyond its id and its title: the sentences of its
+   * description, and pieces of its program - every text in it, and the program itself cut into
+   * stretches of 120 characters, as it is written into an answer.
+   */
+  function piecesOf(example: UnlockedExample): { description: string[]; program: string[] } {
+    const description = example.description
+      .split(/(?<=[.?!])\s+/)
+      .filter((sentence) => sentence.length >= 30)
+      .map(asInJson);
+    const written = JSON.stringify(example.program);
+    const program = textsIn(example.program).map(asInJson);
+    for (let at = 0; at + 120 <= written.length; at += 120) program.push(written.slice(at, at + 120));
+    return { description, program };
+  }
+
+  /**
+   * An answer holds what this visitor may have in this game, and NOTHING else of either game:
+   *
+   *   - of an example that is no card of theirs - every example of the other game among them -
+   *     not the id, not the title;
+   *   - of an example they may not open, not a sentence of its description and not a piece of
+   *     its program;
+   *   - of a level without a card of theirs, not its name, its heading or the words after it;
+   *     and of the other game's headings not the words after them.
+   *
+   * (Two examples can share a sentence - "It needs the robot at its default start position." -
+   * or a run of plain blocks. Such a piece gives nothing away, so only the pieces that stand
+   * in none of the examples this visitor may open are looked for - and the test makes sure
+   * that every example has plenty of those.)
+   */
+  function assertOnlyTheirs(response: UnlockResponse, game: GameExamples, cards: readonly string[], open: readonly string[], who: string): void {
+    const text = JSON.stringify(response);
+    const mayHold = JSON.stringify(game.examples.filter((example) => open.includes(example.id)));
+    for (const other of ALL_GAMES) {
+      for (const example of other.examples) {
+        const about = `${who}, ${game.game}: the answer does not hold`;
+        const isCard = other === game && cards.includes(example.id);
+        const isOpen = other === game && open.includes(example.id);
+        if (!isCard) {
+          assert.ok(!text.includes(`"${example.id}"`), `${about} the id "${example.id}"`);
+          assert.ok(!text.includes(asInJson(example.title)), `${about} the title "${example.title}"`);
+        }
+        if (!isOpen) {
+          const pieces = piecesOf(example);
+          const telling = { description: pieces.description.filter((piece) => !mayHold.includes(piece)), program: pieces.program.filter((piece) => !mayHold.includes(piece)) };
+          assert.ok(telling.description.length >= 3, `${example.id}: ${telling.description.length} sentences of its description are its own`);
+          assert.ok(telling.program.length >= 10, `${example.id}: ${telling.program.length} pieces of its program are its own`);
+          for (const piece of telling.description) assert.ok(!text.includes(piece), `${about} this sentence of the description of ${example.id}: "${piece}"`);
+          for (const piece of telling.program) assert.ok(!text.includes(piece), `${about} this piece of the program of ${example.id}: ${piece}`);
+        }
+      }
+      for (const level of other.levels) {
+        const shown = other === game && game.examples.some((example) => example.level === level.id && cards.includes(example.id));
+        if (shown) continue;
+        // (the levels have the same names and headings in both games; the words after a heading are a game's own)
+        const words = other === game ? [`"${level.id}"`, level.title, level.about] : [level.about];
+        for (const word of words) assert.ok(!text.includes(word), `${who}, ${game.game}: the answer does not hold "${word}" of ${other.game}`);
+      }
+    }
+    // (nor the name of a game: an answer is about the game that was asked for, and does not say which others there are)
+    for (const other of ALL_GAMES) assert.ok(!text.includes(other.game), `${who}, ${game.game}: the answer does not name the game "${other.game}"`);
+  }
+
+  for (const rule of RULE) {
+    const { game } = rule;
+    const name = game.game;
+    const exampleOf = (id: string) => game.examples.find((example) => example.id === id);
+    const hiddenLevels = game.levels.filter((level) => !game.examples.some((example) => example.level === level.id && (rule.forMembers as readonly string[]).includes(example.id)));
+
+    test(`${name}, no code: ${rule.forMembers.length} cards, the ${rule.starters.length} starters to open - and nothing else of either game`, async () => {
+      const response = await ask(name, null);
+      const body = yes(response);
+      assert.equal(body.member, false);
+      assert.deepEqual(ids(body.cards), rule.forMembers);
+      assert.deepEqual(ids(body.examples), rule.starters);
+      assert.deepEqual(body.cards, rule.forMembers.map((id) => ({ id, title: exampleOf(id)?.title, level: exampleOf(id)?.level })), 'a card is an id, a title and a level');
+      assert.deepEqual(body.examples, rule.starters.map(exampleOf), 'an example is its card, its description and its program');
+      assert.deepEqual(
+        body.levels,
+        game.levels.filter((level) => !hiddenLevels.includes(level)),
+        'the headings of this game that have a card below',
+      );
+      assert.deepEqual(
+        body.levels.map((level) => level.title),
+        ['Starter', 'Intermediate'],
+      );
+      assertOnlyTheirs(response, game, rule.forMembers, rule.starters, 'a visitor');
+    });
+
+    test(`${name}, a code on neither list: 403 and nothing else, the same answer as in the other game`, async () => {
+      for (const code of [CODE_NOT_LISTED, 'FIRE-AAAA-2223', 'FIRE-DDDD-5556', 'not a code', 'chief', name]) {
+        const response = await ask(name, code);
+        assert.equal(response.status, 403, code);
+        assert.deepEqual(response.body, { ok: false, reason: 'invalid-code' }, code);
+        assertNoExampleData(response, `${name}, the wrong code ${code}`);
+        assert.deepEqual(response, await ask(undefined, code), 'a wrong code is answered alike whatever game the request is about');
+      }
+    });
+
+    test(`${name}, a member code: the same ${rule.forMembers.length} cards, all of them open - and nothing else of either game`, async () => {
+      for (const code of [CODE_A, CODE_B, 'fire bbbb 3333']) {
+        const response = await ask(name, code);
+        const body = yes(response);
+        assert.equal(body.member, true);
+        assert.deepEqual(ids(body.cards), rule.forMembers);
+        assert.deepEqual(ids(body.examples), rule.forMembers, 'every card can be opened');
+        assert.deepEqual(body.examples, rule.forMembers.map(exampleOf));
+        assert.deepEqual(
+          body.levels.map((level) => level.title),
+          ['Starter', 'Intermediate'],
+        );
+        assertOnlyTheirs(response, game, rule.forMembers, rule.forMembers, 'a member');
+      }
+    });
+
+    test(`${name}, an advanced code: all ${rule.all.length} examples of this game - and nothing of the other game`, async () => {
+      for (const code of [CODE_ADVANCED, CODE_ADVANCED_2, ' dddd-5555 ']) {
+        const response = await ask(name, code);
+        const body = yes(response);
+        assert.equal(body.member, true);
+        assert.deepEqual(ids(body.cards), rule.all);
+        assert.deepEqual(ids(body.examples), rule.all);
+        assert.deepEqual(body.examples, [...game.examples]);
+        assert.deepEqual(body.levels, [...game.levels]);
+        assert.deepEqual(
+          body.levels.map((level) => level.title),
+          ['Starter', 'Intermediate', 'Advanced'],
+        );
+        assertOnlyTheirs(response, game, rule.all, rule.all, 'an advanced code');
+      }
+    });
+
+    test(`${name}: nothing in an answer says that examples were left out, or that another game or another kind of code exists`, async () => {
+      // a website that simply HAS only this game, and of it only the examples for members, answers a visitor and a member in exactly the same way
+      const onlyThese: Partial<UnlockSetup> = {
+        games: [{ game: name, examples: game.examples.filter((example) => (rule.forMembers as readonly string[]).includes(example.id)), levels: game.levels }],
+        advancedOnly: [],
+        advancedCodes: [],
+      };
+      assert.deepEqual(await ask(name, null), await ask(name, null, onlyThese), 'a visitor');
+      assert.deepEqual(await ask(name, CODE_A), await ask(name, CODE_A, onlyThese), 'a member');
+      // and one that has only this game answers an advanced code in exactly the same way
+      assert.deepEqual(await ask(name, CODE_ADVANCED), await ask(name, CODE_ADVANCED, { games: [game] }), 'an advanced code');
+      // a member's answer and an advanced answer are made of the same fields, and say "member" alike
+      const member = yes(await ask(name, CODE_A));
+      const advanced = yes(await ask(name, CODE_ADVANCED));
+      assert.deepEqual(Object.keys(member), Object.keys(advanced));
+      assert.equal(member.member, advanced.member);
+      assert.deepEqual(member.examples, advanced.examples.slice(0, member.examples.length));
+    });
+  }
+
+  test('the check on the answers notices every kind of leak: an id, a title, a sentence, a piece of a program, a heading - of either game', async () => {
+    // (so that "nothing else of either game" in the tests above is not an empty promise)
+    const good = await ask('fire-chief', null);
+    const check = (response: UnlockResponse): void => assertOnlyTheirs(response, FIRE_CHIEF, RULE[1].forMembers, RULE[1].starters, 'a visitor');
+    check(good);
+    const hidden = FIRE_CHIEF.examples[5];
+    const locked = FIRE_CHIEF.examples[3];
+    const otherGame = FIRE_RESCUE.examples[0];
+    assert.deepEqual([hidden.id, locked.id, otherGame.id], ['chief-full-mission', 'chief-wall-follow', 'hello']);
+    const sentence = (example: UnlockedExample, n: number): string => example.description.split(/(?<=[.?!])\s+/).filter((one) => one.length >= 30)[n];
+    const leaks: Array<[string, unknown]> = [
+      ['the id of the example for advanced codes only', { id: hidden.id }],
+      ['its title', hidden.title],
+      ['one sentence of its description', sentence(hidden, 2)],
+      ['its program', hidden.program],
+      ['one block of its program', (hidden.program as { blocks: { blocks: unknown[] } }).blocks.blocks[1]],
+      ['one text of its program', textsIn(hidden.program).filter((text) => text.includes(' '))[3]],
+      ['a sentence of the description of a card this visitor may not open', sentence(locked, 1)],
+      ['the program of a card this visitor may not open', locked.program],
+      ['the id of an example of the other game', { id: otherGame.id }],
+      ['the title of an example of the other game', otherGame.title],
+      ['a sentence of an example of the other game', sentence(otherGame, 0)],
+      ['the program of an example of the other game', otherGame.program],
+      ['the name of the level nobody else sees', { level: 'advanced' }],
+      ['its heading', 'Advanced'],
+      ['the words after its heading', FIRE_CHIEF.levels[2].about],
+      ['the words after a heading of the other game', FIRE_RESCUE.levels[0].about],
+      ['the name of the other game', 'fire-rescue'],
+      ['the name of this game', { game: 'fire-chief' }],
+    ];
+    for (const [what, extra] of leaks) {
+      assert.ok(extra !== undefined, what);
+      const leaking = { ...good, body: { ...good.body, extra } } as unknown as UnlockResponse;
+      assert.throws(() => check(leaking), assert.AssertionError, `an answer that also holds ${what} does not pass`);
+    }
+    // what is theirs does not trip it: a card of theirs, an example of theirs, said twice
+    check({ ...good, body: { ...good.body, extra: [FIRE_CHIEF.examples[0], { id: locked.id, title: locked.title }] } } as unknown as UnlockResponse);
+  });
+
+  test('the numbers: Fire Rescue 5 cards / 3 open, 5 / 5, 7 / 7 - Fire Chief 5 / 3, 5 / 5, 6 / 6', async () => {
+    const counts = async (game: string, code: string | null): Promise<string> => {
+      const body = yes(await ask(game, code));
+      return `${body.cards.length} / ${body.examples.length}`;
+    };
+    assert.deepEqual([await counts('fire-rescue', null), await counts('fire-rescue', CODE_A), await counts('fire-rescue', CODE_ADVANCED)], ['5 / 3', '5 / 5', '7 / 7']);
+    assert.deepEqual([await counts('fire-chief', null), await counts('fire-chief', CODE_A), await counts('fire-chief', CODE_ADVANCED)], ['5 / 3', '5 / 5', '6 / 6']);
+  });
+
+  test('a request that names no game is about Fire Rescue - as every request was before there was a second game', async () => {
+    // what a server that knows Fire Rescue alone answers: the answers of before
+    const before: Partial<UnlockSetup> = { games: rescueOnly() };
+    for (const [who, code] of [
+      ['a visitor', null],
+      ['a member', CODE_A],
+      ['an advanced code', CODE_ADVANCED],
+      ['a wrong code', CODE_NOT_LISTED],
+    ] as const) {
+      const unnamed = await ask(undefined, code);
+      assert.deepEqual(unnamed, await ask('fire-rescue', code), `${who}: no "game" is the same as "fire-rescue"`);
+      assert.deepEqual(unnamed, await ask(undefined, code, before), `${who}: the answer of before, to the letter`);
+      assert.equal(JSON.stringify(unnamed), JSON.stringify(await ask(undefined, code, before)), `${who}: also in the order of its fields`);
+      // (a "no" is the same in every game; a "yes" is about Fire Rescue and not about Fire Chief)
+      if (unnamed.body.ok) assert.notDeepEqual(unnamed, await ask('fire-chief', code), `${who}: and not the answer about Fire Chief`);
+    }
+    // the requests an open page of the live site sends, as its browser writes them - and an empty one
+    const visitor = yes(await ask('fire-rescue', null));
+    for (const body of ['{}', '', '  \n', '{"code":null}', '{"code":""}', '{"other":"field"}']) {
+      assert.deepEqual((await handleUnlockRequest(post(body), setup)).body, visitor, body);
+    }
+    const member = yes(await ask('fire-rescue', CODE_A));
+    assert.deepEqual((await handleUnlockRequest(post(`{"code":"${CODE_A}"}`), setup)).body, member);
+    // such an answer holds nothing of Fire Chief
+    assertOnlyTheirs(await ask(undefined, null), FIRE_RESCUE, RULE[0].forMembers, RULE[0].starters, 'a visitor who names no game');
+    assertOnlyTheirs(await ask(undefined, CODE_A), FIRE_RESCUE, RULE[0].forMembers, RULE[0].forMembers, 'a member who names no game');
+    assertOnlyTheirs(await ask(undefined, CODE_ADVANCED), FIRE_RESCUE, RULE[0].all, RULE[0].all, 'an advanced code that names no game');
+  });
+
+  test('a game that is not one of the two: 400 "unknown-game" - one and the same answer, with no list of the games there are', async () => {
+    const unknown: unknown[] = [
+      'fire',
+      'chief',
+      'fire-chief-2',
+      'smart-logistics',
+      'Fire-Chief', // capitals
+      'FIRE-RESCUE',
+      ' fire-chief', // blanks
+      'fire-chief ',
+      'fire chief',
+      'fire_chief',
+      'fire-rescue,fire-chief',
+      '*',
+      '',
+      '   ',
+      // what is no text at all
+      null,
+      0,
+      1,
+      true,
+      false,
+      [],
+      ['fire-chief'],
+      {},
+      { game: 'fire-chief' },
+      // names that every object answers to
+      '__proto__',
+      'constructor',
+      'toString',
+      'hasOwnProperty',
+      'x'.repeat(200),
+    ];
+    const answers = new Set<string>();
+    for (const game of unknown) {
+      for (const code of [null, CODE_A, CODE_ADVANCED, CODE_NOT_LISTED, 'not a code']) {
+        const response = await ask(game, code);
+        const what = `${JSON.stringify(game)} with ${code === null ? 'no code' : code}`;
+        assert.equal(response.status, 400, what);
+        assert.deepEqual(response.body, { ok: false, reason: 'unknown-game' }, what);
+        assert.deepEqual(response.headers, { 'Cache-Control': 'no-store' }, what);
+        assertNoExampleData(response, what);
+        answers.add(JSON.stringify(response));
+      }
+    }
+    assert.equal(answers.size, 1, 'one and the same answer: with a right code, a wrong one and none');
+    // the answer names no game (assertNoExampleData looks for both names) and holds no list
+    assert.equal([...answers][0], '{"status":400,"headers":{"Cache-Control":"no-store"},"body":{"ok":false,"reason":"unknown-game"}}');
+
+    // the games are the ones of the setup: a server that has Fire Rescue alone does not know Fire Chief
+    assert.deepEqual((await ask('fire-chief', null, { games: rescueOnly() })).body, { ok: false, reason: 'unknown-game' });
+    assert.equal((await ask('fire-rescue', null, { games: rescueOnly() })).status, 200);
+    // ... and one without Fire Rescue cannot answer a request that names no game
+    assert.deepEqual((await ask(undefined, null, { games: [FIRE_CHIEF] })).body, { ok: false, reason: 'unknown-game' });
+
+    // what is not such a request at all is still "bad-request", whatever game it names
+    for (const body of ['{"game":"fire-chief","code":123}', '{"game":"nonsense","code":["FIRE-AAAA-2222"]}', '["fire-chief"]', '"fire-chief"', 'fire-chief']) {
+      const response = await handleUnlockRequest(post(body), setup);
+      assert.equal(response.status, 400, body);
+      assert.deepEqual(response.body, { ok: false, reason: 'bad-request' }, body);
+    }
+    // and the game is named in the request's text, nowhere else
+    const noJson = await handleUnlockRequest(post({ game: 'fire-chief' }, '10.0.0.1', 'text/plain'), setup);
+    assert.equal(noJson.status, 415);
+    assertNoExampleData(noJson, 'a request that does not say it is JSON');
+  });
+
+  test('a request about an unknown game is turned away before its code is looked at: it uses up no try', async () => {
+    const limiter = new AttemptLimiter(2, 60_000, 5000, 1_000);
+    const from = (game: unknown, code: string) => handleUnlockRequest(post({ game, code }, 'school'), { ...setup, limiter, now: () => 1_000 });
+    for (let i = 0; i < 10; i++) assert.equal((await from('no-such-game', CODE_NOT_LISTED)).status, 400);
+    assert.equal((limiter as unknown as { clients: Map<string, unknown> }).clients.size, 0, 'nothing is remembered about this address');
+    assert.equal((await from('fire-chief', CODE_NOT_LISTED)).status, 403, 'the first wrong code is still checked at full speed');
+    assert.equal((await from('fire-rescue', CODE_NOT_LISTED)).status, 403, 'and the second');
+  });
+
+  test('one code for both games: what it is does not depend on the game', async () => {
+    for (const { game } of RULE) {
+      assert.equal(yes(await ask(game.game, CODE_A)).member, true, `${game.game}: a member code`);
+      assert.equal(yes(await ask(game.game, CODE_ADVANCED)).member, true, `${game.game}: an advanced code`);
+      // a cancelled code is cancelled in both games, and the others go on working in both
+      const cancelled: Partial<UnlockSetup> = { codes: setup.codes.filter((entry) => entry.no !== 1), advancedCodes: setup.advancedCodes.filter((entry) => entry.no !== 1) };
+      for (const code of [CODE_A, CODE_ADVANCED]) {
+        const response = await ask(game.game, code, cancelled);
+        assert.equal(response.status, 403, `${game.game}: ${code}`);
+        assertNoExampleData(response, `${game.game}: a cancelled code`);
+      }
+      assert.equal(yes(await ask(game.game, CODE_B, cancelled)).cards.length, 5);
+      assert.equal(yes(await ask(game.game, CODE_ADVANCED_2, cancelled)).cards.length, game.examples.length);
+    }
+    // the setup has two lists of codes and no third: there is no code that works in one game only
+    assert.deepEqual(Object.keys(setup).sort(), ['advancedCodes', 'advancedOnly', 'codes', 'games', 'openToEveryone']);
+    for (const game of ALL_GAMES) assert.deepEqual(Object.keys(game).sort(), ['examples', 'game', 'levels'], 'a game has examples and headings, no codes of its own');
+  });
+
+  test('the owner\'s lists hold the ids of both games together: a line opens or hides the example of the game it belongs to, and nothing in the other', async () => {
+    // a Fire Chief starter locked again, a Fire Rescue intermediate example opened to everyone
+    const moved: Partial<UnlockSetup> = { openToEveryone: ['hello', 'line-follow', 'gripper-demo', 'one-bucket', 'chief-first-wall', 'chief-count-lines'] };
+    assert.deepEqual(ids(yes(await ask('fire-rescue', null, moved)).examples), ['hello', 'line-follow', 'gripper-demo', 'one-bucket']);
+    assert.deepEqual(ids(yes(await ask('fire-chief', null, moved)).examples), ['chief-first-wall', 'chief-count-lines']);
+    assert.deepEqual(ids(yes(await ask('fire-chief', null, moved)).cards), RULE[1].forMembers, 'the locked starter is still a card');
+    // "full-mission" is the example of Fire Rescue: hiding it alone leaves the one of Fire Chief for every member
+    const oneHidden: Partial<UnlockSetup> = { advancedOnly: ['full-mission'] };
+    assert.deepEqual(ids(yes(await ask('fire-rescue', CODE_A, oneHidden)).cards), RULE[0].all.filter((id) => id !== 'full-mission'));
+    assert.deepEqual(ids(yes(await ask('fire-chief', CODE_A, oneHidden)).cards), RULE[1].all);
+    assert.deepEqual(ids(yes(await ask('fire-chief', null, oneHidden)).cards), RULE[1].all, 'a visitor sees its card too, with a lock');
+    // and the other way round
+    const otherHidden: Partial<UnlockSetup> = { advancedOnly: ['chief-full-mission'] };
+    assert.deepEqual(ids(yes(await ask('fire-rescue', CODE_A, otherHidden)).cards), RULE[0].all);
+    assert.deepEqual(ids(yes(await ask('fire-chief', CODE_A, otherHidden)).cards), RULE[1].forMembers);
+  });
+
+  test('the website is not built while "examplesForAdvancedCodesOnly" names something that is an example of neither game', () => {
+    assert.deepEqual(mistakesInSetup(setup), [], 'the advanced examples of both games: all is well');
+    assert.deepEqual(mistakesInSetup({ games: ALL_GAMES, advancedOnly: ALL_GAMES.flatMap((game) => game.examples.map((example) => example.id)) }), [], 'every example of both games is an example');
+    for (const slip of ['chief-full-misson', 'chief-fullmission', 'Chief-Full-Mission', 'cheif-full-mission', 'chief-', 'full-mission-chief', 'first-wall', 'fire-chief', 'fire-rescue', 'chief full mission']) {
+      const mistakes = mistakesInSetup({ ...setup, advancedOnly: ['full-mission', 'chief-full-mission', slip] });
+      assert.equal(mistakes.length, 1, JSON.stringify(slip));
+      // the sentence says which file, which list and which line, what goes wrong, and where the right ids are
+      for (const part of ['content/simulator-codes.ts', '"examplesForAdvancedCodesOnly"', `'${slip}'`, 'not the id of an example of any game', 'NOT be hidden', 'letter by letter', 'at the top of that file']) {
+        assert.ok(mistakes[0].includes(part), `${JSON.stringify(slip)}: the sentence says "${part}": ${mistakes[0]}`);
+      }
+      // it names what the owner wrote, and no example: it ends up in a build log
+      const besidesTheSlip = mistakes[0].split(`'${slip}'`).join('');
+      for (const example of ALL_GAMES.flatMap((game) => game.examples)) {
+        assert.ok(!mistakes[0].includes(example.title), example.title);
+        if (example.id.includes('-')) assert.ok(!besidesTheSlip.includes(example.id), example.id);
+      }
+    }
+    // an id is looked for in BOTH games: with one game alone, the id of the other is a mistake
+    assert.equal(mistakesInSetup({ games: rescueOnly(), advancedOnly: ['chief-full-mission'] }).length, 1);
+    assert.equal(mistakesInSetup({ games: [FIRE_CHIEF], advancedOnly: ['full-mission'] }).length, 1);
+    assert.deepEqual(mistakesInSetup({ games: [FIRE_CHIEF], advancedOnly: ['chief-full-mission'] }), []);
+    assert.equal(mistakesInSetup({ games: [], advancedOnly: ['full-mission'] }).length, 1, 'no game, no example');
+    assert.deepEqual(mistakesInSetup({ games: [], advancedOnly: [] }), []);
+  });
+
+  test('two games with the same id for an example: the website is not built with that either', async () => {
+    const twin: GameExamples = { game: 'fire-chief', examples: FIRE_CHIEF.examples.map((example) => (example.id === 'chief-first-wall' ? { ...example, id: 'hello' } : example)), levels: FIRE_CHIEF.levels };
+    const mistakes = mistakesInSetup({ games: [FIRE_RESCUE, twin], advancedOnly: ['full-mission', 'chief-full-mission'] });
+    assert.equal(mistakes.length, 1);
+    for (const part of ['"fire-rescue" and "fire-chief"', 'the same id', 'content/simulator-codes.ts', 'sample-catalog.ts', 'members.test.ts']) assert.ok(mistakes[0].includes(part), `${part}: ${mistakes[0]}`);
+    // it names the two games and no example
+    assert.ok(!mistakes[0].includes("'hello'") && !mistakes[0].includes('Hello'), mistakes[0]);
+    // two doubles between the same two games are one thing to put right; the same id twice in ONE game is not this function's business
+    const twins: GameExamples = { ...twin, examples: twin.examples.map((example) => (example.id === 'chief-count-lines' ? { ...example, id: 'one-bucket' } : example)) };
+    assert.equal(mistakesInSetup({ games: [FIRE_RESCUE, twins], advancedOnly: [] }).length, 1);
+    assert.deepEqual(mistakesInSetup({ games: [{ ...FIRE_RESCUE, examples: [...FIRE_RESCUE.examples, FIRE_RESCUE.examples[0]] }], advancedOnly: [] }), []);
+    // and what such a double would do if it went live: one line of the owner's list opens an example in each game
+    const live: Partial<UnlockSetup> = { games: [FIRE_RESCUE, twin], openToEveryone: ['hello'] };
+    const openIn = async (game: string): Promise<string[]> => {
+      const response = await handleUnlockRequest(post({ game }), { ...setup, ...live });
+      assert.ok(response.body.ok);
+      return response.body.examples.map((example) => example.id);
+    };
+    assert.deepEqual(await openIn('fire-rescue'), ['hello']);
+    assert.deepEqual(await openIn('fire-chief'), ['hello'], 'which is why the build stops');
+  });
+
+  describe('wrong codes are counted per address, across both games', () => {
+    /** Wrong codes that all have the shape of a code (so that each one is really checked). */
+    const wrongCode = (i: number): string => formatCode(`VVVV${[...String(i).padStart(4, '2')].map((d) => CODE_ALPHABET[Number(d)]).join('')}`);
+
+    test('switching the game gives no new tries: the tries of both games draw on one count', async () => {
+      const limiter = new AttemptLimiter(4, 60_000, 5000, 1_000);
+      let clock = 1_000;
+      const from = (game: unknown, code: string | null, client = 'school') => ask(game, code, { limiter, now: () => clock }, client);
+
+      // four wrong codes at full speed: two in each game, turn and turn about
+      assert.equal((await from('fire-rescue', wrongCode(1))).status, 403);
+      assert.equal((await from('fire-chief', wrongCode(2))).status, 403);
+      assert.equal((await from('fire-rescue', wrongCode(3))).status, 403);
+      assert.equal((await from('fire-chief', wrongCode(4))).status, 403);
+      // the limit is reached - for the address, in every game. One code goes through the slow lane ...
+      assert.equal((await from('fire-chief', wrongCode(5))).status, 403, 'the one turn of the slow lane');
+      // ... and until the second is over nothing is checked, in neither game and not without a game either
+      for (const game of ['fire-rescue', 'fire-chief', undefined]) {
+        for (const code of [wrongCode(6), CODE_A, CODE_ADVANCED]) {
+          const waiting = await from(game, code);
+          assert.equal(waiting.status, 429, `${game}: ${code}`);
+          assert.deepEqual(waiting.body, { ok: false, reason: 'too-many-attempts' });
+          assert.equal(waiting.headers['Retry-After'], '1');
+          assertNoExampleData(waiting, `${game}: too many attempts`);
+        }
+      }
+      // a request without a code is always answered, in both games, and another address is not affected
+      assert.equal((await from('fire-rescue', null)).status, 200);
+      assert.equal((await from('fire-chief', null)).status, 200);
+      assert.equal((await from('fire-chief', CODE_A, 'somewhere else')).status, 200);
+
+      // a second later: one turn, for the address - not one per game
+      clock = 2_000;
+      assert.equal((await from('fire-rescue', wrongCode(7))).status, 403);
+      assert.equal((await from('fire-chief', wrongCode(8))).status, 429, 'the turn of this second was used in the other game');
+      // a right code waits its turn like any other, opens its game, and does not use the turn up
+      clock = 3_000;
+      assert.deepEqual(ids(yes(await from('fire-chief', CODE_A)).examples), RULE[1].forMembers);
+      assert.deepEqual(ids(yes(await from('fire-rescue', CODE_ADVANCED)).examples), RULE[0].all);
+      assert.equal((await from('fire-chief', wrongCode(9))).status, 403);
+      assert.equal((await from('fire-rescue', CODE_A)).status, 429);
+
+      // when the time is over, the address is back at full speed - in both games
+      clock = 1_000 + 60_000;
+      for (let i = 0; i < 4; i++) assert.equal((await from(i % 2 === 0 ? 'fire-chief' : 'fire-rescue', wrongCode(20 + i))).status, 403);
+      assert.equal((await from('fire-chief', CODE_A)).status, 200);
+    });
+
+    test('all the tries used up in one game leave none at full speed in the other - and none for a request that names no game', async () => {
+      for (const [first, then] of [
+        ['fire-rescue', 'fire-chief'],
+        ['fire-chief', 'fire-rescue'],
+        ['fire-chief', undefined],
+        [undefined, 'fire-chief'],
+      ] as const) {
+        const limiter = new AttemptLimiter(3, 60_000, 5000, 1_000);
+        const from = (game: unknown, code: string) => ask(game, code, { limiter, now: () => 5_000 });
+        for (let i = 0; i < 3; i++) assert.equal((await from(first, wrongCode(i))).status, 403);
+        assert.equal((await from(then, wrongCode(3))).status, 403, `${first} then ${then}: the slow lane`);
+        assert.equal((await from(then, wrongCode(4))).status, 429, `${first} then ${then}: no fresh tries in the other game`);
+        assert.equal((await from(first, wrongCode(5))).status, 429);
+        // the limiter remembers the address and nothing about a game
+        const remembered = (limiter as unknown as { clients: Map<string, unknown> }).clients;
+        assert.deepEqual([...remembered.keys()], ['10.0.0.1']);
+      }
+    });
+
+    test('right codes never count, whichever game they are for', async () => {
+      const limiter = new AttemptLimiter(2, 60_000, 5000, 1_000);
+      const from = (game: unknown, code: string) => ask(game, code, { limiter, now: () => 9_000 });
+      for (let i = 0; i < 6; i++) {
+        assert.equal((await from('fire-rescue', CODE_A)).status, 200);
+        assert.equal((await from('fire-chief', CODE_A)).status, 200);
+        assert.equal((await from('fire-chief', CODE_ADVANCED)).status, 200);
+      }
+      assert.equal((limiter as unknown as { clients: Map<string, unknown> }).clients.size, 0, 'nothing is remembered about this address');
+      assert.equal((await from('fire-chief', wrongCode(1))).status, 403);
+      assert.equal((await from('fire-rescue', wrongCode(2))).status, 403, 'two wrong codes at full speed, as the limit says');
+    });
+  });
+});
+
+// =============================================================================================
 // The courtesy limit
 // =============================================================================================
 
@@ -739,8 +1378,7 @@ describe('the courtesy limit on wrong codes', () => {
     setup = {
       codes: [{ no: 1, fingerprint: await fingerprintOf(normalizeCode(CODE_A) as string) }],
       advancedCodes: [],
-      examples: ALL_EXAMPLES,
-      levels: ALL_LEVELS,
+      games: rescueOnly(),
       openToEveryone: [],
       advancedOnly: [],
       now: () => clock,
@@ -907,7 +1545,8 @@ describe('the courtesy limit on wrong codes', () => {
 describe('content/simulator-codes.ts', () => {
   const file = path.join(REPO_ROOT, 'content', 'simulator-codes.ts');
   const text = readFileSync(file, 'utf8');
-  const exampleIds = SAMPLE_CATALOG.map((card) => card.id);
+  /** the ids of the examples of both games: the two lists of examples hold them together */
+  const exampleIds = ALL_GAMES.flatMap((game) => game.examples.map((example) => example.id));
 
   for (const [name, codes, next] of [
     ['simulatorCodes (the member codes)', simulatorCodes, nextSimulatorCodeNumber],
@@ -975,6 +1614,38 @@ describe('content/simulator-codes.ts', () => {
     }
   });
 
+  test('the two lists hold what the organiser decided: the starters of both games open to everyone, the advanced examples of both for advanced codes only', () => {
+    assert.deepEqual(examplesOpenToEveryone, ['hello', 'line-follow', 'gripper-demo', 'chief-first-wall', 'chief-count-lines', 'chief-flame-fan']);
+    assert.deepEqual(examplesForAdvancedCodesOnly, ['smart-bucket', 'full-mission', 'chief-full-mission']);
+    // which is the rule "starter / intermediate / advanced", in both games
+    for (const game of ALL_GAMES) {
+      for (const example of game.examples) {
+        assert.equal(examplesOpenToEveryone.includes(example.id), example.level === 'starter', `${example.id} (${example.level}) and "examplesOpenToEveryone"`);
+        assert.equal(examplesForAdvancedCodesOnly.includes(example.id), example.level === 'advanced', `${example.id} (${example.level}) and "examplesForAdvancedCodesOnly"`);
+      }
+    }
+  });
+
+  test('the explanation above list 1 names every example of both games - its id, its title and its level - and no other', () => {
+    // (the build stops at a misspelt id and sends the owner to "the ids listed at the top" of this file: they must be right)
+    const lines = text.slice(text.indexOf('//  1. EXAMPLES OPEN TO EVERYONE'), text.indexOf('export const examplesOpenToEveryone')).split('\n');
+    const listed: Array<{ id: string; title: string; level: string | undefined }> = [];
+    lines.forEach((line, i) => {
+      const entry = /^ \* {5}'([a-z-]+)' +(.*)$/.exec(line);
+      if (!entry) return;
+      // "Title   (level)" on one line - or, below a long title, the level on a line of its own
+      const withLevel = /^(.*?) +\((starter|intermediate|advanced)[^)]*\)$/.exec(entry[2]);
+      const below = /^ \* +\((starter|intermediate|advanced)[^)]*\)$/.exec(lines[i + 1] ?? '');
+      listed.push({ id: entry[1], title: withLevel ? withLevel[1] : entry[2].trim(), level: withLevel ? withLevel[2] : below?.[1] });
+    });
+    assert.deepEqual(
+      listed,
+      ALL_GAMES.flatMap((game) => game.examples.map(({ id, title, level }) => ({ id, title, level }))),
+      'game by game, in the order of the Examples windows',
+    );
+    assert.ok(lines.includes(' *   Fire Rescue (seven)') && lines.includes(' *   Fire Chief (six)'), 'under the name of their game');
+  });
+
   test('no example is on both lists: open to everyone AND for advanced codes only', () => {
     const onBoth = examplesOpenToEveryone.filter((id) => examplesForAdvancedCodesOnly.includes(id));
     assert.deepEqual(
@@ -986,54 +1657,75 @@ describe('content/simulator-codes.ts', () => {
     );
   });
 
-  test('with the owner\'s lists, an example for advanced codes only is in no answer but the one to an advanced code', async () => {
+  for (const game of ALL_GAMES) {
+    test(`${game.game}, with the owner's lists: an example for advanced codes only is in no answer but the one to an advanced code`, async () => {
+      const setup: UnlockSetup = {
+        codes: [await entryFor(1, CODE_A)],
+        advancedCodes: [await entryFor(1, CODE_ADVANCED)],
+        games: ALL_GAMES,
+        openToEveryone: examplesOpenToEveryone,
+        advancedOnly: examplesForAdvancedCodesOnly,
+      };
+      const hidden = game.examples.filter((example) => examplesForAdvancedCodesOnly.includes(example.id));
+      const shown = game.examples.filter((example) => !examplesForAdvancedCodesOnly.includes(example.id));
+      const otherGames = ALL_GAMES.filter((other) => other !== game).flatMap((other) => other.examples);
+      for (const [who, code] of [
+        ['a visitor', null],
+        ['a member', CODE_A],
+      ] as const) {
+        const response = await handleUnlockRequest(post(code === null ? { game: game.game } : { game: game.game, code }), setup);
+        assert.ok(response.body.ok, who);
+        assert.deepEqual(
+          response.body.cards.map((card) => card.id),
+          shown.map((example) => example.id),
+          `${who} sees the examples of this game that are not for advanced codes only`,
+        );
+        const answer = JSON.stringify(response);
+        for (const example of [...hidden, ...otherGames]) {
+          for (const secret of [`"${example.id}"`, example.title, example.description.slice(0, 60)]) {
+            assert.ok(!answer.includes(secret), `${who}: the answer does not hold ${secret}`);
+          }
+        }
+        // every card stands under a heading, and no heading stands alone
+        assert.deepEqual(
+          response.body.levels.map((level) => level.id),
+          game.levels.map((level) => level.id).filter((id) => shown.some((example) => example.level === id)),
+          who,
+        );
+        // a visitor can open exactly what is open to everyone, a member every card
+        assert.deepEqual(
+          response.body.examples.map((example) => example.id),
+          shown.filter((example) => code !== null || examplesOpenToEveryone.includes(example.id)).map((example) => example.id),
+          who,
+        );
+      }
+      const advanced = await handleUnlockRequest(post({ game: game.game, code: CODE_ADVANCED }), setup);
+      assert.ok(advanced.body.ok);
+      assert.deepEqual(
+        advanced.body.examples.map((example) => example.id),
+        game.examples.map((example) => example.id),
+        'an advanced code opens every example of this game',
+      );
+      const answer = JSON.stringify(advanced);
+      for (const example of otherGames) assert.ok(!answer.includes(`"${example.id}"`) && !answer.includes(example.title), `an advanced code: nothing about ${example.id}, which belongs to another game`);
+    });
+  }
+
+  test('with the owner\'s lists, the numbers are: Fire Rescue 5 cards / 3 open, 5 / 5, 7 / 7 - Fire Chief 5 / 3, 5 / 5, 6 / 6', async () => {
     const setup: UnlockSetup = {
       codes: [await entryFor(1, CODE_A)],
       advancedCodes: [await entryFor(1, CODE_ADVANCED)],
-      examples: ALL_EXAMPLES,
-      levels: ALL_LEVELS,
+      games: ALL_GAMES,
       openToEveryone: examplesOpenToEveryone,
       advancedOnly: examplesForAdvancedCodesOnly,
     };
-    const hidden = ALL_EXAMPLES.filter((example) => examplesForAdvancedCodesOnly.includes(example.id));
-    const shown = ALL_EXAMPLES.filter((example) => !examplesForAdvancedCodesOnly.includes(example.id));
-    for (const [who, code] of [
-      ['a visitor', null],
-      ['a member', CODE_A],
-    ] as const) {
-      const response = await handleUnlockRequest(post(code === null ? {} : { code }), setup);
-      assert.ok(response.body.ok, who);
-      assert.deepEqual(
-        response.body.cards.map((card) => card.id),
-        shown.map((example) => example.id),
-        `${who} sees the examples that are not for advanced codes only`,
-      );
-      const answer = JSON.stringify(response);
-      for (const example of hidden) {
-        for (const secret of [`"${example.id}"`, example.title, example.description.slice(0, 60)]) {
-          assert.ok(!answer.includes(secret), `${who}: the answer does not hold ${secret}`);
-        }
-      }
-      // every card stands under a heading, and no heading stands alone
-      assert.deepEqual(
-        response.body.levels.map((level) => level.id),
-        EXAMPLE_LEVELS.map((level) => level.id).filter((id) => shown.some((example) => example.level === id)),
-        who,
-      );
-      // a visitor can open exactly what is open to everyone, a member every card
-      assert.deepEqual(
-        response.body.examples.map((example) => example.id),
-        shown.filter((example) => code !== null || examplesOpenToEveryone.includes(example.id)).map((example) => example.id),
-        who,
-      );
-    }
-    const advanced = await handleUnlockRequest(post({ code: CODE_ADVANCED }), setup);
-    assert.ok(advanced.body.ok);
-    assert.deepEqual(
-      advanced.body.examples.map((example) => example.id),
-      MENU_ORDER,
-      'an advanced code opens every example',
-    );
+    const counts = async (game: string, code: string | null): Promise<string> => {
+      const response = await handleUnlockRequest(post(code === null ? { game } : { game, code }), setup);
+      assert.ok(response.body.ok, `${game} ${code}`);
+      return `${response.body.cards.length} / ${response.body.examples.length}`;
+    };
+    assert.deepEqual([await counts('fire-rescue', null), await counts('fire-rescue', CODE_A), await counts('fire-rescue', CODE_ADVANCED)], ['5 / 3', '5 / 5', '7 / 7']);
+    assert.deepEqual([await counts('fire-chief', null), await counts('fire-chief', CODE_A), await counts('fire-chief', CODE_ADVANCED)], ['5 / 3', '5 / 5', '6 / 6']);
   });
 
   test('there is no code in the file - only the made-up one that shows what a code looks like', () => {
@@ -1054,48 +1746,118 @@ describe('src/app/api/simulator/unlock/route.ts, with the owner\'s lists', () =>
   const ask = (body: string, contentType: string | null = 'application/json'): Promise<Response> =>
     routePost(new Request('http://localhost/api/simulator/unlock', { method: 'POST', headers: contentType === null ? {} : { 'Content-Type': contentType }, body }));
 
-  test('no code: the cards and the examples the owner\'s two lists allow - and not a word about an example for advanced codes only', async () => {
-    const response = await ask('{}');
-    assert.equal(response.status, 200);
+  /** What the website's address answers to a visitor without a code, for one game: the text of the answer, and the answer. */
+  async function visitorAnswer(body: string): Promise<{ text: string; body: { ok: boolean; member: boolean; levels: Array<{ id: string; about: string }>; cards: Array<{ id: string }>; examples: Array<{ id: string }> } }> {
+    const response = await ask(body);
+    assert.equal(response.status, 200, body);
     assert.equal(response.headers.get('Cache-Control'), 'no-store');
     const text = await response.text();
-    const body = JSON.parse(text) as { ok: boolean; member: boolean; levels: Array<{ id: string }>; cards: Array<{ id: string }>; examples: Array<{ id: string }> };
-    assert.deepEqual(Object.keys(body).sort(), ['cards', 'examples', 'levels', 'member', 'ok']);
-    assert.equal(body.ok, true);
-    assert.equal(body.member, false);
-    const shown = MENU_ORDER.filter((id) => !examplesForAdvancedCodesOnly.includes(id));
+    return { text, body: JSON.parse(text) };
+  }
+
+  for (const game of ALL_GAMES) {
+    test(`${game.game}, no code: the cards and the examples the owner's two lists allow - and not a word about an example for advanced codes only, or about the other game`, async () => {
+      const { text, body } = await visitorAnswer(JSON.stringify({ game: game.game }));
+      assert.deepEqual(Object.keys(body).sort(), ['cards', 'examples', 'levels', 'member', 'ok']);
+      assert.equal(body.ok, true);
+      assert.equal(body.member, false);
+      const shown = game.examples.map((example) => example.id).filter((id) => !examplesForAdvancedCodesOnly.includes(id));
+      assert.deepEqual(
+        body.cards.map((card) => card.id),
+        shown,
+        'every example of this game that is not on "examplesForAdvancedCodesOnly"',
+      );
+      assert.deepEqual(
+        body.examples.map((example) => example.id),
+        shown.filter((id) => examplesOpenToEveryone.includes(id)),
+        'to open: the ones on "examplesOpenToEveryone"',
+      );
+      // the organiser's rule, as the live site answers it: five cards, the three starters open, no "Advanced"
+      assert.equal(body.cards.length, 5);
+      assert.equal(body.examples.length, 3);
+      assert.deepEqual(
+        body.levels.map((level) => level.id),
+        ['starter', 'intermediate'],
+      );
+      assert.deepEqual(
+        body.levels.map((level) => level.about),
+        game.levels.slice(0, 2).map((level) => level.about),
+        'under the headings of this game',
+      );
+      const notTheirs = [...game.examples.filter((e) => examplesForAdvancedCodesOnly.includes(e.id)), ...ALL_GAMES.filter((other) => other !== game).flatMap((other) => other.examples)];
+      assert.equal(notTheirs.length, 13 - 5);
+      for (const example of notTheirs) {
+        for (const secret of [`"${example.id}"`, example.title, example.description.slice(0, 60)]) assert.ok(!text.includes(secret), `the answer does not hold ${secret}`);
+      }
+      assert.ok(!text.includes('dvanced'), 'not the word "Advanced"');
+    });
+  }
+
+  test('a request that names no game gets the answer about Fire Rescue, letter for letter', async () => {
+    const named = await visitorAnswer('{"game":"fire-rescue"}');
     assert.deepEqual(
-      body.cards.map((card) => card.id),
-      shown,
-      'every example that is not on "examplesForAdvancedCodesOnly"',
+      named.body.cards.map((card) => card.id),
+      MENU_ORDER.filter((id) => !examplesForAdvancedCodesOnly.includes(id)),
     );
-    assert.deepEqual(
-      body.examples.map((example) => example.id),
-      shown.filter((id) => examplesOpenToEveryone.includes(id)),
-      'to open: the ones on "examplesOpenToEveryone"',
-    );
-    for (const example of ALL_EXAMPLES.filter((e) => examplesForAdvancedCodesOnly.includes(e.id))) {
-      for (const secret of [`"${example.id}"`, example.title, example.description.slice(0, 60)]) assert.ok(!text.includes(secret), `the answer does not hold ${secret}`);
-    }
+    // what the page of Fire Rescue sent before there was a second game, and an empty request
+    for (const body of ['{}', '', '{"code":null}']) assert.equal((await visitorAnswer(body)).text, named.text, JSON.stringify(body));
+    assert.notEqual((await visitorAnswer('{"game":"fire-chief"}')).text, named.text);
   });
 
-  test('a code that is on no list, and what is not such a request, are refused as before', async () => {
-    const wrong = await ask(JSON.stringify({ code: CODE_EXAMPLE }));
-    assert.equal(wrong.status, 403);
-    assert.equal(wrong.headers.get('Cache-Control'), 'no-store');
-    assert.deepEqual(await wrong.json(), { ok: false, reason: 'invalid-code' });
+  test('a code that is on no list, and what is not such a request, are refused as before - in both games', async () => {
+    for (const sent of [{ code: CODE_EXAMPLE }, { game: 'fire-rescue', code: CODE_EXAMPLE }, { game: 'fire-chief', code: CODE_EXAMPLE }]) {
+      const wrong = await ask(JSON.stringify(sent));
+      assert.equal(wrong.status, 403, JSON.stringify(sent));
+      assert.equal(wrong.headers.get('Cache-Control'), 'no-store');
+      assert.deepEqual(await wrong.json(), { ok: false, reason: 'invalid-code' });
+    }
     assert.equal((await ask('garbage')).status, 400);
     assert.equal((await ask(JSON.stringify({ code: CODE_EXAMPLE }), 'text/plain')).status, 415);
+    assert.equal((await ask(JSON.stringify({ game: 'fire-chief' }), 'text/plain')).status, 415);
     assert.equal((await ask(JSON.stringify({ code: CODE_EXAMPLE, padding: 'x'.repeat(MAX_BODY_BYTES) }))).status, 413);
+    assert.equal((await ask(JSON.stringify({ game: 'fire-chief', padding: 'x'.repeat(MAX_BODY_BYTES) }))).status, 413);
     const get = await routeGet(new Request('http://localhost/api/simulator/unlock'));
     assert.equal(get.status, 405);
     assert.equal(get.headers.get('Allow'), 'POST');
     assert.deepEqual(await get.json(), { ok: false, reason: 'method-not-allowed' });
   });
 
-  test('the website is not built while "examplesForAdvancedCodesOnly" names something that is no example', () => {
+  test('a game that is not one of the two is refused with "unknown-game", and the answer lists no game', async () => {
+    for (const sent of [{ game: 'fire' }, { game: 'Fire-Chief' }, { game: '' }, { game: null }, { game: 7 }, { game: ['fire-chief'] }, { game: 'no-such-game', code: CODE_EXAMPLE }]) {
+      const response = await ask(JSON.stringify(sent));
+      assert.equal(response.status, 400, JSON.stringify(sent));
+      assert.equal(response.headers.get('Cache-Control'), 'no-store');
+      assert.equal(await response.text(), '{"ok":false,"reason":"unknown-game"}', JSON.stringify(sent));
+    }
+  });
+
+  test('the wrong codes of one address are counted across both games: a hundred at full speed, then one a second - whichever game they name', async () => {
+    // (an address of its own, from the range kept for examples, so that no other test of this file shares its count)
+    const from = (sent: object, address = '203.0.113.77'): Promise<Response> =>
+      routePost(new Request('http://localhost/api/simulator/unlock', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-forwarded-for': address }, body: JSON.stringify(sent) }));
+    const wrongCode = (i: number): string => formatCode(`UUUU${[...String(i).padStart(4, '2')].map((d) => CODE_ALPHABET[Number(d)]).join('')}`);
+    const GAMES = [{ game: 'fire-rescue' }, { game: 'fire-chief' }, {}];
+    // 104 wrong codes in the same instant, in turn about Fire Rescue, about Fire Chief and without a game. They are counted
+    // before they are checked, so however the checks overlap: 100 at full speed, 1 in the slow lane, 3 turned away
+    const all = await Promise.all(Array.from({ length: 104 }, (_, i) => from({ ...GAMES[i % 3], code: wrongCode(i) })));
+    const statuses = all.map((response) => response.status);
+    assert.equal(statuses.filter((status) => status === 403).length, 101, 'checked: a hundred, and the one turn of the slow lane');
+    assert.equal(statuses.filter((status) => status === 429).length, 3, 'three were turned away without being looked at');
+    const waiting = all.find((response) => response.status === 429);
+    assert.ok(waiting);
+    assert.equal(waiting.headers.get('Retry-After'), '1');
+    assert.deepEqual(await waiting.json(), { ok: false, reason: 'too-many-attempts' });
+    // with a count per game there would have been 35 + 35 + 34 wrong codes, all under a limit of a hundred, and none turned away
+    assert.ok(Math.ceil(104 / 3) < 100);
+    // a request without a code is still answered at once, in both games - and another address has all its tries
+    assert.equal((await from({ game: 'fire-rescue' })).status, 200);
+    assert.equal((await from({ game: 'fire-chief' })).status, 200);
+    assert.equal((await from({ game: 'fire-chief', code: wrongCode(500) }, '203.0.113.78')).status, 403);
+  });
+
+  test('the website is not built while "examplesForAdvancedCodesOnly" names something that is an example of neither game', () => {
     // the owner's lists as they are: nothing to complain about (or this very file could not have been loaded)
-    assert.deepEqual(mistakesInSetup({ examples: ALL_EXAMPLES, advancedOnly: examplesForAdvancedCodesOnly }), []);
+    assert.deepEqual(mistakesInSetup({ games: ALL_GAMES, advancedOnly: examplesForAdvancedCodesOnly }), []);
     // the route asks once, where the file is loaded - that is: while the site is built - and stops there
     const source = readFileSync(path.join(REPO_ROOT, 'src/app/api/simulator/unlock/route.ts'), 'utf8');
     const check = source.indexOf('\nconst mistakes = mistakesInSetup(SETUP);\nif (mistakes.length > 0) throw new Error(');
@@ -1103,19 +1865,22 @@ describe('src/app/api/simulator/unlock/route.ts, with the owner\'s lists', () =>
     assert.ok(check > source.indexOf('\nconst SETUP: UnlockSetup = {') && check < source.indexOf('\nexport async function POST('), 'outside every function, so that it runs when the site is built');
   });
 
-  test('each of the owner\'s four lists is handed to the place it belongs to', () => {
+  test('each of the owner\'s four lists is handed to the place it belongs to, with the examples of every game and one count of wrong codes', () => {
     // (the plain codes are not in the repository, so the two lists of codes cannot be tried out here: this reads the file instead)
     const source = readFileSync(path.join(REPO_ROOT, 'src/app/api/simulator/unlock/route.ts'), 'utf8');
     for (const line of [
       'codes: simulatorCodes,',
       'advancedCodes: advancedSimulatorCodes,',
-      'examples: ALL_EXAMPLES,',
-      'levels: ALL_LEVELS,',
+      'games: ALL_GAMES,',
       'openToEveryone: examplesOpenToEveryone,',
       'advancedOnly: examplesForAdvancedCodesOnly,',
+      'limiter,',
     ]) {
       assert.equal(source.split(`\n  ${line}\n`).length, 2, `route.ts says "${line}" once`);
     }
+    // one limiter for the whole address, made once: not one per game, and not one per request
+    assert.equal(source.split('new AttemptLimiter(').length, 2);
+    assert.ok(source.includes('\nconst limiter = new AttemptLimiter();\n'));
   });
 });
 
@@ -1215,7 +1980,7 @@ describe('scripts/generate-simulator-codes.mjs', () => {
       assert.equal(entries[row.no - 1].fingerprint, await fingerprintOf(characters), `code number ${row.no}`);
     }
     // ... so the server accepts every new code, and only those
-    const setup: UnlockSetup = { codes: entries, advancedCodes: [], examples: ALL_EXAMPLES, levels: ALL_LEVELS, openToEveryone: [], advancedOnly: [] };
+    const setup: UnlockSetup = { codes: entries, advancedCodes: [], games: rescueOnly(), openToEveryone: [], advancedOnly: [] };
     for (const row of rows) {
       const response = await handleUnlockRequest(post({ code: row.code }), setup);
       assert.ok(response.status === 200 && response.body.ok && response.body.member, row.code);
@@ -1447,7 +2212,7 @@ describe('scripts/generate-simulator-codes.mjs', () => {
       assert.equal(advanced[row.no - 1].fingerprint, await fingerprintOf(normalizeCode(row.code) as string), row.label);
       assert.equal(await kindOfCode(row.code, members, advanced), 'advanced', row.label);
     }
-    const setup: UnlockSetup = { codes: members, advancedCodes: advanced, examples: ALL_EXAMPLES, levels: ALL_LEVELS, openToEveryone: ['hello'], advancedOnly: ['smart-bucket', 'full-mission'] };
+    const setup: UnlockSetup = { codes: members, advancedCodes: advanced, games: rescueOnly(), openToEveryone: ['hello'], advancedOnly: ['smart-bucket', 'full-mission'] };
     const opened = await handleUnlockRequest(post({ code: rows[0].code }), setup);
     assert.ok(opened.body.ok && opened.body.member && opened.body.examples.length === 7 && opened.body.cards.length === 7);
     // a member code of the same file opens five, and sees five

@@ -339,20 +339,27 @@ the second is only the summary students read. Change both when a rule changes.
 
 ### Member codes for the simulator examples
 
-The simulator's **Examples** window holds seven ready-made programs. They are in three
-groups, and there are two kinds of codes:
+The simulator has two games, **Fire Rescue** and **Fire Chief** (the maze), and each has its
+own **Examples** window with ready-made programs: seven in Fire Rescue, six in Fire Chief. In
+both games the examples are in three groups, and there are two kinds of codes:
 
-| Group | Now in it | Who sees the card | Who can open it |
-| --- | --- | --- | --- |
-| **Open to everyone** | the three starter examples | everybody | everybody, without a code |
-| **For members** | the two intermediate examples | everybody — with a lock and "Members only" | a **member code** or an advanced code |
-| **For advanced codes only** | the two advanced examples | nobody else | an **advanced code** |
+| Group | Now in it, in Fire Rescue | Now in it, in Fire Chief | Who sees the card | Who can open it |
+| --- | --- | --- | --- | --- |
+| **Open to everyone** | the three starter examples | the three starter examples | everybody | everybody, without a code |
+| **For members** | the two intermediate examples | the two intermediate examples | everybody — with a lock and "Members only" | a **member code** or an advanced code |
+| **For advanced codes only** | the two advanced examples | the one advanced example | nobody else | an **advanced code** |
 
-So there are three kinds of visitor:
+So there are three kinds of visitor, and each sees the same in both games:
 
 - **No code.** Three open cards, two locked ones. Nothing else.
 - **A member code** (one of the 500 you already have). Five open cards. Nothing else.
-- **An advanced code.** All seven cards, under the headings Starter, Intermediate and Advanced.
+- **An advanced code.** All the cards of that game — seven in Fire Rescue, six in Fire Chief —
+  under the headings Starter, Intermediate and Advanced.
+
+**One set of codes for both games.** There is no code "for Fire Rescue" or "for Fire Chief".
+A member code opens the examples for members in both games, and an advanced code opens every
+example in both. The codes you have already handed out work in Fire Chief as they are: there
+is nothing to make and nothing to hand out again. Cancelling a code cancels it in both games.
 
 An example of the third group is *hidden*, not locked. A visitor, and a member with an ordinary
 member code, do not see its card, its title, the "Advanced" heading or a count — nothing on
@@ -371,12 +378,17 @@ member code", **Unlock**. Capitals, dashes and spaces do not matter. The cards o
 with their descriptions and a "Load this example" button. The browser remembers the code, so
 it is typed once per device, and the simulator checks it with the server again on every visit.
 
+The code is remembered once for both games. Somebody who typed a code in Fire Rescue — also
+long ago, before Fire Chief existed — finds the examples of Fire Chief open in the same
+browser without typing anything, and the other way round. (A page of the other game that is
+already open in another tab shows it after it is loaded again.)
+
 - **A member who gets an advanced code later** presses **Use a different code** in the same
   window and types the new one. Nothing has to be forgotten first. If the new code is
   accepted it takes the place of the old one; if it is not — a typing mistake — everything
   stays as it was.
 - **"Forget this code on this device"**, in the same window, removes the code from the
-  browser — useful on a shared computer.
+  browser — useful on a shared computer. It is then forgotten for both games.
 
 #### What you change, and where
 
@@ -390,10 +402,20 @@ this order, each with its own explanation:
 
 After any change: save, commit and push. The change is live once Vercel has redeployed.
 
-**Moving an example between the three groups.** Every example has an id; the seven ids are
-listed at the top of the file (`'hello'`, `'line-follow'`, `'gripper-demo'`, `'one-bucket'`,
-`'one-person'`, `'smart-bucket'`, `'full-mission'`). An example is in a group because of the
-list its id is on:
+**Moving an example between the three groups.** Every example has an id; the ids of both
+games are listed at the top of the file:
+
+- Fire Rescue: `'hello'`, `'line-follow'`, `'gripper-demo'`, `'one-bucket'`, `'one-person'`,
+  `'smart-bucket'`, `'full-mission'`
+- Fire Chief: `'chief-first-wall'`, `'chief-count-lines'`, `'chief-flame-fan'`,
+  `'chief-wall-follow'`, `'chief-face-flame'`, `'chief-full-mission'`
+
+Lists 1 and 2 hold the ids of both games together, one below the other. Every id of Fire
+Chief begins with `chief-`, so the two cannot be mixed up: `'full-mission'` is the full
+mission of Fire Rescue, `'chief-full-mission'` the one of Fire Chief. A line decides about
+that one example, in its own game, and about nothing in the other game.
+
+An example is in a group because of the list its id is on:
 
 | To put an example into the group… | Its id must be… |
 | --- | --- |
@@ -415,10 +437,10 @@ tests fail and name it (see "Run its tests after every change"). If list 2 is em
 is hidden, and an advanced code opens exactly what a member code opens.
 
 Mind the spelling of an id. A misspelt id on list 1 opens nothing; the tests point it out. A
-misspelt id on **list 2** would hide nothing — the example you meant to hide would be shown
-to everybody — so the website refuses to be built with one: Vercel reports a **failed build**,
-its log names the line, and the website stays exactly as it was until you correct the line
-and push again.
+misspelt id on **list 2** — one that is not the id of an example of either game — would hide
+nothing: the example you meant to hide would be shown to everybody. So the website refuses to
+be built with one: Vercel reports a **failed build**, its log names the line, and the website
+stays exactly as it was until you correct the line and push again.
 
 **Cancelling a code.** Look the code up in your CSV file and note its number.
 
@@ -491,7 +513,8 @@ in its name.)
 The honest limits:
 
 - **The repository is public on GitHub.** Anyone who looks there can read every example
-  program in `src/simulator/fire-rescue/samples.ts` — the advanced ones too — and can read in
+  program in `src/simulator/fire-rescue/samples.ts` and `src/simulator/fire-chief/samples.ts`
+  — the advanced ones too — and can read in
   `content/simulator-codes.ts` which examples are kept for advanced codes. The lock and the
   hiding keep the examples out of the *website*, not out of GitHub. If that ever matters, the
   repository has to be made private.
@@ -500,10 +523,10 @@ The honest limits:
   this in check — when a code gets around, cancel that one code. Give advanced codes only to
   people you trust with the advanced programs.
 - **A shared computer remembers.** Once somebody has typed a code in a browser, the examples
-  stay open — the advanced ones too, if it was an advanced code — for everybody who uses that
-  browser on that computer afterwards, until somebody presses "Forget this code on this
-  device", or you cancel the code. On school computers, ask people to press it when they are
-  done.
+  stay open — in both games, and the advanced ones too, if it was an advanced code — for
+  everybody who uses that browser on that computer afterwards, until somebody presses "Forget
+  this code on this device", or you cancel the code. On school computers, ask people to press
+  it when they are done.
 - **Forgetting a code does not empty the workspace.** A program that was loaded stays in the
   blocks — and is saved in that browser — until somebody presses **New** or loads something
   else. That goes for an advanced example as well.
@@ -520,7 +543,9 @@ The honest limits:
   ten minutes from one network — a school, for instance — the server checks only one code per
   second from that network, and answers "wait a moment" in between. Nobody is locked out
   for a time: as soon as the wrong codes stop, a right code opens the examples again, a
-  second later at most. A few typing mistakes never get near the limit.
+  second later at most. A few typing mistakes never get near the limit. The wrong codes of a
+  network are counted together for both games: trying codes in the other game gives no new
+  tries.
 
 ### Run its tests after every change
 

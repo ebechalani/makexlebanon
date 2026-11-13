@@ -18,8 +18,8 @@
  *  nor ./sample-catalog.ts, the list of the titles.
  *
  *  The title and the level of each example are in ./sample-catalog.ts; the description and the
- *  blocks are here. The server does not hand these examples out yet: that comes with the screen
- *  of this game.
+ *  blocks are here. The server hands them out through /api/simulator/unlock, to a request that
+ *  names this game (see ../members/all-examples.ts).
  * =====================================================================================
  *
  * Every program is written with the program builder (vm/builder.ts), so it is exactly what the

@@ -444,12 +444,18 @@ describe('the examples of Fire Chief stay on the server, like the ones of Fire R
     for (const entry of entries) assert.match(entry.trim(), /^\{ id: 'chief-[a-z-]+', title: '[^']{4,80}', level: '(starter|intermediate|advanced)' \},$/);
   });
 
-  test('no file of the simulator or of the website imports them (only the tests do, until the server hands them out)', () => {
+  test('only the server\'s list of all examples imports them - no file of the simulator screen, no page of the website (and the tests)', () => {
     assert.ok(files.size > 80, `${files.size} source files read`);
     const importers = (target: string): string[] =>
-      [...files].filter(([file, text]) => importsOf(file, text).includes(target.replace(/\.ts$/, ''))).map(([file]) => file);
-    assert.deepEqual(importers(CATALOG), [SAMPLES]);
-    assert.deepEqual(importers(SAMPLES), []);
+      [...files]
+        .filter(([file, text]) => importsOf(file, text).includes(target.replace(/\.ts$/, '')))
+        .map(([file]) => file)
+        .sort();
+    // members/all-examples.ts is what the server hands out from (../members/unlock.ts); the
+    // guard of the server (../members/client-guard.test.ts) keeps it away from the browser
+    const SERVER_LIST = 'simulator/members/all-examples.ts';
+    assert.deepEqual(importers(CATALOG), [SAMPLES, SERVER_LIST].sort());
+    assert.deepEqual(importers(SAMPLES), [SERVER_LIST]);
   });
 
   test('no other file holds a title, an id or the heading of a level of these examples', () => {
