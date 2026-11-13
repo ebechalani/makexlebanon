@@ -17,9 +17,30 @@
  * 17.75rem is the height of everything else in the stage column - the simulator's title row
  * (3rem), the match controls, the status line, the row of buttons under the mat and the gaps.
  * It is never smaller than 17rem, and never wider than its column.
+ *
+ * Two more rows can stand under the mat, and the mat gives up the height of each (2.75rem: a
+ * row and its gap), so that the buttons that turn the robot are not pushed below the window:
+ *   --mbot2-second-row  the buttons under the mat need two rows (see the container rule below)
+ *   --mbot2-ruler-row   the ruler is on, and its measurement is written under the mat
+ * Both are set only where blocks and stage stand side by side (further down). On a phone or an
+ * upright tablet the page scrolls anyway, so a row more under the mat costs the mat nothing.
  */
 .mbot2-mat {
-  max-width: max(17rem, min(100%, calc(var(--mbot2-window) - 17.75rem)));
+  max-width: max(17rem, min(100%, calc(var(--mbot2-window) - 17.75rem - var(--mbot2-second-row, 0rem) - var(--mbot2-ruler-row, 0rem))));
+}
+
+/*
+ * The measurement of the ruler as text (in the ruler's row under the mat). A line of many points
+ * makes a long text. The row must not grow with it without end: side by side, it would push the
+ * buttons under the mat out of the window. So the text shows a few lines and scrolls inside
+ * itself: four lines (one line is 0.9375rem), and three where blocks and stage stand side by
+ * side. (The mat has given up the height of a row of two lines there; the third line moves the
+ * buttons under the mat 15px down, which the window still has. A plan of five pieces fits in
+ * three lines on a small laptop.)
+ */
+.mbot2-ruler-text {
+  max-height: 3.75rem;
+  overflow-y: auto;
 }
 
 /*
@@ -39,23 +60,185 @@
   }
 
   /* messages float over the block workspace, where they cover no button of the stage */
+  /* (while the stage is enlarged, the message is shown on the mat instead: see SimulatorApp.tsx) */
   .mbot2-toast {
     right: min(45%, max(33rem, calc(var(--mbot2-window) - 15.25rem)));
+  }
+
+  /* the ruler is on: the mat makes room for the ruler's row (see the top of this file) */
+  .mbot2-stage-head[data-ruler] {
+    --mbot2-ruler-row: 2.75rem;
+  }
+
+  .mbot2-ruler-text {
+    max-height: 2.8125rem;
   }
 }
 
 /*
  * On windows between 1024 and about 1120px wide - an iPad in landscape - the 45 % column is
- * narrower than 33rem, and the buttons under the mat (Zones / Sensors / Path and the ones that
- * turn the robot) no longer fit on one row. The mat then gives up the height of that second row
- * (2.75rem), so that the turning buttons are not pushed below the window.
+ * narrower than 33rem, and the buttons under the mat (Zones / Sensors / Path / Ruler and the
+ * ones that turn the robot) no longer fit on one row. The mat then gives up the height of that
+ * second row, so that the turning buttons are not pushed below the window.
  * (30rem is the room inside the column: wider than the two groups of buttons side by side,
  * narrower than a 33rem column with its padding and a scroll bar taken off.)
  */
 @container mbot2-stage (max-width: 30rem) {
   .mbot2-mat {
-    max-width: max(17rem, min(100%, calc(var(--mbot2-window) - 20.5rem)));
+    --mbot2-second-row: 2.75rem;
   }
+}
+
+/*
+ * ---------------------------------------------------------------------------------------------
+ * The enlarged stage (the "Enlarge" button of the stage)
+ * ---------------------------------------------------------------------------------------------
+ * The upper part of the stage column - match controls, status line, mat, ruler, the buttons
+ * under the mat - is one box, .mbot2-stage-head. Normally it is an ordinary part of the column.
+ * Enlarged, the SAME box is laid over the whole window (above the site's header, which has
+ * z-index 50). Nothing is moved to another place in the page and nothing depends on the
+ * browser's own full-screen mode, so it works on every device, and the canvas keeps the match
+ * that is running.
+ *
+ * .mbot2-mat-cell is the room the mat gets. Normally it is no box at all ("display: contents"):
+ * the mat is laid out exactly as before, by the rules at the top of this file. Enlarged, it is
+ * the box that takes all the room the controls leave, and the mat is the largest square in it
+ * (cqw / cqh are 1 % of the width / height of that box).
+ */
+.mbot2-mat-cell {
+  display: contents;
+}
+
+.mbot2-stage-head[data-enlarged] {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  /* tall windows (a phone held upright): everything in one column, the mat in the middle */
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background: #f1f5f9; /* the simulator's own background (slate-100) */
+  /* a window too small for all of it scrolls inside the enlarged stage, never the page behind */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  outline: none;
+}
+
+.mbot2-stage-head[data-enlarged] > * {
+  flex: none;
+}
+
+.mbot2-stage-head[data-enlarged] > .mbot2-mat-cell {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  /*
+   * The mat gets the room the controls leave. On a small phone held upright that is less than
+   * the mat has in the normal stage, and "Enlarge" would make the mat smaller. So the mat never
+   * gets less than the full width of the window - or, if that is less, what the window has left
+   * under the match controls and the status line (17.5rem with their gaps on the narrowest
+   * phone). What then does not fit - the buttons under the mat - is reached by scrolling inside
+   * the enlarged stage. This is never less than the mat of the normal stage, and never less
+   * than its smallest size, 17rem.
+   */
+  min-height: max(17rem, min(100vw - 1rem, 100dvh - 17.5rem));
+  container-type: size;
+}
+
+/* (with the ruler on, its row - which then holds the "Shrink" button - stays in the window too: 2.75rem more) */
+.mbot2-stage-head[data-enlarged][data-ruler] > .mbot2-mat-cell {
+  min-height: max(17rem, min(100vw - 1rem, 100dvh - 20.25rem));
+}
+
+.mbot2-stage-head[data-enlarged] .mbot2-ruler-text {
+  max-height: 3.75rem;
+}
+
+.mbot2-stage-head[data-enlarged] .mbot2-mat {
+  flex: none;
+  width: min(100cqw, 100cqh);
+  max-width: none;
+  margin: 0;
+}
+
+/*
+ * Wide windows (laptops, tablets and phones held sideways): the mat on the left, as tall as the
+ * window, and all the controls in a column on its right. "Wide" is 8 / 7 or more: below that the
+ * column of controls would cost the mat more than the rows above and below it do.
+ *
+ * The controls get what a square mat of the full height leaves (100vw - 100dvh), but at least
+ * 20rem - they do not fit in less - and at most 33rem, the width they have in the normal stage
+ * column: wider, the match controls would switch to their large size and need a third row.
+ * On a very wide window mat and controls together are narrower than the window: the padding
+ * left and right grows to keep them in the middle (32.75rem = 33rem of controls + the gap, less
+ * the padding the mat's height already includes).
+ */
+@media (min-aspect-ratio: 8 / 7) {
+  .mbot2-stage-head[data-enlarged] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(20rem, calc(100vw - 100dvh), 33rem);
+    /* (five rows for the controls, then one that takes what is left: the mat reaches over all six) */
+    grid-template-rows: repeat(5, auto) minmax(0, 1fr);
+    column-gap: 0.75rem;
+    padding-inline: max(0.5rem, calc((100vw - 100dvh - 32.75rem) / 2));
+  }
+
+  .mbot2-stage-head[data-enlarged] > * {
+    grid-column: 2;
+  }
+
+  /* (the mat is as tall as the window here: the rule for small upright phones above is not needed) */
+  .mbot2-stage-head[data-enlarged] > .mbot2-mat-cell,
+  .mbot2-stage-head[data-enlarged][data-ruler] > .mbot2-mat-cell {
+    grid-column: 1;
+    grid-row: 1 / -1;
+    min-height: 17rem;
+  }
+
+  /*
+   * (The controls stand in the order of the page: match controls, status line, the ruler's row,
+   * the buttons under the mat. The ruler's row is not put last: it holds the "Shrink" button
+   * while the ruler is on, and on a phone held sideways the last row is below the window.)
+   */
+
+  /*
+   * Beside the mat there is free room under the controls when the window is tall enough: the
+   * measurement may then take up to ten lines (the longest one, 20 points, in the widest column)
+   * before it scrolls. On a low window - a phone held sideways - it stays at four lines.
+   * (30rem is the height of the controls with a four-line measurement in the narrowest column.)
+   */
+  .mbot2-stage-head[data-enlarged] .mbot2-ruler-text {
+    max-height: clamp(3.75rem, 100dvh - 30rem, 9.375rem);
+  }
+}
+
+/*
+ * The stage column is a "container" (see above), and in some browsers a container keeps boxes
+ * with a fixed position inside itself. While the stage is enlarged the column gives that up, so
+ * that the enlarged stage is laid over the window and not over the column.
+ */
+.mbot2-stage-column[data-enlarged] {
+  container-type: normal;
+}
+
+/*
+ * Side by side, the column scrolls on its own. While the stage is enlarged it does not: nothing
+ * of it can be seen, and a box that scrolls must never get the chance to cut off the enlarged
+ * stage inside it. It stays scrolled where it was, and keeps the room of its scroll bar, so
+ * that nothing in it moves.
+ */
+@media (min-width: 64rem) {
+  .mbot2-stage-column[data-enlarged] {
+    overflow: hidden;
+    scrollbar-gutter: stable;
+  }
+}
+
+/* The page behind the enlarged stage does not scroll. (The class is set on <html> by SimulatorApp.tsx.) */
+:root.mbot2-enlarged {
+  overflow: hidden;
 }
 
 /* The "Rules" panel opens under the title row and never reaches below the window. */

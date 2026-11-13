@@ -85,7 +85,8 @@ export function Section({ title, summary, open, onToggle, children }: SectionPro
 // Dialog window
 // =============================================================================================
 
-const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+/** Everything the Tab key can stop at (used to keep Tab inside a window that covers the page). */
+export const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 export interface ModalProps {
   title: string;

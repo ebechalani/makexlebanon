@@ -22,20 +22,22 @@ import { CyberPiPanel, HoldButton } from './CyberPiPanel';
 import { EditorToolbar } from './EditorToolbar';
 import { formatNumber } from './format';
 import { GripperCodeDialog } from './GripperCodeDialog';
-import { CentreIcon, RotateLeftIcon, RotateRightIcon, RulesIcon, SensorsIcon, TestIcon, TrailIcon, ZonesIcon } from './icons';
+import { CentreIcon, EnlargeIcon, RotateLeftIcon, RotateRightIcon, RulerIcon, RulesIcon, SensorsIcon, ShrinkIcon, TestIcon, TrailIcon, ZonesIcon } from './icons';
 import type { ExampleProgram } from './member-unlock';
 import { blankProgram, hasRunnableScript, parseProgramFile, programFileName, serializeProgramFile } from './program-file';
 import type { StageOptions } from './render';
+import { EMPTY_RULER, followRobot, removeLastRulerPoint, rulerText, startsOnRobot, type Ruler } from './ruler';
 import { ScoreSheet, StatusLine } from './ScoreSheet';
 import { SensorDashboard } from './SensorDashboard';
 import { StageCanvas } from './StageCanvas';
+import { escapeAction, readyHint, sizeButtonHint, tabStop } from './stage-view';
 import { centredPose, headingDegrees, isPose, poseFits, rotatedPose } from './start-pose';
 import { PAGE_FRAME } from './page-frame';
 import { isRecord, loadJson, saveJson, storageKey } from './storage';
 import { TitleBar, titleBarButton } from './TitleBar';
 import { useMemberExamples, type ExamplesConfig } from './useMemberExamples';
 import { SPEEDS, useSimulation, type Speed } from './useSimulation';
-import { button, Section, toggleClass, usePopover } from './widgets';
+import { button, FOCUSABLE, Section, toggleClass, usePopover } from './widgets';
 // The simulator's own stylesheet travels with the simulator: the browser fetches it together with
 // this screen, so pages that only link to the simulator never load it.
 import './simulator.css';
@@ -82,6 +84,18 @@ const DEFAULT_OPEN: Record<SectionId, boolean> = {
 const DEFAULT_VIEW: StageOptions = { overlays: false, sensors: true, trail: true };
 
 const ROTATE_STEPS = [1, 15, 90] as const;
+
+/*
+ * The pictures on the Zones / Sensors / Path / Ruler buttons are shown where they fit. The row
+ * under the mat measures its own width (it is a "container"), because the stage column is
+ * narrow on a tablet although the screen is not:
+ *   - from 35rem: the four buttons with their pictures and the buttons that turn the robot fit on one row;
+ *   - from 29rem: they fit on one row without the pictures;
+ *   - below that the row has two lines anyway, and from 21rem the first line has room for the pictures
+ *     (the four buttons are 334 px wide; 21rem is the row of a phone that is 360 px wide).
+ * (Written out in full because Tailwind only finds complete class names.)
+ */
+const VIEW_ICON = 'hidden h-4 w-4 @[21rem]:block @[29rem]:hidden @[35rem]:block';
 
 interface Notice {
   text: string;
@@ -250,6 +264,125 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
     setScenario(next);
   }, []);
 
+  // ------------------------------------------------------------------ the ruler
+  // (The line is kept while the ruler is switched off, so that the student can drag the robot and
+  // come back to the measurement. Nothing of it is saved: after a reload the ruler is off and empty.)
+  const [rulerOn, setRulerOn] = useState(false);
+  const [ruler, setRuler] = useState<Ruler>(EMPTY_RULER);
+  const rulerButtonRef = useRef<HTMLButtonElement>(null);
+
+  // a line that starts on the robot keeps starting on the robot when the robot is put somewhere else
+  const rulerPoseRef = useRef(sim.startPose);
+  useEffect(() => {
+    const from = rulerPoseRef.current;
+    rulerPoseRef.current = sim.startPose;
+    if (from !== sim.startPose) setRuler((line) => followRobot(line, from, sim.startPose));
+  }, [sim.startPose]);
+
+  // A line can be started on the robot wherever it stands - also in the middle of the field,
+  // after a match. Once the robot is somewhere else (Reset field puts it back into its start
+  // zone) the words must not say "From the robot" any more. The place where the robot starts
+  // every match counts as "the robot" all the time: a plan made there is still the robot's plan
+  // while it drives.
+  const rulerRobotThere = startsOnRobot(ruler, snapshot.pose, sim.startPose);
+  const rulerReading = rulerText(ruler, rulerRobotThere);
+
+  // ------------------------------------------------------------------ the enlarged stage
+  // (How it is laid over the window is in simulator.css, at ".mbot2-stage-head[data-enlarged]".)
+  const stageHeadRef = useRef<HTMLDivElement>(null);
+  const enlargeButtonRef = useRef<HTMLButtonElement>(null);
+  /**
+   * Null: normal size. Otherwise the stage covers the window, and `keep` is the height it had in
+   * the page: that room is kept free behind it, so that nothing in the page moves and "Shrink"
+   * puts the stage back exactly where it was. Not saved: after a reload the stage is normal.
+   */
+  const [enlarged, setEnlarged] = useState<{ keep: number } | null>(null);
+  const isEnlarged = enlarged !== null;
+  const enlarge = () => setEnlarged({ keep: stageHeadRef.current?.getBoundingClientRect().height ?? 0 });
+  const shrink = () => setEnlarged(null);
+
+  // A long measurement of the ruler scrolls inside its row (simulator.css, .mbot2-ruler-text).
+  // After every change - and when the row gets another size - its end is shown: that is where
+  // the newest piece and the total are.
+  const rulerTextRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    const text = rulerTextRef.current;
+    if (text) text.scrollTop = text.scrollHeight;
+  }, [rulerReading, rulerOn, isEnlarged]);
+
+  useEffect(() => {
+    if (!isEnlarged) return;
+    const head = stageHeadRef.current;
+    const page = document.documentElement;
+    const column = head?.parentElement ?? null;
+    // the page behind must not scroll (simulator.css) ...
+    page.classList.add('mbot2-enlarged');
+    // ... and should a browser let it scroll all the same, it is put back afterwards
+    const scrolled = { page: window.scrollY, column: column?.scrollTop ?? 0 };
+    const windowWidth = window.innerWidth;
+    // the keyboard focus goes into the enlarged stage ...
+    head?.focus({ preventScroll: true });
+    // ... and Tab stays in it: the rest of the page is covered
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab' || !head) return;
+      const items = Array.from(head.querySelectorAll<HTMLElement>(FOCUSABLE)).filter((item) => item.getClientRects().length > 0);
+      if (items.length === 0) {
+        event.preventDefault();
+        return;
+      }
+      const active = document.activeElement instanceof HTMLElement ? items.indexOf(document.activeElement) : -1;
+      const stop = tabStop(items.length, active, event.shiftKey);
+      if (stop === null) return;
+      event.preventDefault();
+      items[stop].focus();
+    };
+    document.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('keydown', onKey, true);
+      page.classList.remove('mbot2-enlarged');
+      if (column && column.scrollTop !== scrolled.column) column.scrollTop = scrolled.column;
+      if (window.scrollY !== scrolled.page) window.scrollTo({ top: scrolled.page, behavior: 'instant' });
+      // The window got another width while the stage was enlarged (a tablet was turned): the page
+      // is laid out differently now, and the old scroll position shows some other part of it.
+      // Bring the stage into view. (Otherwise nothing is scrolled: the stage is where it was.)
+      if (window.innerWidth !== windowWidth) head?.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+      // Back at the normal size the focus is on the button that enlarges the stage again. (The
+      // button is looked up only now: it stands in another place while the ruler is on, and the
+      // ruler may have been switched on or off in the enlarged stage.)
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      enlargeButtonRef.current?.focus({ preventScroll: true });
+    };
+  }, [isEnlarged]);
+
+  // Escape undoes the smallest thing first: the last point of the ruler, then the enlarged
+  // stage, then the ruler itself (see escapeAction in ./stage-view.ts).
+  const rulerPoints = ruler.points.length;
+  useEffect(() => {
+    if (!rulerOn && !isEnlarged) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      // The key belongs to the stage only while the stage is being used: the focus is in it, or
+      // nowhere. (In the block editor Escape closes the block palette and leaves a number field;
+      // a window on top of the page takes the key for itself before it gets here.)
+      const target = event.target;
+      const onStage = isEnlarged || target === document.body || (target instanceof Node && stageHeadRef.current?.contains(target) === true);
+      if (!onStage) return;
+      const action = escapeAction({ rulerOn, rulerPoints, enlarged: isEnlarged });
+      if (!action) return;
+      event.preventDefault();
+      if (action === 'remove-point') setRuler(removeLastRulerPoint);
+      else if (action === 'shrink') setEnlarged(null);
+      else {
+        // The ruler's row goes away. If the focus is on something in it (Clear, the Enlarge
+        // button), it goes to the Ruler button: it must not get lost with the row.
+        if (document.activeElement instanceof HTMLElement && document.activeElement.closest('.mbot2-ruler-row')) rulerButtonRef.current?.focus({ preventScroll: true });
+        setRulerOn(false);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [rulerOn, rulerPoints, isEnlarged]);
+
   // ------------------------------------------------------------------ match buttons
   const start = () => {
     setGhost(null);
@@ -345,10 +478,54 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
   /** Open the score sheet and bring it into view. */
   const scoreSheetRef = useRef<HTMLDivElement>(null);
   const showScoreSheet = () => {
+    // (the sheet is in the page, behind an enlarged stage)
+    setEnlarged(null);
     setOpen((o) => ({ ...o, score: true }));
     requestAnimationFrame(() => scoreSheetRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
   };
   const toggleView = (key: keyof StageOptions) => () => setView((v) => ({ ...v, [key]: !v[key] }));
+
+  /**
+   * The button that enlarges the stage (and shrinks it again). It has two places, and only one
+   * at a time:
+   *   'mat'  on the top right corner of the mat, like the full-screen button of a video. The rows
+   *          around the mat have no room left for it, and it must not cost the mat any size.
+   *   'row'  at the end of the ruler's row under the mat, while the ruler is on. A button on the
+   *          mat would take the clicks and taps that are meant to set a point there (on a small
+   *          phone it covered both squares of the building in that corner), so with the ruler on
+   *          nothing lies on the mat at all.
+   */
+  const sizeLabel = isEnlarged ? 'Shrink' : 'Enlarge';
+  const sizeButton = (place: 'mat' | 'row') => (
+    <button
+      ref={enlargeButtonRef}
+      type="button"
+      onClick={isEnlarged ? shrink : enlarge}
+      aria-label={sizeLabel}
+      title={sizeButtonHint({ rulerOn, rulerPoints, enlarged: isEnlarged })}
+      className={
+        place === 'mat'
+          ? // small and tight in the corner: even on the smallest mat (17rem) it covers only the roof of the building there.
+            // For a finger the area that answers is larger than the button looks (the "before:" classes).
+            "absolute right-0.5 top-0.5 inline-flex h-6 select-none items-center gap-1 rounded-lg bg-ink-950/80 px-2 text-xs font-bold text-white shadow-md ring-1 ring-inset ring-white/30 transition hover:bg-ink-950 pointer-coarse:before:absolute pointer-coarse:before:-inset-2 pointer-coarse:before:content-['']"
+          : 'inline-flex h-9 min-w-9 shrink-0 select-none items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2 text-xs font-bold text-ink-700 transition hover:bg-slate-50 active:bg-slate-100'
+      }
+    >
+      {isEnlarged ? <ShrinkIcon className={place === 'mat' ? 'h-3.5 w-3.5' : 'h-4 w-4'} /> : <EnlargeIcon className={place === 'mat' ? 'h-3.5 w-3.5' : 'h-4 w-4'} />}
+      {/* (in a narrow row only the picture is shown; the name of the button is still "Enlarge" / "Shrink") */}
+      <span className={place === 'row' ? 'hidden @[30rem]:inline' : undefined}>{sizeLabel}</span>
+    </button>
+  );
+
+  /** The small message of the simulator (see `say`). */
+  const message = notice && (
+    <p
+      role={notice.tone === 'error' ? 'alert' : 'status'}
+      className={`max-w-xl rounded-card px-4 py-2.5 text-sm font-semibold text-white shadow-xl ${notice.tone === 'error' ? 'bg-rose-700' : 'bg-ink-900'}`}
+    >
+      {notice.text}
+    </p>
+  );
 
   return (
     <div className={`${PAGE_FRAME} text-ink-900`}>
@@ -443,7 +620,26 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
         </section>
 
         {/* ============================================================== stage */}
-        <section aria-label="Stage" className="mbot2-stage-column relative flex min-h-0 flex-col gap-2 p-3 lg:shrink-0 lg:overflow-y-auto">
+        <section
+          aria-label="Stage"
+          data-enlarged={isEnlarged ? '' : undefined}
+          className="mbot2-stage-column relative flex min-h-0 flex-col gap-2 p-3 lg:shrink-0 lg:overflow-y-auto"
+        >
+          {/* while the stage covers the window, this keeps its room in the page free */}
+          {enlarged && <div aria-hidden="true" className="shrink-0" style={{ height: enlarged.keep }} />}
+
+          {/* The upper part of the stage: the part that "Enlarge" lays over the whole window (.mbot2-stage-head in simulator.css). */}
+          <div
+            ref={stageHeadRef}
+            // (the scroll margins keep it clear of the site's sticky header when it is brought into view)
+            className="mbot2-stage-head flex scroll-mb-3 scroll-mt-24 flex-col gap-2 lg:scroll-mt-3"
+            data-enlarged={isEnlarged ? '' : undefined}
+            data-ruler={rulerOn ? '' : undefined}
+            role={isEnlarged ? 'dialog' : undefined}
+            aria-modal={isEnlarged ? true : undefined}
+            aria-label={isEnlarged ? 'The stage, enlarged' : undefined}
+            tabIndex={isEnlarged ? -1 : undefined}
+          >
           <ControlBar
             runState={runState}
             canStart={editorReady}
@@ -468,13 +664,15 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
             time={snapshot.time}
             restarts={snapshot.restarts}
             restartPenalty={game.restartPenalty}
-            readyHint={`Ready. Drag the robot inside the ${startZoneName}; turn it with the buttons below the mat.`}
+            readyHint={readyHint(startZoneName, rulerOn, isEnlarged)}
             placingProblem={placing && ghost ? `Not allowed: ${notAllowed.charAt(0).toLowerCase()}${notAllowed.slice(1)} It stays where it was.` : null}
             onShowSheet={showScoreSheet}
           />
 
           {/* as large as fits under the controls without scrolling: .mbot2-mat in simulator.css (the width of the column follows this size) */}
-          <div className="mbot2-mat mx-auto aspect-square w-full">
+          {/* (.mbot2-mat-cell is no box of its own until the stage is enlarged) */}
+          <div className="mbot2-mat-cell">
+          <div className="mbot2-mat relative mx-auto aspect-square w-full">
             <StageCanvas
               simRef={sim.simRef as RefObject<Simulation<unknown>>}
               trail={sim.trail}
@@ -485,23 +683,71 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
               ghost={placing ? ghost : null}
               onPlace={onPlace}
               onRotate={onRotate}
+              ruler={rulerOn ? ruler : null}
+              onRuler={setRuler}
             />
+            {/* (while the ruler is on, the button stands in the ruler's row instead: see sizeButton) */}
+            {!rulerOn && sizeButton('mat')}
+            {/* In the enlarged stage a message of the simulator is shown on the lower edge of the mat:
+                at the bottom of the window it would lie on the buttons under the mat. */}
+            {isEnlarged && message && <div className="pointer-events-none absolute inset-x-0 bottom-3 z-10 flex justify-center px-3">{message}</div>}
+          </div>
           </div>
 
+          {/* The measurement of the ruler as text: for screen readers, for copying, and because the numbers on a small mat are hard to read. */}
+          {/* (The row measures its own width: the button at its end shows its name only where there is room.) */}
+          {rulerOn && (
+            <div className="mbot2-ruler-row @container flex items-start gap-2">
+              <div className="flex min-h-9 min-w-0 flex-1 items-center gap-2 rounded-lg border border-orange-300 bg-orange-50 py-0.5 pl-2.5 pr-1 text-xs leading-tight text-ink-900">
+                {/* A long measurement does not make the row taller and push the buttons below it out of
+                    the window: it scrolls inside the row (.mbot2-ruler-text in simulator.css). From two
+                    points on, the text can be reached with the Tab key, so that it can be scrolled with
+                    the keyboard too. */}
+                <p ref={rulerTextRef} aria-live="polite" tabIndex={rulerPoints >= 2 ? 0 : undefined} className="mbot2-ruler-text min-w-0 flex-1 font-medium tabular-nums">
+                  <span className="sr-only">Ruler: </span>
+                  {rulerReading}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setRuler(EMPTY_RULER)}
+                  disabled={rulerPoints === 0}
+                  className="inline-flex h-7 shrink-0 select-none items-center rounded-md border border-orange-300 bg-white px-2 text-xs font-semibold text-ink-700 transition hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-40"
+                  title="Remove the measurement (the Esc key removes only the last point)"
+                >
+                  Clear
+                </button>
+              </div>
+              {sizeButton('row')}
+            </div>
+          )}
+
           {/* what to show on the stage, and where the robot starts */}
+          {/* (the row measures its own width: see VIEW_ICON) */}
+          <div className="@container">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <div className="flex items-center gap-1.5" role="group" aria-label="Show on the stage">
               <button type="button" aria-pressed={view.overlays} onClick={toggleView('overlays')} className={toggleClass(view.overlays)} title="Colour the zones of this combination: start, people, water squares, tower areas">
-                <ZonesIcon className="h-4 w-4" />
+                <ZonesIcon className={VIEW_ICON} />
                 Zones
               </button>
               <button type="button" aria-pressed={view.sensors} onClick={toggleView('sensors')} className={toggleClass(view.sensors)} title="Show what the line sensor and the ultrasonic sensor see">
-                <SensorsIcon className="h-4 w-4" />
+                <SensorsIcon className={VIEW_ICON} />
                 Sensors
               </button>
               <button type="button" aria-pressed={view.trail} onClick={toggleView('trail')} className={toggleClass(view.trail)} title="Draw the path the robot has driven">
-                <TrailIcon className="h-4 w-4" />
+                <TrailIcon className={VIEW_ICON} />
                 Path
+              </button>
+              <button
+                ref={rulerButtonRef}
+                type="button"
+                aria-pressed={rulerOn}
+                onClick={() => setRulerOn(!rulerOn)}
+                className={toggleClass(rulerOn)}
+                title="Measure on the mat: click points to see the distances in cm and the turns between them"
+              >
+                <RulerIcon className={VIEW_ICON} />
+                Ruler
               </button>
             </div>
 
@@ -553,6 +799,8 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
               </button>
             </div>
 
+          </div>
+          </div>
           </div>
 
           {/* (stacked, the page itself scrolls to the sheet: keep it clear of the site's sticky header) */}
@@ -620,16 +868,8 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
       {/* ================================================================ floating message */}
       {/* (it lets clicks through: a message must never be in the way of a button below it) */}
       {/* (side by side, it sits at the bottom of the block workspace, where it covers no button of the stage) */}
-      {notice && (
-        <div className="mbot2-toast pointer-events-none fixed inset-x-0 bottom-4 z-[60] flex justify-center px-3">
-          <p
-            role={notice.tone === 'error' ? 'alert' : 'status'}
-            className={`max-w-xl rounded-card px-4 py-2.5 text-sm font-semibold text-white shadow-xl ${notice.tone === 'error' ? 'bg-rose-700' : 'bg-ink-900'}`}
-          >
-            {notice.text}
-          </p>
-        </div>
-      )}
+      {/* (while the stage is enlarged, the message is shown on the mat instead: see above) */}
+      {message && !isEnlarged && <div className="mbot2-toast pointer-events-none fixed inset-x-0 bottom-4 z-[60] flex justify-center px-3">{message}</div>}
 
       {batchOpen && (
         <BatchDialog

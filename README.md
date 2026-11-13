@@ -264,6 +264,46 @@ The older, simpler simulator inside the Smart Logistics lessons
 (`/training/interactive/smart-logistics`) is separate and shares nothing with this one except
 the Blockly library.
 
+### The ruler and the enlarged stage
+
+Two helpers on the stage (the mat with its buttons, on the right of the blocks):
+
+- **Ruler** — a button next to Zones / Sensors / Path. While it is on, every click or tap on
+  the mat sets a point. Two points make a line with its length in cm (one decimal); more points
+  continue the line, and every corner shows the turn the robot would make there ("90° right").
+  From three points on, the total length is shown too. A first point set **on the robot** starts
+  at the robot's turning centre — the middle between its two wheels, the point that "moves
+  forward" moves — and the line then begins with the turn from where the robot faces now. Read
+  from start to end, the numbers are a plan: turn, length, turn, length. A piece that reads
+  30.0 cm is what "moves forward 30 cm" drives.
+  A point is dragged by pressing on it and moving; a press that does not move is a click. A
+  click on an earlier point brings the line back to exactly that point ("drive there and come
+  back"); a click close beside a point sets a new point there. **Clear** removes the line, the
+  **Esc** key removes the last point (with no point left, it switches the ruler off). The same
+  numbers are written as text in a row under the mat, for screen readers and for copying; a long
+  text scrolls inside that row. While the ruler is on, the pointer does not drag the robot; the
+  buttons that turn it still work. The line stays while a match runs. When the robot is no
+  longer where a line was started on it (after **Reset field**, for example), the text says
+  "From where the robot was" instead of "From the robot". Nothing of the ruler is saved: after
+  a reload it is off.
+- **Enlarge** — a button on the top right corner of the mat. While the ruler is on, it stands
+  at the end of the ruler's row under the mat instead, so that every place of the mat can be
+  clicked. The stage — mat, Start / Stop, clock and score, speed, the hint line, the buttons
+  under the mat and the ruler — then covers the whole browser window, with the mat as large as
+  the window allows (beside the controls on a wide window, between them on a tall one; on a
+  small phone held upright the mat takes the full width and the buttons under it are reached by
+  scrolling). The button then reads **Shrink**; the Esc key goes back too. Esc always undoes the
+  smallest thing first: a point of the ruler, then the enlarged stage, then the ruler itself.
+  It is a view that covers the window, not the browser's full-screen mode, so it works on
+  phones and tablets as well. It is not saved either.
+
+The ruler measures millimetres of the mat, the same millimetres the physics uses, so its
+numbers do not depend on the size of the screen. Its arithmetic, its words and the rules of the
+pointer (how close a click must be to a point, what counts as a click) are in
+`src/simulator/ui/ruler.ts`, the rule for the Esc key and the hint line in
+`src/simulator/ui/stage-view.ts`, the layout of the enlarged stage in
+`src/simulator/ui/simulator.css` (look for "The enlarged stage").
+
 ### Where its files live
 
 | Folder | What is in it |
@@ -290,6 +330,7 @@ the Blockly library.
 | The measurements of the mat (zones, lines, tower squares, sizes of the elements) | `src/simulator/fire-rescue/field.ts` |
 | The scoring (points, bonus, penalties, what counts as delivered) | `src/simulator/fire-rescue/game.ts` |
 | The short rules behind the **Rules** button | `src/simulator/ui/fire-rescue/rules.ts` |
+| What the ruler says ("32.5 cm, then 90° right, …", "Click the mat to set the first point"), and how close a click must be to a point of the ruler (`RULER_REACH`) | `src/simulator/ui/ruler.ts` |
 | The measurements of the robot | `src/simulator/core/robot.ts` |
 | The text on the cards that lead to the simulator | `content/seasons.ts` |
 
