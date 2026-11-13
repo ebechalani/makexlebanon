@@ -297,8 +297,8 @@ function createReferee(_scenario: FireChiefScenario): Referee<FireChiefScenario>
   let enteredRoom: RoomId | null = null;
   /** match time at which the fan action that is going on right now began; null = no action */
   let actionSince: number | null = null;
-  /** where the robot was at the last tick, to see whether it stands still */
-  const last = { known: false, x: 0, y: 0, heading: 0 };
+  /** where the robot was at the last tick (and when that was), to see whether it stands still */
+  const last = { known: false, x: 0, y: 0, heading: 0, time: 0 };
   let still = false;
   /** match time of the restart, if the team used it */
   let restartAt: number | null = null;
@@ -329,10 +329,13 @@ function createReferee(_scenario: FireChiefScenario): Referee<FireChiefScenario>
       Math.abs(pose.x - last.x) < 1e-6 &&
       Math.abs(pose.y - last.y) < 1e-6 &&
       Math.abs(pose.heading - last.heading) < 1e-9;
+    // the tick the referee is looking at began when the one before it ended
+    const tickBegan = last.time;
     last.known = true;
     last.x = pose.x;
     last.y = pose.y;
     last.heading = pose.heading;
+    last.time = time;
 
     // ---- rules §11: a displaced target ends the attempt; what was earned before stays
     const target = targetOf(world);
@@ -367,11 +370,16 @@ function createReferee(_scenario: FireChiefScenario): Referee<FireChiefScenario>
     }
 
     // ---- 30 + 40 points: the fan action
+    // The referee looks at the END of a tick. When everything is right then, it was right for
+    // that whole tick: the robot has not moved since the tick began, and a program switches the
+    // fan on at the beginning of a tick. So an action begins at the BEGINNING of the first tick
+    // that was right - the moment the program switched the fan on (or the robot came to rest) -
+    // and a fan that blows for 300 ticks ("fan on, wait 3 seconds, fan off") has blown for 3 s.
     const problem = fanProblem(ctx, still);
     if (problem === null) {
-      if (actionSince === null) actionSince = time;
+      if (actionSince === null) actionSince = tickBegan;
       if (!earned.has('fan-start')) {
-        award('fan-start', time, 'the robot stands still, faces the fire and the fan is on.');
+        award('fan-start', actionSince, 'the robot stands still, faces the fire and the fan is on.');
       }
       if (time - actionSince >= FAN_ACTION_SECONDS - 1e-9) {
         award('fan-complete', time, `the fan blew at the fire for ${FAN_ACTION_SECONDS} seconds.`);
@@ -384,9 +392,10 @@ function createReferee(_scenario: FireChiefScenario): Referee<FireChiefScenario>
         };
       }
     } else if (actionSince !== null) {
-      // the action broke: the 30 points stay, the 3 seconds start again with the next action
+      // The action broke during this tick (it was still right when the tick began): the 30
+      // points stay, the 3 seconds start again with the next action.
       speak(
-        `The fan action stopped after ${oneDecimal(time - actionSince)} s: ${problem}. ` +
+        `The fan action stopped after ${oneDecimal(tickBegan - actionSince)} s: ${problem}. ` +
           `The ${FAN_ACTION_SECONDS} seconds start again.`,
       );
       actionSince = null;
@@ -401,6 +410,7 @@ function createReferee(_scenario: FireChiefScenario): Referee<FireChiefScenario>
     enteredRoom = null;
     actionSince = null;
     last.known = false;
+    last.time = ctx.world.time;
     still = false;
     restartAt = ctx.world.time;
   }

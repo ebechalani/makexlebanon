@@ -455,17 +455,31 @@ test('20 points: only once - the second room adds nothing', () => {
 // 30 points: stand still, face the fire, start the fan
 // =============================================================================================
 
-test('30 points: standing still, facing the target, fan on - earned on the tick the fan starts', () => {
-  const { sim, robot } = play(fanOn(), { startPose: aimedAt(BACK_TARGET, 150) });
+test('30 points: standing still, facing the target, fan on - earned at the moment the fan starts', () => {
+  let switchedOnAt = -1;
+  const { sim, robot } = play(
+    function* (io) {
+      yield* sleep(10);
+      switchedOnAt = io.time; // what the timer of the program shows when it switches the fan on
+      io.setDcMotor('M1', 100);
+      yield* forever();
+    },
+    { startPose: aimedAt(BACK_TARGET, 150) },
+  );
   let fanTime = -1;
+  let ticksWithFan = 0;
   const events = runUntil(sim, () => {
-    if (robot.fanOn && fanTime < 0) fanTime = sim.world.time;
+    if (robot.fanOn) ticksWithFan++;
+    // (the referee looks at the end of a tick: the fan came on at the beginning of that tick)
+    if (robot.fanOn && fanTime < 0) fanTime = sim.world.time - sim.dt;
     return lineOf(sim, 'fan-start').ok;
   });
-  assert.ok(fanTime > 0);
+  near(fanTime, 0.1, 1e-9);
+  assert.equal(fanTime, switchedOnAt);
+  assert.equal(ticksWithFan, 1, 'the referee needs no second look: the points come on the first tick with the fan on');
   const line = lineOf(sim, 'fan-start');
   assert.equal(line.points, 30);
-  assert.equal(line.time, fanTime, 'on the very tick the fan came on');
+  assert.equal(line.time, fanTime, 'the time written down is the moment the fan was switched on');
   assert.equal(line.detail, `done at ${clock(fanTime)}`);
   assert.ok(logOf(events).includes(`+30 points at ${clock(fanTime)}: the robot stands still, faces the fire and the fan is on.`));
   // the 40 points take 3 seconds more
@@ -698,12 +712,41 @@ test('40 points: earned exactly 3 seconds after the action began; the attempt en
   assert.equal(harness.io().dcMotorPower('M1'), 0);
 });
 
+test('40 points: "fan on, wait 3 seconds, fan off" is exactly enough', () => {
+  let switchedOnAt = -1;
+  let switchedOff = false;
+  const { sim } = play(
+    function* (io) {
+      yield* sleep(10);
+      switchedOnAt = io.time;
+      io.setDcMotor('M1', 100);
+      // what the "wait (3) seconds" block does: the program goes on once 3 s have passed
+      const until = io.time + 3;
+      yield;
+      while (io.time < until - 1e-9) yield;
+      switchedOff = true;
+      io.stopDcMotor('M1');
+      yield* forever();
+    },
+    { startPose: IN_ROOM },
+  );
+  runUntil(sim, () => sim.status !== 'running');
+  assert.equal(sim.finishReason, 'mission-complete');
+  assert.equal(sim.score().total, 100);
+  // the fan blew for 300 ticks of 1/100 s: the mission is complete at the very moment the wait is over
+  assert.equal(sim.world.tick, 10 + 300);
+  near(sim.world.time, switchedOnAt + 3, 1e-9);
+  assert.equal(switchedOff, false, 'the referee called "complete" before the program switched the fan off');
+  assert.equal(lineOf(sim, 'fan-start').time, switchedOnAt);
+  near((lineOf(sim, 'fan-complete').time ?? 0) - switchedOnAt, 3, 1e-9);
+});
+
 test('40 points: one tick short of 3 seconds is not enough', () => {
   const { sim } = play(
     function* (io) {
       yield* sleep(10);
       io.setDcMotor('M1', 100);
-      yield* sleep(300); // the fan runs for exactly 300 ticks: the action lasts 2.99 s
+      yield* sleep(299); // the fan runs for 299 ticks: the action lasts 2.99 s
       io.stopDcMotor('M1');
       yield* forever();
     },
@@ -739,7 +782,8 @@ test('40 points: a break keeps the 30 points; the 3 seconds start again with the
   const robot = sim.world.robot;
   const events = runUntil(sim, () => {
     if (lineOf(sim, 'fan-start').ok && !robot.fanOn) wasOff = true;
-    if (wasOff && robot.fanOn && second < 0) second = sim.world.time;
+    // (seen at the end of a tick: the fan came on again at the beginning of that tick)
+    if (wasOff && robot.fanOn && second < 0) second = sim.world.time - sim.dt;
     return sim.status !== 'running';
   });
   const first = lineOf(sim, 'fan-start').time ?? 0;
@@ -749,7 +793,10 @@ test('40 points: a break keeps the 30 points; the 3 seconds start again with the
   assert.ok(done - first > 5.7);
   assert.equal(sim.score().total, 100);
   assert.equal(logOf(events).filter((t) => t.startsWith('+30')).length, 1, 'the 30 points are given once');
-  assert.equal(logOf(events).filter((t) => t.startsWith('The fan action stopped after 2.4 s')).length, 1);
+  assert.deepEqual(
+    logOf(events).filter((t) => t.startsWith('The fan action stopped')),
+    ['The fan action stopped after 2.5 s: the fan is off. The 3 seconds start again.'],
+  );
 });
 
 test('40 points: moving during the action breaks it, too', () => {
