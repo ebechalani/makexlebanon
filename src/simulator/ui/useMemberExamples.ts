@@ -20,18 +20,37 @@
  * checked with the server again, and the examples stay locked until the server has said yes -
  * also when the server cannot be reached. That is how a code that was cancelled stops working.
  *
+ * The code is remembered in one place for all games of the simulator (SAVED_CODE_KEY in
+ * ./member-unlock.ts): a code typed in one game is there on the next visit of any other, and
+ * "forget" forgets it for all of them. What it opens is asked game by game, on each game's page.
+ * (A page that is already open does not notice a code typed on another one until it is loaded
+ * again.)
+ *
  * Somebody whose examples are open can type a different code in the place of the one in use.
  * Nothing changes until the server has accepted the different code: when it is refused, or the
  * server cannot be reached, the saved code and the open examples stay exactly as they were.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { isSavedCode, requestUnlock, requestUnlockPatiently, tidyCode, type ExampleCard, type ExampleLevel, type ExampleProgram, type ExampleShelf } from './member-unlock';
+import {
+  isSavedCode,
+  requestUnlock,
+  requestUnlockPatiently,
+  SAVED_CODE_KEY,
+  tidyCode,
+  type ExampleCard,
+  type ExampleLevel,
+  type ExampleProgram,
+  type ExampleShelf,
+  type ExamplesSource,
+} from './member-unlock';
 import { loadJson, removeKey, saveJson } from './storage';
 
-/** What a category hands to the simulator screen about its examples. */
-export interface ExamplesConfig {
-  /** address on this website that hands out the examples (see src/app/api/simulator/unlock/route.ts) */
-  unlockUrl: string;
+/**
+ * What a category hands to the simulator screen about its examples: the address that hands them
+ * out and the game they belong to (`unlockUrl` and `game`, see ExamplesSource), and whose
+ * members they are for.
+ */
+export interface ExamplesConfig extends ExamplesSource {
   /** whose members the examples are for, e.g. "MakeX Lebanon" */
   organisation: string;
 }
@@ -131,12 +150,14 @@ export function shelfOf(answer: ExampleShelf): Shelf {
 }
 
 /**
- * @param key  where the code is remembered in the browser (see storageKey in ./storage.ts)
- * @param config  the examples of this category
+ * @param config  the examples of this category: one object that stays the same between renders
  */
-export function useMemberExamples(key: string, config: ExamplesConfig): MemberExamples {
-  const { unlockUrl } = config;
-  const [savedCode, setSavedCode] = useState<string | null>(() => loadJson(key, isSavedCode)?.code ?? null);
+export function useMemberExamples(config: ExamplesConfig): MemberExamples {
+  const { unlockUrl, game } = config;
+  /** where to ask, and for which game's examples (the same object as long as the two stay the same) */
+  const source = useMemo<ExamplesSource>(() => ({ unlockUrl, game }), [unlockUrl, game]);
+  // (the code is remembered in one place for every game, so there is no place to choose here: see SAVED_CODE_KEY)
+  const [savedCode, setSavedCode] = useState<string | null>(() => loadJson(SAVED_CODE_KEY, isSavedCode)?.code ?? null);
   const [status, setStatus] = useState<CodeStatus>(() => ({ phase: savedCode ? 'checking' : 'none', about: 'saved' }));
   /** what the accepted code opened; null while no code is accepted */
   const [forCode, setForCode] = useState<Shelf | null>(null);
@@ -160,7 +181,7 @@ export function useMemberExamples(key: string, config: ExamplesConfig): MemberEx
   const askOpenList = useCallback(() => {
     const mine = ++openQuestion.current;
     setOpenList('loading');
-    void requestUnlock(unlockUrl, null).then((outcome) => {
+    void requestUnlock(source, null).then((outcome) => {
       if (openQuestion.current !== mine) return;
       if (outcome.kind === 'examples') {
         openListKnown.current = true;
@@ -170,7 +191,7 @@ export function useMemberExamples(key: string, config: ExamplesConfig): MemberEx
         setOpenList('unreachable');
       }
     });
-  }, [unlockUrl]);
+  }, [source]);
 
   const askCode = useCallback(
     (code: string, about: CodeStatus['about']) => {
@@ -180,7 +201,7 @@ export function useMemberExamples(key: string, config: ExamplesConfig): MemberEx
       // the server could not be reached earlier: this is a new try, so ask for the visitor's cards again as well
       if (!openListKnown.current) askOpenList();
       // (a short "wait" of the server is waited out: see requestUnlockPatiently)
-      void requestUnlockPatiently(unlockUrl, code).then((outcome) => {
+      void requestUnlockPatiently(source, code).then((outcome) => {
         if (codeQuestion.current !== mine) return;
         if (outcome.kind === 'examples') {
           // (said to somebody who typed a different code: it has taken the place of the one that was in use)
@@ -188,7 +209,7 @@ export function useMemberExamples(key: string, config: ExamplesConfig): MemberEx
           codeInUse.current = code;
           setForCode(shelfOf(outcome));
           setSavedCode(code);
-          setRemembered(saveJson(key, { code }));
+          setRemembered(saveJson(SAVED_CODE_KEY, { code }));
           setDraft('');
           setStatus(replaced ? { phase: 'unlocked', about, replaced } : { phase: 'unlocked', about });
         } else if (outcome.kind === 'busy') {
@@ -198,7 +219,7 @@ export function useMemberExamples(key: string, config: ExamplesConfig): MemberEx
         }
       });
     },
-    [askOpenList, key, unlockUrl],
+    [askOpenList, source],
   );
 
   // at the start of a visit: ask what a visitor gets, and check the saved code again
@@ -233,13 +254,13 @@ export function useMemberExamples(key: string, config: ExamplesConfig): MemberEx
   const forget = useCallback(() => {
     codeQuestion.current++;
     codeInUse.current = null;
-    removeKey(key);
+    removeKey(SAVED_CODE_KEY);
     setSavedCode(null);
     setRemembered(true);
     setDraft('');
     setForCode(null);
     setStatus({ phase: 'none', about: 'saved' });
-  }, [key]);
+  }, []);
 
   const startChange = useCallback(() => {
     if (!unlocked) return;

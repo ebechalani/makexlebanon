@@ -12,7 +12,7 @@
 import type { ProgramJson } from '../core/types';
 import { CODE_EXAMPLE, formatCode, maskCode, normalizeCode } from '../members/code-format.mjs';
 import { isProgramJson } from './program-file';
-import { isRecord } from './storage';
+import { isRecord, storageKey } from './storage';
 
 // =============================================================================================
 // Examples
@@ -95,6 +95,26 @@ function readList<T extends { id: string }>(items: unknown[], read: (value: unkn
 // Asking the server
 // =============================================================================================
 
+/**
+ * The games the server has examples for, by the names a request gives them. (They are the ids
+ * of the games - `Game.id` - but a page says which examples it wants by itself: see
+ * ExamplesSource.)
+ */
+export const EXAMPLES_GAMES = ['fire-rescue', 'fire-chief'] as const;
+export type ExamplesGame = (typeof EXAMPLES_GAMES)[number];
+
+/** Where to ask for examples, and for which game's. */
+export interface ExamplesSource {
+  /** address on this website that hands out the examples (see src/app/api/simulator/unlock/route.ts) */
+  unlockUrl: string;
+  /**
+   * The game whose examples are wanted. The examples of every game are behind the one address,
+   * and each request must say which game it is about: a request that does not say gets the
+   * examples of Fire Rescue (that is how its page asked while it was the only game).
+   */
+  game: ExamplesGame;
+}
+
 /** How long an answer may take before the question is given up, in milliseconds. */
 export const UNLOCK_TIMEOUT_MS = 15_000;
 
@@ -115,7 +135,13 @@ export type UnlockOutcome =
   | { kind: 'busy'; waitSeconds?: number }
   | { kind: 'unreachable' };
 
-/** The reasons with which the server refuses a code as such (see UnlockRefusal in ../members/unlock.ts). */
+/**
+ * The reasons with which the server refuses a code as such (see UnlockRefusal in ../members/unlock.ts).
+ *
+ * "unknown-game" is not one of them, on purpose: the server then did not look at the code at
+ * all, so nothing is known about it. It is read like every answer that makes no sense
+ * ("unreachable"), and a code that may well be right is not called wrong.
+ */
 const REFUSED_CODE = new Set(['invalid-code', 'bad-request', 'too-large']);
 
 /** Read the server's answer. Anything that is not clearly "yes" or "no" counts as "unreachable". */
@@ -137,12 +163,15 @@ export function readUnlockAnswer(status: number, answer: unknown): UnlockOutcome
 }
 
 /**
- * Ask the server what this visitor may see and open: with a code, or with `null` for what a
- * visitor without a code gets. Never throws: a broken connection, a timeout and a server error
- * all come back as "unreachable".
+ * Ask the server what this visitor may see and open in one game: with a code, or with `null`
+ * for what a visitor without a code gets. Never throws: a broken connection, a timeout and a
+ * server error all come back as "unreachable".
+ *
+ * The request is `{ "game": "fire-chief" }` or `{ "game": "fire-chief", "code": "FIRE-..." }`:
+ * the game is always named, the code only when there is one.
  */
 export async function requestUnlock(
-  url: string,
+  from: ExamplesSource,
   code: string | null,
   fetchImpl: typeof fetch = fetch,
   timeoutMs: number = UNLOCK_TIMEOUT_MS,
@@ -150,10 +179,10 @@ export async function requestUnlock(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetchImpl(url, {
+    const response = await fetchImpl(from.unlockUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(code === null ? {} : { code }),
+      body: JSON.stringify(code === null ? { game: from.game } : { game: from.game, code }),
       cache: 'no-store',
       signal: controller.signal,
     });
@@ -199,14 +228,14 @@ const realSleep = (ms: number): Promise<void> => new Promise((resolve) => setTim
  * @param sleep  waits so many milliseconds (the tests bring their own)
  */
 export async function requestUnlockPatiently(
-  url: string,
+  from: ExamplesSource,
   code: string,
   fetchImpl: typeof fetch = fetch,
   sleep: (ms: number) => Promise<void> = realSleep,
   timeoutMs: number = UNLOCK_TIMEOUT_MS,
 ): Promise<UnlockOutcome> {
   for (let attempt = 1; ; attempt++) {
-    const outcome = await requestUnlock(url, code, fetchImpl, timeoutMs);
+    const outcome = await requestUnlock(from, code, fetchImpl, timeoutMs);
     if (outcome.kind !== 'busy' || outcome.waitSeconds === undefined || outcome.waitSeconds > PATIENCE_SECONDS || attempt >= PATIENT_TRIES) return outcome;
     // (a little longer than asked, and not the same for everybody: a room full of browsers must not all come back in the same instant)
     await sleep(outcome.waitSeconds * 1000 + Math.random() * 400);
@@ -233,6 +262,18 @@ export function hiddenCode(code: string): string {
   const characters = normalizeCode(code);
   return characters === null ? '' : maskCode(characters);
 }
+
+/**
+ * Where the browser keeps the code a member typed: ONE place for every game of the simulator.
+ *
+ * A code is not a code "for a game": it opens the examples of every game. So it is typed once
+ * per device, whichever game it was typed in, and forgetting it forgets it for every game.
+ *
+ * The place is the one where Fire Rescue has kept the code since it was the only game - hence
+ * the "fire-rescue" in its name - so that nobody who typed a code then has to type it again,
+ * in either game. Do not rename it: every code saved in a browser would be lost.
+ */
+export const SAVED_CODE_KEY = storageKey('fire-rescue', 'member-code');
 
 /** What is kept in the browser: `{ "code": "FIRE-7K2M-9QXD" }`. */
 export function isSavedCode(value: unknown): value is { code: string } {

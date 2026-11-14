@@ -74,6 +74,7 @@ export const nav: NavItem[] = [
     children: [
       { label: 'Training & hints', href: '/training' },
       { label: 'Fire Rescue simulator', href: '/training/simulator/fire-rescue' },
+      { label: 'Fire Chief simulator', href: '/training/simulator/fire-chief' },
       { label: 'Workshops & events', href: '/workshops' },
       { label: 'Competition kits', href: '/kits' },
     ],

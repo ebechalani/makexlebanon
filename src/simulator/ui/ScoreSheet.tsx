@@ -3,46 +3,113 @@
 /**
  * The referee's score sheet: every line of the ScoreReport with the reason it does or does not
  * score, in the referee's words, plus the status line shown above the stage.
+ *
+ * The sheet shows whatever lines the game's referee gives, in the referee's order: the lines
+ * that bring points first, then the lines that bring none (penalties, a note about the restart
+ * or about the start position). A game that records WHEN a line was earned (ScoreLine.time) and
+ * when the total was reached (ScoreReport.time) gets those times on the sheet: a ranking that
+ * uses the time needs them.
  */
 import type { ReactNode } from 'react';
-import type { FinishReason, ScoreLine, ScoreReport } from '../core/types';
-import { finishText, formatStamp, restartNote } from './format';
+import type { FinishReason, RestartRules, ScoreLine, ScoreReport } from '../core/types';
+import { finishText, formatRefereeTime, formatStamp, type TimeText } from './format';
 import { CheckIcon, CrossIcon } from './icons';
+import { finishSentence, restartSummary } from './match-words';
+import { capital, DEFAULT_WORDS, type ScreenWords } from './screen-words';
 import type { RunState } from './useSimulation';
 
+/**
+ * How one line of the sheet is marked:
+ *   'done'      it brings its points, or (a line without points) nothing is wrong
+ *   'not-done'  a line with points that has not been earned
+ *   'penalty'   a line without points that has cost some
+ *   'note'      a line without points that the referee wants the team to read: it costs nothing
+ *               by itself (the restart was used, the robot did not start where it should)
+ */
+export type LineMark = 'done' | 'not-done' | 'penalty' | 'note';
+
+export function lineMark(line: Pick<ScoreLine, 'points' | 'max' | 'ok'>): LineMark {
+  if (line.max === 0 && line.points < 0) return 'penalty';
+  if (line.ok) return 'done';
+  return line.max === 0 ? 'note' : 'not-done';
+}
+
+/** What the right-hand end of a line shows: "20/20", a penalty "-5" (or a clean "0"), nothing beside a note. */
+export function linePoints(line: Pick<ScoreLine, 'points' | 'max' | 'ok'>): string {
+  if (line.max > 0) return `${line.points}/${line.max}`;
+  return lineMark(line) === 'note' ? '' : String(line.points);
+}
+
+/** The time a line was earned, as the referee wrote it down; empty for a line that has none. */
+export function lineTime(line: Pick<ScoreLine, 'time'>): string {
+  return typeof line.time === 'number' && Number.isFinite(line.time) ? formatRefereeTime(line.time) : '';
+}
+
+const MARK_STYLE: Record<LineMark, { ring: string; name: string }> = {
+  done: { ring: 'bg-emerald-100 text-emerald-700', name: 'done' },
+  'not-done': { ring: 'bg-slate-100 text-ink-400', name: 'not done' },
+  penalty: { ring: 'bg-rose-100 text-rose-700', name: 'penalty' },
+  note: { ring: 'bg-amber-100 text-amber-800', name: 'note' },
+};
+
 function LineRow({ line }: { line: ScoreLine }) {
-  const isPenalty = line.max === 0;
-  const lost = isPenalty && line.points < 0;
+  const mark = lineMark(line);
+  const points = linePoints(line);
+  const time = lineTime(line);
+  const pointsText = points !== '' && (
+    <span
+      className={
+        'shrink-0 font-mono text-sm font-bold tabular-nums ' +
+        (mark === 'penalty' ? 'text-rose-600' : line.points > 0 ? 'text-emerald-700' : 'text-ink-400')
+      }
+    >
+      {points}
+    </span>
+  );
   return (
     <li className="flex items-start gap-2.5 py-2">
-      <span
-        className={
-          'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ' +
-          (lost ? 'bg-rose-100 text-rose-700' : line.ok ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-ink-400')
-        }
-      >
-        {lost || (!line.ok && !isPenalty) ? <CrossIcon className="h-3.5 w-3.5" /> : <CheckIcon className="h-3.5 w-3.5" />}
-        <span className="sr-only">{lost ? 'penalty' : line.ok ? 'done' : 'not done'}</span>
+      <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${MARK_STYLE[mark].ring}`}>
+        {mark === 'done' ? (
+          <CheckIcon className="h-3.5 w-3.5" />
+        ) : mark === 'note' ? (
+          <span aria-hidden="true" className="text-xs font-bold leading-none">
+            !
+          </span>
+        ) : (
+          <CrossIcon className="h-3.5 w-3.5" />
+        )}
+        <span className="sr-only">{MARK_STYLE[mark].name}</span>
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-ink-800">{line.label}</p>
         <p className="text-xs leading-snug text-ink-500">{line.detail}</p>
       </div>
-      <span
-        className={
-          'shrink-0 font-mono text-sm font-bold tabular-nums ' +
-          (lost ? 'text-rose-600' : line.points > 0 ? 'text-emerald-700' : 'text-ink-400')
-        }
-      >
-        {isPenalty ? line.points : `${line.points}/${line.max}`}
-      </span>
+      {time === '' ? (
+        pointsText
+      ) : (
+        // the referee wrote down the moment this line was earned (a ranking by time uses it): it stands under the points
+        <span className="flex shrink-0 flex-col items-end">
+          {pointsText}
+          <span className="font-mono text-[11px] tabular-nums text-ink-500" title="The time on the clock when this line was earned">
+            <span className="sr-only">earned at </span>
+            {time}
+          </span>
+        </span>
+      )}
     </li>
   );
 }
 
-export function ScoreSheet({ score }: { score: ScoreReport }) {
+export interface ScoreSheetProps {
+  score: ScoreReport;
+  /** the game's words (left out: the words of Fire Rescue) */
+  words?: ScreenWords;
+}
+
+export function ScoreSheet({ score, words = DEFAULT_WORDS }: ScoreSheetProps) {
   const missions = score.lines.filter((line) => line.max > 0);
   const penalties = score.lines.filter((line) => line.max === 0);
+  const totalTime = typeof score.time === 'number' && Number.isFinite(score.time) ? formatRefereeTime(score.time) : '';
   return (
     <div>
       <ul className="divide-y divide-slate-100">
@@ -52,7 +119,7 @@ export function ScoreSheet({ score }: { score: ScoreReport }) {
       </ul>
       {penalties.length > 0 && (
         <>
-          <p className="mt-2 border-t border-slate-200 pt-2 text-xs font-bold uppercase tracking-wide text-ink-500">Penalties</p>
+          <p className="mt-2 border-t border-slate-200 pt-2 text-xs font-bold uppercase tracking-wide text-ink-500">{words.sheetNotesHeading}</p>
           <ul className="divide-y divide-slate-100">
             {penalties.map((line) => (
               <LineRow key={line.id} line={line} />
@@ -66,7 +133,14 @@ export function ScoreSheet({ score }: { score: ScoreReport }) {
           {score.total} <span className="text-sm font-medium text-ink-500">/ {score.max}</span>
         </span>
       </div>
-      <p className="mt-1 text-xs text-ink-500">The score is what the field is worth right now. It can never go below 0.</p>
+      {totalTime !== '' && (
+        <p className="flex items-baseline justify-between gap-3 text-xs text-ink-600" data-score-time>
+          {/* (said as what the rules of the game say: a game that records times ranks equal points by them) */}
+          <span>Time of this score - with equal points, the rules rank the shorter time higher</span>
+          <span className="shrink-0 font-mono font-bold tabular-nums text-ink-900">{totalTime}</span>
+        </p>
+      )}
+      <p className="mt-1 text-xs text-ink-500">{words.sheetNote}</p>
     </div>
   );
 }
@@ -77,9 +151,18 @@ export interface StatusLineProps {
   score: ScoreReport;
   /** simulated seconds on the match clock */
   time: number;
+  /** the referee's own sentence about the end of the match, when the referee ended it (Simulation.finishDetail) */
+  finishDetail?: string | null;
   /** restarts used in this match, and what each one costs (shown because a restart at 0 points does not change the score) */
   restarts?: number;
   restartPenalty?: number;
+  /** the game's own restart rules (Game.restartRules) and how many restarts are left (Simulation.restartsLeft) */
+  restartRules?: RestartRules;
+  restartsLeft?: number;
+  /** the game's words (left out: the words of Fire Rescue) */
+  words?: ScreenWords;
+  /** how this game writes a moment of the match (left out: rounded time stamps; see timeTextOf in ./format.ts) */
+  timeText?: TimeText;
   /** what to tell the student before the start (how to place the robot) */
   readyHint: string;
   /** set when the robot is being put somewhere it may not start: shown in red instead of the hint */
@@ -93,10 +176,29 @@ export interface StatusLineProps {
  * height in every state as long as the text fits on two lines, so the stage below it does not
  * jump; a longer text makes it taller (it is never squeezed: "shrink-0").
  */
-export function StatusLine({ runState, finishReason, score, time, restarts = 0, restartPenalty = 0, readyHint, placingProblem, onShowSheet }: StatusLineProps) {
+export function StatusLine({
+  runState,
+  finishReason,
+  finishDetail = null,
+  score,
+  time,
+  restarts = 0,
+  restartPenalty = 0,
+  restartRules,
+  restartsLeft,
+  words = DEFAULT_WORDS,
+  timeText = formatStamp,
+  readyHint,
+  placingProblem,
+  onShowSheet,
+}: StatusLineProps) {
   const missions = score.lines.filter((line) => line.max > 0 && line.id !== 'bonus');
   const done = missions.filter((line) => line.ok).length;
-  const penaltyNote = restartNote(restarts, restartPenalty);
+  const penaltyNote = restartSummary(restarts, { penalty: restartPenalty, rules: restartRules }, restartsLeft);
+  const Match = capital(words.match);
+  // (Below, a sentence with a word of the game in it is written as ONE piece of text, `...${word}...`,
+  // not as text around a {word}: the browser fits the letters of each piece of text on their own,
+  // and a sentence cut into other pieces is drawn a fraction of a pixel differently.)
   const points = (
     <span className="whitespace-nowrap font-mono font-bold tabular-nums">
       {score.total} / {score.max}
@@ -117,7 +219,8 @@ export function StatusLine({ runState, finishReason, score, time, restarts = 0, 
     tone = 'border-brand-200 bg-brand-50 text-ink-900';
     content = (
       <>
-        <span className="font-bold">Match running.</span> {done} of {missions.length} missions complete.
+        <span className="font-bold">{`${Match} running.`}</span> {done} of {missions.length}
+        {` ${words.goals} complete.`}
         {penaltyNote && <span className="font-semibold text-amber-800"> {penaltyNote}.</span>}
       </>
     );
@@ -125,7 +228,8 @@ export function StatusLine({ runState, finishReason, score, time, restarts = 0, 
     tone = 'border-amber-300 bg-amber-50 text-amber-950';
     content = (
       <>
-        <span className="font-bold">Paused</span> at {formatStamp(time)}. The match clock is paused too.
+        <span className="font-bold">Paused</span> at {timeText(time)}
+        {`. The ${words.match} clock is paused too.`}
       </>
     );
   } else if (runState === 'stopped') {
@@ -133,7 +237,7 @@ export function StatusLine({ runState, finishReason, score, time, restarts = 0, 
     showSheet = true;
     content = (
       <>
-        <span className="font-bold">Stopped by you</span> at {formatStamp(time)} - no final score (so far {points}). Start tries again, Reset puts the
+        <span className="font-bold">Stopped by you</span> at {timeText(time)} - no final score (so far {points}). Start tries again, Reset puts the
         field back.
       </>
     );
@@ -143,8 +247,18 @@ export function StatusLine({ runState, finishReason, score, time, restarts = 0, 
     showSheet = true;
     content = (
       <>
-        <span className="font-bold">Match over.</span> {finishText(finishReason)} at {formatStamp(time)}. Final score: {points}
-        {perfect ? ' - a perfect run!' : score.complete ? ' - every mission complete.' : ''}
+        <span className="font-bold">{`${Match} over.`}</span>{' '}
+        {finishDetail ? (
+          // the referee ended the match: its own sentence says why (and when)
+          <>
+            {finishSentence(finishReason, finishDetail, time, timeText)} Final score: {points}
+          </>
+        ) : (
+          <>
+            {finishText(finishReason)} at {timeText(time)}. Final score: {points}
+          </>
+        )}
+        {perfect ? ' - a perfect run!' : score.complete ? ` - every ${words.goal} complete.` : ''}
         {penaltyNote && ` (${penaltyNote})`}
       </>
     );

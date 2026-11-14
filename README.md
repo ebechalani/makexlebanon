@@ -247,15 +247,17 @@ rules. It lives at:
 https://www.makexlebanon.com/training/simulator/fire-rescue
 ```
 
-(`/training/simulator` on its own leads to the same page.) Nothing is installed, and the
+The same simulator has a second game, **Fire Chief** (the maze, ages 14–17): see "The Fire
+Chief simulator" further down. `/training/simulator` lists the simulators — see "The list of
+simulators" there. Nothing is installed, and the
 student's blocks are saved in their own browser — they are never sent anywhere. The one thing
 the simulator asks the website's server for is the ready-made examples: the server decides,
 visitor by visitor, which of them to show and to open. See "Member codes for the simulator
 examples" below.
 
-Visitors reach it from the **Training** menu, the Training page, the Fire Rescue category page
-and the Season 2027 block on the homepage; the Season 2027 page marks the category with an
-"Online simulator" label. All of that comes from the content files: the `simulator` entry on
+Visitors reach it from the **Training** menu, the Training page, the list of simulators, the
+Fire Rescue category page and the Season 2027 block on the homepage; the Season 2027 page
+marks the category with an "Online simulator" label. All of that comes from the content files: the `simulator` entry on
 the Fire Rescue category and the training track in `content/seasons.ts`, and the menu in
 `content/site.ts`. Remove those entries and the links disappear; the simulator page itself
 stays.
@@ -306,6 +308,8 @@ pointer (how close a click must be to a point, what counts as a click) are in
 
 ### Where its files live
 
+(The files that only Fire Chief has are listed in "The Fire Chief simulator" below.)
+
 | Folder | What is in it |
 | --- | --- |
 | `src/simulator/core/` | The physics: the robot, its motors and sensors, collisions, the match clock |
@@ -339,20 +343,27 @@ the second is only the summary students read. Change both when a rule changes.
 
 ### Member codes for the simulator examples
 
-The simulator's **Examples** window holds seven ready-made programs. They are in three
-groups, and there are two kinds of codes:
+The simulator has two games, **Fire Rescue** and **Fire Chief** (the maze), and each has its
+own **Examples** window with ready-made programs: seven in Fire Rescue, six in Fire Chief. In
+both games the examples are in three groups, and there are two kinds of codes:
 
-| Group | Now in it | Who sees the card | Who can open it |
-| --- | --- | --- | --- |
-| **Open to everyone** | the three starter examples | everybody | everybody, without a code |
-| **For members** | the two intermediate examples | everybody — with a lock and "Members only" | a **member code** or an advanced code |
-| **For advanced codes only** | the two advanced examples | nobody else | an **advanced code** |
+| Group | Now in it, in Fire Rescue | Now in it, in Fire Chief | Who sees the card | Who can open it |
+| --- | --- | --- | --- | --- |
+| **Open to everyone** | the three starter examples | the three starter examples | everybody | everybody, without a code |
+| **For members** | the two intermediate examples | the two intermediate examples | everybody — with a lock and "Members only" | a **member code** or an advanced code |
+| **For advanced codes only** | the two advanced examples | the one advanced example | nobody else | an **advanced code** |
 
-So there are three kinds of visitor:
+So there are three kinds of visitor, and each sees the same in both games:
 
 - **No code.** Three open cards, two locked ones. Nothing else.
 - **A member code** (one of the 500 you already have). Five open cards. Nothing else.
-- **An advanced code.** All seven cards, under the headings Starter, Intermediate and Advanced.
+- **An advanced code.** All the cards of that game — seven in Fire Rescue, six in Fire Chief —
+  under the headings Starter, Intermediate and Advanced.
+
+**One set of codes for both games.** There is no code "for Fire Rescue" or "for Fire Chief".
+A member code opens the examples for members in both games, and an advanced code opens every
+example in both. The codes you have already handed out work in Fire Chief as they are: there
+is nothing to make and nothing to hand out again. Cancelling a code cancels it in both games.
 
 An example of the third group is *hidden*, not locked. A visitor, and a member with an ordinary
 member code, do not see its card, its title, the "Advanced" heading or a count — nothing on
@@ -371,12 +382,17 @@ member code", **Unlock**. Capitals, dashes and spaces do not matter. The cards o
 with their descriptions and a "Load this example" button. The browser remembers the code, so
 it is typed once per device, and the simulator checks it with the server again on every visit.
 
+The code is remembered once for both games. Somebody who typed a code in Fire Rescue — also
+long ago, before Fire Chief existed — finds the examples of Fire Chief open in the same
+browser without typing anything, and the other way round. (A page of the other game that is
+already open in another tab shows it after it is loaded again.)
+
 - **A member who gets an advanced code later** presses **Use a different code** in the same
   window and types the new one. Nothing has to be forgotten first. If the new code is
   accepted it takes the place of the old one; if it is not — a typing mistake — everything
   stays as it was.
 - **"Forget this code on this device"**, in the same window, removes the code from the
-  browser — useful on a shared computer.
+  browser — useful on a shared computer. It is then forgotten for both games.
 
 #### What you change, and where
 
@@ -390,10 +406,20 @@ this order, each with its own explanation:
 
 After any change: save, commit and push. The change is live once Vercel has redeployed.
 
-**Moving an example between the three groups.** Every example has an id; the seven ids are
-listed at the top of the file (`'hello'`, `'line-follow'`, `'gripper-demo'`, `'one-bucket'`,
-`'one-person'`, `'smart-bucket'`, `'full-mission'`). An example is in a group because of the
-list its id is on:
+**Moving an example between the three groups.** Every example has an id; the ids of both
+games are listed at the top of the file:
+
+- Fire Rescue: `'hello'`, `'line-follow'`, `'gripper-demo'`, `'one-bucket'`, `'one-person'`,
+  `'smart-bucket'`, `'full-mission'`
+- Fire Chief: `'chief-first-wall'`, `'chief-count-lines'`, `'chief-flame-fan'`,
+  `'chief-wall-follow'`, `'chief-face-flame'`, `'chief-full-mission'`
+
+Lists 1 and 2 hold the ids of both games together, one below the other. Every id of Fire
+Chief begins with `chief-`, so the two cannot be mixed up: `'full-mission'` is the full
+mission of Fire Rescue, `'chief-full-mission'` the one of Fire Chief. A line decides about
+that one example, in its own game, and about nothing in the other game.
+
+An example is in a group because of the list its id is on:
 
 | To put an example into the group… | Its id must be… |
 | --- | --- |
@@ -415,10 +441,10 @@ tests fail and name it (see "Run its tests after every change"). If list 2 is em
 is hidden, and an advanced code opens exactly what a member code opens.
 
 Mind the spelling of an id. A misspelt id on list 1 opens nothing; the tests point it out. A
-misspelt id on **list 2** would hide nothing — the example you meant to hide would be shown
-to everybody — so the website refuses to be built with one: Vercel reports a **failed build**,
-its log names the line, and the website stays exactly as it was until you correct the line
-and push again.
+misspelt id on **list 2** — one that is not the id of an example of either game — would hide
+nothing: the example you meant to hide would be shown to everybody. So the website refuses to
+be built with one: Vercel reports a **failed build**, its log names the line, and the website
+stays exactly as it was until you correct the line and push again.
 
 **Cancelling a code.** Look the code up in your CSV file and note its number.
 
@@ -491,7 +517,8 @@ in its name.)
 The honest limits:
 
 - **The repository is public on GitHub.** Anyone who looks there can read every example
-  program in `src/simulator/fire-rescue/samples.ts` — the advanced ones too — and can read in
+  program in `src/simulator/fire-rescue/samples.ts` and `src/simulator/fire-chief/samples.ts`
+  — the advanced ones too — and can read in
   `content/simulator-codes.ts` which examples are kept for advanced codes. The lock and the
   hiding keep the examples out of the *website*, not out of GitHub. If that ever matters, the
   repository has to be made private.
@@ -500,10 +527,10 @@ The honest limits:
   this in check — when a code gets around, cancel that one code. Give advanced codes only to
   people you trust with the advanced programs.
 - **A shared computer remembers.** Once somebody has typed a code in a browser, the examples
-  stay open — the advanced ones too, if it was an advanced code — for everybody who uses that
-  browser on that computer afterwards, until somebody presses "Forget this code on this
-  device", or you cancel the code. On school computers, ask people to press it when they are
-  done.
+  stay open — in both games, and the advanced ones too, if it was an advanced code — for
+  everybody who uses that browser on that computer afterwards, until somebody presses "Forget
+  this code on this device", or you cancel the code. On school computers, ask people to press
+  it when they are done.
 - **Forgetting a code does not empty the workspace.** A program that was loaded stays in the
   blocks — and is saved in that browser — until somebody presses **New** or loads something
   else. That goes for an advanced example as well.
@@ -520,7 +547,9 @@ The honest limits:
   ten minutes from one network — a school, for instance — the server checks only one code per
   second from that network, and answers "wait a moment" in between. Nobody is locked out
   for a time: as soon as the wrong codes stop, a right code opens the examples again, a
-  second later at most. A few typing mistakes never get near the limit.
+  second later at most. A few typing mistakes never get near the limit. The wrong codes of a
+  network are counted together for both games: trying codes in the other game gives no new
+  tries.
 
 ### Run its tests after every change
 
@@ -528,12 +557,12 @@ The honest limits:
 npm run test:sim
 ```
 
-It runs more than four hundred checks; among them, every example program is played on the
-real engine with the real referee and its score is compared. They also check
+It runs more than nine hundred checks; among them, every example program of both games is
+played on the real engine with the real referee and its score is compared. They also check
 `content/simulator-codes.ts` (a misspelt example id, an example that is on both lists, a
 damaged line, a code that is on both lists of codes) and that nothing about an example —
 not even a title — can slip back into what every visitor's browser downloads. It takes
-around fifteen seconds and must end with `fail 0`. If it does not, do not deploy — a failing
+around half a minute and must end with `fail 0`. If it does not, do not deploy — a failing
 test means a program would now score differently, a block would behave differently, or an
 example would be shown to somebody who should not see it.
 
@@ -616,6 +645,335 @@ The simulator is a training tool, not a copy of the real field:
 
 ---
 
+## The Fire Chief simulator
+
+The second game of the same simulator: the 2027 **Fire Chief** category, the "Dynamic Maze
+Challenge" for ages 14–17. The robot — an mBot2 without the gripper, with a **colour sensor**
+that looks forward and a **fan** at its front — starts in the START cell of a 5 × 5 field,
+finds its way round the walls to the room with the fire, goes up to the red fire target,
+reads "red", faces the target and blows at it for 3 seconds. The walls are different in every
+round, so the student sets up the maze, draws a random one or types in a code. It lives at:
+
+```
+https://www.makexlebanon.com/training/simulator/fire-chief
+```
+
+**The rules of this category are a draft** ("MakeX Lebanon 2027, Fire Chief, draft competition
+rules": timing, scoring, restarts and the fan action are proposals). The simulator follows that
+draft and what the organiser has decided since. Its **Rules** window says so in its first
+line, and has a second part, "What this simulator assumes", for what nobody has decided yet
+and a student can notice. When the organiser answers one of those questions, see "When the
+organiser decides something" below.
+
+**The draft names a flame sensor; the game has none.** The draft asks the robot to "use a
+flame sensor to locate the infrared fire target". After the draft the organiser decided that
+Fire Chief is played with a colour sensor that looks forward and that the fire target is red.
+The simulator had a flame sensor for a short time while the page was being built; it is gone,
+with its blocks. The word "flame" is still in the code where it means the wooden fire target
+(the rules call it "the wooden flame"), in the flame sign the stage draws around the target,
+and in two example ids (`chief-flame-fan`, `chief-face-flame`), which never change.
+
+Everything that is general works as in Fire Rescue and is described above: the blocks and
+their saving, the ruler and the enlarged stage, the examples and their codes, the title row
+with "Powered by …", the header height.
+
+### The list of simulators
+
+`/training/simulator` is a small page with one card per simulator: the picture of its mat, the
+age group, two sentences and a button. Nothing about a simulator is written in that page
+itself. Every category
+in `content/seasons.ts` that has a `simulator` entry gets a card, in the order of that file:
+
+```ts
+simulator: {
+  href: '/training/simulator/fire-chief',   // the simulator's page
+  summary: 'Two sentences …',               // also shown on the category page
+  mat: '/simulator/fire-chief/mat.webp',    // the picture on the list (a file under public/)
+},
+```
+
+The same entry puts the "Try the simulator" link on the homepage, the "Online simulator" label
+on the season page and the simulator block on the category page. The card on the Training page
+is the entry in `trainingTracks` (same file), and the two lines of the **Training** menu are in
+`content/site.ts`. The menu has one line per simulator, so that each is one click away; the
+list page is for visitors who come to `/training/simulator` itself (it used to send them on to
+Fire Rescue) and for search engines.
+
+### How the game is put together
+
+| File | What is in it |
+| --- | --- |
+| `src/simulator/fire-chief/field.ts` | Every measure of the field, the walls and the fire target; the 25 cells and the 40 places where an inner wall can stand |
+| `src/simulator/fire-chief/robot.ts` | The robot of this game: where the colour sensor and the fan sit and what they reach; where the robot starts |
+| `src/simulator/fire-chief/scenario.ts` | A maze: which of the 40 walls stand, the room of the fire and its place in the room. Which mazes can be played, the named mazes, the random mazes, the short code |
+| `src/simulator/fire-chief/game.ts` | The game and its referee: the four achievements with their points, the 3 minutes, the 3 seconds of the fan, the one restart, the end of an attempt. At its top: the two lists described below |
+| `src/simulator/fire-chief/sample-catalog.ts`, `samples.ts` | The examples: titles and levels, and the programs with their descriptions. They stay on the server (see "Member codes" above) |
+| `src/simulator/ui/fire-chief/` | What only this game shows: `FireChiefSimulator.tsx` (what the general screen is given), `MazeEditor.tsx` (the Maze panel) with its plain helpers `maze-plan.ts`, `maze-level.ts`, `maze-code.ts`, `maze-words.ts`, `maze-choices.ts`, `maze-batch.ts`, the `rules.ts` of the Rules window and the `words.ts` of the screen |
+| `src/app/training/simulator/fire-chief/page.tsx` | The page: its address, title and description |
+| `public/simulator/fire-chief/` | The two pictures of the mat: `mat.webp` is the one shown, `mat-sensor.webp` is the one the line sensor reads |
+
+What the two games share is everything else: the engine (`src/simulator/core/` — it knows
+walls, a colour sensor that is fixed to the front of a robot and a fan on a DC motor port for
+any game), the interpreter, the blocks and the screen (`src/simulator/ui/SimulatorApp.tsx`).
+
+- **The blocks.** Each game has its own palette (`src/simulator/blocks/palettes.ts`). Fire
+  Chief has no Servo and no Gripper group, and two groups Fire Rescue does not have: **mBot2
+  Extension Port** (the DC motor that drives the fan) and its own **Colour Sensor** group, for
+  the sensor that looks forward ("colour sensor (1) detects [red] ?" and "colour sensor (1)
+  colour"). Fire Rescue's group of the same name is another sensor, the one at the claw; no
+  palette shows both. The texts on the blocks of these two groups are in
+  `src/simulator/blocks/mblock-wording.ts`; that file also says, block by block, what has not
+  been compared with real mBlock yet (see "Block texts that are not confirmed" below).
+- **The referee has a memory.** In Fire Rescue the points can be read from the field at the
+  end. Here they depend on what happened and when, so the referee looks at every moment of the
+  attempt and writes down the time of each achievement — the ranking uses the time.
+- **The screen's words.** The general screen says "match", "missions" and "combination"; this
+  game hands it "attempt", "achievements" and "maze" (`src/simulator/ui/fire-chief/words.ts`;
+  all the words a game can change are listed in `src/simulator/ui/screen-words.ts`).
+
+### Where the measures, the decisions and the assumptions are
+
+Every number is written once:
+
+| What | Where |
+| --- | --- |
+| The mat (1500 mm, 5 × 5 cells of 300 mm), the walls (150 mm high, 3 mm thick, the wall around the field; what a colour sensor reads on them), the fire target (60 mm wide, 120 mm high, 20 mm deep; red; its three places per room), the size limits of the robot | `src/simulator/fire-chief/field.ts` |
+| The colour sensor (in the middle of the front, 60 mm above the mat, reads from 15 mm or closer) and the fan (port M1, from 20 % power, 20° to each side, 300 mm) | `src/simulator/fire-chief/robot.ts` |
+| The points (10, 20, 30, 40), the 180 seconds, the 3 seconds of the fan action, the one restart, how far the target may move before it counts as moved (5 mm) | `src/simulator/fire-chief/game.ts` |
+
+The top of `src/simulator/fire-chief/game.ts` holds two lists, each line with the name of the
+constant behind it:
+
+- **Decisions of the organiser** — what the organiser has answered since the draft: touching
+  the target without moving it costs nothing; a fan action counts from outside the room within
+  30 cm of the target (it then ends the attempt with 80 points); the 30 points need only the
+  position — what the colour sensor reads does not matter to the referee; the target is 6 cm
+  wide and 12 cm high; the outer edge of the field is walled; the walls are 3 mm thick; the
+  robot finds the fire with a colour sensor that looks forward, and the fire target is red.
+- **Assumptions** — everything neither the draft nor the organiser says, which the simulator
+  had to choose. They are numbered 1 to 20 there; in short:
+  - *The field:* how long a wall panel is; that the target is 20 mm deep and light enough to
+    be pushed; its three places per room; **that it is red on every face**; **what the colour
+    sensor reads on a wooden wall** ("yellow", never "red").
+  - *The robot:* **which colour sensor it is and where it sits** (one sensor in the middle of
+    the front, 60 mm above the mat, looking along one straight line, never wrong); **how close
+    it must be** (15 mm or less from the face of the sensor — Makeblock gives 5 to 15 mm for
+    its RGB colour sensors, and the simulator takes the strict end: a program that works at
+    15 mm also works with a sensor that sees further); the fan (port M1, from 20 % power, 20°
+    to each side).
+  - *The referee:* when the target counts as moved (5 mm), that it cannot fall over, what
+    "touching" (0.5 mm), "standing still" and "facing the target" mean, when a fan action
+    begins, the last moment of the time, the restart, the start position, and one more end of
+    an attempt ("the program has ended").
+  - *The engine:* walls cannot be moved and are perfectly smooth.
+
+  The list ends with the sentences of the draft that the simulator does not judge at all —
+  among them "use a flame sensor", which the organiser's decision for a colour sensor
+  overrules.
+
+The **Rules** window (`src/simulator/ui/fire-chief/rules.ts`) has the same two parts: the
+draft rules with the organiser's decisions, and "What this simulator assumes" — the
+assumptions a student can notice. An assumption must never read like a rule.
+
+#### Block texts that are not confirmed
+
+Nobody has compared these texts letter for letter with real mBlock 5 (Makeblock's help pages
+could not be opened when they were written). They are all in
+`src/simulator/blocks/mblock-wording.ts`, each with a note on what exactly is open:
+
+| Block (as the simulator shows it) | How sure |
+| --- | --- |
+| Group name "mBot2 Extension Port" | likely: it is the title of Makeblock's help page for these blocks |
+| "DC motor [M1] rotates at power (50) %" | likely: the block exists, the word order was not read |
+| "DC motor M1 rotates at power (50) % , DC motor M2 rotates at power (50) %" | a guess: a block for both ports exists, its text is open |
+| "DC motor [M1] stops rotating" | a guess: the block exists; "stops rotating" and the menu entry "all" are open |
+| Group name "Colour Sensor" | a guess: it depends on which colour sensor the robot gets |
+| "colour sensor (1) detects [red] ?" | a guess: the usual pattern of an mBuild module; the words and the colours of the menu are open |
+| "colour sensor (1) colour" | a guess: the words, and what it gives when it sees no colour ("none" here), are open |
+
+(mBlock spells "color"; the simulator writes "colour" in every text of its blocks.)
+
+#### Questions for the organiser
+
+Each answer turns an assumption into a decision (see the next section for the steps):
+
+1. **Which colour sensor is it**, and where on the robot does it sit? (Its model decides the
+   blocks in mBlock, how far it sees and how wide its spot is.)
+2. **How close must it be** to read a colour? The simulator takes 15 mm or less.
+3. **Is the target red on every face**, or only on its front?
+4. **What are the walls made of**, and what should a colour sensor read on them? (The
+   simulator draws light wood and reads "yellow" on it, never "red".)
+5. **Can the target really stand in a corner?** With the three assumptions above, a 130 mm
+   wide robot that drives at a corner target is stopped by the two walls of the corner when
+   its nose is exactly 15 mm from the target. So it reads "red" there only while it touches
+   both walls (or is 2.5 mm from them at most), and with no margin at all. A sensor that sees
+   a few millimetres further, or no corner place, would remove this.
+6. **Where may the target stand**, how deep and how heavy is it, and how far may it be pushed
+   before it counts as moved? (Assumed: three places per room, 20 mm, light, 5 mm.)
+7. The exact texts of the DC motor blocks and of the colour sensor blocks in mBlock (the
+   table above).
+
+#### When the organiser decides something
+
+1. Change the constant (if the number changes).
+2. In the comment of the constant, change the word `ASSUMPTION` to `DECISION`.
+3. In the header of `game.ts`, move the line from the list of assumptions to the list of
+   decisions.
+4. In `src/simulator/ui/fire-chief/rules.ts`, move the sentence from `FIRE_CHIEF_ASSUMPTIONS`
+   into `FIRE_CHIEF_RULES` and word it as a rule.
+5. `npm run test:sim`. Two tests tell you what you forgot: "decisions and assumptions" in
+   `src/simulator/fire-chief/game.test.ts` compares the comments with the two lists, and
+   `src/simulator/ui/fire-chief/rules.test.ts` compares **every number in the Rules window**
+   with the constant that holds it. A number in the window that is on no list of that test
+   fails it, so a new sentence with a number needs a line in its `CHECKS`.
+
+### The Maze panel
+
+The panel "Maze" under the stage (it takes the place of Fire Rescue's "Combination"):
+
+- **The plan.** The 5 × 5 field with START and the two rooms. Each of the 40 places of an
+  inner wall is a button: a click or a tap puts the wall up or takes it away, and the stage
+  shows it at once. With the keyboard, the plan is one stop of the Tab key; the arrow keys go
+  from wall to wall and the space bar switches the wall. A screen reader hears "Wall between
+  A1 and B1, pressed". A change puts the field back to the start, as in Fire Rescue — also
+  during an attempt.
+- **Ready-made mazes** (the named mazes of the game), **Random maze** and **Default maze**.
+- **The fire:** its room and its place in the room (corner, back wall, side wall).
+- **How hard is this maze?** A level from 1 to 5 and what was counted for it: the walls, the
+  shortest way from START into the room of the fire, its turns, the dead ends. The level comes
+  from the number of walls (none: 1, up to 6: 2, up to 11: 3, up to 15: 4, more: 5) and is one
+  higher when the shortest way is 10 cells or longer. It is counted, not measured with a
+  program, and the panel says so. The rule is in `src/simulator/ui/fire-chief/maze-level.ts`.
+- **The code**, for example `LC-4406-N0E0`: the room of the fire (L or B), its place (C, B or
+  S), then eight characters for the 40 walls. **Copy** copies it; typed or pasted into the
+  field it brings the maze back. A text that is no code gets one plain sentence that says what
+  a code looks like (`maze-code.ts`).
+
+**A maze in which a room cannot be reached** is no competition maze — the draft asks for a way
+from START to both rooms. The simulator still lets the student **start an attempt in it, for
+practice**: a maze built by hand passes through such states, a closed room or a box around
+START is a useful exercise, and nothing in the engine or the referee needs the ways. As long
+as the maze is like this, the panel says what is wrong in the game's own words ("There is no
+way from START to the bedroom: take a wall away."), that it is a practice maze, and it shows
+the closed cells in grey. Its code can be copied and typed in like any other, and it is still
+there after a reload. (The reasons are written down in `maze-words.ts`.)
+
+**Test on many mazes** (the button in the title row) plays the program on a list of mazes:
+10, 50 or 200 random mazes, in which the fire stands at each of its six places in turn; the
+named mazes, each with the fire at its six places; or the maze on the stage with the fire at
+its six places. For every run the table shows the points, the time at which they were reached
+(the ranking uses it) and how the attempt ended in the referee's own words. The lists are in
+`src/simulator/ui/fire-chief/maze-batch.ts`.
+
+### What to change, and where
+
+| To change… | Edit |
+| --- | --- |
+| A measure of the field, the walls or the fire target | `src/simulator/fire-chief/field.ts` |
+| Where the colour sensor sits and how far it sees, what the fan reaches, or where the robot starts | `src/simulator/fire-chief/robot.ts` |
+| The points, the time of an attempt, the seconds of the fan action, the restart, when the target counts as moved | `src/simulator/fire-chief/game.ts` |
+| The sentences of the **Rules** window | `src/simulator/ui/fire-chief/rules.ts` (and the list `CHECKS` in `rules.test.ts` when a number is new) |
+| The named mazes, the default maze, how random mazes are made | `src/simulator/fire-chief/scenario.ts` |
+| How the level of a maze is counted, and its words | `src/simulator/ui/fire-chief/maze-level.ts` |
+| The lists of "Test on many mazes" | `src/simulator/ui/fire-chief/maze-batch.ts` |
+| The examples | `src/simulator/fire-chief/samples.ts` and `sample-catalog.ts`; who may see them: `content/simulator-codes.ts` |
+| The words "attempt", "achievement", "maze" and the hints of the buttons | `src/simulator/ui/fire-chief/words.ts` |
+| The texts on the Colour Sensor and DC motor blocks | `src/simulator/blocks/mblock-wording.ts` |
+| The cards and links that lead to the simulator | `content/seasons.ts`, `content/site.ts` |
+
+#### Adding a named maze
+
+Named mazes are drawn, not typed as numbers. In `src/simulator/fire-chief/scenario.ts`, add
+an entry to `NAMED_MAZES`:
+
+```ts
+{
+  id: 'zigzag',                      // never change an id later
+  name: 'Zigzag',
+  level: 3,                          // 1 (easiest) to 5: see below
+  about: 'Nine walls. …',            // one sentence for the student
+  scenario: maze('living', 'side', [ // the room of the fire and its place: corner, back or side
+    '+---+---+---+---+---+',
+    '| L |           | B |',         // "|" between two cells = a wall, a space = no wall
+    '+   +---+---+   +   +',         // "---" under a cell = a wall, spaces = no wall
+    …                                // 11 lines of 21 characters; see the top of scenario.ts
+  ]),
+},
+```
+
+That is all: the maze gets its button in the Maze panel and is part of "Test on many mazes".
+`npm run test:sim` then tells you what else to do:
+
+- A maze without a way from START to both rooms stops everything with "a maze of scenario.ts
+  cannot be played".
+- `level` must be the level the Maze panel counts for it (see "How hard is this maze?" above),
+  so that the panel does not show two different levels for one maze.
+- A few tests say "five named mazes" and "30 runs" in so many words (`scenario.test.ts`,
+  `maze.test.ts`, `ui-games.test.ts`): change the numbers there.
+
+The **default maze** is the one `defaultScenario()` returns in the same file ("Crossroads").
+Two example descriptions and the tests of the examples count on it; think twice before
+changing it.
+
+#### Adding an example
+
+1. Write the program in `src/simulator/fire-chief/samples.ts`, built with the same helpers as
+   the six that are there, and add it to `SAMPLE_PROGRAMS`.
+2. Give it an id, a title and a level in `src/simulator/fire-chief/sample-catalog.ts`. The id
+   starts with `chief-`: an id must not exist twice, in either game.
+3. Decide who sees it, in `content/simulator-codes.ts`: add the id to `examplesOpenToEveryone`
+   for an example without a lock, or to `examplesForAdvancedCodesOnly` to hide it from
+   everybody without an advanced code. On neither list, it is an example for members.
+4. `npm run test:sim`. The tests play every example in many mazes (`samples.test.ts`): add
+   the points you expect from the new one there, and change the test that counts the
+   examples ("six examples …"). The guard that keeps the examples out of the browser
+   (`src/simulator/members/client-guard.test.ts`) reads the new title and id from the
+   catalog by itself, but one of its tests counts them: change that number too. The website
+   is not built while an id on one of the two lists is misspelt.
+
+Use only blocks of the Fire Chief palette — blocks that exist in real mBlock. A test checks it.
+
+### How the examples lock treats the two games
+
+Described in full in "Member codes for the simulator examples" above. In short:
+
+- **One address, two games.** Both simulators ask `/api/simulator/unlock`, and each says which
+  game it is. The answer holds the cards and the programs of that game only.
+- **One set of codes.** A member code opens the member examples of both games, an advanced
+  code shows every example of both. There is nothing to make or to hand out for Fire Chief.
+- **Typed once.** The browser keeps the code in one place for both games.
+- **The same three groups.** Fire Chief has three starter examples open to everyone, two for
+  members and one that only an advanced code shows — and, without such a code, no card, no
+  heading and no hint that it exists.
+- **Wrong codes are counted together** for both games.
+
+### Known limits of Fire Chief
+
+- **The rules are a draft**, and so is everything that follows from them.
+- **The fire target cannot fall over**, and it does not move at all when the robot hits it
+  squarely where it stands flat against its wall. A real target can fall.
+- **Walls cannot be moved** and are perfectly smooth: a robot that touches one slides along it.
+- **The robot is perfect** — no wheel slip, no sensor noise. The examples that count cells by
+  distance work every time here and will drift on a real robot.
+- **The texts of the Colour Sensor and DC motor blocks** have not been compared letter for
+  letter with real mBlock (see "Block texts that are not confirmed" above).
+- **The colour sensor is an assumption from end to end**: which sensor, where it sits, that it
+  reads from 15 mm or closer, that it is never wrong. With the target in a corner the robot
+  reads "red" only while it touches the two walls of that corner (question 5 above).
+- **No reading of the colour sensor is worth a point.** The referee counts the position only,
+  so a program that never reads a colour scores the same.
+- **A program that still holds flame sensor blocks** (saved in a browser or in a file while
+  the page was being built) opens without them: the blocks are taken out, the rest of the
+  program stays, and one sentence at the bottom of the screen says so ("2 flame sensor blocks
+  were taken out of this program, because the simulator has no flame sensor any more: their
+  places are empty now."). Without this, Blockly would refuse the whole program. The code is
+  `withoutRetiredBlocks` in `src/simulator/ui/program-file.ts`; the page with the flame sensor
+  was never published, so it can go once nobody can hold such a program any more.
+- **The level of a maze** is counted from its walls and its shortest way. It says nothing
+  about how hard the maze is for one particular program.
+
+---
+
 ## Deploying
 
 The site is designed for Vercel, the same platform already hosting the 2026 team portal.
@@ -693,7 +1051,13 @@ These are marked with `TODO` or `NOTE` comments in `content/seasons.ts`:
   photographs on the Drive are not. See "Still not imported" above.
 - **Ranking-card captions** — each 2026 gallery has a `captions.json` describing the division
   and age band. Edit it to add winner names, which become the alt text.
-- **Training tracks** — four of the six are marked `coming-soon`. Write the content, then
+- **The Fire Chief category text** — `content/seasons.ts` still introduces Fire Chief as "Two
+  robots. One operation. Command the whole response." on the platform "mBot2 + vision". The
+  draft rules of the category describe one robot in a maze, with a fan and a sensor that finds
+  the fire (the organiser has since decided for a colour sensor and a red fire target). The
+  category page now shows that older line directly above the simulator block: change
+  `summary` and `platform` when the category is announced in full.
+- **Training tracks** — four of the seven are marked `coming-soon`. Write the content, then
   change `status` to `available` and add an `href` in `content/seasons.ts`. (A track can also
   set `cta` to change the wording of its link — the simulator's card says "Open the simulator"
   instead of "Open training".)
@@ -710,7 +1074,7 @@ content/            All editable text and data
 public/
   gallery/          Competition photos, by year and category
   downloads/        Rules, scoresheets, STL archives
-  simulator/        Pictures of the Fire Rescue mat, for the simulator
+  simulator/        Pictures of the two mats, for the simulators
 scripts/
   fetch-legacy-assets.mjs
   generate-simulator-codes.mjs   Makes new member codes for the simulator
@@ -718,5 +1082,5 @@ src/
   app/              Pages and routing
   components/       Header, Footer, Gallery, shared UI
   lib/gallery.ts    Reads the photo folders
-  simulator/        The Fire Rescue simulator (see its own section above)
+  simulator/        The mBot2 simulator: Fire Rescue and Fire Chief (see their sections above)
 ```

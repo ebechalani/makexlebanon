@@ -4,22 +4,36 @@
  * The "combination" (the random starting arrangement the referee draws before a match):
  * its short code, buttons to draw a random one or go back to the default, a box to type in a
  * code from the board, and - passed in by the game - a small editor to set it up by hand.
+ *
+ * What the arrangement is called ("combination", "maze") and how a typed code is read are the
+ * game's: see ./screen-words.ts and ./scenario-code.ts.
  */
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import type { Game } from '../core/types';
 import { CopyIcon, DiceIcon } from './icons';
+import { codeReaderOf, type CodeReader } from './scenario-code';
+import { capital, DEFAULT_WORDS, type ScreenWords } from './screen-words';
 import { button } from './widgets';
 
 export interface CombinationPanelProps<S> {
   game: Game<S>;
   scenario: S;
   onChange: (scenario: S) => void;
+  /** the game's words for the panel (left out: the words of Fire Rescue) */
+  words?: ScreenWords;
+  /**
+   * How a typed code is read: the combination it stands for, or one plain sentence that says
+   * why it is none. Left out: the game decodes it, and a text it does not know gets the
+   * sentence of Fire Rescue.
+   */
+  readCode?: CodeReader<S>;
   /** the game's own editor for the combination */
   children?: ReactNode;
 }
 
-export function CombinationPanel<S>({ game, scenario, onChange, children }: CombinationPanelProps<S>) {
+export function CombinationPanel<S>({ game, scenario, onChange, words = DEFAULT_WORDS, readCode, children }: CombinationPanelProps<S>) {
   const code = game.encodeScenario(scenario);
+  const read = useMemo(() => readCode ?? codeReaderOf(game), [readCode, game]);
   const [typed, setTyped] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -28,14 +42,15 @@ export function CombinationPanel<S>({ game, scenario, onChange, children }: Comb
     event.preventDefault();
     const text = typed.trim();
     if (text === '') return;
-    const decoded = game.decodeScenario(text);
-    if (!decoded) {
-      setError(`"${text}" is not a combination code. A code looks like ${game.encodeScenario(game.defaultScenario())}.`);
+    const reading = read(text);
+    if (!reading.ok) {
+      // (one plain sentence under the field: what was typed stays, so that it can be corrected)
+      setError(reading.problem);
       return;
     }
     setError(null);
     setTyped('');
-    onChange(decoded);
+    onChange(reading.scenario);
   };
 
   const copy = async () => {
@@ -51,10 +66,10 @@ export function CombinationPanel<S>({ game, scenario, onChange, children }: Comb
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="rounded-lg bg-ink-900 px-2.5 py-1.5 font-mono text-sm font-bold tracking-wide text-white" aria-label={`Combination code ${code}`}>
+        <span className="rounded-lg bg-ink-900 px-2.5 py-1.5 font-mono text-sm font-bold tracking-wide text-white" aria-label={`${capital(words.scenario)} code ${code}`}>
           {code}
         </span>
-        <button type="button" onClick={() => void copy()} className={button.icon} aria-label="Copy the combination code" title="Copy the code">
+        <button type="button" onClick={() => void copy()} className={button.icon} aria-label={`Copy the ${words.scenario} code`} title="Copy the code">
           <CopyIcon className="h-4 w-4" />
         </button>
         {copied && (
@@ -63,12 +78,12 @@ export function CombinationPanel<S>({ game, scenario, onChange, children }: Comb
           </span>
         )}
         <span className="ml-auto flex gap-2">
-          <button type="button" onClick={() => onChange(game.randomScenario(Math.random))} className={button.plain} title="Draw a random combination, like the referee does">
+          <button type="button" onClick={() => onChange(game.randomScenario(Math.random))} className={button.plain} title={words.randomHint}>
             <DiceIcon className="h-4 w-4 text-brand-600" />
-            Random
+            {words.randomLabel}
           </button>
-          <button type="button" onClick={() => onChange(game.defaultScenario())} className={button.plain} title="The combination drawn in the rule book">
-            Default
+          <button type="button" onClick={() => onChange(game.defaultScenario())} className={button.plain} title={words.defaultHint}>
+            {words.defaultLabel}
           </button>
         </span>
       </div>
@@ -106,7 +121,11 @@ export function CombinationPanel<S>({ game, scenario, onChange, children }: Comb
       </form>
 
       <p className="text-xs text-ink-500">
-        {game.scenarioCount().toLocaleString('en')} combinations are possible. Changing the combination puts the field back to the start.
+        {words.scenarioNote ?? (
+          <>
+            {game.scenarioCount().toLocaleString('en')} combinations are possible. Changing the combination puts the field back to the start.
+          </>
+        )}
       </p>
     </div>
   );

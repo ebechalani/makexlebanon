@@ -6,7 +6,7 @@
  * is then selected in the workspace.
  */
 import { useEffect, useRef } from 'react';
-import { formatStamp, type LogLevel, type LogLine } from './format';
+import { formatStamp, type LogLevel, type LogLine, type TimeText } from './format';
 import { button } from './widgets';
 
 const LEVEL_STYLE: Record<LogLevel, { dot: string; text: string; name: string }> = {
@@ -21,9 +21,11 @@ export interface ConsolePanelProps {
   onClear: () => void;
   /** select the block a line belongs to; false when the block no longer exists */
   onSelectBlock: (blockId: string) => void;
+  /** how this game writes a moment of the match (left out: rounded time stamps; see timeTextOf in ./format.ts) */
+  timeText?: TimeText;
 }
 
-export function ConsolePanel({ logs, onClear, onSelectBlock }: ConsolePanelProps) {
+export function ConsolePanel({ logs, onClear, onSelectBlock, timeText = formatStamp }: ConsolePanelProps) {
   const listRef = useRef<HTMLDivElement>(null);
   /** keep showing the newest line, unless the student has scrolled up to read */
   const stickRef = useRef(true);
@@ -54,7 +56,7 @@ export function ConsolePanel({ logs, onClear, onSelectBlock }: ConsolePanelProps
               const style = LEVEL_STYLE[line.level];
               const body = (
                 <>
-                  <span className="shrink-0 font-mono tabular-nums text-ink-400">{formatStamp(line.time)}</span>
+                  <span className="shrink-0 font-mono tabular-nums text-ink-400">{timeText(line.time)}</span>
                   <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${style.dot}`} aria-hidden="true" />
                   <span className={`min-w-0 flex-1 break-words ${style.text} ${line.level === 'error' ? 'font-semibold' : ''}`}>
                     <span className="sr-only">{style.name}: </span>

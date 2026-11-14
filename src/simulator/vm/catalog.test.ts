@@ -142,8 +142,10 @@ describe('toolbox', () => {
   });
 
   it('lists every visible catalog block exactly once, in its own category', () => {
+    // the toolbox with every category of the catalog; a game's palette shows only some of them
+    // (TOOLBOX is the palette of Fire Rescue: blocks/palettes.test.ts)
     const listed = new Map<string, string>();
-    for (const category of TOOLBOX.contents) {
+    for (const category of buildToolbox().contents) {
       for (const item of category.contents ?? []) {
         if (item.kind !== 'block') continue;
         assert.ok(!listed.has(item.type), `${item.type} is listed twice`);
@@ -160,10 +162,16 @@ describe('toolbox', () => {
     assert.deepEqual(JSON.parse(JSON.stringify(TOOLBOX)), TOOLBOX);
     assert.equal(TOOLBOX.kind, 'categoryToolbox');
     assert.deepEqual(
-      TOOLBOX.contents.map((c) => c.name),
+      buildToolbox().contents.map((c) => c.name),
       CATEGORIES.map((c) => c.name),
     );
+    // the palette of a game is a part of the catalog, in the same order
+    const order = CATEGORIES.map((c) => c.id);
     const names = TOOLBOX.contents.map((c) => c.toolboxitemid);
+    assert.deepEqual(
+      names,
+      order.filter((id) => names.includes(id)),
+    );
     assert.ok(names.indexOf('events') < names.indexOf('control'));
     assert.ok(names.indexOf('control') < names.indexOf('operators'));
     assert.ok(names.indexOf('operators') < names.indexOf('variables'));

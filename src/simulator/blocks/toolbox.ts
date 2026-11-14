@@ -4,7 +4,11 @@
  * It is built from the catalog and is PURE DATA (Blockly's "toolbox JSON" format), so importing
  * this file needs neither Blockly nor a browser:
  *
- *   Blockly.inject(div, { toolbox: TOOLBOX, ... })
+ *   Blockly.inject(div, { toolbox: TOOLBOX, ... })                      // the palette of Fire Rescue
+ *   Blockly.inject(div, { toolbox: paletteToolbox('fire-chief'), ... }) // the palette of another game
+ *
+ * Every game has its own palette (./palettes.ts says which categories it shows). TOOLBOX is the
+ * palette of Fire Rescue, the first game of the simulator: an editor that names no game gets it.
  *
  * Every number / text slot gets its white bubble (a "shadow" block) with the default value, like
  * in Scratch: the student can type into it or drop a round block on top of it.
@@ -18,6 +22,7 @@
  */
 import { BLOCKS, CATEGORIES, fieldArgs, fieldDefault, getBlockDef, getCategory, valueInputs } from './catalog';
 import type { CategoryId, ShadowSpec } from './catalog';
+import { DEFAULT_PALETTE, paletteCategories } from './palettes';
 
 // =============================================================================================
 // Types (the subset of Blockly's toolbox JSON we produce)
@@ -151,9 +156,10 @@ export function categoryContents(id: CategoryId): ToolboxItem[] {
 }
 
 /**
- * Build the toolbox. Without argument: every category, in catalog (mBlock) order. With a list of
- * category ids: only those categories, in the order you list them (for example a beginner set
- * that starts with Events and the chassis and leaves the sensors out).
+ * Build a toolbox. Without argument: every category of the catalog, in catalog (mBlock) order -
+ * more than any one game shows. With a list of category ids: only those categories, in the order
+ * you list them (for example a beginner set that starts with Events and the chassis and leaves
+ * the sensors out). For the palette of a game use paletteToolbox().
  */
 export function buildToolbox(only?: CategoryId[]): ToolboxJson {
   const contents: ToolboxCategory[] = [];
@@ -173,8 +179,28 @@ export function buildToolbox(only?: CategoryId[]): ToolboxJson {
   return { kind: 'categoryToolbox', contents };
 }
 
-/** The complete toolbox with every category. */
-export const TOOLBOX: ToolboxJson = buildToolbox();
+/**
+ * The palette of a game (give Game.id: 'fire-rescue', 'fire-chief'): the categories ./palettes.ts
+ * lists for it. Left out, or a game without a palette of its own: the palette of Fire Rescue.
+ */
+export function paletteToolbox(gameId?: string): ToolboxJson {
+  return buildToolbox(paletteCategories(gameId));
+}
+
+/**
+ * The palette of Fire Rescue, and what an editor shows when no game is named. It must stay
+ * exactly as it is: a test (blocks/palettes.test.ts) pins its categories and its blocks.
+ */
+export const TOOLBOX: ToolboxJson = paletteToolbox(DEFAULT_PALETTE);
+
+/**
+ * Every catalog block that belongs to a game's palette: the blocks of its categories, the ones
+ * a dynamic category lists itself (variables, lists) included. In catalog order.
+ */
+export function paletteBlockTypes(gameId?: string): string[] {
+  const categories = new Set<CategoryId>(paletteCategories(gameId));
+  return BLOCKS.filter((def) => categories.has(def.category)).map((def) => def.type);
+}
 
 /** Every block type a toolbox mentions (blocks and their shadows), for checks and tests. */
 export function toolboxBlockTypes(toolbox: ToolboxJson = TOOLBOX): string[] {

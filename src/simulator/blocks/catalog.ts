@@ -10,12 +10,19 @@
  *              --> vm/          (knows which inputs / fields each block has and their defaults)
  *
  * The wording follows mBlock 5 (device CyberPi + extensions mBot2, Quad RGB Sensor, Ultrasonic
- * Sensor 2) closely enough that students recognise the blocks.
+ * Sensor 2) closely enough that students recognise the blocks. The texts of the DC motor
+ * blocks and of the blocks of the colour sensor that looks forward are not confirmed yet: they
+ * are kept apart, in ./mblock-wording.ts.
+ *
+ * Not every game shows every category: which categories a game's palette holds is written in
+ * ./palettes.ts.
  *
  * mBot2 wiring reminder (important for the "encoder motor EM1 ... EM2 ..." blocks):
  *   EM1 = LEFT wheel, EM2 = RIGHT wheel, and the two motors are mounted mirrored. A positive speed
  *   turns a motor clockwise, so driving straight ahead needs EM1 = +50 and EM2 = -50.
  */
+
+import { DC_MOTOR_MENU, DC_MOTOR_STOP_MENU, UNCONFIRMED_BLOCK_TEXTS, UNCONFIRMED_CATEGORY_NAMES } from './mblock-wording';
 
 // =============================================================================================
 // Types
@@ -33,11 +40,13 @@ export type CategoryId =
   | 'variables'
   | 'myblocks'
   | 'chassis'
+  | 'extensionport'
   | 'servo'
   | 'gripper'
   | 'quadrgb'
   | 'ultrasonic'
-  | 'colorsensor';
+  | 'colorsensor'
+  | 'frontcolorsensor';
 
 export interface CategoryDef {
   id: CategoryId;
@@ -129,6 +138,10 @@ export const LIST_VARIABLE_TYPE = 'list';
 // Categories (toolbox order = mBlock order: device blocks, Scratch basics, then the extensions)
 // =============================================================================================
 
+/**
+ * Every category of the block language. A game shows only some of them (./palettes.ts): the
+ * Fire Rescue robot has a gripper and no fan, the Fire Chief robot a fan and no gripper.
+ */
 export const CATEGORIES: CategoryDef[] = [
   { id: 'cyberpi', name: 'CyberPi', colour: '#9966FF' },
   { id: 'sensing', name: 'Sensing', colour: '#5CB1D6' },
@@ -138,11 +151,17 @@ export const CATEGORIES: CategoryDef[] = [
   { id: 'variables', name: 'Variables', colour: '#FF8C1A', custom: 'VARIABLE' },
   { id: 'myblocks', name: 'My Blocks', colour: '#FF6680', custom: 'PROCEDURE' },
   { id: 'chassis', name: 'mBot2 Chassis', colour: '#4C97FF' },
+  // the DC motor ports M1 / M2 of the mBot2 shield (in mBlock this category holds the servo blocks too)
+  { id: 'extensionport', name: UNCONFIRMED_CATEGORY_NAMES.extensionPort.text, colour: '#3F6FD9' },
   { id: 'servo', name: 'Servos', colour: '#4A6CD4' },
   { id: 'gripper', name: 'Gripper', colour: '#CF63CF' },
   { id: 'quadrgb', name: 'Quad RGB Sensor', colour: '#0FBD8C' },
   { id: 'ultrasonic', name: 'Ultrasonic Sensor 2', colour: '#0E9E86' },
   { id: 'colorsensor', name: 'Colour Sensor', colour: '#2E9BB5' },
+  // The colour sensor that is fixed to the front of the Fire Chief robot: another sensor than
+  // the one at the claw of Fire Rescue, with blocks of its own. No palette shows both, so the
+  // two share a colour. (Taken to be an mBuild module added with "+ extension", so it comes last.)
+  { id: 'frontcolorsensor', name: UNCONFIRMED_CATEGORY_NAMES.colorSensor.text, colour: '#2E9BB5' },
 ];
 
 /** Colour of the list blocks inside the Variables category (same as Scratch). */
@@ -892,6 +911,34 @@ export const BLOCKS: BlockDef[] = [
     tooltip: 'Sets the rotated angle of the motor back to 0.',
   },
 
+  // ------------------------------------------------------------------------------- mBot2 extension port: DC motors M1 / M2
+  // (the texts of these three blocks are not confirmed against mBlock yet: see ./mblock-wording.ts)
+  {
+    type: 'mbot2_dc_motor_power',
+    category: 'extensionport',
+    shape: 'statement',
+    message: UNCONFIRMED_BLOCK_TEXTS.mbot2_dc_motor_power.text,
+    args: [pick('PORT', DC_MOTOR_MENU), num('POWER', 50)],
+    tooltip:
+      'Runs the DC motor on port M1 or M2 of the mBot2 shield at this power (-100 to 100; a negative power turns it the other way). It keeps running until you change the power or stop it. A fan on this port blows from a power of 20 % on.',
+  },
+  {
+    type: 'mbot2_dc_motor_drive',
+    category: 'extensionport',
+    shape: 'statement',
+    message: UNCONFIRMED_BLOCK_TEXTS.mbot2_dc_motor_drive.text,
+    args: [num('M1', 50), num('M2', 50)],
+    tooltip: 'Sets the power of both DC motor ports at once (each -100 to 100). 0 stops a motor.',
+  },
+  {
+    type: 'mbot2_dc_motor_stop',
+    category: 'extensionport',
+    shape: 'statement',
+    message: UNCONFIRMED_BLOCK_TEXTS.mbot2_dc_motor_stop.text,
+    args: [pick('PORT', DC_MOTOR_STOP_MENU)],
+    tooltip: 'Stops the DC motor on this port (or on both ports). A fan on it stops blowing.',
+  },
+
   // ------------------------------------------------------------------------------- Servos (mBot2 shield)
   {
     type: 'mbot2_servo_set',
@@ -1055,6 +1102,27 @@ export const BLOCKS: BlockDef[] = [
     message: 'object detected at claw ?',
     args: [],
     tooltip: 'True when there is a bucket or a person in (or just in front of) the claw.',
+  },
+
+  // ------------------------------------------------------------------------------- Colour sensor fixed to the front of the robot (Fire Chief)
+  // (the texts of these two blocks are not confirmed against mBlock yet: see ./mblock-wording.ts)
+  {
+    type: 'sensing_colorsensor_color_is',
+    category: 'frontcolorsensor',
+    shape: 'boolean',
+    message: UNCONFIRMED_BLOCK_TEXTS.sensing_colorsensor_color_is.text,
+    args: [num('INDEX', 1), pick('COLOR', SENSOR_COLOURS)],
+    tooltip:
+      'True when the thing right in front of the colour sensor has this colour. The sensor is at the front of the robot and only sees a thing that is very close: in this simulator 1.5 cm or less. The number says which colour sensor is meant: 1 is the first one (this robot has one).',
+  },
+  {
+    type: 'sensing_colorsensor_color',
+    category: 'frontcolorsensor',
+    shape: 'reporter',
+    message: UNCONFIRMED_BLOCK_TEXTS.sensing_colorsensor_color.text,
+    args: [num('INDEX', 1)],
+    tooltip:
+      'The name of the colour right in front of the colour sensor: red, yellow, green, cyan, blue, purple, white or black. It is "none" when nothing is close enough (in this simulator: 1.5 cm or less).',
   },
 ];
 

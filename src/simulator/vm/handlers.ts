@@ -13,8 +13,8 @@
  * Blocks that need to know about scripts (control, events, variables, my blocks) live in index.ts.
  */
 import type { RobotIO } from '../core/io';
-import type { ButtonName, MotorPort, ProbeName, Scalar, SensorColor, ServoPort, Wheel } from '../core/types';
-import { BUTTON_NAMES, PROBE_NAMES, SERVO_PORTS } from '../core/types';
+import type { ButtonName, DcMotorPort, MotorPort, ProbeName, Scalar, SensorColor, ServoPort, Wheel } from '../core/types';
+import { BUTTON_NAMES, DC_MOTOR_PORTS, PROBE_NAMES, SERVO_PORTS } from '../core/types';
 import { clampNumber, compare, isWholeNumber, parseColour, toNumber, toText } from './values';
 
 /** Wheel speed used by the "... cm until done" and "... ° until done" blocks (they have no speed slot). */
@@ -160,6 +160,48 @@ const tidy = (n: number): number => Math.round(n * 1e10) / 1e10;
 
 const NO_GRIPPER = 'This robot has no gripper fitted, so this block does nothing.';
 
+// (each sentence is said by a true / false block and by a block that gives a colour name, so it
+// does not say which of the two answers the block gives)
+const NO_CLAW_SENSOR = 'This robot has no claw, so this block finds nothing there. The colour sensor of this robot looks forward and has its own blocks.';
+const NO_COLOR_SENSOR = 'This robot has no colour sensor that looks forward, so this block sees no colour.';
+const ONE_COLOR_SENSOR = 'This robot has one colour sensor: its number is 1. With any other number this block sees no colour.';
+
+/**
+ * What the "claw colour sensor" blocks read: the colour sensor at the claw (Fire Rescue).
+ * A robot whose colour sensor is fixed to its front (Fire Chief: frontColorSensor.mount) has no
+ * sensor at a claw. There these blocks read "none" - as they did on that robot before it got
+ * its sensor - and say why: they are blocks for a part the robot does not have.
+ */
+function clawColor(ctx: BlockContext): SensorColor | 'none' {
+  if (ctx.io.config.frontColorSensor.mount) {
+    ctx.warn(NO_CLAW_SENSOR);
+    return 'none';
+  }
+  return ctx.io.frontColor();
+}
+
+/**
+ * The blocks of the colour sensor that looks forward carry the number of the sensor (mBuild
+ * modules of one kind are numbered along their chain; 1 is the first). The robot has at most
+ * one, so only number 1 reads anything. True when this block reads the robot's colour sensor -
+ * the one that is fixed to its front, not the one at a claw.
+ */
+function readsColorSensor(ctx: BlockContext): boolean {
+  const sensor = ctx.io.config.frontColorSensor;
+  if (!sensor.enabled || !sensor.mount) {
+    ctx.warn(NO_COLOR_SENSOR);
+    return false;
+  }
+  if (Math.round(ctx.num('INDEX')) !== 1) {
+    ctx.warn(ONE_COLOR_SENSOR);
+    return false;
+  }
+  return true;
+}
+
+/** Power for a DC motor port: -100 .. 100 %. */
+const dcPower = (ctx: BlockContext, slot: string): number => clampNumber(ctx.finite(slot), -100, 100);
+
 // =============================================================================================
 // Statements
 // =============================================================================================
@@ -244,6 +286,23 @@ export const STATEMENTS: Record<string, StatementHandler> = {
   mbot2_motor_reset_angle(ctx) {
     const which = ctx.field('PORT');
     ctx.io.resetWheelAngle(which === 'EM1' || which === 'EM2' ? WHEEL_OF[which] : 'all');
+  },
+
+  // ------------------------------------------------------------------ DC motor ports M1 / M2 (a fan ...)
+  // These do not touch the drive wheels, so they never take the drive motors away from a move.
+  mbot2_dc_motor_power(ctx) {
+    const port: DcMotorPort = ctx.field('PORT') === 'M2' ? 'M2' : 'M1';
+    ctx.io.setDcMotor(port, dcPower(ctx, 'POWER'));
+  },
+
+  mbot2_dc_motor_drive(ctx) {
+    ctx.io.setDcMotor('M1', dcPower(ctx, 'M1'));
+    ctx.io.setDcMotor('M2', dcPower(ctx, 'M2'));
+  },
+
+  mbot2_dc_motor_stop(ctx) {
+    const which = ctx.field('PORT') as DcMotorPort;
+    ctx.io.stopDcMotor(DC_MOTOR_PORTS.includes(which) ? which : 'all');
   },
 
   // ------------------------------------------------------------------ servos
@@ -382,13 +441,21 @@ export const REPORTERS: Record<string, ReporterHandler> = {
 
   // ------------------------------------------------------------------ colour sensor at the claw
   sensing_claw_color_is(ctx) {
-    return ctx.io.frontColor() === ctx.field('COLOR');
+    return clawColor(ctx) === ctx.field('COLOR');
   },
   sensing_claw_color(ctx) {
-    return ctx.io.frontColor();
+    return clawColor(ctx);
   },
   sensing_claw_object_detected(ctx) {
-    return ctx.io.frontColor() !== 'none';
+    return clawColor(ctx) !== 'none';
+  },
+
+  // ------------------------------------------------------------------ colour sensor fixed to the front of the robot
+  sensing_colorsensor_color_is(ctx) {
+    return readsColorSensor(ctx) && ctx.io.frontColor() === ctx.field('COLOR');
+  },
+  sensing_colorsensor_color(ctx) {
+    return readsColorSensor(ctx) ? ctx.io.frontColor() : 'none';
   },
 
   // ------------------------------------------------------------------ CyberPi

@@ -18,17 +18,20 @@ import { before, describe, test } from 'node:test';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-import { ALL_EXAMPLES, ALL_LEVELS } from '../members/all-examples';
+import { ALL_GAMES } from '../members/all-examples';
 import { fingerprintOf } from '../members/code-fingerprint.mjs';
 import { normalizeCode } from '../members/code-format.mjs';
 import { handleUnlockRequest, type UnlockSetup } from '../members/unlock';
 import { ExamplesDialog } from './ExamplesDialog';
 import { codeMessage, examplesIntro, EXAMPLES_WORDS, type CodeMessage, type ExamplesView } from './examples-words';
 import { blankProgram } from './program-file';
-import { CODE_LOOKS_LIKE, hiddenCode, PATIENCE_SECONDS, PATIENT_TRIES, readUnlockAnswer, requestUnlock, requestUnlockPatiently } from './member-unlock';
+import { CODE_LOOKS_LIKE, hiddenCode, PATIENCE_SECONDS, PATIENT_TRIES, readUnlockAnswer, requestUnlock, requestUnlockPatiently, type ExamplesSource } from './member-unlock';
 import { shelfOf, type CodePhase, type CodeStatus, type MemberExamples, type Shelf } from './useMemberExamples';
 
 const ORG = 'MakeX Lebanon';
+
+/** Where the simulator asks for its examples in these tests: a made-up address, and the game Fire Rescue. */
+const SOURCE: ExamplesSource = { unlockUrl: '/u', game: 'fire-rescue' };
 
 /** Words a 12-year-old with a code on a piece of paper should never have to read. */
 const TECHNICAL = /\b(server|hash|fingerprint|api|endpoint|localstorage|storage|cookie|request|response|http|json|database|cache|token|fetch|status code|error code|403|429|invalid|authenticat\w*|authori[sz]\w*|credential\w*|session)\b/i;
@@ -332,13 +335,13 @@ describe('how long to wait', () => {
     (async () => Response.json({ ok: false, reason: 'too-many-attempts' }, { status: 429, headers: retryAfter === undefined ? {} : { 'Retry-After': retryAfter } })) as unknown as typeof fetch;
 
   test('the server says for how long (Retry-After, in seconds): the browser passes it on', async () => {
-    assert.deepEqual(await requestUnlock('/u', 'FIRE-AAAA-2222', busyServer('600')), { kind: 'busy', waitSeconds: 600 });
-    assert.deepEqual(await requestUnlock('/u', 'FIRE-AAAA-2222', busyServer('42')), { kind: 'busy', waitSeconds: 42 });
+    assert.deepEqual(await requestUnlock(SOURCE, 'FIRE-AAAA-2222', busyServer('600')), { kind: 'busy', waitSeconds: 600 });
+    assert.deepEqual(await requestUnlock(SOURCE, 'FIRE-AAAA-2222', busyServer('42')), { kind: 'busy', waitSeconds: 42 });
   });
 
   test('it does not say, or says nonsense: "busy" all the same, without a time', async () => {
     for (const header of [undefined, '', '0', '-5', 'soon', 'Wed, 21 Oct 2015 07:28:00 GMT']) {
-      assert.deepEqual(await requestUnlock('/u', 'FIRE-AAAA-2222', busyServer(header)), { kind: 'busy' }, `Retry-After: ${header}`);
+      assert.deepEqual(await requestUnlock(SOURCE, 'FIRE-AAAA-2222', busyServer(header)), { kind: 'busy' }, `Retry-After: ${header}`);
     }
   });
 });
@@ -362,7 +365,7 @@ describe('a short "wait" is waited out', () => {
     const slept: number[] = [];
     const fetchImpl = (async () => answers[Math.min(asked++, answers.length - 1)]()) as unknown as typeof fetch;
     const sleep = async (ms: number) => void slept.push(ms);
-    return { ask: () => requestUnlockPatiently('/u', CODE, fetchImpl, sleep), asked: () => asked, slept };
+    return { ask: () => requestUnlockPatiently(SOURCE, CODE, fetchImpl, sleep), asked: () => asked, slept };
   }
 
   test('"wait a second", then "yes": the member never hears about it', async () => {
@@ -422,21 +425,23 @@ describe('the window as each kind of visitor sees it', () => {
   let member: Shelf;
   let advanced: Shelf;
 
+  /** A pretend server with the examples of every game: the starters open to everyone, the advanced ones for advanced codes only. */
+  let setup: UnlockSetup;
+  /** What the browser makes of the server's answer about one game to this code (null: no code). */
+  const ask = async (code: string | null, game: ExamplesSource['game'] = SOURCE.game): Promise<Shelf> => {
+    const answer = await handleUnlockRequest({ method: 'POST', body: JSON.stringify(code === null ? { game } : { game, code }), contentType: 'application/json', client: 'test' }, setup);
+    const outcome = readUnlockAnswer(answer.status, JSON.parse(JSON.stringify(answer.body)));
+    assert.ok(outcome.kind === 'examples', `the server answers ${code === null ? 'a visitor' : 'a code'}`);
+    return shelfOf(outcome);
+  };
+
   before(async () => {
-    const setup: UnlockSetup = {
+    setup = {
       codes: [{ no: 1, fingerprint: await fingerprintOf(normalizeCode(MEMBER_CODE) as string) }],
       advancedCodes: [{ no: 1, fingerprint: await fingerprintOf(normalizeCode(ADVANCED_CODE) as string) }],
-      examples: ALL_EXAMPLES,
-      levels: ALL_LEVELS,
-      openToEveryone: ['hello', 'line-follow', 'gripper-demo'],
-      advancedOnly: KEPT_FOR_ADVANCED,
-    };
-    /** What the browser makes of the server's answer to this code (null: no code). */
-    const ask = async (code: string | null): Promise<Shelf> => {
-      const answer = await handleUnlockRequest({ method: 'POST', body: JSON.stringify(code === null ? {} : { code }), contentType: 'application/json', client: 'test' }, setup);
-      const outcome = readUnlockAnswer(answer.status, JSON.parse(JSON.stringify(answer.body)));
-      assert.ok(outcome.kind === 'examples', `the server answers ${code === null ? 'a visitor' : 'a code'}`);
-      return shelfOf(outcome);
+      games: ALL_GAMES,
+      openToEveryone: ['hello', 'line-follow', 'gripper-demo', 'chief-first-wall', 'chief-count-lines', 'chief-flame-fan'],
+      advancedOnly: [...KEPT_FOR_ADVANCED, 'chief-full-mission'],
     };
     visitor = await ask(null);
     member = await ask(MEMBER_CODE);
@@ -448,7 +453,7 @@ describe('the window as each kind of visitor sees it', () => {
   /** The state of the window: what the server answered, and where things stand with the code. */
   function windowWith(shelf: Shelf | null, over: Partial<MemberExamples> = {}): MemberExamples {
     return {
-      config: { unlockUrl: '/u', organisation: ORG },
+      config: { ...SOURCE, organisation: ORG },
       levels: shelf?.levels ?? [],
       cards: shelf?.cards ?? [],
       available: shelf?.available ?? {},
@@ -625,6 +630,50 @@ describe('the window as each kind of visitor sees it', () => {
       assert.doesNotMatch(wordsOf(html), HINTS_AT_MORE);
       assert.doesNotMatch(wordsOf(html), /members only/i, 'no card, so nothing is marked');
     }
+  });
+
+  test('the same window in Fire Chief: it draws the answer about that game for each kind of visitor - and not a word of Fire Rescue', async () => {
+    const STARTERS = ['chief-first-wall', 'chief-count-lines', 'chief-flame-fan'];
+    const FOR_MEMBERS = [...STARTERS, 'chief-wall-follow', 'chief-face-flame'];
+    const chief = ALL_GAMES.find((game) => game.game === 'fire-chief');
+    const rescue = ALL_GAMES.find((game) => game.game === 'fire-rescue');
+    assert.ok(chief && rescue);
+    /** What must not stand in the window of anybody without an advanced code, and what must stand in nobody's: the other game. */
+    const KEPT = ['chief-full-mission', 'The whole mission on any maze', 'dvanced', chief.levels[2].about];
+    const OTHER_GAME = [...rescue.examples.flatMap((example) => [`"${example.id}"`, example.title]), ...rescue.levels.map((level) => level.about)];
+    const inChief = (window: MemberExamples): MemberExamples => ({ ...window, config: { unlockUrl: '/u', game: 'fire-chief', organisation: ORG } });
+
+    for (const state of NOT_UNLOCKED) {
+      const html = draw(inChief(windowWith(await ask(null, 'fire-chief'), state)));
+      const where = `a visitor, ${state.status?.phase}/${state.status?.about}`;
+      assert.deepEqual(cardsIn(html), [...STARTERS, 'chief-wall-follow (locked)', 'chief-face-flame (locked)'], where);
+      assert.deepEqual(headingsIn(html), ['starter', 'intermediate'], where);
+      assert.equal(html.split(EXAMPLES_WORDS.loadExample).length - 1, 3, where);
+      for (const telling of [...KEPT, ...OTHER_GAME]) assert.ok(!html.includes(telling), `${where}: "${telling}" is nowhere in the window`);
+      assert.doesNotMatch(ownWords(html), HINTS_AT_MORE, where);
+    }
+    for (const state of ACCEPTED) {
+      const html = draw(inChief(unlockedWith(await ask(MEMBER_CODE, 'fire-chief'), state)));
+      const where = `a member, ${JSON.stringify(state)}`;
+      assert.deepEqual(cardsIn(html), FOR_MEMBERS, where);
+      assert.deepEqual(headingsIn(html), ['starter', 'intermediate'], where);
+      assert.equal(html.split(EXAMPLES_WORDS.loadExample).length - 1, 5, where);
+      for (const telling of [...KEPT, ...OTHER_GAME]) assert.ok(!html.includes(telling), `${where}: "${telling}" is nowhere in the window`);
+      assert.doesNotMatch(wordsOf(html), /members only|\block(ed|s)?\b|\bmissing\b|\bnot available\b|\bcoming soon\b/i, `${where}: nothing is said to be locked or missing`);
+      assert.doesNotMatch(ownWords(html), HINTS_AT_MORE, where);
+    }
+    for (const state of ACCEPTED) {
+      const html = draw(inChief(unlockedWith(await ask(ADVANCED_CODE, 'fire-chief'), state)));
+      const where = `an advanced code, ${JSON.stringify(state)}`;
+      assert.deepEqual(cardsIn(html), [...FOR_MEMBERS, 'chief-full-mission'], where);
+      assert.deepEqual(headingsIn(html), ['starter', 'intermediate', 'advanced'], where);
+      assert.equal(html.split(EXAMPLES_WORDS.loadExample).length - 1, 6, where);
+      for (const telling of OTHER_GAME) assert.ok(!html.includes(telling), `${where}: "${telling}" is nowhere in the window`);
+      for (const level of chief.levels) assert.ok(wordsOf(html).includes(level.about), `${where}: the heading of Fire Chief, "${level.about}"`);
+    }
+    // what the window itself adds to the answer is the same in both games, word for word
+    assert.equal(ownWords(draw(inChief(windowWith(await ask(null, 'fire-chief'))))), ownWords(draw(windowWith(visitor))));
+    assert.equal(ownWords(draw(inChief(unlockedWith(await ask(MEMBER_CODE, 'fire-chief'))))), ownWords(draw(unlockedWith(member))));
   });
 
   test('a member is back: while the saved code is checked the line at the top is the one that stays', () => {

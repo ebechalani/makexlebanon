@@ -9,6 +9,8 @@
  *   import * as Blockly from 'blockly';
  *   const workspace = createEditor(Blockly, div);              // does the three steps below
  *
+ *   const workspace = createEditor(Blockly, div, { palette: 'fire-chief' });   // the palette of a game
+ *
  *   registerBlocks(Blockly);                                   // once, before Blockly.inject
  *   const workspace = Blockly.inject(div, { toolbox: TOOLBOX, ...EDITOR_LOOK });
  *   attachToolboxCallbacks(Blockly, workspace);                // Scratch-like Variables palette
@@ -18,7 +20,7 @@ import { blocklyDefinitions, LIST_VARIABLE_TYPE } from './catalog';
 import { gripperVariantOf } from './gripper-original';
 import type { GripperVariantId } from './gripper-original';
 import { EDITOR_LOOK } from './theme';
-import { GRIPPER_CODE_CALLBACK, GROUP_GAP, SEE_MBLOCK_CODE, TOOLBOX, toolboxBlock } from './toolbox';
+import { GRIPPER_CODE_CALLBACK, GROUP_GAP, paletteToolbox, SEE_MBLOCK_CODE, toolboxBlock } from './toolbox';
 import type { ToolboxItem, ToolboxJson } from './toolbox';
 
 /** The Blockly module, as you get it from `import * as Blockly from 'blockly'`. */
@@ -406,7 +408,12 @@ export function addBubblesToMyBlocks(Blockly: BlocklyApi, workspace: BlocklyModu
 // =============================================================================================
 
 export interface EditorOptions extends Omit<BlocklyModule.BlocklyOptions, 'toolbox'> {
-  /** defaults to the complete TOOLBOX; pass buildToolbox([...]) for a smaller one */
+  /**
+   * The game whose palette the editor shows: give Game.id ('fire-rescue', 'fire-chief' - see
+   * ./palettes.ts). Left out, or a game without a palette of its own: the palette of Fire Rescue.
+   */
+  palette?: string;
+  /** your own toolbox instead of a game's palette, e.g. buildToolbox([...]) for a smaller one; it wins over `palette` */
   toolbox?: ToolboxJson;
   /**
    * Shows the real mBlock code of the Gripper blocks (the button of the Gripper palette and the
@@ -419,13 +426,13 @@ export interface EditorOptions extends Omit<BlocklyModule.BlocklyOptions, 'toolb
 /**
  * Register the blocks, create a Blockly workspace inside `container` with the mBlock toolbox and
  * look, and install the Scratch-like Variables palette, the bubbles of the my-block slots and the
- * "See the real mBlock code" button and menu entry of the Gripper blocks. Any
- * Blockly option can be overridden
+ * "See the real mBlock code" button and menu entry of the Gripper blocks. `palette` picks the
+ * palette of a game. Any Blockly option can be overridden
  * (readOnly, media, plugins: CONTINUOUS_TOOLBOX_PLUGINS, zoom ...).
  */
 export function createEditor(Blockly: BlocklyApi, container: Element | string, options: EditorOptions = {}): BlocklyModule.WorkspaceSvg {
   registerBlocks(Blockly);
-  const { toolbox = TOOLBOX, onGripperCode, ...rest } = options;
+  const { palette, toolbox = paletteToolbox(palette), onGripperCode, ...rest } = options;
   const workspace = Blockly.inject(container, {
     ...EDITOR_LOOK,
     ...rest,

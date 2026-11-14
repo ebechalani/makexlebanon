@@ -2,7 +2,7 @@
  * Small text and colour helpers shared by the simulator screens.
  * Plain TypeScript (no DOM, no React), so it can be unit-tested under Node.
  */
-import type { FinishReason, RGB, SimEvent } from '../core/types';
+import type { FinishReason, Game, RestartRules, RGB, SimEvent } from '../core/types';
 
 /** 125.4 -> "2:05" (whole seconds, rounded up so the clock shows 3:00 until time really starts to run). */
 export function formatClock(seconds: number): string {
@@ -19,6 +19,35 @@ export function formatStamp(seconds: number): string {
   const m = Math.floor(tenths / 600);
   const s = (tenths - m * 600) / 10;
   return `${m}:${s.toFixed(1).padStart(4, '0')}`;
+}
+
+/**
+ * A time the referee wrote down, as the referee writes it: 83.47 -> "1:23.4". The tenths are cut
+ * off, never rounded up - a time on the score sheet must not be later than what was measured.
+ * (Games that record times word them the same way in their own sentences, so the time beside a
+ * line of the sheet and the time inside its text agree.)
+ */
+export function formatRefereeTime(seconds: number): string {
+  const tenths = Math.max(0, Math.floor((Number.isFinite(seconds) ? seconds : 0) * 10 + 1e-6));
+  const m = Math.floor(tenths / 600);
+  const s = (tenths - m * 600) / 10;
+  return `${m}:${s.toFixed(1).padStart(4, '0')}`;
+}
+
+/** How a moment of the match is written on the screen: seconds in, "1:05.4" out. */
+export type TimeText = (seconds: number) => string;
+
+/**
+ * How the screen writes the moments of a match in this game.
+ *
+ * A game whose referee writes times down (Game.createReferee: its sheet and its sentences carry
+ * them, and a ranking uses them) cuts the tenths off. There every time on the screen is written
+ * that way - the console, the status line, the table of a test - so that "0:23.0" on the sheet
+ * is not "0:23.1" one panel further down. Every other game keeps the rounded time stamps it
+ * always had.
+ */
+export function timeTextOf(game: Pick<Game, 'createReferee'>): TimeText {
+  return game.createReferee ? formatRefereeTime : formatStamp;
 }
 
 /** A number for the dashboard: at most `digits` decimals, no "-0". */
@@ -63,12 +92,20 @@ export function inkOn(c: RGB): string {
   return luminance(c) > 0.6 ? '#111827' : '#ffffff';
 }
 
-/** "tower:W1" -> "tower W1", "bucket:red" -> "the red bucket", "wall" -> "the table wall". */
+/**
+ * "tower:W1" -> "tower W1", "bucket:red" -> "the red bucket", "wall" -> "the table wall".
+ * A fixed wall is named after the two cells it stands between or after its side of the field:
+ * "wall:A1-B1" -> "the wall between A1 and B1", "wall:top" -> "the top wall".
+ */
 export function bodyName(bodyId: string): string {
   if (bodyId === 'wall') return 'the table wall';
   const [kind, name] = bodyId.split(':');
   if (!name) return bodyId;
   if (kind === 'tower') return `tower ${name}`;
+  if (kind === 'wall') {
+    const cells = name.split('-');
+    if (cells.length === 2 && cells[0] !== '' && cells[1] !== '') return `the wall between ${cells[0]} and ${cells[1]}`;
+  }
   return `the ${name} ${kind}`;
 }
 
@@ -80,9 +117,58 @@ export function finishText(reason: FinishReason | null): string {
       return 'You declared "Finished"';
     case 'program-ended':
       return 'The program ended';
+    case 'mission-complete':
+      return 'Mission complete';
+    case 'target-displaced':
+      return 'The target was moved';
     default:
       return 'Match over';
   }
+}
+
+/**
+ * What a restart does in a game, as far as the screen has to say it: the points one restart
+ * costs (Game.restartPenalty) and the game's own restart rules (Game.restartRules: how many
+ * restarts there are, whether one clears the points, whether the game elements are put back).
+ */
+export interface RestartFacts {
+  penalty: number;
+  rules?: RestartRules;
+}
+
+export function restartFacts(game: Pick<Game, 'restartPenalty' | 'restartRules'>): RestartFacts {
+  return { penalty: game.restartPenalty, rules: game.restartRules };
+}
+
+/** Restarts are counted in whole numbers; "no limit" stays Infinity. */
+function wholeRestarts(n: number): number {
+  if (n === Infinity) return Infinity;
+  return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
+}
+
+/**
+ * How many restarts are left, in a few words: "1 restart left", "No restart left". Empty for a
+ * game that sets no limit (`left` is then Infinity) and when the number is not known.
+ */
+export function restartsLeftText(facts: RestartFacts, left: number | undefined): string {
+  if (facts.rules?.maxRestarts === undefined || left === undefined) return '';
+  const n = wholeRestarts(left);
+  if (n === Infinity) return '';
+  return n === 0 ? 'No restart left' : `${n} restart${n === 1 ? '' : 's'} left`;
+}
+
+/**
+ * The console line of a restart. Fire Rescue: "Restart: the robot is back in the start zone
+ * (-5 points)." A game whose restart clears the points, or that allows only so many restarts,
+ * says that too. `left`: the restarts the team still has after this one.
+ */
+export function restartLine(facts: RestartFacts, left?: number): string {
+  let text = 'Restart: the robot is back in the start zone';
+  text += facts.penalty > 0 ? ` (-${facts.penalty} points).` : '.';
+  if (facts.rules?.clearsPoints) text += ' The points earned so far are cleared; the clock keeps running.';
+  const remaining = restartsLeftText(facts, left);
+  if (remaining) text += ` ${remaining}.`;
+  return text;
 }
 
 /**
@@ -128,11 +214,21 @@ export interface LogLine {
   count: number;
 }
 
+/** The restart of the simulator's first game, Fire Rescue: 5 points each, as often as the team wants. */
+const FIRST_GAME_RESTART: RestartFacts = { penalty: 5 };
+
 /**
  * Turn an engine event into a line for the console, in words a student understands.
  * Returns null for events that are not worth a line (sounds).
+ *
+ * `game` says what the lines cannot know from the event alone: what a restart does in the game
+ * that is played, how many restarts are left after the one that just happened, and what the game
+ * calls one scored run ("match", "attempt"). Left out: the restart and the word of Fire Rescue.
  */
-export function describeEvent(event: SimEvent): Omit<LogLine, 'n' | 'count'> | null {
+export function describeEvent(
+  event: SimEvent,
+  game: RestartFacts & { left?: number; match?: string } = FIRST_GAME_RESTART,
+): Omit<LogLine, 'n' | 'count'> | null {
   switch (event.type) {
     case 'log':
       return { time: event.time, level: event.level, text: event.text, blockId: event.blockId };
@@ -147,9 +243,10 @@ export function describeEvent(event: SimEvent): Omit<LogLine, 'n' | 'count'> | n
     case 'bump':
       return { time: event.time, level: 'event', text: `Bumped into ${bodyName(event.bodyId)}.` };
     case 'restart':
-      return { time: event.time, level: 'warn', text: 'Restart: the robot is back in the start zone (-5 points).' };
+      return { time: event.time, level: 'warn', text: restartLine(game, game.left) };
     case 'finish':
-      return { time: event.time, level: 'info', text: `${finishText(event.reason)} - the match is over.` };
+      // (a referee that ended the match says why in its own sentence: that sentence is the line)
+      return { time: event.time, level: 'info', text: event.detail ? event.detail : `${finishText(event.reason)} - the ${game.match ?? 'match'} is over.` };
     case 'tone':
       return null;
   }

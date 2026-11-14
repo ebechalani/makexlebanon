@@ -15,7 +15,7 @@ import { memo, useEffect, useRef, useState } from 'react';
 import type * as BlocklyModule from 'blockly';
 import { createEditor, type BlocklyApi, type GripperCodeHandler } from '../blocks';
 import type { ProgramJson } from '../core/types';
-import { isProgramJson } from './program-file';
+import { isProgramJson, retiredBlocksNote, withoutRetiredBlocks } from './program-file';
 import { programFitScale } from './program-view';
 import { loadJson, saveJson } from './storage';
 
@@ -45,6 +45,11 @@ export interface EditorStatus {
 export interface BlocklyEditorProps {
   /** localStorage key the workspace is saved under */
   storageKey: string;
+  /**
+   * The game whose block palette the editor shows: Game.id (see ../blocks/palettes.ts).
+   * Left out: the palette of Fire Rescue. It is read once, when the editor is made.
+   */
+  palette?: string;
   /** what to show when nothing has been saved yet */
   initialProgram: () => ProgramJson;
   /** folder with Blockly's own pictures (sprites, cursors), ending with a slash */
@@ -55,6 +60,12 @@ export interface BlocklyEditorProps {
   onStatus?: (status: EditorStatus) => void;
   /** called when the student asks to see the real mBlock code of the Gripper blocks (see ./GripperCodeDialog.tsx) */
   onGripperCode?: GripperCodeHandler;
+  /**
+   * called once, when the editor is ready, with one sentence for the student - only when the
+   * saved blocks could not be shown as they were saved (blocks the simulator no longer has
+   * were taken out: see withoutRetiredBlocks in ./program-file.ts)
+   */
+  onSavedNote?: (text: string) => void;
 }
 
 /** Space kept free above and to the left of the program after loading (pixels). */
@@ -107,7 +118,7 @@ function BlocklyEditorImpl(props: BlocklyEditorProps) {
     propsRef.current = props;
   });
   const [phase, setPhase] = useState<'loading' | 'ready' | 'failed'>('loading');
-  const { storageKey, mediaPath } = props;
+  const { storageKey, mediaPath, palette } = props;
 
   useEffect(() => {
     let disposed = false;
@@ -130,8 +141,11 @@ function BlocklyEditorImpl(props: BlocklyEditorProps) {
         media: mediaPath,
         // a classroom full of clicking robots is loud enough
         sounds: false,
-        // the button of the Gripper palette and the right-click entry of the Gripper blocks
-        onGripperCode: (at) => propsRef.current.onGripperCode?.(at),
+        // the blocks this game's robot can use
+        palette,
+        // The button of the Gripper palette and the right-click entry of the Gripper blocks. An
+        // editor that was given nobody to show that code gets neither: the entry would open nothing.
+        onGripperCode: propsRef.current.onGripperCode ? (at) => propsRef.current.onGripperCode?.(at) : undefined,
       });
       workspace = ws;
       const serializer = Blockly.serialization.workspaces;
@@ -143,12 +157,17 @@ function BlocklyEditorImpl(props: BlocklyEditorProps) {
       }
 
       // ---- show the saved program (or the starting one)
+      // (blocks the simulator no longer has are taken out first: Blockly would refuse the whole
+      // program for one such block, and the saved work would be gone)
       const saved = loadJson(storageKey, isProgramJson);
-      const first = saved ?? propsRef.current.initialProgram();
+      const kept = saved ? withoutRetiredBlocks(saved) : null;
+      let savedNote = kept ? retiredBlocksNote(kept, 'your saved program') : null;
+      const first = kept?.program ?? propsRef.current.initialProgram();
       try {
         serializer.load(first, ws, { recordUndo: false });
       } catch {
         // a damaged save must not lock the student out: start fresh
+        savedNote = null;
         ws.clear();
         try {
           serializer.load(propsRef.current.initialProgram(), ws, { recordUndo: false });
@@ -235,6 +254,7 @@ function BlocklyEditorImpl(props: BlocklyEditorProps) {
       setPhase('ready');
       propsRef.current.onStatus?.(status());
       propsRef.current.onReady(handle);
+      if (savedNote) propsRef.current.onSavedNote?.(savedNote);
     };
 
     setUp().catch(() => {
@@ -254,7 +274,7 @@ function BlocklyEditorImpl(props: BlocklyEditorProps) {
       workspace?.dispose();
       workspace = null;
     };
-  }, [mediaPath, storageKey]);
+  }, [mediaPath, palette, storageKey]);
 
   return (
     <div className="relative h-full w-full">

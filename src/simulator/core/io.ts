@@ -8,10 +8,12 @@
  *   core/engine.ts         export function createSimulation<S>(opts: SimulationOptions<S>): Simulation<S>
  *   vm/index.ts            export function createVM(program: ProgramJson, io: RobotIO): VM
  *   fire-rescue/game.ts    export const fireRescueGame: Game<FireRescueScenario>
+ *   fire-chief/game.ts     export const fireChiefGame: Game<FireChiefScenario>
  *   blocks/                Blockly block definitions + toolbox (browser only)
  */
 import type {
   ButtonName,
+  DcMotorPort,
   ProbeName,
   ProbeReading,
   RGB,
@@ -72,11 +74,22 @@ export interface RobotIO {
   lineOffset(): number;
   /** distance to the nearest obstacle in cm; config.ultrasonic.maxRangeCm when nothing is seen */
   ultrasonicCm(): number;
-  /** colour of the object in / just ahead of the claw, 'none' if nothing (or sensor not fitted) */
+  /**
+   * front colour sensor (config.frontColorSensor). At the claw: the colour of the object in /
+   * just ahead of the claw. Fixed to the robot (`mount`): the colour of the nearest thing
+   * straight ahead, a wall included. 'none' if nothing is in range (or no sensor is fitted).
+   */
   frontColor(): SensorColor | 'none';
   /** unwrapped yaw since the last reset, degrees, clockwise positive */
   yawDeg(): number;
   resetYaw(): void;
+
+  // ------------------------------------------------------------------ DC motors (fan)
+  /** run the DC motor on port M1 / M2 at a power of -100..100 % (0 stops it); it keeps running until changed */
+  setDcMotor(port: DcMotorPort, power: number): void;
+  stopDcMotor(port: DcMotorPort | 'all'): void;
+  /** current power of a DC motor port, -100..100 */
+  dcMotorPower(port: DcMotorPort): number;
 
   // ------------------------------------------------------------------ CyberPi
   buttonDown(name: ButtonName): boolean;

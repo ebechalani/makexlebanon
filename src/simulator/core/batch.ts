@@ -44,6 +44,10 @@ export interface BatchResult {
   time: number;
   /** why the match ended ('declared' also when the match was cut short by `maxSeconds`) */
   finishReason: FinishReason | null;
+  /** the referee's sentence about the end, when the game's referee ended the match; left out otherwise */
+  finishDetail?: string;
+  /** match time (seconds) at which the final score was reached, for games that rank by time; left out otherwise */
+  scoreTime?: number;
   /** the referee's score sheet, line by line */
   lines: ScoreLine[];
   /** problems the interpreter found in the program (unknown block, empty slot ...); left out when there are none */
@@ -66,6 +70,8 @@ export function resultOf<S>(sim: Simulation<S>): BatchResult {
     finishReason: sim.finishReason,
     lines: report.lines,
   };
+  if (sim.finishDetail !== null) result.finishDetail = sim.finishDetail;
+  if (report.time !== undefined) result.scoreTime = report.time;
   const errors = sim.vm.errors();
   if (errors.length > 0) result.errors = errors;
   return result;
@@ -115,7 +121,8 @@ export interface BatchSettings<S> {
 /** Everything a batch needs to know. */
 export interface BatchArgs<S> extends BatchSettings<S> {
   game: Game<S>;
-  robotConfig: RobotConfig;
+  /** left out = the robot of the game (game.robotConfig), or the simulator's standard robot */
+  robotConfig?: RobotConfig;
   program: ProgramJson;
   /** the combinations to play, in this order */
   scenarios: S[];

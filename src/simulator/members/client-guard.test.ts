@@ -2,8 +2,9 @@
  * The guard on the examples: nothing a visitor's browser gets may contain an example program,
  * the text that explains one - or so much as the title of one.
  *
- * The programs and descriptions (../fire-rescue/samples.ts) and the list of the titles
- * (../fire-rescue/sample-catalog.ts) stay on the server. They leave it only through
+ * Every game of the simulator has examples of its own: Fire Rescue and Fire Chief. The programs
+ * and descriptions (samples.ts in ../fire-rescue and in ../fire-chief) and the lists of the
+ * titles (sample-catalog.ts, next to them) stay on the server. They leave it only through
  * /api/simulator/unlock, which decides for every request what that visitor may see: an example
  * the owner keeps for advanced codes only must not show anywhere - not even its title, not
  * even the heading of its level - before an advanced code was checked. If a file of the
@@ -21,7 +22,8 @@
  *     anywhere, even in a comment: so a list of titles copied into a file of the screen by
  *     hand is caught as well. That goes for files that are not code too - a .json file of
  *     cards, a stylesheet - and for a title written in small letters, broken over two lines or
- *     spelt with escapes.
+ *     spelt with escapes. The examples of ALL games are looked for in ALL files: the screen of
+ *     one game must not hold a title of another game either.
  *
  * Where it starts from ("what the browser gets"):
  *   - every file that begins with 'use client', and everything those import;
@@ -33,8 +35,9 @@
  * name or in its text, and neither may the configuration files of the website.
  *
  * And one thing more: the files of the simulator that the browser gets must not name a level
- * of the examples ("advanced") or hold one of the headings. The headings come from the server
- * together with the cards, so that a heading without a visible card never reaches a browser.
+ * of the examples ("advanced") or hold one of the headings - of either game. The headings come
+ * from the server together with the cards, so that a heading without a visible card never
+ * reaches a browser.
  */
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
@@ -43,18 +46,36 @@ import { describe, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
-import { EXAMPLE_LEVELS, SAMPLE_CATALOG } from '../fire-rescue/sample-catalog';
+import { EXAMPLE_LEVELS as CHIEF_LEVELS, SAMPLE_CATALOG as CHIEF_CATALOG } from '../fire-chief/sample-catalog';
+import { EXAMPLE_LEVELS as RESCUE_LEVELS, SAMPLE_CATALOG as RESCUE_CATALOG } from '../fire-rescue/sample-catalog';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 
-/** The list of the examples: their ids, titles and levels, and the headings of the levels. */
+/** The list of the examples of Fire Rescue: their ids, titles and levels, and the headings of the levels. */
 const CATALOG = 'src/simulator/fire-rescue/sample-catalog.ts';
+/** The same list for Fire Chief. */
+const CHIEF_CATALOG_FILE = 'src/simulator/fire-chief/sample-catalog.ts';
+/** The list of every game, with the number of examples it holds. */
+const CATALOGS: ReadonlyArray<{ file: string; samples: string; game: string; examples: number }> = [
+  { file: CATALOG, samples: 'src/simulator/fire-rescue/samples.ts', game: 'Fire Rescue', examples: 7 },
+  { file: CHIEF_CATALOG_FILE, samples: 'src/simulator/fire-chief/samples.ts', game: 'Fire Chief', examples: 6 },
+];
+
+/** The cards of every game: what the titles and the ids are taken from. */
+const SAMPLE_CATALOG = [...RESCUE_CATALOG, ...CHIEF_CATALOG];
+/**
+ * The headings of every game. (Both games call their levels the same - Starter, Intermediate,
+ * Advanced - but the few words after a heading are a game's own, and all six are looked for.)
+ */
+const EXAMPLE_LEVELS = [...RESCUE_LEVELS, ...CHIEF_LEVELS];
 
 /** The files that hold the examples (paths from the repository's folder), and what they hold. */
 const HOLDERS: Record<string, string> = {
   'src/simulator/fire-rescue/samples.ts': 'holds example programs and descriptions',
+  'src/simulator/fire-chief/samples.ts': 'holds example programs and descriptions',
   'src/simulator/members/all-examples.ts': 'holds example programs and descriptions',
   [CATALOG]: 'holds the titles of the examples',
+  [CHIEF_CATALOG_FILE]: 'holds the titles of the examples',
 };
 
 /** Files that belong to the server for other reasons: the lists of codes and the code that checks one. */
@@ -91,7 +112,7 @@ function exampleMarkers(cards: ReadonlyArray<{ id: string; title: string }>): Re
   return markers;
 }
 
-/** The titles and ids of the real examples. */
+/** The titles and ids of the real examples, of every game. */
 const REAL_MARKERS = exampleMarkers(SAMPLE_CATALOG);
 
 const SOURCE_FILE = /\.(?:ts|tsx|mts|cts|js|jsx|mjs|cjs)$/;
@@ -490,30 +511,56 @@ describe('the examples stay on the server', () => {
     assert.ok(fromPage.has('src/simulator/ui/SimulatorApp.tsx'), 'page -> loader -> import() -> simulator');
     assert.ok(fromPage.has('src/simulator/ui/ExamplesDialog.tsx'), 'the Examples window');
     assert.ok(fromPage.has('src/simulator/ui/member-unlock.ts'));
-    assert.ok(!fromPage.has(CATALOG), 'the screen holds no list of examples');
+    for (const catalog of CATALOGS) assert.ok(!fromPage.has(catalog.file) && !fromPage.has(catalog.samples), `the screen holds no list of examples, and no example: not of ${catalog.game}`);
     assert.ok(reachableFrom(graph, 'src/simulator/ui/fire-rescue/FireRescueSimulator.tsx').has('src/simulator/vm/index.ts'), 'and the interpreter');
   });
 
   test('the files that hold the examples are known to the guard', () => {
     const forbidden = forbiddenFiles(files, graph);
     for (const file of [...Object.keys(HOLDERS), ...SERVER_ONLY]) assert.ok(forbidden.has(file), `${file} exists`);
-    assert.match(forbidden.get(CATALOG) ?? '', /titles/);
-    // nothing but samples.ts builds programs outside the tests
+    // the examples of every game: its list of titles and its programs
+    assert.deepEqual(
+      CATALOGS.map((catalog) => catalog.game),
+      ['Fire Rescue', 'Fire Chief'],
+    );
+    for (const catalog of CATALOGS) {
+      assert.match(forbidden.get(catalog.file) ?? '', /titles/, catalog.file);
+      assert.match(forbidden.get(catalog.samples) ?? '', /programs and descriptions/, catalog.samples);
+    }
+    // nothing but the samples.ts of a game builds programs outside the tests
     assert.deepEqual(
       [...forbidden].filter(([, why]) => why.includes('builder')).map(([file]) => file),
       [],
       'a file that imports the program builder holds programs: list it in HOLDERS and keep it on the server',
     );
-    assert.ok((graph.edges.get('src/simulator/fire-rescue/samples.ts') ?? []).includes(BUILDER));
+    for (const catalog of CATALOGS) assert.ok((graph.edges.get(catalog.samples) ?? []).includes(BUILDER), `${catalog.samples} is written with the program builder`);
+    // ... and the server's own list brings them all along
+    for (const catalog of CATALOGS) {
+      for (const file of [catalog.file, catalog.samples]) assert.ok((graph.edges.get('src/simulator/members/all-examples.ts') ?? []).includes(file), `all-examples.ts imports ${file}`);
+    }
     // files in which a title or an id is written are found without being listed: the script that
     // makes codes (its explanations for the owner name every example) is one of them
     assert.match(forbidden.get('scripts/generate-simulator-codes.mjs') ?? '', /holds the title or the id of an example/);
-    assert.equal(REAL_MARKERS.length, 7 + 2 + 6, 'seven titles, two first halves of a title, six ids of more than one word');
-    for (const card of SAMPLE_CATALOG) assert.ok(REAL_MARKERS.some((marker) => marker.test(`title: '${card.title}'`)), card.title);
+    assert.equal(exampleMarkers(RESCUE_CATALOG).length, 7 + 2 + 6, 'Fire Rescue: seven titles, two first halves of a title, six ids of more than one word');
+    assert.equal(exampleMarkers(CHIEF_CATALOG).length, 6 + 0 + 6, 'Fire Chief: six titles (none with a colon), six ids of more than one word');
+    assert.equal(REAL_MARKERS.length, 15 + 12, 'and the guard looks for all of them');
+    assert.equal(SAMPLE_CATALOG.length, 7 + 6);
+    for (const card of SAMPLE_CATALOG) {
+      assert.ok(REAL_MARKERS.some((marker) => marker.test(`title: '${card.title}'`)), card.title);
+      assert.ok(REAL_MARKERS.some((marker) => marker.test(card.title.toUpperCase())), `${card.title}, in capitals`);
+      if (card.id.includes('-')) assert.ok(REAL_MARKERS.some((marker) => marker.test(`{ id: "${card.id}" }`)), card.id);
+    }
     for (const telling of ["'smart-bucket'", '"full-mission"', 'the "Smart bucket" program', 'Full mission', '`one-person`']) {
       assert.ok(REAL_MARKERS.some((marker) => marker.test(telling)), telling);
     }
     for (const harmless of ['A line-following robot', 'hello', 'the gripper', 'smart', 'a bucket', 'one-personality', 'not-one-bucket']) {
+      assert.ok(!REAL_MARKERS.some((marker) => marker.test(harmless)), harmless);
+    }
+    // the same for Fire Chief
+    for (const telling of ["'chief-first-wall'", '"chief-full-mission"', '`chief-flame-fan`', 'the "Follow the right-hand wall to a room" program', 'the whole mission on\n   any maze', 'data-example="chief-count-lines"']) {
+      assert.ok(REAL_MARKERS.some((marker) => marker.test(telling)), telling);
+    }
+    for (const harmless of ['fire-chief', 'chief', 'the fire chief', 'chief-first-walls', 'the first wall', 'the whole mission', 'count the grid lines', 'the colour sensor and the fan', 'read red', 'start the fan', 'find the fire', 'follow the wall to a room']) {
       assert.ok(!REAL_MARKERS.some((marker) => marker.test(harmless)), harmless);
     }
   });
@@ -525,8 +572,9 @@ describe('the examples stay on the server', () => {
       [],
       `\n\nExample programs, their descriptions or their titles would be sent to every visitor's browser:\n\n  ${leaks.join('\n  ')}\n\n` +
         'Take that import out (or the title that was written into that file). The screen holds nothing about the examples -\n' +
-        'not even src/simulator/fire-rescue/sample-catalog.ts, the list of the titles: an example for advanced codes only\n' +
-        'must not show anywhere. The cards, the programs and the descriptions come from the server, through /api/simulator/unlock.\n',
+        'not even a sample-catalog.ts (src/simulator/fire-rescue, src/simulator/fire-chief), the list of the titles of a game:\n' +
+        'an example for advanced codes only must not show anywhere. The cards, the programs and the descriptions come from\n' +
+        'the server, through /api/simulator/unlock.\n',
     );
   });
 
@@ -536,10 +584,15 @@ describe('the examples stay on the server', () => {
       named,
       [],
       `\n\nA level of the examples is named in what every visitor's browser downloads:\n\n  ${named.join('\n  ')}\n\n` +
-        'The headings (Starter, Intermediate, Advanced) are in src/simulator/fire-rescue/sample-catalog.ts, on the server.\n' +
+        'The headings (Starter, Intermediate, Advanced) and the few words after them are in the sample-catalog.ts of each game\n' +
+        '(src/simulator/fire-rescue, src/simulator/fire-chief), on the server.\n' +
         'The Examples window draws the headings the server sends - a visitor who may not see an advanced example\n' +
         'must not get the word "Advanced" either.\n',
     );
+    // the headings of both games are looked for: the names of the three levels, and the words after each heading
+    assert.equal(EXAMPLE_LEVELS.length, 3 + 3);
+    assert.equal(new Set(EXAMPLE_LEVELS.map((level) => level.about)).size, 6, 'six different texts');
+    assert.deepEqual([...new Set(EXAMPLE_LEVELS.map((level) => level.id))], ['starter', 'intermediate', 'advanced']);
     // (the check looks at the screen's own files, and at their code, not at their comments)
     const screen = reachableFrom(graph, 'src/simulator/ui/fire-rescue/FireRescueSimulator.tsx');
     assert.ok([...screen.keys()].filter((file) => file.startsWith('src/simulator/')).length >= 30);
@@ -548,23 +601,27 @@ describe('the examples stay on the server', () => {
     assert.ok(codeOnly("export const a = <p title='x'>Advanced {`first ${1} steps`}</p>;").includes('Advanced'));
   });
 
-  test('the catalog - the list of the titles - stays on the server, and imports nothing', () => {
-    const text = files.get(CATALOG);
-    assert.ok(text);
-    assert.deepEqual(importsOf(text), [], 'no import at all');
-    const code = codeOnly(text);
-    for (const word of ['description', 'program', 'blocks', 'note(']) {
-      assert.ok(!code.includes(word), `sample-catalog.ts has no "${word}" outside its comments`);
-    }
-    // every entry of the list is one short line: { id, title, level }
-    const entries = text.match(/^ {2}\{ id: .* level: .*\},$/gm) ?? [];
-    assert.equal(entries.length, 7);
-    for (const entry of entries) assert.match(entry.trim(), /^\{ id: '[a-z-]+', title: '[^']{4,80}', level: '(starter|intermediate|advanced)' \},$/);
-    // nothing the browser gets leads to it
-    for (const root of [...roots.client, ...roots.pages]) {
-      assert.ok(!reachableFrom(graph, root).has(CATALOG), `${root} does not reach the catalog`);
-    }
-  });
+  for (const catalog of CATALOGS) {
+    test(`${catalog.game}: the catalog - the list of the titles - stays on the server, and imports nothing`, () => {
+      const text = files.get(catalog.file);
+      assert.ok(text);
+      assert.deepEqual(importsOf(text), [], 'no import at all');
+      const code = codeOnly(text);
+      for (const word of ['description', 'program', 'blocks', 'note(']) {
+        assert.ok(!code.includes(word), `sample-catalog.ts has no "${word}" outside its comments`);
+      }
+      // every entry of the list is one short line: { id, title, level }
+      const entries = text.match(/^ {2}\{ id: .* level: .*\},$/gm) ?? [];
+      assert.equal(entries.length, catalog.examples);
+      for (const entry of entries) assert.match(entry.trim(), /^\{ id: '[a-z-]+', title: '[^']{4,80}', level: '(starter|intermediate|advanced)' \},$/);
+      // nothing the browser gets leads to it, or to the programs
+      for (const root of [...roots.client, ...roots.pages]) {
+        const reached = reachableFrom(graph, root);
+        assert.ok(!reached.has(catalog.file), `${root} does not reach the catalog`);
+        assert.ok(!reached.has(catalog.samples), `${root} does not reach the programs`);
+      }
+    });
+  }
 
   test('nothing that is served as it is names an example: no file in public/, and not the configuration of the website', () => {
     const served = readServedFiles('public');
@@ -592,6 +649,8 @@ describe('the examples stay on the server', () => {
         .sort();
     assert.deepEqual(importers(CATALOG), ['src/simulator/fire-rescue/samples.ts', 'src/simulator/members/all-examples.ts']);
     assert.deepEqual(importers('src/simulator/fire-rescue/samples.ts'), ['src/simulator/members/all-examples.ts']);
+    assert.deepEqual(importers(CHIEF_CATALOG_FILE), ['src/simulator/fire-chief/samples.ts', 'src/simulator/members/all-examples.ts']);
+    assert.deepEqual(importers('src/simulator/fire-chief/samples.ts'), ['src/simulator/members/all-examples.ts']);
     assert.deepEqual(importers('src/simulator/members/all-examples.ts'), ['src/app/api/simulator/unlock/route.ts']);
     assert.deepEqual(importers('src/simulator/members/unlock.ts'), ['src/app/api/simulator/unlock/route.ts']);
     assert.deepEqual(importers('content/simulator-codes.ts'), ['src/app/api/simulator/unlock/route.ts']);
@@ -610,8 +669,15 @@ describe('the guard catches a leak', () => {
       ['src/simulator/vm/builder.ts', 'export function program(scripts: unknown[]) { return { scripts }; }\n'],
       ['src/simulator/fire-rescue/samples.ts', SAMPLES],
       ['src/simulator/fire-rescue/sample-catalog.ts', "export const SAMPLE_CATALOG = [{ id: 'hello', title: 'Hello, mBot2' }, { id: 'full-mission', title: 'Full mission: 180 points on the default combination' }];\n"],
-      ['src/simulator/members/all-examples.ts', "import { SAMPLE_CATALOG } from '../fire-rescue/sample-catalog';\nimport { SAMPLE_PROGRAMS } from '../fire-rescue/samples';\nexport const ALL_EXAMPLES = [SAMPLE_CATALOG, SAMPLE_PROGRAMS];\n"],
-      ['src/app/api/simulator/unlock/route.ts', "import { ALL_EXAMPLES } from '@/simulator/members/all-examples';\nexport const POST = () => ALL_EXAMPLES;\n"],
+      ['src/simulator/fire-chief/samples.ts', SAMPLES],
+      ['src/simulator/fire-chief/sample-catalog.ts', "export const SAMPLE_CATALOG = [{ id: 'chief-first-wall', title: 'Stop in front of the first wall' }, { id: 'chief-full-mission', title: 'The whole mission on any maze' }];\n"],
+      [
+        'src/simulator/members/all-examples.ts',
+        "import { SAMPLE_CATALOG } from '../fire-rescue/sample-catalog';\nimport { SAMPLE_PROGRAMS } from '../fire-rescue/samples';\n" +
+          "import { SAMPLE_CATALOG as CHIEF_CATALOG } from '../fire-chief/sample-catalog';\nimport { SAMPLE_PROGRAMS as CHIEF_PROGRAMS } from '../fire-chief/samples';\n" +
+          'export const ALL_GAMES = [SAMPLE_CATALOG, SAMPLE_PROGRAMS, CHIEF_CATALOG, CHIEF_PROGRAMS];\n',
+      ],
+      ['src/app/api/simulator/unlock/route.ts', "import { ALL_GAMES } from '@/simulator/members/all-examples';\nexport const POST = () => ALL_GAMES;\n"],
       ['src/simulator/fire-rescue/integration.test.ts', "import { SAMPLE_PROGRAMS } from './samples';\nvoid SAMPLE_PROGRAMS;\n"],
       ['src/simulator/ui/member-unlock.ts', "export const requestUnlock = (url: string) => fetch(url, { method: 'POST' });\n"],
       ['src/simulator/ui/Screen.tsx', "'use client';\nimport { requestUnlock } from './member-unlock';\nexport const Screen = () => requestUnlock('/api/simulator/unlock');\n"],
@@ -640,6 +706,92 @@ describe('the guard catches a leak', () => {
     }
     const page = findLeaks(withFile('src/app/training/page.tsx', "import { SAMPLE_CATALOG } from '@/simulator/fire-rescue/sample-catalog';\nexport default function Page() { return SAMPLE_CATALOG.length; }\n"));
     assert.ok(page.some((leak) => leak.startsWith('src/app/training/page.tsx  ->  src/simulator/fire-rescue/sample-catalog.ts')));
+  });
+
+  test('the examples of Fire Chief are guarded like the ones of Fire Rescue: its programs, its list of titles, however a file gets there', () => {
+    const ways = ["import { SAMPLE_PROGRAMS } from '../fire-chief/samples';", "import type { SampleProgram } from '../fire-chief/samples';", "const load = () => import('@/simulator/fire-chief/samples');", "export * from '../fire-chief/samples';"];
+    for (const line of ways) {
+      const leaks = findLeaks(withFile('src/simulator/ui/Screen.tsx', `'use client';\n${line}\nexport const Screen = () => null;\n`));
+      assert.ok(leaks.some((leak) => leak.startsWith('src/simulator/ui/Screen.tsx  ->  src/simulator/fire-chief/samples.ts') && leak.includes('holds example programs and descriptions')), line);
+    }
+    for (const line of ["import { SAMPLE_CATALOG } from '../fire-chief/sample-catalog';", "import type { ExampleCard } from '../fire-chief/sample-catalog';", "const load = () => import('../fire-chief/sample-catalog');"]) {
+      // in the screen every game shares, in a screen of Fire Chief's own, through a helper
+      for (const screen of ['src/simulator/ui/Screen.tsx', 'src/simulator/ui/fire-chief/FireChiefSimulator.tsx']) {
+        const from = line.replace("'../fire-chief/", screen.includes('/ui/fire-chief/') ? "'../../fire-chief/" : "'../fire-chief/");
+        const leaks = findLeaks(withFile(screen, `'use client';\n${from}\nexport const Screen = () => null;\n`));
+        assert.ok(leaks.some((leak) => leak.startsWith(`${screen}  ->  src/simulator/fire-chief/sample-catalog.ts`) && leak.includes('holds the titles')), `${screen}: ${from}`);
+      }
+      const files = withFile('src/simulator/ui/helper.ts', `${line}\nexport const helper = 1;\n`);
+      files.set('src/simulator/ui/Screen.tsx', "'use client';\nimport { helper } from './helper';\nexport const Screen = () => helper;\n");
+      assert.ok(findLeaks(files).some((leak) => leak.startsWith('src/simulator/ui/Screen.tsx  ->  src/simulator/ui/helper.ts  ->  src/simulator/fire-chief/sample-catalog.ts')), line);
+    }
+    // a page of the game, and the server's list of every game's examples
+    const page = findLeaks(withFile('src/app/training/simulator/fire-chief/page.tsx', "import { SAMPLE_CATALOG } from '@/simulator/fire-chief/sample-catalog';\nexport default function Page() { return SAMPLE_CATALOG.length; }\n"));
+    assert.ok(page.some((leak) => leak.startsWith('src/app/training/simulator/fire-chief/page.tsx  ->  src/simulator/fire-chief/sample-catalog.ts')));
+    const all = findLeaks(withFile('src/simulator/ui/Screen.tsx', "'use client';\nimport { ALL_GAMES } from '../members/all-examples';\nexport const Screen = () => ALL_GAMES;\n"));
+    for (const file of ['src/simulator/fire-rescue/samples.ts', 'src/simulator/fire-rescue/sample-catalog.ts', 'src/simulator/fire-chief/samples.ts', 'src/simulator/fire-chief/sample-catalog.ts']) {
+      assert.ok(all.some((leak) => leak.startsWith('src/simulator/ui/Screen.tsx  ->  src/simulator/members/all-examples.ts') && leak.includes(`(${file} `)), file);
+    }
+  });
+
+  test('a title or an id of a Fire Chief example written into a file the browser gets is caught - with the real titles, also in the screen of the other game', () => {
+    assert.deepEqual(findLeaks(base()), [], 'the tree is clean with the real titles');
+    const telling = [
+      ...CHIEF_CATALOG.map((card) => `export const CARDS = [{ id: 'x', title: '${card.title}' }];`),
+      ...CHIEF_CATALOG.map((card) => `export const CARDS = [{ id: '${card.id}' }];`),
+      'export const hint = "Ask for the whole mission on any maze";',
+      "export const title = 'STOP IN FRONT OF THE FIRST WALL';",
+      'export const card = <li>Find the fire in a room\n        and check   its colour</li>;',
+      "export const title = 'Count grid' + ' lines to drive ' + `two cells`;",
+      '// the locked card of chief-wall-follow is not drawn\nexport const nothing = 1;',
+    ];
+    for (const line of telling) {
+      for (const file of ['src/simulator/ui/Screen.tsx', 'src/simulator/ui/fire-chief/FireChiefSimulator.tsx', 'src/simulator/ui/fire-rescue/FireRescueSimulator.tsx']) {
+        const leaks = findLeaks(withFile(file, `'use client';\n${line}\nexport const Screen = () => null;\n`));
+        assert.ok(leaks.some((leak) => leak.startsWith(file) && leak.includes('holds the title or the id of an example')), `${file}: ${line}`);
+      }
+      assert.ok(findLeaks(withFile('src/app/training/simulator/fire-chief/page.tsx', `${line}\nexport default function Page() { return null; }\n`)).length > 0, line);
+      // on the server and in a test it is nobody's business
+      assert.deepEqual(findLeaks(withFile('src/simulator/members/server-helper.ts', `${line}\n`)), [], line);
+      assert.deepEqual(findLeaks(withFile('src/simulator/ui/cards.test.ts', `${line}\n`)), [], line);
+    }
+    // a stylesheet, a file of cards, a file in public/
+    for (const [file, text, line] of [
+      ['src/simulator/ui/screen.css', '[data-example="chief-full-mission"] { color: red; }', "import './screen.css';"],
+      ['src/simulator/ui/cards.json', '[{ "title": "Read red, then start the fan" }]', "import cards from './cards.json';"],
+    ] as const) {
+      const files = withFile(file, text);
+      files.set('src/simulator/ui/Screen.tsx', `'use client';\n${line}\nexport const Screen = () => null;\n`);
+      assert.ok(findLeaks(files).some((leak) => leak.startsWith(`src/simulator/ui/Screen.tsx  ->  ${file}`) && leak.includes('holds the title or the id of an example')), file);
+    }
+    assert.deepEqual(
+      findNamedExamples([
+        { name: 'public/simulator/fire-chief/mat.webp', text: null },
+        { name: 'public/simulator/fire-chief/chief-full-mission.png', text: null },
+        { name: 'public/simulator/fire-chief/The_Whole_Mission_On_Any_Maze.pdf', text: null },
+        { name: 'public/simulator/fire-chief/examples.json', text: '[{ "title": "Follow the right-hand wall to a room" }]' },
+      ]).map((line) => line.split('   ')[0]),
+      ['public/simulator/fire-chief/chief-full-mission.png', 'public/simulator/fire-chief/The_Whole_Mission_On_Any_Maze.pdf', 'public/simulator/fire-chief/examples.json'],
+    );
+    // plain words about the game are no title
+    for (const line of ["export const title = 'Fire Chief';", "export const text = 'Drive through the maze, find the fire and blow it out with the fan.';", "export const id = 'fire-chief';", "export const hint = 'Stop in front of a wall';"]) {
+      assert.deepEqual(findLeaks(withFile('src/simulator/ui/fire-chief/FireChiefSimulator.tsx', `'use client';\n${line}\nexport const Screen = () => null;\n`)), [], line);
+    }
+  });
+
+  test('the headings of Fire Chief are looked for like the ones of Fire Rescue: the words after a heading, in the screen of either game and on its page', () => {
+    assert.deepEqual(findLevelNames(base()), []);
+    for (const level of CHIEF_LEVELS) {
+      for (const file of ['src/simulator/ui/Screen.tsx', 'src/simulator/ui/fire-chief/FireChiefSimulator.tsx', 'src/simulator/ui/fire-rescue/FireRescueSimulator.tsx']) {
+        const named = findLevelNames(withFile(file, `'use client';\nexport const about = '${level.about}';\nexport const Screen = () => null;\n`));
+        assert.equal(named.length, 1, `${file}: ${level.about}`);
+        assert.ok(named[0].includes(level.about));
+      }
+      assert.equal(findLevelNames(withFile('src/app/training/simulator/fire-chief/page.tsx', `export default function Page() { return '${level.title}: ${level.about}'; }\n`)).length, 1, level.about);
+      // in a comment, on the server and on another page of the website it is nobody's business
+      assert.deepEqual(findLevelNames(withFile('src/simulator/ui/Screen.tsx', `'use client';\n// ${level.about}\nexport const Screen = () => null;\n`)), [], level.about);
+      assert.deepEqual(findLevelNames(withFile('src/simulator/members/server-helper.ts', `export const about = '${level.about}';\n`)), [], level.about);
+    }
   });
 
   test('a title or an id of an example written into a file of the screen is caught without any import', () => {

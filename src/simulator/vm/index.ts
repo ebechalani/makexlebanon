@@ -24,7 +24,7 @@
 import { BLOCKS, fieldArgs, fieldDefault, valueInputs } from '../blocks/catalog';
 import type { RobotIO } from '../core/io';
 import type { BlockJson, ButtonName, ProgramJson, Scalar, VM, VMError } from '../core/types';
-import { BUTTON_NAMES } from '../core/types';
+import { BUTTON_NAMES, DC_MOTOR_PORTS } from '../core/types';
 import { REPORTERS, STATEMENTS } from './handlers';
 import type { BlockContext, Wait } from './handlers';
 import { compare, toBoolean, toFinite, toNumber, toText } from './values';
@@ -630,12 +630,17 @@ class Interpreter implements VM {
     for (const script of this.scripts) script.thread = null;
   }
 
-  /** "stop all": end every script, stop the wheels, and let nothing start again until start(). */
+  /**
+   * "stop all": end every script, stop the wheels and the DC motors (a fan), and let nothing
+   * start again until start().
+   */
   halt(): void {
     this.killAll();
     this.halted = true;
     this.driveToken++;
     this.io.stopWheel('all');
+    // (asked only when one is running: a robot that never used M1 / M2 gets no extra command)
+    if (DC_MOTOR_PORTS.some((port) => this.io.dcMotorPower(port) !== 0)) this.io.stopDcMotor('all');
   }
 
   // ------------------------------------------------------------------ problems

@@ -41,8 +41,9 @@ import type {
   Simulation,
 } from '../core/types';
 import { PROBE_NAMES, SERVO_PORTS } from '../core/types';
-import { appendLog, describeEvent, type LogLine } from './format';
+import { appendLog, describeEvent, restartFacts, type LogLine } from './format';
 import { hasHatBlock, hasRunnableScript } from './program-file';
+import { capital } from './screen-words';
 import { Trail } from './trail';
 
 // =============================================================================================
@@ -54,7 +55,8 @@ import { Trail } from './trail';
  * running  - the match clock is running
  * paused   - frozen by the student (the match clock is frozen too)
  * stopped  - the student stopped the run; the field stays as it is
- * finished - the match is over (time up, "Finished" declared, or the program ended)
+ * finished - the match is over (time up, "Finished" declared, the program ended, or the game's
+ *            referee ended it)
  */
 export type RunState = 'ready' | 'running' | 'paused' | 'stopped' | 'finished';
 
@@ -69,7 +71,11 @@ export interface UiSnapshot {
   timeLeft: number;
   score: ScoreReport;
   restarts: number;
+  /** restarts the team may still use in this match (Infinity when the game sets no limit) */
+  restartsLeft: number;
   finishReason: FinishReason | null;
+  /** the referee's own sentence about the end of the match, when the referee ended it; otherwise null */
+  finishDetail: string | null;
   sensors: SensorSnapshot;
   variables: Record<string, Scalar | Scalar[]>;
   leds: RGB[];
@@ -93,6 +99,10 @@ export interface UseSimulationOptions<S> {
   getProgram: () => ProgramJson | null;
   /** called about 10 times per second with the blocks being executed (empty when nothing runs) */
   onActiveBlocks?: (ids: string[]) => void;
+  /** what the game calls one scored run, for the lines of the console ("match" when left out) */
+  matchWord?: string;
+  /** what the game calls one starting arrangement, for the console line of a start ("combination" when left out) */
+  scenarioWord?: string;
 }
 
 export interface SimulationController<S> {
@@ -125,7 +135,7 @@ export interface SimulationController<S> {
   stop: () => void;
   pause: () => void;
   resume: () => void;
-  /** rules restart: robot back to the start zone, -5 points, the clock keeps running */
+  /** rules restart: robot back to the start zone, the clock keeps running; what else it does is the game's rule (Game.restartRules) */
   restart: () => void;
   /** the team declares "Finished" */
   declareFinished: () => void;
@@ -170,8 +180,10 @@ function takeSnapshot<S>(sim: Simulation<S>, runState: RunState): UiSnapshot {
     timeLeft: sim.timeLeft,
     score: sim.score(),
     restarts: sim.restarts,
+    restartsLeft: sim.restartsLeft,
     finishReason: sim.finishReason,
-    sensors: { ...sensors, probes },
+    finishDetail: sim.finishDetail,
+    sensors: { ...sensors, probes, dcMotorPower: { ...sensors.dcMotorPower } },
     variables: sim.vm.variables(),
     leds: robot.leds.map((led) => ({ ...led })),
     screenLines: [...robot.screen.lines],
@@ -276,11 +288,12 @@ export function useSimulation<S>(options: UseSimulationOptions<S>): SimulationCo
           continue;
         }
         if (event.type === 'restart') trail.breakLine();
-        const line = describeEvent(event);
+        // (a restart line says what a restart does in this game and how many are left after it)
+        const line = describeEvent(event, { ...restartFacts(game), left: simRef.current.restartsLeft, match: optionsRef.current.matchWord });
         if (line) addLog(line);
       }
     },
-    [addLog, playTone, trail],
+    [addLog, game, playTone, trail],
   );
 
   // ------------------------------------------------------------------ the animation loop
@@ -392,7 +405,7 @@ export function useSimulation<S>(options: UseSimulationOptions<S>): SimulationCo
     tickDebtRef.current = 0;
 
     logsRef.current = [];
-    addLog({ time: 0, level: 'info', text: `Start! Combination ${game.encodeScenario(scenarioRef.current)}.` });
+    addLog({ time: 0, level: 'info', text: `Start! ${capital(optionsRef.current.scenarioWord ?? 'combination')} ${game.encodeScenario(scenarioRef.current)}.` });
     if (!hasHatBlock(program)) {
       addLog({
         time: 0,
