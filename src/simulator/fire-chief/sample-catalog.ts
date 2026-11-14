@@ -4,13 +4,15 @@
  *
  *   chief-first-wall     starter       Stop in front of the first wall
  *   chief-count-lines    starter       Count grid lines to drive two cells
- *   chief-flame-fan      starter       A first look at the flame sensor and the fan
+ *   chief-flame-fan      starter       Read red, then start the fan
  *   chief-wall-follow    intermediate  Follow the right-hand wall to a room
- *   chief-face-flame     intermediate  Find the flame and turn to face it
+ *   chief-face-flame     intermediate  Find the fire in a room and check its colour
  *   chief-full-mission   advanced      The whole mission on any maze
  *
  * Every id starts with "chief-": the ids of the examples must be different across all games
- * (the other list is ../fire-rescue/sample-catalog.ts).
+ * (the other list is ../fire-rescue/sample-catalog.ts). The ids do not change when a title
+ * does: the lists of content/simulator-codes.ts name the examples by id. (So two ids still say
+ * "flame", the name of the wooden fire target, although the robot finds it by its colour.)
  *
  * =====================================================================================
  *  THIS FILE STAYS ON THE WEBSITE'S SERVER. NEVER IMPORT IT FROM THE SIMULATOR SCREEN.
@@ -49,9 +51,9 @@ export interface ExampleCard {
 export const SAMPLE_CATALOG: readonly ExampleCard[] = [
   { id: 'chief-first-wall', title: 'Stop in front of the first wall', level: 'starter' },
   { id: 'chief-count-lines', title: 'Count grid lines to drive two cells', level: 'starter' },
-  { id: 'chief-flame-fan', title: 'A first look at the flame sensor and the fan', level: 'starter' },
+  { id: 'chief-flame-fan', title: 'Read red, then start the fan', level: 'starter' },
   { id: 'chief-wall-follow', title: 'Follow the right-hand wall to a room', level: 'intermediate' },
-  { id: 'chief-face-flame', title: 'Find the flame and turn to face it', level: 'intermediate' },
+  { id: 'chief-face-flame', title: 'Find the fire in a room and check its colour', level: 'intermediate' },
   { id: 'chief-full-mission', title: 'The whole mission on any maze', level: 'advanced' },
 ];
 

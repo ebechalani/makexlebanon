@@ -10,8 +10,9 @@
  *              --> vm/          (knows which inputs / fields each block has and their defaults)
  *
  * The wording follows mBlock 5 (device CyberPi + extensions mBot2, Quad RGB Sensor, Ultrasonic
- * Sensor 2) closely enough that students recognise the blocks. The texts of the DC motor and
- * flame sensor blocks are not confirmed yet: they are kept apart, in ./mblock-wording.ts.
+ * Sensor 2) closely enough that students recognise the blocks. The texts of the DC motor
+ * blocks and of the blocks of the colour sensor that looks forward are not confirmed yet: they
+ * are kept apart, in ./mblock-wording.ts.
  *
  * Not every game shows every category: which categories a game's palette holds is written in
  * ./palettes.ts.
@@ -45,7 +46,7 @@ export type CategoryId =
   | 'quadrgb'
   | 'ultrasonic'
   | 'colorsensor'
-  | 'flamesensor';
+  | 'frontcolorsensor';
 
 export interface CategoryDef {
   id: CategoryId;
@@ -157,8 +158,10 @@ export const CATEGORIES: CategoryDef[] = [
   { id: 'quadrgb', name: 'Quad RGB Sensor', colour: '#0FBD8C' },
   { id: 'ultrasonic', name: 'Ultrasonic Sensor 2', colour: '#0E9E86' },
   { id: 'colorsensor', name: 'Colour Sensor', colour: '#2E9BB5' },
-  // an mBuild module added with "+ extension", so it comes last
-  { id: 'flamesensor', name: UNCONFIRMED_CATEGORY_NAMES.flameSensor.text, colour: '#E0533D' },
+  // The colour sensor that is fixed to the front of the Fire Chief robot: another sensor than
+  // the one at the claw of Fire Rescue, with blocks of its own. No palette shows both, so the
+  // two share a colour. (Taken to be an mBuild module added with "+ extension", so it comes last.)
+  { id: 'frontcolorsensor', name: UNCONFIRMED_CATEGORY_NAMES.colorSensor.text, colour: '#2E9BB5' },
 ];
 
 /** Colour of the list blocks inside the Variables category (same as Scratch). */
@@ -1101,25 +1104,25 @@ export const BLOCKS: BlockDef[] = [
     tooltip: 'True when there is a bucket or a person in (or just in front of) the claw.',
   },
 
-  // ------------------------------------------------------------------------------- Flame sensor (mBuild module, add-on)
+  // ------------------------------------------------------------------------------- Colour sensor fixed to the front of the robot (Fire Chief)
   // (the texts of these two blocks are not confirmed against mBlock yet: see ./mblock-wording.ts)
   {
-    type: 'sensing_flame_detected',
-    category: 'flamesensor',
+    type: 'sensing_colorsensor_color_is',
+    category: 'frontcolorsensor',
     shape: 'boolean',
-    message: UNCONFIRMED_BLOCK_TEXTS.sensing_flame_detected.text,
-    args: [num('INDEX', 1)],
+    message: UNCONFIRMED_BLOCK_TEXTS.sensing_colorsensor_color_is.text,
+    args: [num('INDEX', 1), pick('COLOR', SENSOR_COLOURS)],
     tooltip:
-      'True when the flame sensor sees the infrared light of a flame in front of the robot. The number says which flame sensor is meant: 1 is the first one (this robot has one).',
+      'True when the thing right in front of the colour sensor has this colour. The sensor is at the front of the robot and only sees a thing that is very close: in this simulator 1.5 cm or less. The number says which colour sensor is meant: 1 is the first one (this robot has one).',
   },
   {
-    type: 'sensing_flame_size',
-    category: 'flamesensor',
+    type: 'sensing_colorsensor_color',
+    category: 'frontcolorsensor',
     shape: 'reporter',
-    message: UNCONFIRMED_BLOCK_TEXTS.sensing_flame_size.text,
+    message: UNCONFIRMED_BLOCK_TEXTS.sensing_colorsensor_color.text,
     args: [num('INDEX', 1)],
     tooltip:
-      'How strong the infrared light is that the flame sensor sees: 0 = no flame, 100 = very strong. The value is higher when the flame is nearer and more straight ahead. A wall between the sensor and the flame gives 0.',
+      'The name of the colour right in front of the colour sensor: red, yellow, green, cyan, blue, purple, white or black. It is "none" when nothing is close enough (in this simulator: 1.5 cm or less).',
   },
 ];
 

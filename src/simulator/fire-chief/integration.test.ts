@@ -4,14 +4,19 @@
  *   block program (builder)  ->  interpreter  ->  engine (walls, sensors)  ->  Fire Chief referee
  *
  * In these tests the robot really drives from START through the maze; nothing is put into a room
- * by hand. Everything that has blocks today is a block program run by the real interpreter:
- * driving and turning, the ultrasonic sensor (walls), the Quad RGB sensor (the printed grid
- * lines), variables, loops.
+ * by hand. The way through the maze is a block program run by the real interpreter: driving and
+ * turning, the ultrasonic sensor (walls), the Quad RGB sensor (the printed grid lines),
+ * variables, loops.
  *
- * The flame sensor and the fan have no blocks yet (they come in the next round). Until then that
- * part of a mission is written against RobotIO - the seam the engine tests use: a small
- * "co-pilot" script runs the block program with the real interpreter first, and then reads the
- * flame sensor and switches the fan itself (runBlocks, lookAround and blowAt below).
+ * The end of a mission - finding the place of the fire in a room, reading its colour, the fan -
+ * is written against RobotIO, the seam the engine tests use: a small "co-pilot" script runs the
+ * block program with the real interpreter first, and then reads the ultrasonic sensor and the
+ * colour sensor and switches the fan itself (runBlocks, lookForTheFire and goCloseAndBlow
+ * below). It does what the example programs do with blocks (samples.ts; samples.test.ts plays
+ * those): so the same mission is checked here a second time, without the examples.
+ *
+ * No flame sensor is used in this game: the fire target is red, and the colour sensor at
+ * the front of the robot reads "red" on it from 1.5 cm or less.
  */
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
@@ -24,7 +29,6 @@ import { makeProbeReading } from '../core/engine-sensors';
 import { DEG, makeRng, wrapAngle, type Rect } from '../core/geometry';
 import type { RobotIO } from '../core/io';
 import { RasterMatSampler } from '../core/mat';
-import { wheelDegreesForTurn } from '../core/robot';
 import { createSimulation } from '../core/simulation';
 import { scripted, sleep, turn as turnBy, type Script } from '../core/test-helpers';
 import type { MatSampler, Pose, ProgramJson, RobotConfig, ScoreLine, SimEvent, Simulation, VM } from '../core/types';
@@ -59,6 +63,8 @@ import {
   BEDROOM_CELL,
   FIELD_SIZE,
   FIRE_SPOTS,
+  TARGET_DEPTH,
+  TARGET_WIDTH,
   GRID_LINE_COLOR,
   GRID_LINE_STARTS,
   GRID_LINE_WIDTH,
@@ -74,12 +80,12 @@ import {
   cellRect,
   roomRect,
   sameCell,
-  wallIndexBetween,
   type Cell,
+  type FireSpot,
   type RoomId,
 } from './field';
 import { TARGET_BODY_ID, fireChiefGame, roomAround, targetOf } from './game';
-import { FIRE_CHIEF_ROBOT, START_POSE } from './robot';
+import { COLOR_SENSOR_RANGE_MM, FIRE_CHIEF_ROBOT, START_POSE } from './robot';
 import {
   NAMED_MAZES,
   defaultScenario,
@@ -87,8 +93,6 @@ import {
   openField,
   randomScenario,
   wallBetweenCells,
-  withFire,
-  withWall,
   type FireChiefScenario,
 } from './scenario';
 
@@ -239,7 +243,7 @@ const LINE_COUNTER: ProgramJson = program([
   ]),
 ]);
 
-// ---- the co-pilot: what has no blocks yet, written against RobotIO
+// ---- the co-pilot: the end of a mission, written against RobotIO
 
 /** Run a block program with the real interpreter, one step per tick, until it has ended. */
 function* runBlocks(io: RobotIO, blocks: ProgramJson): Generator<void, VM, void> {
@@ -254,51 +258,70 @@ function* runBlocks(io: RobotIO, blocks: ProgramJson): Generator<void, VM, void>
   return vm;
 }
 
-/** Where the flame sensor read its highest value during a turn (yaw: degrees turned since the turn began). */
-interface Sighting {
-  value: number;
-  yawDeg: number;
+/**
+ * From the middle of a room: "something stands in front of this wall" when the ultrasonic
+ * sensor reads less than this (cm). The bare wall reads 4.5 cm, the target (2 cm deep) 3 cm.
+ */
+const WALL_PLACE_CM = 4;
+/** The same for the look into the outer corner: the empty corner reads 9 cm, the target in it 5.7 cm. */
+const CORNER_PLACE_CM = 7.5;
+/** The slow drive at the target (RPM), and how long it lasts at most (ticks). */
+const APPROACH_RPM = 20;
+const APPROACH_TICKS = 300;
+
+/** What the co-pilot found in a room it looked into. */
+interface Visit {
+  room: RoomId;
+  /** what the ultrasonic sensor read (cm) at each look it took: straight ahead, into the corner, at the other wall */
+  looks: number[];
+  /** something stands at one of the three places */
+  found: boolean;
+  /** the robot went close and the colour sensor read red */
+  red: boolean;
 }
 
-/** Turn once round on the spot and remember where the flame sensor read the highest value. */
-function* lookAround(io: RobotIO, rpm = 30): Generator<void, Sighting, void> {
-  const best: Sighting = { value: 0, yawDeg: 0 };
-  io.resetYaw();
-  const wheel = wheelDegreesForTurn(io.config, 360);
-  io.startMotion(wheel, -wheel, rpm);
-  while (!io.motionDone()) {
-    yield;
-    const value = io.flameValue();
-    if (value > best.value) {
-      best.value = value;
-      best.yawDeg = io.yawDeg();
-    }
+/**
+ * In the middle of a room, look at the three places where the fire can stand. The robot has
+ * come in facing the back wall or the side wall: a place is straight ahead, the outer corner is
+ * half a quarter turn further, the other wall a quarter turn. It stops at the first place where
+ * something stands; when there is nothing it turns back to the way it came in.
+ */
+function* lookForTheFire(io: RobotIO, at: Place, looks: number[]): Generator<void, boolean, void> {
+  // the corner is to the left of a robot that faces up in the living room or right in the bedroom
+  const swing = (at.col === LIVING_ROOM_CELL.col && at.dir === 0) || (at.col === BEDROOM_CELL.col && at.dir === 1) ? -1 : 1;
+  const limits = [WALL_PLACE_CM, CORNER_PLACE_CM, WALL_PLACE_CM];
+  for (let look = 0; look < limits.length; look++) {
+    if (look > 0) yield* turnBy(io, swing * 45, 40);
+    yield* sleep(5);
+    looks.push(io.ultrasonicCm());
+    if (looks[look] < limits[look]) return true;
   }
-  return best;
+  yield* turnBy(io, -swing * 90, 40);
+  return false;
 }
 
-/** Turn back to where the flame was strongest, stand still, and blow at it for longer than 3 seconds. */
-function* blowAt(io: RobotIO, seen: Sighting): Generator<void, void, void> {
-  yield* turnBy(io, seen.yawDeg > 180 ? seen.yawDeg - 360 : seen.yawDeg, 40);
-  yield* sleep(5);
+/**
+ * Drive slowly at the thing ahead until the colour sensor reads red, stand still, and blow at
+ * it for longer than 3 seconds. Without red (after 3 seconds of driving) the fan stays off.
+ * (`visit.red` is written down before the fan starts: the referee ends the attempt while it blows.)
+ */
+function* goCloseAndBlow(io: RobotIO, visit: Visit): Generator<void, void, void> {
+  io.setWheelRpm('left', APPROACH_RPM);
+  io.setWheelRpm('right', APPROACH_RPM);
+  for (let tick = 0; tick < APPROACH_TICKS && io.frontColor() !== 'red'; tick++) yield;
+  io.stopWheel('all');
+  yield* sleep(30);
+  visit.red = io.frontColor() === 'red';
+  if (!visit.red) return;
   io.setDcMotor('M1', 100);
   yield* sleep(350); // (the referee ends the attempt after 300 ticks)
   io.stopDcMotor('M1');
 }
 
-/** What the co-pilot found in a room it looked around in. */
-interface Visit {
-  room: RoomId;
-  /** highest flame value during the turn */
-  flame: number;
-  detected: boolean;
-}
-
-const threshold = (io: RobotIO): number => io.config.flameSensor?.threshold ?? 0;
-
 /**
- * A whole mission: blocks drive to a room; there the co-pilot looks around with the flame
- * sensor. A flame: turn to it and blow. No flame: the blocks go on to the other room.
+ * A whole mission: blocks drive to a room; there the co-pilot looks for the fire with the
+ * ultrasonic sensor. Something stands there: go close, read red, blow. Nothing: the blocks go
+ * on to the other room.
  */
 function explorer(visits: Visit[]): Script {
   return function* (io: RobotIO) {
@@ -308,11 +331,11 @@ function explorer(visits: Visit[]): Script {
       const vm = yield* runBlocks(io, wallFollower(at, rooms));
       const now = vm.variables();
       at = { col: Number(now.col), row: Number(now.row), dir: Number(now.dir) };
-      const seen = yield* lookAround(io);
-      const detected = seen.value > threshold(io);
-      visits.push({ room: at.col === LIVING_ROOM_CELL.col ? 'living' : 'bedroom', flame: seen.value, detected });
-      if (detected) {
-        yield* blowAt(io, seen);
+      const visit: Visit = { room: at.col === LIVING_ROOM_CELL.col ? 'living' : 'bedroom', looks: [], found: false, red: false };
+      visits.push(visit);
+      visit.found = yield* lookForTheFire(io, at, visit.looks);
+      if (visit.found) {
+        yield* goCloseAndBlow(io, visit);
         return;
       }
       rooms = rooms.filter((col) => col !== at.col);
@@ -328,6 +351,51 @@ function explore(scenario: FireChiefScenario, o: { robotConfig?: RobotConfig; se
     harness.factory,
   );
   return { sim, visits, harness };
+}
+
+/**
+ * How far (mm) the middle of the robot's front face - where the colour sensor sits - is from the
+ * front face of the fire target, on paper: the face of a target at the back or at the side wall
+ * lies one target depth in front of that wall, the face of a target in the corner lies across
+ * the corner, (width + depth) / 2 + depth / 2 from it.
+ */
+function noseToTarget(sim: Sim): number {
+  const { fireRoom, fireSpot } = sim.scenario;
+  const pose = sim.world.robot.pose;
+  const front = sim.robotConfig.chassisFront;
+  const nose = { x: pose.x + front * Math.sin(pose.heading), y: pose.y - front * Math.cos(pose.heading) };
+  const fromSide = fireRoom === 'living' ? nose.x : FIELD_SIZE - nose.x;
+  if (fireSpot === 'back') return nose.y - TARGET_DEPTH;
+  if (fireSpot === 'side') return fromSide - TARGET_DEPTH;
+  return (fromSide + nose.y) / Math.SQRT2 - ((TARGET_WIDTH + TARGET_DEPTH) / 2 + TARGET_DEPTH / 2);
+}
+
+/** The two walls of the outer corner of a room: a robot that reads red on a target in that corner touches them. */
+const cornerWalls = (room: RoomId): string[] => ['wall:top', room === 'living' ? 'wall:left' : 'wall:right'];
+
+/**
+ * What a run that found the fire must show at its end: the colour sensor reads red, the robot
+ * stands 1.4 cm in front of a target at a wall and has touched nothing - or, for a target in
+ * the corner, exactly the 1.5 cm of the sensor from it, held by the two walls of that corner
+ * (one bump; it never touches the target). The target stands where it stood.
+ */
+function assertStandsAtTheFire(sim: Sim, events: SimEvent[], touched: boolean, what: string): void {
+  assert.equal(sim.readSensors().frontColor, 'red', what);
+  const gap = noseToTarget(sim);
+  if (sim.scenario.fireSpot === 'corner') {
+    assert.ok(Math.abs(gap - COLOR_SENSOR_RANGE_MM) < 0.01, `${what}: the nose is ${gap} mm from the target in the corner`);
+    assert.equal(touched, true, `${what}: the walls of the corner stopped the robot`);
+    assert.equal(bumps(events).length, 1, `${what}: bumps ${bumps(events).join(', ')}`);
+    assert.ok(cornerWalls(sim.scenario.fireRoom).includes(bumps(events)[0]), `${what}: bumped into ${bumps(events)[0]}`);
+  } else {
+    assert.ok(gap > 13.5 && gap < COLOR_SENSOR_RANGE_MM, `${what}: the nose is ${gap} mm from the target`);
+    assert.equal(touched, false, `${what}: the robot touched nothing`);
+    assert.deepEqual(bumps(events), [], what);
+  }
+  assert.ok(!said(events).some((text) => text.startsWith('The robot touches the fire target')), `${what}: the robot never touched the target`);
+  const target = targetOf(sim.world);
+  assert.ok(target);
+  assert.deepEqual([target.x, target.y, target.angle], [target.home.x, target.home.y, target.home.angle], what);
 }
 
 // =============================================================================================
@@ -440,42 +508,57 @@ test('real run, blocks only: the wall follower reaches a room in every named maz
 // Blocks + co-pilot: the whole mission
 // =============================================================================================
 
-test('real run: blocks drive to the living room, the flame sensor finds the fire, the fan blows 3 s - 100 points', () => {
-  const seenInRoom: Sighting = { value: 0, yawDeg: 0 };
-  let detectedBeforeFan = false;
+test('real run: blocks drive to the living room, the ultrasonic sensor finds the fire in its corner, the colour sensor reads red, the fan blows 3 s - 100 points', () => {
+  const looks: number[] = [];
+  let found = false;
+  let redBeforeFan = false;
   let fanSwitchedOnAt = -1;
   let programSwitchedFanOff = false;
   const harness = scripted(function* (io) {
     yield* runBlocks(io, ROUTE_TO_LIVING_ROOM);
-    Object.assign(seenInRoom, yield* lookAround(io));
-    yield* turnBy(io, seenInRoom.yawDeg > 180 ? seenInRoom.yawDeg - 360 : seenInRoom.yawDeg, 40);
-    yield* sleep(5);
-    detectedBeforeFan = io.flameDetected();
+    // (the route ends in the living room, facing left: the side wall is straight ahead)
+    found = yield* lookForTheFire(io, { col: LIVING_ROOM_CELL.col, row: LIVING_ROOM_CELL.row, dir: 3 }, looks);
+    io.setWheelRpm('left', APPROACH_RPM);
+    io.setWheelRpm('right', APPROACH_RPM);
+    for (let tick = 0; tick < APPROACH_TICKS && io.frontColor() !== 'red'; tick++) yield;
+    io.stopWheel('all');
+    yield* sleep(30);
+    redBeforeFan = io.frontColor() === 'red';
     fanSwitchedOnAt = io.time;
     io.setDcMotor('M1', 100);
     yield* sleep(350);
     programSwitchedFanOff = true;
     io.stopDcMotor('M1');
   });
-  const sim = createEngineSimulation({ game: fireChiefGame, scenario: defaultScenario(), program: {} }, harness.factory);
+  const sim: Sim = createEngineSimulation({ game: fireChiefGame, scenario: defaultScenario(), program: {} }, harness.factory);
   let fanTicks = 0;
-  let touched = false;
+  let touchTicks = 0;
+  let sawRedBeforeTheCorner = false;
   sim.start();
   const events: SimEvent[] = [];
   while (sim.status === 'running') {
     sim.step(1);
     events.push(...sim.drainEvents());
     if (sim.world.robot.fanOn) fanTicks++;
-    if (sim.world.robot.touching) touched = true;
+    if (sim.world.robot.touching) touchTicks++;
+    // (the colour sensor is asked only near the target: the robot's turning point is inside the living room then)
+    if (touchTicks === 0 && roomAround(sim.robotShapes()) === 'living' && sim.readSensors().frontColor === 'red') sawRedBeforeTheCorner = true;
   }
   events.push(...sim.drainEvents());
   assert.deepEqual(problems(events), []);
 
-  // the sensor found the fire: strongest where the robot looks straight at it
-  assert.ok(seenInRoom.value > 60, `highest flame value in the room: ${seenInRoom.value}`);
-  assert.equal(detectedBeforeFan, true);
-  assert.ok(aimErrorDeg(sim) < 2, `the robot points ${aimErrorDeg(sim)} degrees beside the target`);
-  assert.equal(sim.readSensors().flameDetected, true);
+  // the ultrasonic sensor found the place: a bare wall straight ahead (4.5 cm), then the target in the corner (5.7 cm)
+  assert.equal(defaultScenario().fireSpot, 'corner');
+  assert.equal(found, true);
+  assert.deepEqual(looks, [4.5, 5.7]);
+  // the colour sensor read red when the robot had gone close, and the robot faces the target
+  assert.equal(redBeforeFan, true);
+  assert.ok(aimErrorDeg(sim) < 0.1, `the robot points ${aimErrorDeg(sim)} degrees beside the target`);
+  // In the corner the two walls stop the robot when its nose is exactly 1.5 cm from the target:
+  // only there is the colour sensor close enough. It pressed on them for 3 hundredths of a second.
+  assert.equal(sawRedBeforeTheCorner, false, 'no red before the walls of the corner stopped the robot');
+  assert.equal(touchTicks, 3);
+  assertStandsAtTheFire(sim, events, touchTicks > 0, 'default maze');
 
   // the referee: mission complete, 3 seconds after the fan came on
   assert.equal(sim.finishReason, 'mission-complete');
@@ -503,53 +586,58 @@ test('real run: blocks drive to the living room, the flame sensor finds the fire
   assert.equal(programSwitchedFanOff, false);
   assert.equal(sim.world.robot.fanOn, false);
   assert.equal(sim.readSensors().dcMotorPower.M1, 0);
-
-  // nothing was touched: no wall, and not the target
-  assert.equal(touched, false);
-  assert.deepEqual(bumps(events), []);
-  const target = targetOf(sim.world);
-  assert.ok(target);
-  assert.deepEqual([target.x, target.y], [target.home.x, target.home.y]);
 });
 
-test('real run: a wall follower made of blocks plus the flame sensor and the fan solves every named maze', () => {
+/**
+ * Play a whole mission of the co-pilot to its end, tick by tick. `touched`: the robot pressed
+ * against something at some moment (the walls of a corner hold it for 3 ticks only: a look
+ * every few ticks would miss that).
+ */
+function playMission(scenario: FireChiefScenario): { sim: Sim; visits: Visit[]; events: SimEvent[]; touched: boolean } {
+  const { sim, visits } = explore(scenario);
+  const events: SimEvent[] = [];
+  let touched = false;
+  sim.start();
+  while (sim.status === 'running') {
+    sim.step(1);
+    if (sim.world.robot.touching) touched = true;
+    events.push(...sim.drainEvents());
+  }
+  events.push(...sim.drainEvents());
+  return { sim, visits, events, touched };
+}
+
+test('real run: a wall follower made of blocks plus the ultrasonic sensor, the colour sensor and the fan solves every named maze', () => {
   for (const { id, scenario } of NAMED_MAZES) {
-    const { sim, visits } = explore(scenario);
-    let touched = false;
-    const events = runToEnd(sim, () => {
-      if (sim.world.robot.touching) touched = true;
-    });
+    const { sim, visits, events, touched } = playMission(scenario);
     assert.deepEqual(problems(events), [], id);
     assert.equal(sim.finishReason, 'mission-complete', id);
     const report = sim.score();
     assert.equal(report.total, 100, `${id}: ${sheet(report.lines)}`);
     assert.ok(sim.world.time < 120, `${id}: done after ${sim.world.time} s`);
     assert.equal(report.time, sim.world.time, id);
-    // it looked around in one room or in both; the last one is the room with the fire
+    // it looked into one room or into both; the last one is the room with the fire
     assert.ok(visits.length === 1 || visits.length === 2, id);
     const last = visits[visits.length - 1];
     assert.equal(last.room, scenario.fireRoom, id);
-    assert.equal(last.detected, true, id);
-    assert.ok(aimErrorDeg(sim) < 2.5, `${id}: aimed ${aimErrorDeg(sim)} degrees beside the target`);
+    assert.deepEqual([last.found, last.red], [true, true], id);
+    assert.ok(aimErrorDeg(sim) < 0.1, `${id}: aimed ${aimErrorDeg(sim)} degrees beside the target`);
     if (visits.length === 2) {
-      // in the room without the fire the flame sensor read nothing at all, all the way round
+      // in the room without the fire the ultrasonic sensor read the bare walls at all three places
       assert.notEqual(visits[0].room, scenario.fireRoom, id);
-      assert.equal(visits[0].flame, 0, id);
+      assert.deepEqual(visits[0], { room: visits[0].room, looks: [4.5, 9, 4.5], found: false, red: false }, id);
       // the 20 points came from that first room, long before the fan
       const room = lineOf(report.lines, 'enter-room');
       assert.equal(room.detail.endsWith(`(${ROOMS[visits[0].room].name})`), true, id);
     }
-    // a robot that keeps to the middle of the cells touches nothing
-    assert.equal(touched, false, id);
-    assert.deepEqual(bumps(events), [], id);
+    // a robot that keeps to the middle of the cells touches nothing - but the two walls of the corner, for a fire in the corner
+    assertStandsAtTheFire(sim, events, touched, id);
   }
   // the named mazes cover both cases: the fire in the first room the follower comes to, and in the second
-  const firstRoom = NAMED_MAZES.map(({ scenario }) => {
-    const { sim, visits } = explore(scenario);
-    runToEnd(sim);
-    return visits.length;
-  });
-  assert.ok(firstRoom.includes(1) && firstRoom.includes(2), `rooms looked at: ${firstRoom.join(', ')}`);
+  const firstRoom = NAMED_MAZES.map(({ scenario }) => playMission(scenario).visits.length);
+  assert.ok(firstRoom.includes(1) && firstRoom.includes(2), `rooms looked into: ${firstRoom.join(', ')}`);
+  // ... and a fire at a wall as well as a fire in a corner
+  assert.deepEqual([...new Set(NAMED_MAZES.map(({ scenario }) => scenario.fireSpot))].sort(), ['back', 'corner', 'side']);
 });
 
 test('real run: the same robot solves 40 random mazes, with the fire at every place', () => {
@@ -559,13 +647,13 @@ test('real run: the same robot solves 40 random mazes, with the fire at every pl
     const scenario = randomScenario(makeRng(seed));
     const code = encodeScenario(scenario);
     seenPlaces.add(`${scenario.fireRoom} ${scenario.fireSpot}`);
-    const { sim, visits } = explore(scenario);
-    const events = runToEnd(sim);
+    const { sim, visits, events, touched } = playMission(scenario);
     assert.deepEqual(problems(events), [], code);
     assert.equal(sim.finishReason, 'mission-complete', code);
     assert.equal(sim.score().total, 100, `${code}: ${sheet(sim.score().lines)}`);
     assert.equal(visits[visits.length - 1].room, scenario.fireRoom, code);
-    assert.deepEqual(bumps(events), [], code);
+    assert.equal(visits[visits.length - 1].red, true, code);
+    assertStandsAtTheFire(sim, events, touched, code);
     slowest = Math.max(slowest, sim.world.time);
   }
   assert.equal(seenPlaces.size, ROOM_IDS.length * FIRE_SPOTS.length, 'the 40 mazes have the fire at all six places');
@@ -573,75 +661,86 @@ test('real run: the same robot solves 40 random mazes, with the fire at every pl
 });
 
 // =============================================================================================
-// The flame sensor in the maze
+// The two sensors that find the fire
 // =============================================================================================
 
-/** Highest flame value, and whether a flame was ever "detected", while the robot turns once round at `pose`. */
-function flameAround(scenario: FireChiefScenario, pose: Pose): { highest: number; detected: boolean; aimError: number } {
-  const out = { highest: 0, detected: false, aimError: 0 };
-  const harness = scripted(function* (io) {
-    const wheel = wheelDegreesForTurn(io.config, 360);
-    io.startMotion(wheel, -wheel, 30);
-    let bestHeading = 0;
-    while (!io.motionDone()) {
-      yield;
-      const value = io.flameValue();
-      if (io.flameDetected()) out.detected = true;
-      if (value > out.highest) {
-        out.highest = value;
-        bestHeading = sim.world.robot.pose.heading;
-      }
-    }
-    const target = targetOf(sim.world);
-    if (target) {
-      const wanted = Math.atan2(target.x - pose.x, pose.y - target.y);
-      out.aimError = Math.abs(wrapAngle(wanted - bestHeading)) / DEG;
-    }
-  });
-  const sim: Sim = createEngineSimulation({ game: fireChiefGame, scenario, program: {}, startPose: pose }, harness.factory);
-  const events = runToEnd(sim);
-  assert.deepEqual(problems(events).filter((text) => !text.includes('start zone')), []);
-  return out;
+/** What the two sensors read while the robot stands at `pose`: the ultrasonic sensor (cm) and the colour sensor. */
+function readingsAt(scenario: FireChiefScenario, pose: Pose): { cm: number; colour: string } {
+  const sim: Sim = createSimulation({ game: fireChiefGame, scenario, program: {}, startPose: pose });
+  const sensors = sim.readSensors();
+  return { cm: sensors.ultrasonicCm, colour: sensors.frontColor };
 }
 
-const middleOf = (room: RoomId): Pose => {
+/** The middle of a room, looking at one of its three places (straight at a wall, or into the outer corner). */
+function lookingAt(room: RoomId, place: FireSpot): Pose {
   const rect = roomRect(room);
-  return { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2, heading: 0 };
-};
+  const outwards = room === 'living' ? -1 : 1;
+  const degrees = place === 'back' ? 0 : place === 'side' ? outwards * 90 : outwards * 45;
+  return { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2, heading: degrees * DEG };
+}
 
-test('flame sensor in the maze: in the room with the fire a full turn finds it, in the other room it reads 0', () => {
+test('the two sensors from the middle of a room: the ultrasonic sensor tells the place of the fire, the colour sensor is too far away to read it', () => {
   for (const fireRoom of ROOM_IDS) {
     const otherRoom: RoomId = fireRoom === 'living' ? 'bedroom' : 'living';
     for (const fireSpot of FIRE_SPOTS) {
-      // the open field is the hardest case: no inner wall hides the flame from the other room
+      // the open field is the hardest case: no inner wall stands between the rooms
       const scenario = openField(fireRoom, fireSpot);
-      const here = flameAround(scenario, middleOf(fireRoom));
-      assert.ok(here.highest > 50, `${fireRoom} ${fireSpot}: highest value ${here.highest}`);
-      assert.equal(here.detected, true, `${fireRoom} ${fireSpot}`);
-      assert.ok(here.aimError < 1.5, `${fireRoom} ${fireSpot}: the highest value is ${here.aimError} degrees beside the target`);
-      const there = flameAround(scenario, middleOf(otherRoom));
-      assert.equal(there.highest, 0, `${fireRoom} ${fireSpot}: seen from the ${otherRoom}`);
-      assert.equal(there.detected, false, `${fireRoom} ${fireSpot}`);
+      for (const place of FIRE_SPOTS) {
+        const here = readingsAt(scenario, lookingAt(fireRoom, place));
+        const bare = place === 'corner' ? 9 : 4.5;
+        const withTarget = place === 'corner' ? 5.7 : 3;
+        // only the look at the place where the target stands reads less than the bare wall
+        assert.equal(here.cm, place === fireSpot ? withTarget : bare, `fire ${fireRoom} ${fireSpot}, looking at ${place}`);
+        assert.equal(here.cm < (place === 'corner' ? CORNER_PLACE_CM : WALL_PLACE_CM), place === fireSpot, `fire ${fireRoom} ${fireSpot}, looking at ${place}`);
+        // from the middle of the room the target is 2.5 cm (at a wall) or 5.7 cm (corner) ahead: more than the colour sensor sees
+        assert.equal(here.colour, 'none', `fire ${fireRoom} ${fireSpot}, looking at ${place}`);
+        // in the room without the fire every look reads the bare wall
+        const there = readingsAt(scenario, lookingAt(otherRoom, place));
+        assert.deepEqual(there, { cm: bare, colour: 'none' }, `fire ${fireRoom} ${fireSpot}, looking at ${place} of the ${otherRoom}`);
+      }
     }
   }
 });
 
-test('flame sensor in the maze: a wall of the maze hides the flame, the open door shows it', () => {
-  // the cell below the living room (A2); the fire stands in the corner of the room and looks this way
-  const below: Pose = { ...cellCenter({ col: 0, row: 1 }), heading: 0 };
-  const boundary = wallIndexBetween(LIVING_ROOM_CELL, { col: 0, row: 1 });
-  const open = withFire(openField(), 'living', 'corner');
-  const walled = withWall(open, boundary, true);
-  const throughDoor = flameAround(open, below);
-  assert.ok(throughDoor.highest > 20, `through the open boundary: ${throughDoor.highest}`);
-  assert.equal(throughDoor.detected, true);
-  assert.ok(throughDoor.aimError < 3, `aimed ${throughDoor.aimError} degrees beside the target`);
-  const behindWall = flameAround(walled, below);
-  assert.equal(behindWall.highest, 0);
-  assert.equal(behindWall.detected, false);
-  // in the default maze that wall stands: from A2 the fire in the living room cannot be seen
-  assert.equal(defaultScenario().walls[boundary], true);
-  assert.equal(flameAround(defaultScenario(), below).highest, 0);
+test('the colour sensor in front of the target: red from 1.5 cm, nothing from 1.6 cm, and "yellow" on the bare wall', () => {
+  // the robot faces the back wall of the living room, its nose `gap` mm from the front face of the target there
+  const facing = (gap: number): Pose => ({ x: roomRect('living').x + 150, y: TARGET_DEPTH + gap + FIRE_CHIEF_ROBOT.chassisFront, heading: 0 });
+  const fire = openField('living', 'back');
+  assert.equal(readingsAt(fire, facing(COLOR_SENSOR_RANGE_MM)).colour, 'red');
+  assert.equal(readingsAt(fire, facing(COLOR_SENSOR_RANGE_MM + 1)).colour, 'none');
+  assert.equal(readingsAt(fire, facing(5)).colour, 'red');
+  // the ultrasonic sensor cannot tell these distances apart: everything nearer than 3 cm reads 3 cm
+  for (const gap of [5, COLOR_SENSOR_RANGE_MM, COLOR_SENSOR_RANGE_MM + 1, 25]) assert.equal(readingsAt(fire, facing(gap)).cm, 3, `${gap} mm`);
+  // without the target the same poses look at the wall, 2 cm further away: it never reads red
+  const empty = openField('bedroom', 'back');
+  assert.equal(readingsAt(empty, facing(COLOR_SENSOR_RANGE_MM)).colour, 'none');
+  assert.equal(readingsAt(empty, facing(-5)).colour, 'yellow');
+});
+
+test('real run on the open field, the fire at each of its six places: the looks the robot needs, and where it stands when it reads red', () => {
+  // The left hand leads up the left side of the open field: the robot comes into the living room
+  // facing its back wall. With the fire in the bedroom it goes on along the top wall and comes
+  // into the bedroom facing its side wall. What the ultrasonic sensor reads at each look:
+  const expected: Record<string, number[][]> = {
+    'living back': [[3]],
+    'living corner': [[4.5, 5.7]],
+    'living side': [[4.5, 9, 3]],
+    'bedroom side': [[4.5, 9, 4.5], [3]],
+    'bedroom corner': [[4.5, 9, 4.5], [4.5, 5.7]],
+    'bedroom back': [[4.5, 9, 4.5], [4.5, 9, 3]],
+  };
+  for (const fireRoom of ROOM_IDS) {
+    for (const fireSpot of FIRE_SPOTS) {
+      const what = `${fireRoom} ${fireSpot}`;
+      const { sim, visits, events, touched } = playMission(openField(fireRoom, fireSpot));
+      assert.deepEqual(problems(events), [], what);
+      assert.equal(sim.score().total, 100, `${what}: ${sheet(sim.score().lines)}`);
+      assert.deepEqual(visits.map((visit) => visit.looks), expected[what], what);
+      assert.deepEqual(visits.map((visit) => visit.room), fireRoom === 'living' ? ['living'] : ['living', 'bedroom'], what);
+      assert.equal(visits[visits.length - 1].red, true, what);
+      assertStandsAtTheFire(sim, events, touched, what);
+    }
+  }
 });
 
 // =============================================================================================
@@ -687,7 +786,7 @@ test('real run: a restart on the way - back to START, the points are gone, the p
   }
   assert.equal(lineOf(report.lines, 'restart').ok, false);
   assert.match(lineOf(report.lines, 'restart').detail, /^restart used at 0:\d\d\.\d: the points earned before it were cleared$/);
-  // (the first try ended before the robot looked around: only the second try reached that point)
+  // (the first try ended before the robot looked for the fire: only the second try reached that point)
   assert.deepEqual(visits.map((visit) => visit.room), ['living']);
 });
 
@@ -725,7 +824,7 @@ test('the same run twice: every event, the final field and the score sheet are i
   // gives the same run again, tick for tick
   const noisy: RobotConfig = {
     ...FIRE_CHIEF_ROBOT,
-    noise: { wheelSlip: 0.02, sensor: 6, ultrasonicCm: 0.3, flame: 1 },
+    noise: { wheelSlip: 0.02, sensor: 6, ultrasonicCm: 0.3 },
   };
   const noisyFirst = play({ robotConfig: noisy, seed: 7 });
   assert.equal(play({ robotConfig: noisy, seed: 7 }), noisyFirst);

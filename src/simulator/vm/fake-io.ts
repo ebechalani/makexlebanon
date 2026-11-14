@@ -74,10 +74,12 @@ export interface FakeIO extends RobotIO {
     lineStatus: number;
     lineOffset: number;
     ultrasonicCm: number;
+    /**
+     * what the front colour sensor reads: the sensor at the claw, or - on a robot whose
+     * config.frontColorSensor has a `mount` - the sensor that is fixed to its front
+     */
     frontColor: SensorColor | 'none';
     yawDeg: number;
-    /** flame sensor value 0..100; "detected" above config.flameSensor.threshold (10 when no sensor is configured) */
-    flame: number;
   };
   /** values random() hands out next (falls back to 0.5 when empty) */
   randomQueue: number[];
@@ -159,7 +161,6 @@ export function createFakeIO(options: { dt?: number; config?: Partial<RobotConfi
       ultrasonicCm: config.ultrasonic.maxRangeCm,
       frontColor: 'none',
       yawDeg: 0,
-      flame: 0,
     },
     randomQueue: [],
 
@@ -218,8 +219,6 @@ export function createFakeIO(options: { dt?: number; config?: Partial<RobotConfi
       io.calls.push('resetYaw');
       io.sensors.yawDeg = 0;
     },
-    flameValue: () => io.sensors.flame,
-    flameDetected: () => io.sensors.flame > (config.flameSensor?.threshold ?? 10),
 
     // ---------------------------------------------------------------- DC motors
     setDcMotor(port, power) {

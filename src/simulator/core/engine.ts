@@ -39,7 +39,7 @@ import {
   rayBoxDistance as importedRayBoxDistance,
   type Contact,
 } from './engine-collide';
-import { fastVectorSampler, flameSignal, hashNoise, lineOffsetOf, lineStatusOf, makeProbeReading } from './engine-sensors';
+import { fastVectorSampler, hashNoise, lineOffsetOf, lineStatusOf, makeProbeReading } from './engine-sensors';
 import { clamp, DEG, makeRng, wrapAngle, type OBB } from './geometry';
 import type { RobotIO } from './io';
 import {
@@ -63,6 +63,7 @@ import {
   type DcMotorState,
   type FinishReason,
   type FixedWall,
+  type FrontColorMount,
   type Game,
   type MatSampler,
   type Pose,
@@ -166,8 +167,14 @@ const WALL_ROUNDS = 3;
 const WALL_SUBSTEP_SHARE = 0.8;
 /** With fixed walls a fast robot simply gets more small steps per tick (up to this many) instead of longer ones. */
 const MAX_SUBSTEPS_WITH_WALLS = 64;
-/** The front colour sensor looks along three parallel lines this far apart (mm). */
+/** The front colour sensor at the claw looks along three parallel lines this far apart (mm). */
 const FRONT_EYE_SPREAD = 6;
+/**
+ * A front colour sensor that is fixed to the robot sees a thing that is "at most rangeMm" away.
+ * A thing at exactly that distance must be seen, also when the arithmetic of a turned robot or
+ * a turned box puts it a few billionths of a millimetre further: this much (mm) is allowed on top.
+ */
+const FRONT_EYE_SLACK = 1e-6;
 /** Limits that keep a long batch run from filling the memory. */
 const MAX_EVENTS = 4000;
 const MAX_SCREEN_LINES = 30;
@@ -266,7 +273,6 @@ function makeRobotState(config: RobotConfig, pose: Pose): RobotState {
     lastUltrasonicCm: config.ultrasonic.maxRangeCm,
     dcMotors: { M1: { power: 0 }, M2: { power: 0 } },
     fanOn: false,
-    lastFlame: 0,
   };
 }
 
@@ -436,11 +442,6 @@ class EngineSimulation<S> implements Simulation<S> {
   private readonly rayDirY = new Float64Array(ULTRASONIC_RAYS);
   /** cosine of the half opening angle of the ultrasonic beam */
   private readonly beamCos: number;
-  /** indices of the bodies that carry an infrared emitter (what the flame sensor can see) */
-  private readonly emitters: number[] = [];
-  private flameTick = -1;
-  private flameEpoch = -1;
-  private flameNow = 0;
 
   constructor(opts: SimulationOptions<S>, createVM: VMFactory) {
     const cfg = opts.robotConfig ?? opts.game.robotConfig ?? DEFAULT_ROBOT_CONFIG;
@@ -485,7 +486,6 @@ class EngineSimulation<S> implements Simulation<S> {
       this.bodyRadius[i] = Math.hypot(b.w, b.l) / 2;
       this.lastBump[i] = -BUMP_QUIET_TICKS - 1;
       this.dirty[i] = 1; // check once that nothing starts inside something else
-      if (b.infrared) this.emitters.push(i);
     }
     this.unsettled = n > 0;
 
@@ -777,9 +777,7 @@ class EngineSimulation<S> implements Simulation<S> {
       lineStatus: this.probeStatus,
       lineOffset: this.probeOffset,
       ultrasonicCm: this.measureUltrasonic(),
-      frontColor: this.lookAtClaw(),
-      flame: this.measureFlame(),
-      flameDetected: this.flameDetected(),
+      frontColor: this.readFrontColor(),
       dcMotorPower: { M1: this.dcMotors.M1.power, M2: this.dcMotors.M2.power },
       fanOn: robot.fanOn === true,
       yawDeg: robot.yawDeg,
@@ -2265,7 +2263,6 @@ class EngineSimulation<S> implements Simulation<S> {
     robot.screen = fresh.screen;
     robot.touching = false;
     robot.lastUltrasonicCm = fresh.lastUltrasonicCm;
-    robot.lastFlame = 0;
     this.stopDcMotors();
     this.motion.active = false;
     this.liftBlocked = false;
@@ -2602,8 +2599,93 @@ class EngineSimulation<S> implements Simulation<S> {
   }
 
   /**
-   * Front colour sensor: the colour of the object held in the claw, or of the nearest grippable
-   * object straight ahead, between the fingers or up to rangeMm beyond the gripping centre.
+   * Front colour sensor, whichever kind the robot has: a sensor that is fixed to the robot
+   * (frontColorSensor.mount) looks straight ahead at everything, the sensor at the claw looks at
+   * what the gripper holds or could pick up. 'none' on a robot without one.
+   */
+  private readFrontColor(): SensorColor | 'none' {
+    const sensor = this.cfg.frontColorSensor;
+    if (sensor.enabled && sensor.mount) return this.lookAhead(sensor.mount);
+    return this.lookAtClaw();
+  }
+
+  /**
+   * Front colour sensor that is fixed to the robot: the colour name of the NEAREST thing on the
+   * straight line ahead of the sensor - a body or a fixed wall that reaches the height of the
+   * sensor - when it is at most rangeMm from the face of the sensor. The nearest thing wins, so
+   * nothing is seen through a wall or behind another body; a thing without a colour name reads
+   * 'none' and hides what is behind it all the same. (FrontColorMount in ./types.ts.)
+   *
+   * One line, not three like the sensor at the claw: it is the stricter reading. Whatever this
+   * line reads, a real sensor with a wider spot reads too, as long as the thing fills its spot;
+   * a program that works here does not depend on how wide the real spot is.
+   *
+   * (Nothing is remembered from one reading to the next: it is one ray against the few things
+   * right in front of the nose, and this sensor has no noise.)
+   */
+  private lookAhead(mount: FrontColorMount): SensorColor | 'none' {
+    const pose = this.robot.pose;
+    const s = Math.sin(pose.heading);
+    const c = Math.cos(pose.heading);
+    const ox = pose.x + mount.forward * s;
+    const oy = pose.y - mount.forward * c;
+    const height = mount.height;
+    let best = Math.max(0, this.cfg.frontColorSensor.rangeMm) + FRONT_EYE_SLACK;
+    let seen: SensorColor | 'none' = 'none';
+
+    const bodies = this.bodies;
+    for (let i = 0; i < bodies.length; i++) {
+      const b = bodies[i];
+      if (b.z > height || b.z + b.h < height) continue; // the sensor looks under or over it
+      const dx = b.x - ox;
+      const dy = b.y - oy;
+      const far = best + this.bodyRadius[i];
+      if (dx * dx + dy * dy > far * far) continue;
+      const d = rayBoxDistance(ox, oy, s, -c, b.x, b.y, b.w / 2, b.l / 2, Math.sin(b.angle), Math.cos(b.angle));
+      if (d >= 0 && d < best) {
+        best = d;
+        seen = b.colorName ?? 'none';
+      }
+    }
+
+    if (this.wallCount > 0) {
+      // only a wall that reaches into the box around the line of sight can be on it
+      const endX = ox + s * best;
+      const endY = oy - c * best;
+      const minX = Math.min(ox, endX);
+      const maxX = Math.max(ox, endX);
+      const minY = Math.min(oy, endY);
+      const maxY = Math.max(oy, endY);
+      const data = this.wallData;
+      for (let w = 0, at = 0; w < this.wallCount; w++, at += WALL_STRIDE) {
+        if (data[at + WALL_H] < height) continue; // the sensor looks over a low wall
+        if (data[at + WALL_MIN_X] > maxX || data[at + WALL_MAX_X] < minX) continue;
+        if (data[at + WALL_MIN_Y] > maxY || data[at + WALL_MAX_Y] < minY) continue;
+        const d = rayBoxDistance(
+          ox,
+          oy,
+          s,
+          -c,
+          data[at + WALL_X],
+          data[at + WALL_Y],
+          data[at + WALL_HW],
+          data[at + WALL_HL],
+          data[at + WALL_SIN],
+          data[at + WALL_COS],
+        );
+        // (a wall exactly as near as a body does not win: the body stands in front of it)
+        if (d >= 0 && d < best) {
+          best = d;
+          seen = this.walls[w].colorName ?? 'none';
+        }
+      }
+    }
+    return seen;
+  }
+
+  /**
+   * Front colour sensor at the claw: the colour of the object held in the claw, or of the nearest
+   * grippable object straight ahead, between the fingers or up to rangeMm beyond the gripping centre.
    * The sensor sits on the arm, so it only sees things at the height of the fingers.
    */
   private lookAtClaw(): SensorColor | 'none' {
@@ -2643,115 +2725,6 @@ class EngineSimulation<S> implements Simulation<S> {
       }
     }
     return seen?.colorName ?? 'none';
-  }
-
-  /**
-   * Flame sensor: the strength (0..100) of the strongest infrared emitter it can see. An emitter
-   * is seen only with a free line of sight; how strong it reads is worked out by flameSignal().
-   * 0 on a robot without a flame sensor.
-   */
-  private measureFlame(): number {
-    const f = this.cfg.flameSensor;
-    if (!f || !f.enabled) return 0;
-    const tick = this.world.tick;
-    if (this.flameTick === tick && this.flameEpoch === this.epoch) return this.flameNow;
-    const bodies = this.bodies;
-    const pose = this.robot.pose;
-    const sx = pose.x + f.forward * Math.sin(pose.heading);
-    const sy = pose.y - f.forward * Math.cos(pose.heading);
-    let best = 0;
-    for (const i of this.emitters) {
-      const b = bodies[i];
-      const e = b.infrared;
-      if (!e) continue;
-      const ex = b.x + e.forward * Math.sin(b.angle);
-      const ey = b.y - e.forward * Math.cos(b.angle);
-      // (how much the emitter is turned towards the robot is judged from the point the robot
-      // turns around, not from the sensor on its nose: see flameSignal)
-      const signal = flameSignal(
-        sx,
-        sy,
-        pose.heading,
-        f.halfAngleDeg,
-        f.rangeMm,
-        ex,
-        ey,
-        b.angle,
-        e.halfAngleDeg,
-        f.distancePower,
-        pose.x,
-        pose.y,
-      );
-      if (signal <= best) continue;
-      if (this.sightBlocked(sx, sy, f.height, ex, ey, b.z + e.height, i)) continue;
-      best = signal;
-    }
-    let value = best;
-    const noise = this.cfg.noise.flame ?? 0;
-    if (noise > 0 && best > 0) value += noise * hashNoise(this.seed, tick, 101);
-    value = Math.round(clamp(value, 0, 100) * 10) / 10;
-    this.flameTick = tick;
-    this.flameEpoch = this.epoch;
-    this.flameNow = value;
-    this.robot.lastFlame = value;
-    return value;
-  }
-
-  private flameDetected(): boolean {
-    const f = this.cfg.flameSensor;
-    return f !== undefined && f.enabled && this.measureFlame() > f.threshold;
-  }
-
-  /**
-   * Is the straight line from (ax, ay) at height az to (bx, by) at height bz cut by a fixed
-   * wall, or by a body other than `skip`? Something cuts the line when it is at least as tall
-   * as the line is high at the place where the line reaches it (and, for a body that stands on
-   * something, when its base is not above the line there).
-   */
-  private sightBlocked(ax: number, ay: number, az: number, bx: number, by: number, bz: number, skip: number): boolean {
-    const dx = bx - ax;
-    const dy = by - ay;
-    const length = Math.hypot(dx, dy);
-    if (length < 1e-9) return false;
-    const ux = dx / length;
-    const uy = dy / length;
-    const minX = Math.min(ax, bx);
-    const maxX = Math.max(ax, bx);
-    const minY = Math.min(ay, by);
-    const maxY = Math.max(ay, by);
-
-    const data = this.wallData;
-    for (let w = 0, at = 0; w < this.wallCount; w++, at += WALL_STRIDE) {
-      if (data[at + WALL_MIN_X] > maxX || data[at + WALL_MAX_X] < minX) continue;
-      if (data[at + WALL_MIN_Y] > maxY || data[at + WALL_MAX_Y] < minY) continue;
-      const d = rayBoxDistance(
-        ax,
-        ay,
-        ux,
-        uy,
-        data[at + WALL_X],
-        data[at + WALL_Y],
-        data[at + WALL_HW],
-        data[at + WALL_HL],
-        data[at + WALL_SIN],
-        data[at + WALL_COS],
-      );
-      if (d < 0 || d >= length) continue;
-      if (az + (bz - az) * (d / length) <= data[at + WALL_H]) return true;
-    }
-
-    const bodies = this.bodies;
-    for (let i = 0; i < bodies.length; i++) {
-      if (i === skip) continue;
-      const b = bodies[i];
-      const far = this.bodyRadius[i];
-      if (b.x - far > maxX || b.x + far < minX || b.y - far > maxY || b.y + far < minY) continue;
-      const d = rayBoxDistance(ax, ay, ux, uy, b.x, b.y, b.w / 2, b.l / 2, Math.sin(b.angle), Math.cos(b.angle));
-      if (d < 0 || d >= length) continue;
-      const height = az + (bz - az) * (d / length);
-      if (height >= b.z && height <= b.z + b.h) return true;
-    }
-    return false;
   }
 
   // ===========================================================================================
@@ -2892,19 +2865,13 @@ class EngineSimulation<S> implements Simulation<S> {
         return this.measureUltrasonic();
       },
       frontColor: (): SensorColor | 'none' => {
-        return this.lookAtClaw();
+        return this.readFrontColor();
       },
       yawDeg: (): number => {
         return robot.yawDeg;
       },
       resetYaw: (): void => {
         robot.yawDeg = 0;
-      },
-      flameValue: (): number => {
-        return this.measureFlame();
-      },
-      flameDetected: (): boolean => {
-        return this.flameDetected();
       },
 
       // ---------------------------------------------------------------- DC motors (fan)

@@ -615,10 +615,14 @@ export const ultrasonic = (): BlockNode => b('sensing_ultrasonic_distance');
 export const clawColorIs = (colour: ColourName): BlockNode => b('sensing_claw_color_is', { fields: { COLOR: colour } });
 export const clawColor = (): BlockNode => b('sensing_claw_color');
 export const clawObjectDetected = (): BlockNode => b('sensing_claw_object_detected');
-/** true when the flame sensor sees a flame; `index` = which flame sensor (the robot has one: 1) */
-export const flameDetected = (index: Value = 1): BlockNode => b('sensing_flame_detected', { inputs: { INDEX: index } });
-/** 0 (no flame) .. 100 (very strong): higher when the flame is nearer and more straight ahead */
-export const flameSize = (index: Value = 1): BlockNode => b('sensing_flame_size', { inputs: { INDEX: index } });
+/**
+ * The colour sensor that is fixed to the front of the robot (Fire Chief), not the one at the claw.
+ * True when the thing right in front of it has this colour; `index` = which colour sensor (the robot has one: 1)
+ */
+export const colorSensorDetects = (colour: ColourName, index: Value = 1): BlockNode =>
+  b('sensing_colorsensor_color_is', { fields: { COLOR: colour }, inputs: { INDEX: index } });
+/** the name of the colour right in front of that sensor, or "none" when nothing is close enough */
+export const colorSensorColor = (index: Value = 1): BlockNode => b('sensing_colorsensor_color', { inputs: { INDEX: index } });
 
 // ------------------------------------------------------------------------------- CyberPi
 /** colour as '#rrggbb' */

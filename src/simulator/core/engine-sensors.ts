@@ -3,7 +3,6 @@
  * The engine decides WHERE a sensor looks, this file decides what it reports.
  * (At the bottom: a faster version of the vector mat sampler, used when no sampler is given.)
  */
-import { DEG } from './geometry';
 import { VectorMatSampler } from './mat';
 import type { MatSampler, MatVector, ProbeReading, RGB, SensorColor } from './types';
 
@@ -110,92 +109,6 @@ export function lineOffsetOf(
   // A line under the RIGHT probes means the sensor sits to the LEFT of the line: the sign turns round.
   const deviation = (-100 * linePositionSum) / weightSum;
   return deviation === 0 ? 0 : deviation; // (so a centred line reads 0, never "-0")
-}
-
-// =============================================================================================
-// Flame sensor
-// =============================================================================================
-
-/**
- * The flame value falls with the distance like (1 - distance / range) to this power, unless the
- * sensor's configuration names another one (FlameSensorConfig.distancePower).
- */
-export const FLAME_DISTANCE_POWER = 2;
-/** An emitter shines at full strength in the inner part of its cone; in this outer share of it the light fades to nothing. */
-const EMITTER_FADE = 0.25;
-
-/**
- * What a flame sensor reads from ONE infrared emitter when nothing stands between them:
- * 0 (nothing) .. 100 (the emitter right at the sensor, straight ahead).
- *
- *   value = 100 x distance part x direction part x emitter part
- *
- *  - distance part: (1 - distance / range) to the power `distancePower`, normally squared: 1 at
- *    the sensor, about 0.5 at 30 % of the range, 0.25 at half the range, 0 from the full range on.
- *  - direction part: how far the emitter is from "straight ahead" of the sensor. 1 straight
- *    ahead, 0.5 at half the field of view, 0 at its edge (a cosine squared).
- *  - emitter part: the emitter shines forward, into a cone. 1 in the inner three quarters of
- *    the cone, fading to 0 at its edge; 0 beside and behind the emitter.
- *
- * The emitter part is judged from the point (pivotX, pivotY), when one is given: the point the
- * robot turns around (the middle of its wheel axle), not the sensor on its nose. The sensor
- * swings on an arm while the robot turns on the spot; judged from the sensor, the emitter part
- * would change during the turn - near the edge of the emitter's cone so quickly that the
- * highest value of the turn was up to 10 degrees beside the flame. Judged from the pivot it
- * stays the same for the whole turn. (Left out, the sensor itself is that point.)
- *
- * So the value has one single peak when a robot turns on the spot: exactly where it points at
- * the emitter. There the sensor looks straight at the emitter (direction part 1) and is nearest
- * to it (the distance part is at its highest), and the emitter part does not change. Only a
- * wall end that hides the emitter at that very heading can move the peak.
- *
- * Headings are simulator headings (radians, 0 = up the mat, clockwise positive).
- */
-export function flameSignal(
-  sensorX: number,
-  sensorY: number,
-  sensorHeading: number,
-  halfAngleDeg: number,
-  rangeMm: number,
-  emitterX: number,
-  emitterY: number,
-  emitterHeading: number,
-  emitterHalfAngleDeg: number,
-  distancePower: number = FLAME_DISTANCE_POWER,
-  pivotX: number = sensorX,
-  pivotY: number = sensorY,
-): number {
-  const half = halfAngleDeg * DEG;
-  const cone = emitterHalfAngleDeg * DEG;
-  if (!(rangeMm > 0) || !(half > 0) || !(cone > 0)) return 0;
-  const dx = emitterX - sensorX;
-  const dy = emitterY - sensorY;
-  const distance = Math.hypot(dx, dy);
-  if (distance >= rangeMm) return 0;
-
-  // off: the emitter seen from the sensor, as an angle away from straight ahead
-  // side: the pivot seen from the emitter, as an angle away from where the emitter faces
-  let off = 0;
-  let side = 0;
-  if (distance > 1e-6) {
-    const fx = Math.sin(sensorHeading);
-    const fy = -Math.cos(sensorHeading);
-    off = Math.abs(Math.atan2(fx * dy - fy * dx, fx * dx + fy * dy));
-  }
-  const px = pivotX - emitterX;
-  const py = pivotY - emitterY;
-  if (px * px + py * py > 1e-12) {
-    const gx = Math.sin(emitterHeading);
-    const gy = -Math.cos(emitterHeading);
-    side = Math.abs(Math.atan2(gx * py - gy * px, gx * px + gy * py));
-  }
-  if (off >= half || side >= cone) return 0;
-
-  const distancePart = Math.pow(1 - distance / rangeMm, distancePower > 0 ? distancePower : FLAME_DISTANCE_POWER);
-  const directionPart = Math.pow(Math.cos((off / half) * (Math.PI / 2)), 2);
-  const full = cone * (1 - EMITTER_FADE);
-  const emitterPart = side <= full ? 1 : Math.pow(Math.cos(((side - full) / (cone - full)) * (Math.PI / 2)), 2);
-  return 100 * distancePart * directionPart * emitterPart;
 }
 
 /**

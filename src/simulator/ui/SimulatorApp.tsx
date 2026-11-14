@@ -40,9 +40,9 @@ import { timeTextOf } from './format';
 import { GripperCodeDialog } from './GripperCodeDialog';
 import { CentreIcon, EnlargeIcon, RotateLeftIcon, RotateRightIcon, RulerIcon, RulesIcon, SensorsIcon, ShrinkIcon, TestIcon, TrailIcon, ZonesIcon } from './icons';
 import type { ExampleProgram } from './member-unlock';
-import { blankProgram, hasRunnableScript, otherGameNote, parseProgramFile, programFileName, serializeProgramFile } from './program-file';
+import { blankProgram, hasRunnableScript, otherGameNote, parseProgramFile, programFileName, retiredBlocksNote, serializeProgramFile, withoutRetiredBlocks } from './program-file';
 import type { StageOptions } from './render';
-import { robotParts, sensorSummary, sensorsViewHint } from './robot-parts';
+import { robotParts, sensorSummary } from './robot-parts';
 import { EMPTY_RULER, followRobot, removeLastRulerPoint, rulerText, startsOnRobot, type Ruler } from './ruler';
 import type { CodeReader } from './scenario-code';
 import { ScoreSheet, StatusLine } from './ScoreSheet';
@@ -307,6 +307,8 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
     if (noticeTimer.current) clearTimeout(noticeTimer.current);
     setNotice(null);
   }, []);
+  // what the editor has to tell about the blocks it kept from the last visit (long enough to be read)
+  const onSavedNote = useCallback((text: string) => say(text, 'info', 12000), [say]);
   useEffect(
     () => () => {
       if (noticeTimer.current) clearTimeout(noticeTimer.current);
@@ -543,11 +545,14 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
       say(parsed.error, 'error');
       return;
     }
-    if (!replaceProgram(parsed.program, `the program from "${fileName}"`)) return;
+    // (blocks the simulator no longer has are taken out first: Blockly would refuse the whole file for one of them)
+    const kept = withoutRetiredBlocks(parsed.program);
+    if (!replaceProgram(kept.program, `the program from "${fileName}"`)) return;
     // A program made in another game opens here too, but its blocks for parts this robot does
-    // not have do not work: say so now, in plain words (and long enough to be read).
-    const note = otherGameNote(parsed.program, parsed.game, game.id);
-    if (note) say(`Opened ${fileName}. ${note}`, 'info', 12000);
+    // not have do not work: say so now, in plain words (and long enough to be read). The same
+    // for blocks that were taken out.
+    const notes = [retiredBlocksNote(kept, 'this program'), otherGameNote(kept.program, parsed.game, game.id)].filter((note) => note !== null);
+    if (notes.length > 0) say(`Opened ${fileName}. ${notes.join(' ')}`, 'info', 12000);
     else say(`Opened ${fileName}.`);
   };
 
@@ -705,6 +710,7 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
               onReady={onEditorReady}
               onStatus={setEditorStatus}
               onGripperCode={hasGripperBlocks ? showGripperCode : undefined}
+              onSavedNote={onSavedNote}
             />
             {/* An empty workspace says how to begin. The note lies under the open block palette
                 (which has z-index 20) and lets clicks and drags through; it goes away with the
@@ -848,7 +854,7 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
                 <ZonesIcon className={VIEW_ICON} />
                 Zones
               </button>
-              <button type="button" aria-pressed={view.sensors} onClick={toggleView('sensors')} className={toggleClass(view.sensors)} title={sensorsViewHint(parts)}>
+              <button type="button" aria-pressed={view.sensors} onClick={toggleView('sensors')} className={toggleClass(view.sensors)} title="Show what the line sensor and the ultrasonic sensor see">
                 <SensorsIcon className={VIEW_ICON} />
                 Sensors
               </button>

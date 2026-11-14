@@ -1,7 +1,7 @@
 /**
  * The Fire Chief referee, sentence by sentence of the rules (§6 - §11), including the ways NOT
  * to score. Every test runs the real engine; a tiny fake VM runs a script that drives the robot
- * through RobotIO (the blocks for the flame sensor and the fan come later).
+ * through RobotIO (the blocks of the colour sensor and of the fan have their own tests in vm/).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -21,9 +21,11 @@ import {
   OUTER_WALLS,
   ROOM_IDS,
   START_RECT,
+  TARGET_COLOR,
   TARGET_DEPTH,
   TARGET_HEIGHT,
   TARGET_WIDTH,
+  WALL_COLOR_NAME,
   WALL_POSITIONS,
   WALL_THICKNESS,
   roomRect,
@@ -35,6 +37,7 @@ import {
 import {
   ACHIEVEMENT_IDS,
   FAN_ACTION_SECONDS,
+  KIND_FIRE_TARGET,
   MATCH_DURATION,
   MAX_RESTARTS,
   MAX_SCORE,
@@ -53,7 +56,7 @@ import {
   targetOf,
   targetShift,
 } from './game';
-import { FAN, FIRE_CHIEF_ROBOT, START_POSE } from './robot';
+import { COLOR_SENSOR, COLOR_SENSOR_RANGE_MM, FAN, FIRE_CHIEF_ROBOT, START_POSE } from './robot';
 import {
   NAMED_MAZES,
   defaultScenario,
@@ -201,7 +204,7 @@ test('game: the walls of a combination - four around the field plus the inner wa
   assert.equal(sim.world.walls?.length, 14);
 });
 
-test('game: one fire target with an infrared emitter, at its spot, clear of the walls', () => {
+test('game: one red fire target, at its spot, clear of the walls', () => {
   for (const room of ROOM_IDS) {
     for (const spot of FIRE_SPOTS) {
       for (const base of [openField(), defaultScenario(), NAMED_MAZES[4].scenario]) {
@@ -215,8 +218,9 @@ test('game: one fire target with an infrared emitter, at its spot, clear of the 
         assert.deepEqual([target.w, target.l, target.h], [TARGET_WIDTH, TARGET_DEPTH, TARGET_HEIGHT]);
         assert.deepEqual(target.home, { x: at.x, y: at.y, angle: at.angle, z: 0, restingOn: null });
         assert.equal(target.grippable, false);
-        // the emitter is in the middle of its front face
-        assert.deepEqual(target.infrared, { forward: 10, height: 60, halfAngleDeg: 70 });
+        // it is the fire of this game (the stage draws its flame sign by this word), and it is red
+        assert.equal(target.kind, KIND_FIRE_TARGET);
+        assert.equal(target.colorName, 'red');
         // it does not stand in a wall, and the engine leaves it exactly where the game put it
         const { sim } = play(function* () { yield* sleep(50); }, { scenario });
         sim.start();
@@ -945,15 +949,17 @@ test('mission complete without the room: the fan action from just outside the ro
   assert.equal(lineOf(sim, 'enter-room').detail, 'not earned - the robot was never completely inside the living room or the bedroom');
 });
 
-test('the fan action needs no flame reading: beside the target, where the flame sensor reads 0, it counts', () => {
-  // (assumption 13 in game.ts: "facing the target" is geometry; the referee does not ask the flame sensor)
+test('the fan action needs no sensor reading: far from the target, where the colour sensor reads nothing, it counts', () => {
+  // (decision D3 in game.ts: the 30 points need only the position; what the colour sensor reads does not matter to the referee)
   // the robot stands in the cell right of the living room and looks left along the top wall at the end of the target
   const { sim, harness } = play(fanOn(), { startPose: { x: 350 + FRONT, y: 66, heading: -90 * DEG } });
   sim.start();
   sim.step(5);
-  assert.equal(harness.io().flameValue(), 0, 'the emitter shines down the mat, not sideways');
-  assert.equal(harness.io().flameDetected(), false);
+  assert.equal(harness.io().frontColor(), 'none', 'its nose is 170 mm from the target: far outside the 15 mm of the colour sensor');
+  assert.equal(sim.readSensors().frontColor, 'none');
   runUntil(sim, () => sim.status !== 'running');
+  // the colour sensor never read red, from the start to the end
+  assert.equal(harness.io().frontColor(), 'none');
   assert.equal(sim.finishReason, 'mission-complete');
   assert.equal(sim.score().total, 80);
 });
@@ -1092,7 +1098,7 @@ test('not an end: a touch that moves the target by a millimetre or two', () => {
 });
 
 test('a touch that does not displace the target: the attempt goes on, and the referee says so once per touch', () => {
-  // ASSUMPTION 9 in game.ts: the target cannot fall over in the simulator. A robot that drives
+  // ASSUMPTION 10 in game.ts: the target cannot fall over in the simulator. A robot that drives
   // squarely into a target that stands flat against its wall cannot move it - so the attempt
   // does not end, however hard it pushes. The referee tells the team that it touches.
   const TOUCH = /^The robot touches the fire target\. A fan action does not count while it touches, and the attempt ends if the target is pushed out of its place\. Keep a distance: a real target can also fall over\.$/;
@@ -1642,7 +1648,7 @@ test('fanProblem: says in student words why the action does not count', () => {
 });
 
 test('touching: closer than 0.5 mm in front of a face of the target; at a corner of it up to 0.7 mm', () => {
-  // (assumption 10 in game.ts: the test makes the target 0.5 mm larger on every side)
+  // (assumption 11 in game.ts: the test makes the target 0.5 mm larger on every side)
   const touching = (pose: Pose): boolean => {
     const { sim } = play(function* () { yield* forever(); }, { startPose: pose });
     sim.start();
@@ -1696,7 +1702,7 @@ test('decisions and assumptions: the two lists at the top of game.ts name every 
   for (const [said, constants] of [
     [/D1\. Touching or hitting the fire target without moving it costs nothing\. Only a target\s+\*\s+that is moved ends the attempt/, []],
     [/D2\. A fan action from outside the room is valid when the fan is within 30 cm/, ['FAN']],
-    [/D3\. The 30 points need only the position[^]*No reading of the flame sensor is needed/, []],
+    [/D3\. The 30 points need only the position[^]*What the colour sensor reads does not matter to the\s+\*\s+referee: no reading of any sensor counts for a point/, []],
     [/D4\. The fire target is 60 mm wide and 120 mm high/, ['TARGET_WIDTH', 'TARGET_HEIGHT']],
     [/D5\. The outer edge of the field is walled/, ['OUTER_WALLS']],
     [/the walls are 3 mm thick/, ['WALL_THICKNESS']],
@@ -1723,17 +1729,50 @@ test('decisions and assumptions: the two lists at the top of game.ts name every 
     'WALL_LENGTH',
     'TARGET_DEPTH',
     'TARGET_MASS',
-    'EMITTER_HEIGHT',
-    'EMITTER_HALF_ANGLE_DEG',
-    'EMITTER_FADE',
     'FIRE_SPOTS',
-    'FLAME_SENSOR',
     'FAN',
     'TARGET_DISPLACED_MM',
     'TOUCH_MM',
+    // what came with the colour sensor and the red target
+    'COLOR_SENSOR',
+    'COLOR_SENSOR_RANGE_MM',
+    'TARGET_COLOR',
+    'WALL_COLOR_NAME',
   ]) {
     assert.ok(names(assumptions, name), `${name} is in the list of assumptions`);
   }
+  // ---- the colour sensor: the organiser has decided THAT the robot has one and that the
+  // target is red; everything else about them is assumed, with the numbers the code really has
+  assert.match(decisions, /the robot finds the fire with a COLOUR SENSOR that looks forward, and\s+\*\s+the fire target is RED\. The game has no flame sensor and the target no emitter/);
+  for (const said of [
+    /4\. The target is red on every face/,
+    /5\. What the colour sensor reads on a wooden wall: never "red"[^]*"yellow"/,
+    /6\. Which colour sensor it is, and where it sits[^]*60 mm above the mat[^]*never\s+\*\s+wrong \(no noise\)/,
+    /7\. How close it must be: 15 mm or less from the face of the sensor/,
+    /Makeblock gives a detection range of 5 to 15 mm/,
+  ]) {
+    assert.match(assumptions, said);
+  }
+  // ---- the flame sensor and the infrared emitter of the draft are gone: neither list holds a
+  // constant of theirs, and the three files that hold the measures have none either
+  for (const [file, source] of [['game.ts', game], ['field.ts', field], ['robot.ts', robot]] as const) {
+    assert.ok(!/FLAME_SENSOR|EMITTER_|flameSensor|infrared:/.test(source), `${file} holds nothing of the flame sensor or the emitter`);
+  }
+  assert.match(assumptions, /§1, §4, §5 "use a flame sensor"[^]*overruled by the organiser's later decision/);
+  // the numbers of the list go from 1 to 20 without a gap (a line that is taken out must not leave a hole)
+  const numbers = [...assumptions.matchAll(/^ \* {1,3}(\d+)\. /gm)].map((m) => Number(m[1]));
+  assert.deepEqual(
+    numbers,
+    Array.from({ length: 20 }, (_, i) => i + 1),
+  );
+  assert.equal(COLOR_SENSOR_RANGE_MM, 15);
+  assert.equal(COLOR_SENSOR.rangeMm, COLOR_SENSOR_RANGE_MM);
+  assert.equal(COLOR_SENSOR.mount!.height, 60);
+  assert.equal(TARGET_COLOR, 'red');
+  assert.equal(WALL_COLOR_NAME, 'yellow');
+  // (the constants of the robot say what they are in their own comments too)
+  assert.match(robot, /ASSUMPTION: how close the colour sensor must be[^]*export const COLOR_SENSOR_RANGE_MM = 15;/);
+  assert.match(robot, /The colour sensor\. ASSUMPTIONS, all of it[^]*export const COLOR_SENSOR\b/);
 
   // ---- A constant whose own comment says ASSUMPTION is in the list of assumptions, and one
   // whose comment says DECISION is in the list of decisions - and in that list only. One that
@@ -1775,7 +1814,8 @@ test('decisions and assumptions: the two lists at the top of game.ts name every 
 
   // the two other files that hold measures point to the lists
   assert.match(field, /The ONE list of all assumptions and decisions of this game[^]*is at the top of \.\/game\.ts/);
-  assert.match(robot, /the list of every\s+\* assumption and decision of this game is at the top of \.\/game\.ts/);
+  // (wherever the comment breaks its lines)
+  assert.match(robot.replace(/\s+\*\s+/g, ' '), /the list of every assumption and decision of this game is at the top of \.\/game\.ts/);
   // (the reach of the fan is the one number of the robot that the organiser has decided)
   assert.match(robot, /300 mm from the fan \(DECISION of the organiser/);
   // the choices of the referee that a reviewer found unnamed are named in the list of assumptions

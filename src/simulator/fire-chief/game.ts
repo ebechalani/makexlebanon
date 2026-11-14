@@ -33,19 +33,23 @@
  *
  *   D1. Touching or hitting the fire target without moving it costs nothing. Only a target
  *       that is moved ends the attempt. (The draft's own condition stays: no fan action
- *       counts while the robot touches the target, §7. How far "moved" is: assumption 7.)
+ *       counts while the robot touches the target, §7. How far "moved" is: assumption 9.)
  *                                                                     observe(), checkFan()
  *   D2. A fan action from outside the room is valid when the fan is within 30 cm of the
  *       target. It gives the 30 and the 40 points; a team that never drove completely into a
  *       room then ends "mission complete" with 80 points, without the 20 points for a room.
  *                                              FAN.reachMm in ./robot.ts, observe(), score()
  *   D3. The 30 points need only the position: standing still, facing the target, fan on,
- *       within 30 cm, no wall between. No reading of the flame sensor is needed - the referee
- *       does not ask what the sensor shows (§4, §5 "use a flame sensor" are not checked).
- *                                                                                 checkFan()
+ *       within 30 cm, no wall between. What the colour sensor reads does not matter to the
+ *       referee: no reading of any sensor counts for a point.                    checkFan()
  *   D4. The fire target is 60 mm wide and 120 mm high.           TARGET_WIDTH, TARGET_HEIGHT
  *   D5. The outer edge of the field is walled.                                   OUTER_WALLS
  *   (Decided earlier, with the map: the walls are 3 mm thick.                WALL_THICKNESS)
+ *   (Decided after the draft, which names a flame sensor and an infrared emitter in the
+ *   target - §1, §4, §5: the robot finds the fire with a COLOUR SENSOR that looks forward, and
+ *   the fire target is RED. The game has no flame sensor and the target no emitter. What the
+ *   organiser has not said about the colour sensor and the red target is assumed: 4 to 7
+ *   below.)
  *
  * =====================================================================================
  *  ASSUMPTIONS - the one list of everything neither the draft rules nor the organiser say
@@ -59,49 +63,60 @@
  *   1. A wall panel is one cell + one thickness long, so that panels close the corners
  *      without a gap.                                                            WALL_LENGTH
  *   2. The target is 20 mm deep and light enough to be pushed.     TARGET_DEPTH, TARGET_MASS
- *   3. Its emitter: in the middle of the front face, 60 mm above the mat, shining 70 degrees
- *      to each side; in the outer quarter of that cone the light fades out.
- *            EMITTER_HEIGHT, EMITTER_HALF_ANGLE_DEG; EMITTER_FADE in core/engine-sensors.ts
- *   4. Three spots per room, against the outer walls, facing into the room.
+ *   3. Three spots per room, against the outer walls, facing into the room.
  *                                                                 FIRE_SPOTS, targetPose()
+ *   4. The target is red on every face: the colour sensor reads "red" from whichever side
+ *      the robot comes.                                                         TARGET_COLOR
+ *   5. What the colour sensor reads on a wooden wall: never "red". The simulator names the
+ *      wood colour with its own colour naming (the one of the Quad RGB sensor), which calls
+ *      light wood "yellow". Inner and outer walls read the same.  WALL_COLOR_NAME, WALL_WOOD
  *
  * B. The robot (./robot.ts)
- *   5. The flame sensor: at the front, 60 mm high, 30 degrees to each side, 1000 mm far,
- *      "detected" above 10.                                                    FLAME_SENSOR
- *      Whether the robot is "in front of the target" is judged from the point the robot turns
- *      around, not from the sensor: then the highest value of a turn on the spot points at the
- *      target (flameSignal() in core/engine-sensors.ts).
- *   6. The fan: on port M1, blowing from 20 % power, 20 degrees to each side. (How far it
+ *   6. Which colour sensor it is, and where it sits: one sensor, fixed to the middle of the
+ *      front face of the chassis, 60 mm above the mat (half the height of the target), looking
+ *      straight ahead along one line. It names the nearest thing on that line and is never
+ *      wrong (no noise). The texts of its two blocks in mBlock are not confirmed either
+ *      (blocks/mblock-wording.ts).                                             COLOR_SENSOR
+ *   7. How close it must be: 15 mm or less from the face of the sensor to the thing it looks
+ *      at. Makeblock gives a detection range of 5 to 15 mm for its RGB colour sensors; the
+ *      simulator takes the far end and no more, because a stricter simulator is the safe side
+ *      (a program that works at 15 mm also works with a sensor that sees further). The near
+ *      end is not modelled: it also reads a thing it touches.          COLOR_SENSOR_RANGE_MM
+ *      (What follows from 3, 7 and the 130 mm wide chassis together: a robot that drives at a
+ *      target in a corner is stopped by the two walls of that corner when its nose is exactly
+ *      15 mm from the target. So that target is read only by a robot that touches both walls,
+ *      or is less than about 1 mm away from them.)
+ *   8. The fan: on port M1, blowing from 20 % power, 20 degrees to each side. (How far it
  *      reaches, 300 mm, is decision D2.)                                                FAN
  *
  * C. The referee (this file)
- *   7. "Displaced" (§11) = one corner of the target is more than 5 mm from where it stood.
+ *   9. "Displaced" (§11) = one corner of the target is more than 5 mm from where it stood.
  *                                                                       TARGET_DISPLACED_MM
- *   8. The target cannot fall over in the simulator ("must not knock over", §7, is not
+ *  10. The target cannot fall over in the simulator ("must not knock over", §7, is not
  *      modelled). A robot that hits it squarely, where it stands flat against its wall, does
  *      not move it at all. The referee says a sentence when the robot touches the target.
- *   9. "Touching" (§7) = closer than half a millimetre. (Measured with the target made that
+ *  11. "Touching" (§7) = closer than half a millimetre. (Measured with the target made that
  *      much larger on every side: at a corner of the target it is up to 0.7 mm.)       TOUCH_MM
- *  10. "Stationary" (§7) = both wheel speeds are 0 and the robot is exactly where it was one
+ *  12. "Stationary" (§7) = both wheel speeds are 0 and the robot is exactly where it was one
  *      tick (1/100 s) before. Wheels that spin against a wall are not stationary.   observe()
- *  11. "Directed towards the wooden flame" (§7) = the straight-ahead line of the fan hits the
+ *  13. "Directed towards the wooden flame" (§7) = the straight-ahead line of the fan hits the
  *      target, or the middle of the target is at most 20 degrees away from that line. The
  *      30 cm of D2 are measured from the fan to the middle of the target. "No wall between" =
  *      no wall on the straight line from the fan to the middle of the target.
  *                                                                  lookAtFan(), checkFan()
- *  12. A fan action begins at the beginning of the first tick in which everything was right;
+ *  14. A fan action begins at the beginning of the first tick in which everything was right;
  *      that moment is the time written on the 30 points.                           observe()
- *  13. What is earned on the tick that ends at exactly 180.00 s still counts, and "mission
+ *  15. What is earned on the tick that ends at exactly 180.00 s still counts, and "mission
  *      complete" on that tick wins over "time".              tick() in core/engine.ts
- *  14. ScoreReport.complete is true only with all four achievements (100 points). An attempt
+ *  16. ScoreReport.complete is true only with all four achievements (100 points). An attempt
  *      can end with the reason 'mission-complete' and complete = false (see D2).      score()
- *  15. Restart (§10): the robot is put back exactly where and how it started; a nudged target
+ *  17. Restart (§10): the robot is put back exactly where and how it started; a nudged target
  *      is put back.                                                   fireChiefGame.restartRules
- *  16. A fifth end that §8 does not name: the program has ended, the robot stands still and no
+ *  18. A fifth end that §8 does not name: the program has ended, the robot stands still and no
  *      DC motor runs ('program-ended'). It is the simulator's way to say "nothing more will
  *      happen". A program that ends with a DC motor left on runs to 180 s. After this end, as
  *      after every end, no restart is possible.                              core/engine.ts
- *  17. The start (§6.1, §8): the screen puts the robot only where the whole robot is inside
+ *  19. The start (§6.1, §8): the screen puts the robot only where the whole robot is inside
  *      START (Simulation.setStartPose refuses everything else). A start pose handed over in
  *      SimulationOptions is NOT held to START - tests use it to begin next to the target. The
  *      referee notes it at the start signal and writes it on the sheet (line 'start-position').
@@ -110,12 +125,15 @@
  *      log; the target stays where it is: core/engine.ts.)
  *
  * D. The engine (core/engine.ts)
- *  18. Walls cannot be moved, are perfectly smooth and never stop a turn: a robot that touches
+ *  20. Walls cannot be moved, are perfectly smooth and never stop a turn: a robot that touches
  *      one while it drives or turns slides along it. "Minor accidental contact with a wall"
  *      (§11) is therefore any contact, for any time; "must not deliberately push walls" is not
  *      judged.
  *
  * E. Rule sentences that are NOT implemented
+ *      §1, §4, §5 "use a flame sensor", "detect the infrared signal rather than relying only on
+ *                the target's colour or shape": overruled by the organiser's later decision
+ *                for a colour sensor and a red target. No sensor is checked at all (D3).
  *      §3        "must not depend solely on a memorised sequence of movements": the referee does
  *                not judge how a program finds its way.
  *      §4, §6.2  "operate autonomously, no remote control": the CyberPi buttons work during an
@@ -158,8 +176,6 @@ import type {
 } from '../core/types';
 import { wallBetween } from '../core/walls';
 import {
-  EMITTER_HALF_ANGLE_DEG,
-  EMITTER_HEIGHT,
   FIELD_SIZE,
   MAT_IMAGE_URL,
   MAT_SENSOR_IMAGE_URL,
@@ -167,6 +183,7 @@ import {
   ROOMS,
   ROOM_IDS,
   START_RECT,
+  TARGET_COLOR,
   TARGET_DEPTH,
   TARGET_HEIGHT,
   TARGET_MASS,
@@ -229,7 +246,12 @@ const TOUCH_QUIET_SECONDS = 0.5;
 export const KIND_FIRE_TARGET = 'fire-target';
 export const TARGET_BODY_ID = 'target:fire';
 
-const TARGET_FILL = '#f97316';
+/**
+ * The target is drawn in the colour the colour sensor reads on it: a clear red, easy to tell
+ * from the wood of the walls and from the blue robot. (A test holds that the simulator's own
+ * colour naming calls this colour by the name the sensor reads: TARGET_COLOR.)
+ */
+export const TARGET_FILL = '#dc2626';
 const START_ZONE_CSS = '#dc2626';
 const ROOM_CSS = '#2563eb';
 const FIRE_ROOM_CSS = '#f97316';
@@ -239,15 +261,18 @@ export function footprint(body: Pick<Body, 'x' | 'y' | 'w' | 'l' | 'angle'>): OB
   return { x: body.x, y: body.y, w: body.w, l: body.l, angle: body.angle };
 }
 
-/** The one game element: the wooden flame with its infrared emitter, looking into its room. */
+/** The one game element: the red wooden flame, standing against the outer wall of its room. */
 function createBodies(s: FireChiefScenario): Body[] {
   const at = targetPose(s.fireRoom, s.fireSpot);
   return [
     {
       id: TARGET_BODY_ID,
       kind: KIND_FIRE_TARGET,
-      label: 'F',
+      // (no letter: on a 20 mm board it could not be read; the stage draws a flame sign around it)
+      label: '',
       fill: TARGET_FILL,
+      // what the robot's colour sensor reads on it, from every side
+      colorName: TARGET_COLOR,
       x: at.x,
       y: at.y,
       angle: at.angle,
@@ -261,8 +286,6 @@ function createBodies(s: FireChiefScenario): Body[] {
       platform: false,
       mass: TARGET_MASS,
       home: { x: at.x, y: at.y, angle: at.angle, z: 0, restingOn: null },
-      // the emitter sits in the middle of the front face
-      infrared: { forward: TARGET_DEPTH / 2, height: EMITTER_HEIGHT, halfAngleDeg: EMITTER_HALF_ANGLE_DEG },
     },
   ];
 }
@@ -531,7 +554,7 @@ const ACHIEVEMENTS: Record<AchievementId, { label: string; points: number }> = {
   'fan-complete': { label: `Keep the fan on the fire for ${FAN_ACTION_SECONDS} seconds`, points: POINTS_FAN_COMPLETE },
 };
 
-/** The extra line of the sheet for a robot that did not start inside START (see assumption 17 at the top). */
+/** The extra line of the sheet for a robot that did not start inside START (see assumption 19 at the top). */
 export const START_POSITION_LINE_ID = 'start-position';
 
 /** Match time as the referee writes it down: 83.42 -> "1:23.4" (tenths are cut off, never rounded up). */
@@ -834,7 +857,7 @@ function createReferee(_scenario: FireChiefScenario): Referee<FireChiefScenario>
     const inside =
       begun || ctx.world.tick > 0 ? startedInside : ctx.robotShapes.every((shape) => rectContainsOBB(START_RECT, shape));
     if (!inside) {
-      // (only a start pose from SimulationOptions can do this: see assumption 17 at the top)
+      // (only a start pose from SimulationOptions can do this: see assumption 19 at the top)
       lines.push({
         id: START_POSITION_LINE_ID,
         label: 'Start completely inside START',

@@ -648,11 +648,11 @@ The simulator is a training tool, not a copy of the real field:
 ## The Fire Chief simulator
 
 The second game of the same simulator: the 2027 **Fire Chief** category, the "Dynamic Maze
-Challenge" for ages 14–17. The robot — an mBot2 without the gripper, with a **flame sensor**
-and a **fan** at its front — starts in the START cell of a 5 × 5 field, finds its way round
-the walls to the room with the fire, faces the fire target and blows at it for 3 seconds. The
-walls are different in every round, so the student sets up the maze, draws a random one or
-types in a code. It lives at:
+Challenge" for ages 14–17. The robot — an mBot2 without the gripper, with a **colour sensor**
+that looks forward and a **fan** at its front — starts in the START cell of a 5 × 5 field,
+finds its way round the walls to the room with the fire, goes up to the red fire target,
+reads "red", faces the target and blows at it for 3 seconds. The walls are different in every
+round, so the student sets up the maze, draws a random one or types in a code. It lives at:
 
 ```
 https://www.makexlebanon.com/training/simulator/fire-chief
@@ -664,6 +664,14 @@ draft and what the organiser has decided since. Its **Rules** window says so in 
 line, and has a second part, "What this simulator assumes", for what nobody has decided yet
 and a student can notice. When the organiser answers one of those questions, see "When the
 organiser decides something" below.
+
+**The draft names a flame sensor; the game has none.** The draft asks the robot to "use a
+flame sensor to locate the infrared fire target". After the draft the organiser decided that
+Fire Chief is played with a colour sensor that looks forward and that the fire target is red.
+The simulator had a flame sensor for a short time while the page was being built; it is gone,
+with its blocks. The word "flame" is still in the code where it means the wooden fire target
+(the rules call it "the wooden flame"), in the flame sign the stage draws around the target,
+and in two example ids (`chief-flame-fan`, `chief-face-flame`), which never change.
 
 Everything that is general works as in Fire Rescue and is described above: the blocks and
 their saving, the ruler and the enlarged stage, the examples and their codes, the title row
@@ -696,7 +704,7 @@ Fire Rescue) and for search engines.
 | File | What is in it |
 | --- | --- |
 | `src/simulator/fire-chief/field.ts` | Every measure of the field, the walls and the fire target; the 25 cells and the 40 places where an inner wall can stand |
-| `src/simulator/fire-chief/robot.ts` | The robot of this game: where the flame sensor and the fan sit and what they reach; where the robot starts |
+| `src/simulator/fire-chief/robot.ts` | The robot of this game: where the colour sensor and the fan sit and what they reach; where the robot starts |
 | `src/simulator/fire-chief/scenario.ts` | A maze: which of the 40 walls stand, the room of the fire and its place in the room. Which mazes can be played, the named mazes, the random mazes, the short code |
 | `src/simulator/fire-chief/game.ts` | The game and its referee: the four achievements with their points, the 3 minutes, the 3 seconds of the fan, the one restart, the end of an attempt. At its top: the two lists described below |
 | `src/simulator/fire-chief/sample-catalog.ts`, `samples.ts` | The examples: titles and levels, and the programs with their descriptions. They stay on the server (see "Member codes" above) |
@@ -705,14 +713,17 @@ Fire Rescue) and for search engines.
 | `public/simulator/fire-chief/` | The two pictures of the mat: `mat.webp` is the one shown, `mat-sensor.webp` is the one the line sensor reads |
 
 What the two games share is everything else: the engine (`src/simulator/core/` — it knows
-walls, a flame sensor and a fan on a DC motor port for any game), the interpreter, the blocks
-and the screen (`src/simulator/ui/SimulatorApp.tsx`).
+walls, a colour sensor that is fixed to the front of a robot and a fan on a DC motor port for
+any game), the interpreter, the blocks and the screen (`src/simulator/ui/SimulatorApp.tsx`).
 
 - **The blocks.** Each game has its own palette (`src/simulator/blocks/palettes.ts`). Fire
-  Chief has no Servo, Gripper and Colour Sensor groups, and two groups Fire Rescue does not
-  have: **mBot2 Extension Port** (the DC motor that drives the fan) and **Flame Sensor**. The
-  texts on those blocks are in `src/simulator/blocks/mblock-wording.ts`; that file also says,
-  block by block, what has not been compared with real mBlock yet.
+  Chief has no Servo and no Gripper group, and two groups Fire Rescue does not have: **mBot2
+  Extension Port** (the DC motor that drives the fan) and its own **Colour Sensor** group, for
+  the sensor that looks forward ("colour sensor (1) detects [red] ?" and "colour sensor (1)
+  colour"). Fire Rescue's group of the same name is another sensor, the one at the claw; no
+  palette shows both. The texts on the blocks of these two groups are in
+  `src/simulator/blocks/mblock-wording.ts`; that file also says, block by block, what has not
+  been compared with real mBlock yet (see "Block texts that are not confirmed" below).
 - **The referee has a memory.** In Fire Rescue the points can be read from the field at the
   end. Here they depend on what happened and when, so the referee looks at every moment of the
   attempt and writes down the time of each achievement — the ranking uses the time.
@@ -726,8 +737,8 @@ Every number is written once:
 
 | What | Where |
 | --- | --- |
-| The mat (1500 mm, 5 × 5 cells of 300 mm), the walls (150 mm high, 3 mm thick, the wall around the field), the fire target (60 mm wide, 120 mm high, 20 mm deep; its infrared light; its three places per room), the size limits of the robot | `src/simulator/fire-chief/field.ts` |
-| The flame sensor (30° to each side, 1000 mm, "detected" above 10) and the fan (port M1, from 20 % power, 20° to each side, 300 mm) | `src/simulator/fire-chief/robot.ts` |
+| The mat (1500 mm, 5 × 5 cells of 300 mm), the walls (150 mm high, 3 mm thick, the wall around the field; what a colour sensor reads on them), the fire target (60 mm wide, 120 mm high, 20 mm deep; red; its three places per room), the size limits of the robot | `src/simulator/fire-chief/field.ts` |
+| The colour sensor (in the middle of the front, 60 mm above the mat, reads from 15 mm or closer) and the fan (port M1, from 20 % power, 20° to each side, 300 mm) | `src/simulator/fire-chief/robot.ts` |
 | The points (10, 20, 30, 40), the 180 seconds, the 3 seconds of the fan action, the one restart, how far the target may move before it counts as moved (5 mm) | `src/simulator/fire-chief/game.ts` |
 
 The top of `src/simulator/fire-chief/game.ts` holds two lists, each line with the name of the
@@ -736,16 +747,71 @@ constant behind it:
 - **Decisions of the organiser** — what the organiser has answered since the draft: touching
   the target without moving it costs nothing; a fan action counts from outside the room within
   30 cm of the target (it then ends the attempt with 80 points); the 30 points need only the
-  position, not a reading of the flame sensor; the target is 6 cm wide and 12 cm high; the
-  outer edge of the field is walled; the walls are 3 mm thick.
+  position — what the colour sensor reads does not matter to the referee; the target is 6 cm
+  wide and 12 cm high; the outer edge of the field is walled; the walls are 3 mm thick; the
+  robot finds the fire with a colour sensor that looks forward, and the fire target is red.
 - **Assumptions** — everything neither the draft nor the organiser says, which the simulator
-  had to choose: where in its room the target stands, how thick and how heavy it is, what the
-  flame sensor sees, what "facing the target", "standing still" and "touching" mean, and so
-  on. The list ends with the sentences of the draft that the simulator does not judge at all.
+  had to choose. They are numbered 1 to 20 there; in short:
+  - *The field:* how long a wall panel is; that the target is 20 mm deep and light enough to
+    be pushed; its three places per room; **that it is red on every face**; **what the colour
+    sensor reads on a wooden wall** ("yellow", never "red").
+  - *The robot:* **which colour sensor it is and where it sits** (one sensor in the middle of
+    the front, 60 mm above the mat, looking along one straight line, never wrong); **how close
+    it must be** (15 mm or less from the face of the sensor — Makeblock gives 5 to 15 mm for
+    its RGB colour sensors, and the simulator takes the strict end: a program that works at
+    15 mm also works with a sensor that sees further); the fan (port M1, from 20 % power, 20°
+    to each side).
+  - *The referee:* when the target counts as moved (5 mm), that it cannot fall over, what
+    "touching" (0.5 mm), "standing still" and "facing the target" mean, when a fan action
+    begins, the last moment of the time, the restart, the start position, and one more end of
+    an attempt ("the program has ended").
+  - *The engine:* walls cannot be moved and are perfectly smooth.
+
+  The list ends with the sentences of the draft that the simulator does not judge at all —
+  among them "use a flame sensor", which the organiser's decision for a colour sensor
+  overrules.
 
 The **Rules** window (`src/simulator/ui/fire-chief/rules.ts`) has the same two parts: the
 draft rules with the organiser's decisions, and "What this simulator assumes" — the
 assumptions a student can notice. An assumption must never read like a rule.
+
+#### Block texts that are not confirmed
+
+Nobody has compared these texts letter for letter with real mBlock 5 (Makeblock's help pages
+could not be opened when they were written). They are all in
+`src/simulator/blocks/mblock-wording.ts`, each with a note on what exactly is open:
+
+| Block (as the simulator shows it) | How sure |
+| --- | --- |
+| Group name "mBot2 Extension Port" | likely: it is the title of Makeblock's help page for these blocks |
+| "DC motor [M1] rotates at power (50) %" | likely: the block exists, the word order was not read |
+| "DC motor M1 rotates at power (50) % , DC motor M2 rotates at power (50) %" | a guess: a block for both ports exists, its text is open |
+| "DC motor [M1] stops rotating" | a guess: the block exists; "stops rotating" and the menu entry "all" are open |
+| Group name "Colour Sensor" | a guess: it depends on which colour sensor the robot gets |
+| "colour sensor (1) detects [red] ?" | a guess: the usual pattern of an mBuild module; the words and the colours of the menu are open |
+| "colour sensor (1) colour" | a guess: the words, and what it gives when it sees no colour ("none" here), are open |
+
+(mBlock spells "color"; the simulator writes "colour" in every text of its blocks.)
+
+#### Questions for the organiser
+
+Each answer turns an assumption into a decision (see the next section for the steps):
+
+1. **Which colour sensor is it**, and where on the robot does it sit? (Its model decides the
+   blocks in mBlock, how far it sees and how wide its spot is.)
+2. **How close must it be** to read a colour? The simulator takes 15 mm or less.
+3. **Is the target red on every face**, or only on its front?
+4. **What are the walls made of**, and what should a colour sensor read on them? (The
+   simulator draws light wood and reads "yellow" on it, never "red".)
+5. **Can the target really stand in a corner?** With the three assumptions above, a 130 mm
+   wide robot that drives at a corner target is stopped by the two walls of the corner when
+   its nose is exactly 15 mm from the target. So it reads "red" there only while it touches
+   both walls (or is less than about 1 mm from them), and with no margin at all. A sensor
+   that sees a few millimetres further, or no corner place, would remove this.
+6. **Where may the target stand**, how deep and how heavy is it, and how far may it be pushed
+   before it counts as moved? (Assumed: three places per room, 20 mm, light, 5 mm.)
+7. The exact texts of the DC motor blocks and of the colour sensor blocks in mBlock (the
+   table above).
 
 #### When the organiser decides something
 
@@ -804,7 +870,7 @@ its six places. For every run the table shows the points, the time at which they
 | To change… | Edit |
 | --- | --- |
 | A measure of the field, the walls or the fire target | `src/simulator/fire-chief/field.ts` |
-| What the flame sensor and the fan reach, or where the robot starts | `src/simulator/fire-chief/robot.ts` |
+| Where the colour sensor sits and how far it sees, what the fan reaches, or where the robot starts | `src/simulator/fire-chief/robot.ts` |
 | The points, the time of an attempt, the seconds of the fan action, the restart, when the target counts as moved | `src/simulator/fire-chief/game.ts` |
 | The sentences of the **Rules** window | `src/simulator/ui/fire-chief/rules.ts` (and the list `CHECKS` in `rules.test.ts` when a number is new) |
 | The named mazes, the default maze, how random mazes are made | `src/simulator/fire-chief/scenario.ts` |
@@ -812,7 +878,7 @@ its six places. For every run the table shows the points, the time at which they
 | The lists of "Test on many mazes" | `src/simulator/ui/fire-chief/maze-batch.ts` |
 | The examples | `src/simulator/fire-chief/samples.ts` and `sample-catalog.ts`; who may see them: `content/simulator-codes.ts` |
 | The words "attempt", "achievement", "maze" and the hints of the buttons | `src/simulator/ui/fire-chief/words.ts` |
-| The texts on the Flame Sensor and DC motor blocks | `src/simulator/blocks/mblock-wording.ts` |
+| The texts on the Colour Sensor and DC motor blocks | `src/simulator/blocks/mblock-wording.ts` |
 | The cards and links that lead to the simulator | `content/seasons.ts`, `content/site.ts` |
 
 #### Adding a named maze
@@ -889,8 +955,20 @@ Described in full in "Member codes for the simulator examples" above. In short:
 - **Walls cannot be moved** and are perfectly smooth: a robot that touches one slides along it.
 - **The robot is perfect** — no wheel slip, no sensor noise. The examples that count cells by
   distance work every time here and will drift on a real robot.
-- **The texts of the Flame Sensor and DC motor blocks** have not been compared letter for
-  letter with real mBlock.
+- **The texts of the Colour Sensor and DC motor blocks** have not been compared letter for
+  letter with real mBlock (see "Block texts that are not confirmed" above).
+- **The colour sensor is an assumption from end to end**: which sensor, where it sits, that it
+  reads from 15 mm or closer, that it is never wrong. With the target in a corner the robot
+  reads "red" only while it touches the two walls of that corner (question 5 above).
+- **No reading of the colour sensor is worth a point.** The referee counts the position only,
+  so a program that never reads a colour scores the same.
+- **A program that still holds flame sensor blocks** (saved in a browser or in a file while
+  the page was being built) opens without them: the blocks are taken out, the rest of the
+  program stays, and one sentence at the bottom of the screen says so ("2 flame sensor blocks
+  were taken out of this program, because the simulator has no flame sensor any more: their
+  places are empty now."). Without this, Blockly would refuse the whole program. The code is
+  `withoutRetiredBlocks` in `src/simulator/ui/program-file.ts`; the page with the flame sensor
+  was never published, so it can go once nobody can hold such a program any more.
 - **The level of a maze** is counted from its walls and its shortest way. It says nothing
   about how hard the maze is for one particular program.
 
@@ -975,7 +1053,8 @@ These are marked with `TODO` or `NOTE` comments in `content/seasons.ts`:
   and age band. Edit it to add winner names, which become the alt text.
 - **The Fire Chief category text** — `content/seasons.ts` still introduces Fire Chief as "Two
   robots. One operation. Command the whole response." on the platform "mBot2 + vision". The
-  draft rules of the category describe one robot in a maze, with a flame sensor and a fan. The
+  draft rules of the category describe one robot in a maze, with a fan and a sensor that finds
+  the fire (the organiser has since decided for a colour sensor and a red fire target). The
   category page now shows that older line directly above the simulator block: change
   `summary` and `platform` when the category is announced in full.
 - **Training tracks** — four of the seven are marked `coming-soon`. Write the content, then

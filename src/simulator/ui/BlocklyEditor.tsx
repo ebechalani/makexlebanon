@@ -15,7 +15,7 @@ import { memo, useEffect, useRef, useState } from 'react';
 import type * as BlocklyModule from 'blockly';
 import { createEditor, type BlocklyApi, type GripperCodeHandler } from '../blocks';
 import type { ProgramJson } from '../core/types';
-import { isProgramJson } from './program-file';
+import { isProgramJson, retiredBlocksNote, withoutRetiredBlocks } from './program-file';
 import { programFitScale } from './program-view';
 import { loadJson, saveJson } from './storage';
 
@@ -60,6 +60,12 @@ export interface BlocklyEditorProps {
   onStatus?: (status: EditorStatus) => void;
   /** called when the student asks to see the real mBlock code of the Gripper blocks (see ./GripperCodeDialog.tsx) */
   onGripperCode?: GripperCodeHandler;
+  /**
+   * called once, when the editor is ready, with one sentence for the student - only when the
+   * saved blocks could not be shown as they were saved (blocks the simulator no longer has
+   * were taken out: see withoutRetiredBlocks in ./program-file.ts)
+   */
+  onSavedNote?: (text: string) => void;
 }
 
 /** Space kept free above and to the left of the program after loading (pixels). */
@@ -151,12 +157,17 @@ function BlocklyEditorImpl(props: BlocklyEditorProps) {
       }
 
       // ---- show the saved program (or the starting one)
+      // (blocks the simulator no longer has are taken out first: Blockly would refuse the whole
+      // program for one such block, and the saved work would be gone)
       const saved = loadJson(storageKey, isProgramJson);
-      const first = saved ?? propsRef.current.initialProgram();
+      const kept = saved ? withoutRetiredBlocks(saved) : null;
+      let savedNote = kept ? retiredBlocksNote(kept, 'your saved program') : null;
+      const first = kept?.program ?? propsRef.current.initialProgram();
       try {
         serializer.load(first, ws, { recordUndo: false });
       } catch {
         // a damaged save must not lock the student out: start fresh
+        savedNote = null;
         ws.clear();
         try {
           serializer.load(propsRef.current.initialProgram(), ws, { recordUndo: false });
@@ -243,6 +254,7 @@ function BlocklyEditorImpl(props: BlocklyEditorProps) {
       setPhase('ready');
       propsRef.current.onStatus?.(status());
       propsRef.current.onReady(handle);
+      if (savedNote) propsRef.current.onSavedNote?.(savedNote);
     };
 
     setUp().catch(() => {

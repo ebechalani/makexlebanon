@@ -6,7 +6,7 @@ const PATH = '/training/simulator/fire-chief';
 const TITLE = 'mBot2 simulator — Fire Chief';
 const DESCRIPTION =
   'Build a program with mBlock-style blocks and watch a Makeblock mBot2 find its way through the ' +
-  'MakeX Lebanon 2027 Fire Chief maze: around the walls, to the room with the fire, with a flame ' +
+  'MakeX Lebanon 2027 Fire Chief maze: around the walls, to the room with the fire, with a colour ' +
   'sensor and a fan — on any maze, scored by the draft rules of the category. Free, in the ' +
   'browser, for ages 14–17.';
 

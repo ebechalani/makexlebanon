@@ -5,8 +5,9 @@
  *    came. It is pinned here three ways: its categories and blocks written out, a fingerprint
  *    of the whole toolbox (so a changed default value, label or gap is caught too), and a
  *    fingerprint of the definitions of its blocks (texts, menus, tooltips).
- *  - Fire Chief shows the same without Gripper, Servos and Colour Sensor, plus the two new
- *    categories: the DC motor ports and the flame sensor.
+ *  - Fire Chief shows the same without Gripper, Servos and the Colour Sensor at the claw, plus
+ *    two categories of its own: the DC motor ports and the colour sensor that is fixed to the
+ *    front of its robot. It has no flame sensor: no block, no category, no word of one.
  *  - The texts of the new blocks are not confirmed against mBlock yet; they all come from one
  *    file (./mblock-wording.ts).
  *  - The real Blockly library accepts both palettes (it is loaded with a pretend browser, jsdom).
@@ -118,7 +119,10 @@ const FIRE_RESCUE_PINNED: PinnedCategory[] = [
 const FIRE_RESCUE_TOOLBOX_FINGERPRINT = 'd2128fa4c33a8a1673f3590cbafd0c7abfb61ced04ff704e9a625704141edae6';
 const FIRE_RESCUE_BLOCKS_FINGERPRINT = '29a225233bcbd098dd0441ed0592962a5153f316c6a6545ad2d9e5e999464445';
 
-/** The palette of Fire Chief: no Servos, no Gripper, no Colour Sensor; the DC motor ports and the flame sensor instead. */
+/**
+ * The palette of Fire Chief: no Servos, no Gripper, no Colour Sensor at the claw; the DC motor
+ * ports and the colour sensor that looks forward instead.
+ */
 const FIRE_CHIEF_PINNED: PinnedCategory[] = [
   ...COMMON_PINNED,
   {
@@ -129,7 +133,12 @@ const FIRE_CHIEF_PINNED: PinnedCategory[] = [
   },
   QUAD_RGB_PINNED,
   ULTRASONIC_PINNED,
-  { id: 'flamesensor', name: 'Flame Sensor', colour: '#E0533D', blocks: ['sensing_flame_detected', 'sensing_flame_size'] },
+  {
+    id: 'frontcolorsensor',
+    name: 'Colour Sensor',
+    colour: '#2E9BB5',
+    blocks: ['sensing_colorsensor_color_is', 'sensing_colorsensor_color'],
+  },
 ];
 
 describe('the palette of Fire Rescue stays exactly as it was', () => {
@@ -168,21 +177,37 @@ describe('the palette of Fire Rescue stays exactly as it was', () => {
     );
   });
 
-  it('shows nothing of the fan or the flame sensor', () => {
+  it('shows nothing of the fan or the colour sensor of Fire Chief', () => {
     const types = toolboxBlockTypes(TOOLBOX);
-    for (const type of ['mbot2_dc_motor_power', 'mbot2_dc_motor_drive', 'mbot2_dc_motor_stop', 'sensing_flame_detected', 'sensing_flame_size']) {
+    for (const type of [
+      'mbot2_dc_motor_power',
+      'mbot2_dc_motor_drive',
+      'mbot2_dc_motor_stop',
+      'sensing_colorsensor_color_is',
+      'sensing_colorsensor_color',
+    ]) {
       assert.ok(!types.includes(type), type);
       assert.ok(!paletteBlockTypes('fire-rescue').includes(type), type);
     }
     assert.ok(!JSON.stringify(TOOLBOX).includes('DC motor'));
-    assert.ok(!/flame/i.test(JSON.stringify(TOOLBOX)));
+    assert.ok(!JSON.stringify(TOOLBOX).includes('colorsensor_'));
+    // its one "Colour Sensor" category is the one at the claw, with the three blocks it always had
+    const colour = TOOLBOX.contents.filter((category) => category.name === 'Colour Sensor');
+    assert.deepEqual(
+      colour.map((category) => category.toolboxitemid),
+      ['colorsensor'],
+    );
+    assert.deepEqual(
+      ['sensing_claw_color_is', 'sensing_claw_color', 'sensing_claw_object_detected'].map((type) => getBlockDef(type)?.message),
+      ['claw colour sensor detects %1 ?', 'claw colour sensor colour', 'object detected at claw ?'],
+    );
   });
 });
 
 describe('the palette of Fire Chief', () => {
   const toolbox = paletteToolbox('fire-chief');
 
-  it('is the palette of Fire Rescue without Gripper, Servos and Colour Sensor, plus the DC motor ports and the flame sensor', () => {
+  it('is the palette of Fire Rescue without Gripper, Servos and the Colour Sensor at the claw, plus the DC motor ports and its own colour sensor', () => {
     assert.equal(fireChiefGame.id, 'fire-chief');
     assert.deepEqual(shown(toolbox), FIRE_CHIEF_PINNED);
     assert.deepEqual(paletteCategories('fire-chief'), FIRE_CHIEF_PINNED.map((category) => category.id));
@@ -194,7 +219,7 @@ describe('the palette of Fire Chief', () => {
     );
     assert.deepEqual(
       chief.filter((id) => !rescue.includes(id)),
-      ['extensionport', 'flamesensor'],
+      ['extensionport', 'frontcolorsensor'],
     );
     // a category both games show is the very same in both: same blocks, default values and gaps
     for (const category of toolbox.contents) {
@@ -222,6 +247,17 @@ describe('the palette of Fire Chief', () => {
     assert.equal(mine.size, 91 - 2 - 3 - 3 + 3 + 2);
   });
 
+  it('has no flame sensor: the game is played with the colour sensor, and no palette, category or block of the simulator names a flame', () => {
+    // (the flame sensor of the draft rules was taken out when the organiser chose a colour sensor)
+    assert.equal(/flame/i.test(JSON.stringify(toolbox)), false, 'the Fire Chief toolbox');
+    assert.equal(/flame/i.test(JSON.stringify(TOOLBOX)), false, 'the Fire Rescue toolbox');
+    assert.equal(/flame/i.test(JSON.stringify(CATEGORIES)), false, 'the categories of the catalog');
+    assert.equal(/flame|infrared/i.test(JSON.stringify(BLOCKS)), false, 'the blocks of the catalog: types, texts, tooltips');
+    assert.equal(/flame/i.test(JSON.stringify([UNCONFIRMED_CATEGORY_NAMES, UNCONFIRMED_BLOCK_TEXTS])), false, 'the texts that wait for a check against mBlock');
+    // the colour sensor is there, and it is the last category
+    assert.equal(toolbox.contents[toolbox.contents.length - 1].toolboxitemid, 'frontcolorsensor');
+  });
+
   it('gives the new blocks their white bubbles and menus', () => {
     const port = toolbox.contents.find((c) => c.toolboxitemid === 'extensionport')!;
     assert.deepEqual(port.contents, [
@@ -241,10 +277,15 @@ describe('the palette of Fire Chief', () => {
       },
       { kind: 'block', type: 'mbot2_dc_motor_stop', fields: { PORT: 'M1' } },
     ]);
-    const flame = toolbox.contents.find((c) => c.toolboxitemid === 'flamesensor')!;
-    assert.deepEqual(flame.contents, [
-      { kind: 'block', type: 'sensing_flame_detected', inputs: { INDEX: { shadow: { type: 'math_number', fields: { NUM: 1 } } } } },
-      { kind: 'block', type: 'sensing_flame_size', inputs: { INDEX: { shadow: { type: 'math_number', fields: { NUM: 1 } } } } },
+    const colour = toolbox.contents.find((c) => c.toolboxitemid === 'frontcolorsensor')!;
+    assert.deepEqual(colour.contents, [
+      {
+        kind: 'block',
+        type: 'sensing_colorsensor_color_is',
+        fields: { COLOR: 'red' },
+        inputs: { INDEX: { shadow: { type: 'math_number', fields: { NUM: 1 } } } },
+      },
+      { kind: 'block', type: 'sensing_colorsensor_color', inputs: { INDEX: { shadow: { type: 'math_number', fields: { NUM: 1 } } } } },
     ]);
   });
 });
@@ -270,7 +311,12 @@ describe('palettes and games', () => {
         `${id} follows the order of the catalog`,
       );
       assert.deepEqual(categories.slice(0, 8), ['cyberpi', 'sensing', 'events', 'control', 'operators', 'variables', 'myblocks', 'chassis']);
+      // no palette shows two categories of the same name (the catalog has two called "Colour
+      // Sensor": the one at the claw of Fire Rescue and the one at the front of Fire Chief)
+      const names = categories.map((category) => getCategory(category).name);
+      assert.equal(new Set(names).size, names.length, `${id}: ${names.join(', ')}`);
     }
+    assert.equal(getCategory('colorsensor').name, getCategory('frontcolorsensor').name);
     // paletteCategories hands out a copy: changing it does not change the palette
     paletteCategories('fire-chief').push('gripper');
     assert.equal(PALETTES['fire-chief'].includes('gripper'), false);
@@ -296,8 +342,9 @@ describe('palettes and games', () => {
       const has = (category: CategoryId): boolean => PALETTES[id].includes(category);
       assert.equal(has('gripper'), robot.gripper.enabled, `${id}: gripper`);
       assert.equal(has('servo'), robot.gripper.enabled, `${id}: servos (they move the gripper)`);
-      assert.equal(has('colorsensor'), robot.frontColorSensor.enabled, `${id}: colour sensor at the claw`);
-      assert.equal(has('flamesensor'), robot.flameSensor?.enabled === true, `${id}: flame sensor`);
+      const colour = robot.frontColorSensor;
+      assert.equal(has('colorsensor'), colour.enabled && colour.mount === undefined, `${id}: colour sensor at the claw`);
+      assert.equal(has('frontcolorsensor'), colour.enabled && colour.mount !== undefined, `${id}: colour sensor fixed to the front`);
       assert.equal(has('extensionport'), robot.fan?.enabled === true, `${id}: fan on a DC motor port`);
     }
     // the fan of Fire Chief is on a port the DC motor blocks offer
@@ -308,13 +355,20 @@ describe('palettes and games', () => {
 describe('block texts that are not confirmed against mBlock yet', () => {
   it('are all in one file: the two category names and the five block texts', () => {
     assert.equal(getCategory('extensionport').name, UNCONFIRMED_CATEGORY_NAMES.extensionPort.text);
-    assert.equal(getCategory('flamesensor').name, UNCONFIRMED_CATEGORY_NAMES.flameSensor.text);
-    const fromNewCategories = BLOCKS.filter((def) => def.category === 'extensionport' || def.category === 'flamesensor').map((def) => def.type);
+    assert.equal(getCategory('frontcolorsensor').name, UNCONFIRMED_CATEGORY_NAMES.colorSensor.text);
+    assert.equal(Object.keys(UNCONFIRMED_CATEGORY_NAMES).length, 2);
+    assert.equal(UNCONFIRMED_BLOCK_TYPES.length, 5);
+    const unconfirmed: CategoryId[] = ['extensionport', 'frontcolorsensor'];
+    const fromNewCategories = BLOCKS.filter((def) => unconfirmed.includes(def.category)).map((def) => def.type);
     assert.deepEqual([...UNCONFIRMED_BLOCK_TYPES].sort(), [...fromNewCategories].sort());
     for (const [type, entry] of Object.entries(UNCONFIRMED_BLOCK_TEXTS)) {
       assert.equal(getBlockDef(type)?.message, entry.text, type);
       assert.ok(entry.toCheck.length > 20, type);
     }
+    // nothing about the colour sensor is confirmed: its category and both its blocks are guesses
+    assert.equal(UNCONFIRMED_CATEGORY_NAMES.colorSensor.confidence, 'guess');
+    assert.equal(UNCONFIRMED_BLOCK_TEXTS.sensing_colorsensor_color_is.confidence, 'guess');
+    assert.equal(UNCONFIRMED_BLOCK_TEXTS.sensing_colorsensor_color.confidence, 'guess');
   });
 
   it('are the wording the research found most likely', () => {
@@ -322,20 +376,46 @@ describe('block texts that are not confirmed against mBlock yet', () => {
     assert.equal(text('mbot2_dc_motor_power'), 'DC motor %1 rotates at power %2 %');
     assert.equal(text('mbot2_dc_motor_drive'), 'DC motor M1 rotates at power %1 % , DC motor M2 rotates at power %2 %');
     assert.equal(text('mbot2_dc_motor_stop'), 'DC motor %1 stops rotating');
-    assert.equal(text('sensing_flame_detected'), 'flame sensor %1 detects flame?');
-    assert.equal(text('sensing_flame_size'), 'flame sensor %1 flame size');
+    assert.equal(text('sensing_colorsensor_color_is'), 'colour sensor %1 detects %2 ?');
+    assert.equal(text('sensing_colorsensor_color'), 'colour sensor %1 colour');
     assert.deepEqual(DC_MOTOR_MENU, ['M1', 'M2']);
     assert.deepEqual(DC_MOTOR_STOP_MENU, ['M1', 'M2', 'all']);
     assert.equal(UNCONFIRMED_CATEGORY_NAMES.extensionPort.text, 'mBot2 Extension Port');
-    assert.equal(UNCONFIRMED_CATEGORY_NAMES.flameSensor.text, 'Flame Sensor');
+    assert.equal(UNCONFIRMED_CATEGORY_NAMES.colorSensor.text, 'Colour Sensor');
+  });
+
+  it('the blocks of the colour sensor carry the number of the sensor first, as the blocks of mBuild modules do; the tooltips name the 15 mm of this simulator', () => {
+    const detects = getBlockDef('sensing_colorsensor_color_is')!;
+    const colour = getBlockDef('sensing_colorsensor_color')!;
+    assert.deepEqual(
+      detects.args.map((arg) => [arg.type, arg.name]),
+      [
+        ['input_value', 'INDEX'],
+        ['field_dropdown', 'COLOR'],
+      ],
+    );
+    assert.deepEqual(
+      colour.args.map((arg) => [arg.type, arg.name]),
+      [['input_value', 'INDEX']],
+    );
+    // a number slot whose white bubble says 1: the first (and only) colour sensor
+    for (const def of [detects, colour]) assert.deepEqual(def.args[0], { type: 'input_value', name: 'INDEX', shadow: { kind: 'number', value: 1 } });
+    // the one number the tooltips say is the range of the sensor of the Fire Chief robot, in centimetres
+    const range = fireChiefGame.robotConfig!.frontColorSensor.rangeMm;
+    assert.equal(range, 15);
+    for (const def of [detects, colour]) {
+      assert.ok(def.tooltip.includes(`${range / 10} cm or less`), def.tooltip);
+      assert.ok(def.tooltip.includes('in this simulator'), 'the 1.5 cm are the simulator\'s, not a rule');
+      assert.deepEqual(def.tooltip.match(/\d+(\.\d+)? ?(cm|mm)/g), ['1.5 cm'], def.tooltip);
+    }
   });
 
   it('the blocks have the shapes mBlock gives them', () => {
     assert.equal(getBlockDef('mbot2_dc_motor_power')?.shape, 'statement');
     assert.equal(getBlockDef('mbot2_dc_motor_drive')?.shape, 'statement');
     assert.equal(getBlockDef('mbot2_dc_motor_stop')?.shape, 'statement');
-    assert.equal(getBlockDef('sensing_flame_detected')?.shape, 'boolean');
-    assert.equal(getBlockDef('sensing_flame_size')?.shape, 'reporter');
+    assert.equal(getBlockDef('sensing_colorsensor_color_is')?.shape, 'boolean');
+    assert.equal(getBlockDef('sensing_colorsensor_color')?.shape, 'reporter');
   });
 });
 
@@ -403,15 +483,15 @@ describe('the editor factory', () => {
         count++;
       }
     }
-    assert.equal(count, 75, '78 of Fire Rescue - 2 servo - 3 gripper - 3 colour sensor + 3 DC motor + 2 flame sensor');
+    assert.equal(count, 75, '78 of Fire Rescue - 2 servo - 3 gripper - 3 colour sensor at the claw + 3 DC motor + 2 colour sensor');
 
     // what a student reads on the new blocks (menus show their first entry, bubbles their default)
     const read = (type: string): string => workspace.getBlocksByType(type)[0].toString();
     assert.equal(read('mbot2_dc_motor_power'), 'DC motor M1 rotates at power 50 %');
     assert.equal(read('mbot2_dc_motor_drive'), 'DC motor M1 rotates at power 50 % , DC motor M2 rotates at power 50 %');
     assert.equal(read('mbot2_dc_motor_stop'), 'DC motor M1 stops rotating');
-    assert.equal(read('sensing_flame_detected'), 'flame sensor 1 detects flame?');
-    assert.equal(read('sensing_flame_size'), 'flame sensor 1 flame size');
+    assert.equal(read('sensing_colorsensor_color_is'), 'colour sensor 1 detects red ?');
+    assert.equal(read('sensing_colorsensor_color'), 'colour sensor 1 colour');
 
     // the blocks of a game the palette does not show are still known: a program from Fire Rescue loads
     const foreign = Blockly.serialization.blocks.append({ type: 'gripper_claw', fields: { ACTION: 'close' } } as never, workspace);

@@ -1,9 +1,13 @@
 /**
- * The robot Fire Chief is played with: the simulator's mBot2 WITHOUT the gripper and without the
- * front colour sensor, and with two new parts at its front:
+ * The robot Fire Chief is played with: the simulator's mBot2 WITHOUT the gripper (and so without
+ * the colour sensor at the claw), and with these parts at its front:
  *
- *   - a flame sensor (infrared), looking forward
+ *   - a colour sensor, fixed to the middle of the front face, looking forward: it reads "red"
+ *     when the red fire target is right in front of it
  *   - a fan, blowing forward, on DC motor port M1 of the mBot2 shield
+ *
+ * (The draft rules name a flame sensor. The organiser has decided since that the game is played
+ * with a colour sensor and a red target: this robot has no flame sensor.)
  *
  * It keeps the two encoder motors, the Ultrasonic Sensor 2 (looking forward), the Quad RGB
  * sensor (looking down: it sees the printed grid lines, a real way to count cells) and the
@@ -11,45 +15,45 @@
  *
  * The chassis is 175 mm long and 130 mm wide: inside the 180 x 130 mm limit of the rules.
  *
- * The numbers of the flame sensor and of the fan are ASSUMPTIONS (the organiser has not
+ * The numbers of the colour sensor and of the fan are ASSUMPTIONS (the organiser has not
  * published a sensor or a fan) - all but one: that a fan action counts within 30 cm of the
- * target is a DECISION of the organiser. They are all here, in one place; the list of every
- * assumption and decision of this game is at the top of ./game.ts.
+ * target is a DECISION of the organiser. They are all here; the list of every assumption and
+ * decision of this game is at the top of ./game.ts.
  */
 import { DEFAULT_ROBOT_CONFIG } from '../core/robot';
-import type { FanConfig, FlameSensorConfig, Pose, RobotConfig } from '../core/types';
-import { START_CELL, cellCenter } from './field';
+import type { FanConfig, Pose, RobotConfig } from '../core/types';
+import { START_CELL, TARGET_HEIGHT, cellCenter } from './field';
 
 /**
- * The flame sensor. Its value is 0 (no infrared light) .. 100 (the emitter right in front of
- * it); how the value is worked out is written down at flameSignal() in core/engine-sensors.ts:
+ * ASSUMPTION: how close the colour sensor must be. It names the colour of a thing that is at
+ * most this far (mm) from the face of the sensor; further away it reads "none".
  *
- *   value = 100 x (1 - distance / range)^2 x (how straight ahead the flame is) x (how much the
- *           flame is turned towards the sensor)
- *
- * With these numbers a flame straight ahead reads about 81 at 100 mm, 49 at 300 mm (one cell),
- * 16 at 600 mm and 0 from 1000 mm on; at 15 degrees to the side it reads half of that, at 30
- * degrees nothing. Behind a wall it always reads 0.
- *
- * "How much the flame is turned towards the sensor" is judged from the point the robot turns
- * around (the middle of its wheel axle), not from the sensor on its nose. So a robot that turns
- * on the spot reads its highest value exactly when it points at the flame - unless the end of a
- * wall hides the flame at that very heading.
+ * Source: Makeblock gives a detection range of 5 to 15 mm for its RGB colour sensors. (That
+ * number was handed to us with the task; Makeblock's own pages could not be opened to read it
+ * there.) The simulator takes the far end of that range and not a millimetre more: a stricter
+ * simulator is the safe side - a program that works at 15 mm also works with a sensor that sees
+ * further. The near end is not modelled: the simulated sensor also reads a thing it touches.
  */
-export const FLAME_SENSOR: FlameSensorConfig = {
+export const COLOR_SENSOR_RANGE_MM = 15;
+
+/**
+ * The colour sensor. ASSUMPTIONS, all of it (the organiser has only said: a colour sensor that
+ * looks forward): which sensor it is, where it sits and how far it sees.
+ *
+ * It looks along one straight line, from the middle of the front face of the chassis, and
+ * names the colour of the nearest thing on that line - the fire target, or a wall - when that
+ * thing is close enough. It is never wrong: the simulator's sensor noise does not touch it.
+ * (How it is worked out: lookAhead() in core/engine.ts; FrontColorMount in core/types.ts.)
+ */
+export const COLOR_SENSOR: RobotConfig['frontColorSensor'] = {
   enabled: true,
-  // on the front face of the chassis, beside the ultrasonic sensor
-  forward: 105,
-  // at the height of the emitter of the target (and below the 150 mm limit of the rules)
-  height: 60,
-  // it sees 30 degrees to each side
-  halfAngleDeg: 30,
-  // and up to one metre
-  rangeMm: 1000,
-  // the value falls with the square of (1 - distance / range): fast near the flame, slowly far away
-  distancePower: 2,
-  // "a flame is detected" above 10: straight ahead that is up to about 680 mm (two cells)
-  threshold: 10,
+  rangeMm: COLOR_SENSOR_RANGE_MM,
+  mount: {
+    // on the front face of the chassis, in the middle
+    forward: DEFAULT_ROBOT_CONFIG.chassisFront,
+    // at half the height of the target (60 mm; below the 150 mm limit of the rules)
+    height: TARGET_HEIGHT / 2,
+  },
 };
 
 /**
@@ -76,9 +80,8 @@ export const FIRE_CHIEF_ROBOT: RobotConfig = {
   ...DEFAULT_ROBOT_CONFIG,
   quadRgb: { ...DEFAULT_ROBOT_CONFIG.quadRgb },
   ultrasonic: { ...DEFAULT_ROBOT_CONFIG.ultrasonic },
-  frontColorSensor: { ...DEFAULT_ROBOT_CONFIG.frontColorSensor, enabled: false },
+  frontColorSensor: COLOR_SENSOR,
   gripper: { ...DEFAULT_ROBOT_CONFIG.gripper, enabled: false },
-  flameSensor: FLAME_SENSOR,
   fan: FAN,
   noise: { ...DEFAULT_ROBOT_CONFIG.noise },
 };

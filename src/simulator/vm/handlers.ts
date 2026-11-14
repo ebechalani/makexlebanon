@@ -160,21 +160,40 @@ const tidy = (n: number): number => Math.round(n * 1e10) / 1e10;
 
 const NO_GRIPPER = 'This robot has no gripper fitted, so this block does nothing.';
 
-const NO_FLAME_SENSOR = 'This robot has no flame sensor fitted, so this block always reads "no flame".';
-const ONE_FLAME_SENSOR = 'This robot has one flame sensor: its number is 1. Any other number reads "no flame".';
+// (each sentence is said by a true / false block and by a block that gives a colour name, so it
+// does not say which of the two answers the block gives)
+const NO_CLAW_SENSOR = 'This robot has no claw, so this block finds nothing there. The colour sensor of this robot looks forward and has its own blocks.';
+const NO_COLOR_SENSOR = 'This robot has no colour sensor that looks forward, so this block sees no colour.';
+const ONE_COLOR_SENSOR = 'This robot has one colour sensor: its number is 1. With any other number this block sees no colour.';
 
 /**
- * The flame sensor blocks carry the number of the sensor (mBuild modules of one kind are
- * numbered along their chain; 1 is the first). The robot has at most one flame sensor, so only
- * number 1 reads anything. True when this block reads the robot's flame sensor.
+ * What the "claw colour sensor" blocks read: the colour sensor at the claw (Fire Rescue).
+ * A robot whose colour sensor is fixed to its front (Fire Chief: frontColorSensor.mount) has no
+ * sensor at a claw. There these blocks read "none" - as they did on that robot before it got
+ * its sensor - and say why: they are blocks for a part the robot does not have.
  */
-function readsFlameSensor(ctx: BlockContext): boolean {
-  if (ctx.io.config.flameSensor?.enabled !== true) {
-    ctx.warn(NO_FLAME_SENSOR);
+function clawColor(ctx: BlockContext): SensorColor | 'none' {
+  if (ctx.io.config.frontColorSensor.mount) {
+    ctx.warn(NO_CLAW_SENSOR);
+    return 'none';
+  }
+  return ctx.io.frontColor();
+}
+
+/**
+ * The blocks of the colour sensor that looks forward carry the number of the sensor (mBuild
+ * modules of one kind are numbered along their chain; 1 is the first). The robot has at most
+ * one, so only number 1 reads anything. True when this block reads the robot's colour sensor -
+ * the one that is fixed to its front, not the one at a claw.
+ */
+function readsColorSensor(ctx: BlockContext): boolean {
+  const sensor = ctx.io.config.frontColorSensor;
+  if (!sensor.enabled || !sensor.mount) {
+    ctx.warn(NO_COLOR_SENSOR);
     return false;
   }
   if (Math.round(ctx.num('INDEX')) !== 1) {
-    ctx.warn(ONE_FLAME_SENSOR);
+    ctx.warn(ONE_COLOR_SENSOR);
     return false;
   }
   return true;
@@ -422,21 +441,21 @@ export const REPORTERS: Record<string, ReporterHandler> = {
 
   // ------------------------------------------------------------------ colour sensor at the claw
   sensing_claw_color_is(ctx) {
-    return ctx.io.frontColor() === ctx.field('COLOR');
+    return clawColor(ctx) === ctx.field('COLOR');
   },
   sensing_claw_color(ctx) {
-    return ctx.io.frontColor();
+    return clawColor(ctx);
   },
   sensing_claw_object_detected(ctx) {
-    return ctx.io.frontColor() !== 'none';
+    return clawColor(ctx) !== 'none';
   },
 
-  // ------------------------------------------------------------------ flame sensor
-  sensing_flame_detected(ctx) {
-    return readsFlameSensor(ctx) && ctx.io.flameDetected();
+  // ------------------------------------------------------------------ colour sensor fixed to the front of the robot
+  sensing_colorsensor_color_is(ctx) {
+    return readsColorSensor(ctx) && ctx.io.frontColor() === ctx.field('COLOR');
   },
-  sensing_flame_size(ctx) {
-    return readsFlameSensor(ctx) ? roundTo(ctx.io.flameValue(), 1) : 0;
+  sensing_colorsensor_color(ctx) {
+    return readsColorSensor(ctx) ? ctx.io.frontColor() : 'none';
   },
 
   // ------------------------------------------------------------------ CyberPi

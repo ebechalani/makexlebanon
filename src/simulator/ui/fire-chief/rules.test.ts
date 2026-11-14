@@ -12,13 +12,9 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { flameSignal } from '../../core/engine-sensors';
-import { DEG } from '../../core/geometry';
 import { createSimulation } from '../../core/simulation';
 import {
   CELL_SIZE,
-  EMITTER_HALF_ANGLE_DEG,
-  EMITTER_HEIGHT,
   FIELD_SIZE,
   FIRE_SPOTS,
   GRID_CELLS,
@@ -28,10 +24,12 @@ import {
   ROBOT_MAX_WIDTH,
   ROOM_IDS,
   SENSOR_MAX_HEIGHT,
+  TARGET_COLOR,
   TARGET_DEPTH,
   TARGET_HEIGHT,
   TARGET_MASS,
   TARGET_WIDTH,
+  WALL_COLOR_NAME,
   WALL_HEIGHT,
   WALL_LENGTH,
   WALL_THICKNESS,
@@ -50,10 +48,10 @@ import {
   TOUCH_MM,
   fireChiefGame,
 } from '../../fire-chief/game';
-import { FAN, FIRE_CHIEF_ROBOT, FLAME_SENSOR, START_POSE } from '../../fire-chief/robot';
+import { COLOR_SENSOR, COLOR_SENSOR_RANGE_MM, FAN, FIRE_CHIEF_ROBOT, START_POSE } from '../../fire-chief/robot';
 import { defaultScenario, openField } from '../../fire-chief/scenario';
 import { blankProgram } from '../program-file';
-import { dcMotor, moveCm, program, script, wait, whenStart } from '../../vm/builder';
+import { dcMotor, move, moveCm, program, script, wait, whenStart } from '../../vm/builder';
 import type { RulesSection } from '../SimulatorApp';
 import { FIRE_CHIEF_ASSUMPTIONS, FIRE_CHIEF_RULES, FIRE_CHIEF_RULES_NOTE } from './rules';
 
@@ -82,7 +80,7 @@ const CHECKS: NumberCheck[] = [
   { find: /a cell is (\d+) x (\d+) cm/, values: [cm(CELL_SIZE), cm(CELL_SIZE)], part: 'rules' },
   { find: /whole mat is (\d+) x (\d+) cm/, values: [cm(FIELD_SIZE), cm(FIELD_SIZE)], part: 'rules' },
   { find: /They are (\d+) cm high and (\d+) mm thick/, values: [cm(WALL_HEIGHT), WALL_THICKNESS], part: 'rules' },
-  { find: /infrared light in it, (\d+) cm wide and (\d+) cm high/, values: [cm(TARGET_WIDTH), cm(TARGET_HEIGHT)], part: 'rules' },
+  { find: /a red wooden flame, (\d+) cm wide and (\d+) cm high/, values: [cm(TARGET_WIDTH), cm(TARGET_HEIGHT)], part: 'rules' },
   // ---- the robot
   { find: /at most (\d+) cm long, (\d+) cm wide and (\d+) cm high/, values: [cm(ROBOT_MAX_LENGTH), cm(ROBOT_MAX_WIDTH), cm(ROBOT_MAX_HEIGHT)], part: 'rules' },
   { find: /higher than (\d+) cm above the mat/, values: [cm(SENSOR_MAX_HEIGHT)], part: 'rules' },
@@ -99,19 +97,17 @@ const CHECKS: NumberCheck[] = [
   { find: /the (\d+)-second fan action is done/, values: [FAN_ACTION_SECONDS], part: 'rules' },
   // ---- what the simulator assumes: the target
   { find: /It is (\d+) cm thick and light/, values: [cm(TARGET_DEPTH)], part: 'assumed' },
-  { find: /middle of its front, (\d+) cm above the mat\. It shines forward, up to (\d+) degrees to each side/, values: [cm(EMITTER_HEIGHT), EMITTER_HALF_ANGLE_DEG], part: 'assumed' },
   { find: /more than (\d+) mm away from its place/, values: [TARGET_DISPLACED_MM], part: 'assumed' },
   { find: /closer than ([\d.]+) mm/, values: [TOUCH_MM], part: 'assumed' },
-  // ---- the flame sensor and the fan
-  { find: /front of the robot, (\d+) cm above the mat\. It sees (\d+) degrees to each side and up to (\d+) cm far/, values: [cm(FLAME_SENSOR.height), FLAME_SENSOR.halfAngleDeg, cm(FLAME_SENSOR.rangeMm)], part: 'assumed' },
-  // (the range of the value is the contract of every flame sensor, core/types.ts: FlameSensorConfig; tried out below)
-  { find: /goes from (\d+) \(no flame\) to (\d+) \(very strong\)/, values: [0, 100], part: 'assumed' },
-  { find: /the value is above (\d+)/, values: [FLAME_SENSOR.threshold], part: 'assumed' },
+  // ---- the colour sensor and the fan
+  { find: /one sensor in the middle of the front of the robot, (\d+) cm above the mat/, values: [cm(COLOR_SENSOR.mount!.height)], part: 'assumed' },
+  { find: /the thing in front of it is (\d+) mm away or closer/, values: [COLOR_SENSOR_RANGE_MM], part: 'assumed' },
+  { find: /stop the robot (\d+) mm in front of it/, values: [COLOR_SENSOR_RANGE_MM], part: 'assumed' },
   { find: /power of that motor is (\d+) % or more/, values: [FAN.minPower], part: 'assumed' },
   { find: /at most (\d+) degrees to the side/, values: [FAN.coneHalfAngleDeg], part: 'assumed' },
   { find: /The (\d+) cm are measured from the fan/, values: [cm(FAN.reachMm)], part: 'assumed' },
   // ---- the robot of the simulator
-  { find: /([\d.]+) cm long and (\d+) cm wide, with the flame sensor and the fan/, values: [cm(FIRE_CHIEF_ROBOT.chassisFront + FIRE_CHIEF_ROBOT.chassisRear), cm(FIRE_CHIEF_ROBOT.chassisWidth)], part: 'assumed' },
+  { find: /([\d.]+) cm long and (\d+) cm wide, with the colour sensor and the fan/, values: [cm(FIRE_CHIEF_ROBOT.chassisFront + FIRE_CHIEF_ROBOT.chassisRear), cm(FIRE_CHIEF_ROBOT.chassisWidth)], part: 'assumed' },
   { find: /time written on the (\d+) points/, values: [POINTS_FAN_START], part: 'assumed' },
 ];
 
@@ -149,7 +145,7 @@ test('rules: every number in the window is the number the code has', () => {
   }
   // the checks really find numbers: all the sentences together hold this many, and each is looked at
   const all = [...RULES, ...ASSUMED].flatMap(numbersIn);
-  assert.ok(all.length >= 45, `${all.length} numbers`);
+  assert.ok(all.length >= 40, `${all.length} numbers`);
 });
 
 test('rules: what is said in words instead of numbers is the code\'s too', () => {
@@ -196,24 +192,67 @@ test('rules: what is said in words instead of numbers is the code\'s too', () =>
   // the robot of the simulator is inside the limits the rules give
   assert.ok(FIRE_CHIEF_ROBOT.chassisFront + FIRE_CHIEF_ROBOT.chassisRear <= ROBOT_MAX_LENGTH);
   assert.ok(FIRE_CHIEF_ROBOT.chassisWidth <= ROBOT_MAX_WIDTH);
-  assert.ok(FLAME_SENSOR.height <= SENSOR_MAX_HEIGHT);
-  // "the fan, at the front of the robot": the fan sits on the front face of the chassis
+  assert.ok(COLOR_SENSOR.mount!.height <= SENSOR_MAX_HEIGHT);
+  // "the fan, at the front of the robot", "one sensor in the middle of the front of the robot":
+  // both sit on the front face of the chassis
   assert.equal(FAN.forward, FIRE_CHIEF_ROBOT.chassisFront);
-  assert.equal(FLAME_SENSOR.forward, FIRE_CHIEF_ROBOT.chassisFront);
+  assert.equal(FIRE_CHIEF_ROBOT.frontColorSensor, COLOR_SENSOR);
+  assert.equal(COLOR_SENSOR.mount!.forward, FIRE_CHIEF_ROBOT.chassisFront);
+  // "the fire is a red wooden flame", 'on the fire target it reads "red". On a wall it reads "yellow", never "red"'
+  assert.match(RULES_TEXT, /The fire is a red wooden flame/);
+  assert.match(ASSUMED_TEXT, /On the fire target it reads "red"\. On a wall it reads "yellow", never "red"\./);
+  assert.equal(TARGET_COLOR, 'red');
+  assert.equal(WALL_COLOR_NAME, 'yellow');
+  // the robot of the rules has no flame sensor: nothing of the game's robot is called one
+  assert.ok(!Object.keys(FIRE_CHIEF_ROBOT).some((part) => /flame/i.test(part)));
 });
 
 test('rules: sentences that can be tried out are true on the real engine and referee', () => {
-  // "its value goes from 0 (no flame) to 100 (very strong)", "up to 100 cm far"
-  const value = (distance: number): number => flameSignal(0, distance, 0, FLAME_SENSOR.halfAngleDeg, FLAME_SENSOR.rangeMm, 0, 0, Math.PI, EMITTER_HALF_ANGLE_DEG, FLAME_SENSOR.distancePower);
-  assert.ok(Math.abs(value(0.001) - 100) < 0.01, 'right at the flame: 100');
-  assert.equal(value(FLAME_SENSOR.rangeMm), 0);
-  assert.equal(value(FLAME_SENSOR.rangeMm + 1), 0);
-  assert.ok(value(FLAME_SENSOR.rangeMm - 50) > 0);
-  for (const distance of [1, 50, 300, 700, 999]) assert.ok(value(distance) > 0 && value(distance) <= 100);
-  // "it sees 30 degrees to each side": nothing at the edge of its view, something just inside
-  const turned = (deg: number): number => flameSignal(0, 300, deg * DEG, FLAME_SENSOR.halfAngleDeg, FLAME_SENSOR.rangeMm, 0, 0, Math.PI, EMITTER_HALF_ANGLE_DEG, FLAME_SENSOR.distancePower);
-  assert.ok(turned(FLAME_SENSOR.halfAngleDeg) < 1e-9);
-  assert.ok(turned(FLAME_SENSOR.halfAngleDeg - 2) > 0);
+  // ---- the colour sensor, with the fire at the back wall of the living room (its face is at y = 20 mm)
+  const back = targetPose('living', 'back');
+  const face = back.y + TARGET_DEPTH / 2;
+  const FRONT = FIRE_CHIEF_ROBOT.chassisFront;
+  const reads = (pose: { x: number; y: number; heading: number }, spot: 'back' | 'corner' = 'back'): string =>
+    createSimulation({ game: fireChiefGame, scenario: openField('living', spot), program: blankProgram(), startPose: pose }).readSensors().frontColor;
+  // "it names a colour only when the thing in front of it is 15 mm away or closer. Further away it reads none"
+  assert.equal(reads({ x: back.x, y: face + COLOR_SENSOR_RANGE_MM + FRONT, heading: 0 }), 'red');
+  assert.equal(reads({ x: back.x, y: face + COLOR_SENSOR_RANGE_MM + 1 + FRONT, heading: 0 }), 'none');
+  // 'on a wall it reads "yellow", never "red"': the top wall beside the target, and the left wall
+  assert.equal(reads({ x: 250, y: COLOR_SENSOR_RANGE_MM + FRONT, heading: 0 }), 'yellow');
+  assert.equal(reads({ x: 250, y: COLOR_SENSOR_RANGE_MM + 1 + FRONT, heading: 0 }), 'none');
+  assert.equal(reads({ x: 10 + FRONT, y: 220, heading: -Math.PI / 2 }), 'yellow');
+  // "it is red on every side": one of its two ends, looked at along the top wall
+  assert.equal(reads({ x: back.x + TARGET_WIDTH / 2 + 10 + FRONT, y: back.y, heading: -Math.PI / 2 }), 'red');
+  // "when the target stands in a corner, the two walls of the corner stop the robot 15 mm in
+  // front of it. There the sensor reads red only while the robot touches both walls, or almost
+  // touches them": a robot that drives at it along the diagonal of the room
+  const corner = targetPose('living', 'corner');
+  const diagonal = corner.angle + Math.PI; // looking squarely at the front of the target
+  const cornerFace = { x: corner.x + (TARGET_DEPTH / 2) * Math.sin(corner.angle), y: corner.y - (TARGET_DEPTH / 2) * Math.cos(corner.angle) };
+  const onDiagonal = (gap: number) => ({ x: cornerFace.x - Math.sin(diagonal) * (gap + FRONT), y: cornerFace.y + Math.cos(diagonal) * (gap + FRONT), heading: diagonal });
+  const driven = createSimulation({
+    game: fireChiefGame,
+    scenario: openField('living', 'corner'),
+    program: program([script(whenStart(), [move('forward', 20), wait(3)])]),
+    startPose: onDiagonal(40),
+  });
+  driven.start();
+  let red = 0;
+  let redWithoutWalls = 0;
+  for (let tick = 0; tick < 250; tick++) {
+    driven.step(1);
+    if (driven.readSensors().frontColor !== 'red') continue;
+    red++;
+    if (!driven.world.robot.touching) redWithoutWalls++;
+  }
+  const nose = driven.world.robot.pose;
+  const gap = Math.hypot(nose.x - cornerFace.x, nose.y - cornerFace.y) - FRONT;
+  assert.ok(Math.abs(gap - COLOR_SENSOR_RANGE_MM) < 0.01, `the walls stopped it ${gap} mm in front of the target`);
+  assert.ok(red > 100, 'pressed against the two walls it reads red');
+  assert.equal(redWithoutWalls, 0, 'it never read red before it touched the walls');
+  assert.equal(driven.score().lines.find((line) => line.id === 'fan-start')?.ok, false, 'reading red alone earns nothing');
+  // two millimetres further back, clear of the walls, the sensor reads nothing
+  assert.equal(reads(onDiagonal(COLOR_SENSOR_RANGE_MM + 2), 'corner'), 'none');
 
   // "the fan blows when the power of that motor is 20 % or more, forwards or backwards"
   const fanAt = (power: number): boolean => {
@@ -282,14 +321,18 @@ test('rules: marked as a draft; the organiser\'s decisions are rules; what is as
     FIRE_CHIEF_RULES.map((section) => section.title),
     ['The field', 'The robot', 'The attempt', 'Points - each achievement counts once (100 in all)', 'What does not count', 'An attempt ends when', 'Restart', 'Ranking'],
   );
-  // ---- the five answers of the organiser (and the thickness of the walls) are in the rules ...
+  // ---- the answers of the organiser (and the thickness of the walls) are in the rules ...
   const decided = [
     /Touching or hitting the target without moving it costs nothing\./,
     /The fan action also counts from outside the room, when the fan is at most 30 cm from the target\./,
-    /The flame sensor does not have to show anything for these points\./,
+    /Only this position counts: what the colour sensor reads does not matter to the referee\./,
     /6 cm wide and 12 cm high/,
     /The outer edge of the field is walled too\./,
     /3 mm thick/,
+    // decided after the draft: a colour sensor that looks forward, a red target, no flame sensor
+    /It has a colour sensor that looks forward, and a fan\./,
+    /The fire is a red wooden flame/,
+    /the game is played with a colour sensor, not with a flame sensor\./,
   ];
   for (const said of decided) {
     assert.match(RULES_TEXT, said);
@@ -306,18 +349,33 @@ test('rules: marked as a draft; the organiser\'s decisions are rules; what is as
   assert.match(FIRE_CHIEF_ASSUMPTIONS.note ?? '', /At the competition they can be different\./);
   assert.deepEqual(
     FIRE_CHIEF_ASSUMPTIONS.sections.map((section) => section.title),
-    ['The fire target', 'The flame sensor and the fan', 'The robot and the walls', 'The referee of the simulator'],
+    ['The fire target', 'The colour sensor and the fan', 'The robot and the walls', 'The referee of the simulator'],
   );
+  // ---- the flame sensor of the draft: the rules say in one sentence that it is gone, and no
+  // other sentence of the window speaks of a flame sensor or of infrared light
+  const aboutFlameSensor = [...RULES, ...ASSUMED].filter((sentence) => /flame sensor|infrared/i.test(sentence));
+  assert.deepEqual(aboutFlameSensor, ['The draft rules still name a flame sensor. The organiser has decided since then: the game is played with a colour sensor, not with a flame sensor.']);
+  // ---- what the organiser has NOT said about the colour sensor is among the assumptions, never
+  // among the rules: which sensor, the 15 mm, red on every side, what a wall reads, the corner
+  for (const said of [
+    /Which colour sensor the robot gets is not decided yet\./,
+    /In real mBlock its blocks can have other words than here\./,
+    /15 mm away or closer/,
+    /It is red on every side/,
+    /On a wall it reads "yellow", never "red"\./,
+    /touches both walls, or almost touches them/,
+  ]) {
+    assert.match(ASSUMED_TEXT, said);
+    assert.ok(!said.test(RULES_TEXT), `${said} is an assumption, not a rule`);
+  }
+  assert.ok(!/\d+ mm away|every side|"yellow"|"none"/.test(RULES_TEXT), 'the rules say nothing about how the colour sensor reads');
   // ---- what a student can notice of the list at the top of the game is there
   for (const said of [
     /three places of its room/, // where the fire can stand
     /2 cm thick and light/, // its depth and weight
-    /up to 70 degrees to each side/, // its emitter
     /more than 5 mm away from its place/, // when it counts as moved
     /cannot fall over here/,
     /closer than 0\.5 mm/, // touching
-    /sees 30 degrees to each side and up to 100 cm far/, // the flame sensor
-    /the value is above 10/,
     /DC motor port M1/, // the fan
     /at most 20 degrees to the side/, // "facing"
     /measured from the fan, at the front of the robot, to the middle of the target/,
@@ -336,7 +394,7 @@ test('rules: marked as a draft; the organiser\'s decisions are rules; what is as
   for (const said of [
     /START is the cell at the bottom centre/,
     /There is always a way from START to both rooms/,
-    /must use a flame sensor to find the fire/,
+    /the robot finds it, reads "red" with the colour sensor and blows at it with the fan/,
     /The clock starts at that signal/,
     /A fan that blows in the room without the fire/,
     /the time is up;/,

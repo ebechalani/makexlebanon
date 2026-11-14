@@ -74,19 +74,15 @@ export interface RobotIO {
   lineOffset(): number;
   /** distance to the nearest obstacle in cm; config.ultrasonic.maxRangeCm when nothing is seen */
   ultrasonicCm(): number;
-  /** colour of the object in / just ahead of the claw, 'none' if nothing (or sensor not fitted) */
+  /**
+   * front colour sensor (config.frontColorSensor). At the claw: the colour of the object in /
+   * just ahead of the claw. Fixed to the robot (`mount`): the colour of the nearest thing
+   * straight ahead, a wall included. 'none' if nothing is in range (or no sensor is fitted).
+   */
   frontColor(): SensorColor | 'none';
   /** unwrapped yaw since the last reset, degrees, clockwise positive */
   yawDeg(): number;
   resetYaw(): void;
-  /**
-   * flame sensor: strength of the infrared light it sees, 0 (none) .. 100 (very strong). Higher
-   * when the flame is nearer and more straight ahead; 0 behind a wall, out of its field of view,
-   * out of range, or when no flame sensor is fitted.
-   */
-  flameValue(): number;
-  /** true when flameValue() is above config.flameSensor.threshold */
-  flameDetected(): boolean;
 
   // ------------------------------------------------------------------ DC motors (fan)
   /** run the DC motor on port M1 / M2 at a power of -100..100 % (0 stops it); it keeps running until changed */

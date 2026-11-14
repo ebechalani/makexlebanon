@@ -43,7 +43,7 @@ export default function FireChiefSimulator() {
   return (
     <SimulatorApp
       game={fireChiefGame}
-      // the robot of this game: no gripper, a flame sensor and a fan (../../fire-chief/robot.ts)
+      // the robot of this game: no gripper, a colour sensor that looks forward and a fan (../../fire-chief/robot.ts)
       robotConfig={FIRE_CHIEF_ROBOT}
       title="Fire Chief"
       startZoneName={FIRE_CHIEF_START_ZONE}

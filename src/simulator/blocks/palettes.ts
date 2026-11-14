@@ -6,9 +6,10 @@
  * the Gripper shortcuts that were made for that game:
  *
  *   Fire Rescue   the mBot2 with the gripper: Servos, Gripper and the Colour Sensor at the claw;
- *                 no fan and no flame sensor.
- *   Fire Chief    the mBot2 with a fan on DC motor port M1 and a flame sensor; no gripper, so no
- *                 Servos, no Gripper shortcuts and no Colour Sensor.
+ *                 no fan.
+ *   Fire Chief    the mBot2 with a fan on DC motor port M1 and a colour sensor fixed to its
+ *                 front (it has blocks of its own); no gripper, so no Servos, no Gripper
+ *                 shortcuts and no Colour Sensor at the claw.
  *
  * The name of a palette is the id of its game (Game.id). To get the palette of a game:
  *
@@ -38,7 +39,7 @@ const COMMON: CategoryId[] = ['cyberpi', 'sensing', 'events', 'control', 'operat
 /** The categories of each game's palette, in the order they are shown (mBlock order). */
 export const PALETTES: Record<PaletteId, readonly CategoryId[]> = {
   'fire-rescue': [...COMMON, 'servo', 'gripper', 'quadrgb', 'ultrasonic', 'colorsensor'],
-  'fire-chief': [...COMMON, 'extensionport', 'quadrgb', 'ultrasonic', 'flamesensor'],
+  'fire-chief': [...COMMON, 'extensionport', 'quadrgb', 'ultrasonic', 'frontcolorsensor'],
 };
 
 export const PALETTE_IDS: PaletteId[] = Object.keys(PALETTES) as PaletteId[];

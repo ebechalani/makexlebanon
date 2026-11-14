@@ -4,8 +4,8 @@
  * Live values of everything the robot can measure, as the blocks would report them:
  * the four probes of the Quad RGB line sensor, the ultrasonic distance, the gyro, the wheel
  * encoders, the timer and the student's own variables - and the parts only some robots have
- * (./robot-parts.ts): the colour in the claw and the two servos of the gripper, or the flame
- * sensor, the DC motor ports and the fan.
+ * (./robot-parts.ts): the colour in the claw and the two servos of the gripper, or the colour
+ * sensor at the front, the DC motor ports and the fan.
  */
 import { PROBE_NAMES, type ProbeName, type ProbeReading, type RobotConfig, type Scalar, type SensorColor } from '../core/types';
 import { formatNumber, rgbCss } from './format';
@@ -88,7 +88,6 @@ export function SensorDashboard({ snapshot, robotConfig }: SensorDashboardProps)
   const variables = Object.entries(snapshot.variables);
   const g = robotConfig.gripper;
   const parts = robotParts(robotConfig);
-  const flame = parts.flameSensor;
 
   return (
     <div className="flex flex-col gap-3">
@@ -111,26 +110,6 @@ export function SensorDashboard({ snapshot, robotConfig }: SensorDashboardProps)
       </div>
 
       <dl className="grid grid-cols-2 gap-x-4">
-        {flame && (
-          <div
-            // (over the full width: the value and the "flame detected" label need more room than half a row)
-            className="col-span-2 flex items-center justify-between gap-2 border-b border-slate-100 py-1"
-            title={`Infrared light the flame sensor sees, 0 (none) to 100 (very strong). "Flame detected" above ${formatNumber(flame.threshold)}.`}
-          >
-            <dt className="truncate text-xs text-ink-500">Flame sensor</dt>
-            <dd className="flex shrink-0 items-center gap-1.5 font-mono text-sm font-semibold tabular-nums text-ink-900">
-              {formatNumber(s.flame, 1)}
-              <span
-                className={
-                  'rounded px-1.5 py-0.5 font-sans text-[11px] font-bold leading-none ' +
-                  (s.flameDetected ? 'bg-orange-600 text-white' : 'bg-white text-ink-500 ring-1 ring-slate-300')
-                }
-              >
-                {s.flameDetected ? 'flame detected' : 'no flame'}
-              </span>
-            </dd>
-          </div>
-        )}
         <Value
           label="Ultrasonic"
           value={sees ? formatNumber(s.ultrasonicCm, 1) : `${formatNumber(robotConfig.ultrasonic.maxRangeCm)}`}
@@ -144,6 +123,21 @@ export function SensorDashboard({ snapshot, robotConfig }: SensorDashboardProps)
                 <span className="h-3.5 w-3.5 rounded-full ring-1 ring-slate-400" style={{ background: SENSOR_COLOR_CSS[s.frontColor] }} aria-hidden="true" />
               )}
               {s.frontColor === 'none' ? 'nothing' : s.frontColor}
+            </dd>
+          </div>
+        )}
+        {parts.frontColour && (
+          <div
+            className="flex items-center justify-between gap-2 border-b border-slate-100 py-1"
+            title={`What the colour sensor at the front of the robot reads. In this simulator it names the colour of a thing that is ${formatNumber(parts.frontColour.rangeMm)} mm or less in front of it. "none" = nothing is that close.`}
+          >
+            <dt className="text-xs text-ink-500">Colour sensor</dt>
+            {/* (the words are the ones the "colour sensor (1) colour" block gives: a colour name, or "none") */}
+            <dd className="flex items-center gap-1.5 text-sm font-semibold text-ink-900">
+              {s.frontColor !== 'none' && (
+                <span className="h-3.5 w-3.5 rounded-full ring-1 ring-slate-400" style={{ background: SENSOR_COLOR_CSS[s.frontColor] }} aria-hidden="true" />
+              )}
+              {s.frontColor}
             </dd>
           </div>
         )}

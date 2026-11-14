@@ -51,7 +51,7 @@ import {
   wallIndexBetween,
   type Cell,
 } from './field';
-import { FAN, FIRE_CHIEF_ROBOT, FLAME_SENSOR, START_POSE } from './robot';
+import { COLOR_SENSOR, FAN, FIRE_CHIEF_ROBOT, START_POSE } from './robot';
 
 const near = (actual: number, expected: number, eps: number, what = 'value') =>
   assert.ok(Math.abs(actual - expected) <= eps, `${what}: ${actual} is not within ${eps} of ${expected}`);
@@ -326,9 +326,11 @@ test('mat: white cells, eight black grid lines where they are printed, the two r
 // The robot
 // =============================================================================================
 
-test('robot: the mBot2 without gripper and front colour sensor, inside the size limits of the rules', () => {
+test('robot: the mBot2 without gripper and without the colour sensor at the claw, inside the size limits of the rules', () => {
   assert.equal(FIRE_CHIEF_ROBOT.gripper.enabled, false);
-  assert.equal(FIRE_CHIEF_ROBOT.frontColorSensor.enabled, false);
+  // its colour sensor is fixed to its front (it has a mount): see ./color-sensor.test.ts
+  assert.equal(FIRE_CHIEF_ROBOT.frontColorSensor.enabled, true);
+  assert.notEqual(FIRE_CHIEF_ROBOT.frontColorSensor.mount, undefined);
   const size = robotSize(FIRE_CHIEF_ROBOT);
   assert.deepEqual(size, { length: 175, width: 130 });
   assert.ok(size.length <= ROBOT_MAX_LENGTH && ROBOT_MAX_LENGTH === 180);
@@ -341,28 +343,24 @@ test('robot: the mBot2 without gripper and front colour sensor, inside the size 
   assert.equal(FIRE_CHIEF_ROBOT.trackWidth, DEFAULT_ROBOT_CONFIG.trackWidth);
   assert.deepEqual(FIRE_CHIEF_ROBOT.ultrasonic, DEFAULT_ROBOT_CONFIG.ultrasonic);
   assert.deepEqual(FIRE_CHIEF_ROBOT.quadRgb, DEFAULT_ROBOT_CONFIG.quadRgb);
-  // the standard robot itself was not changed: it still has its gripper and no flame sensor or fan
+  // the standard robot itself was not changed: it still has its gripper and no fan
   assert.equal(DEFAULT_ROBOT_CONFIG.gripper.enabled, true);
-  assert.equal(DEFAULT_ROBOT_CONFIG.flameSensor, undefined);
   assert.equal(DEFAULT_ROBOT_CONFIG.fan, undefined);
 });
 
-test('robot: a flame sensor and a fan on M1 at its front, no sensor higher than 150 mm', () => {
-  assert.equal(FIRE_CHIEF_ROBOT.flameSensor, FLAME_SENSOR);
-  assert.deepEqual(FLAME_SENSOR, {
-    enabled: true,
-    forward: 105,
-    height: 60,
-    halfAngleDeg: 30,
-    rangeMm: 1000,
-    distancePower: 2,
-    threshold: 10,
-  });
+test('robot: a colour sensor and a fan on M1 at its front, no flame sensor, no sensor higher than 150 mm', () => {
+  assert.equal(FIRE_CHIEF_ROBOT.frontColorSensor, COLOR_SENSOR);
   assert.equal(FIRE_CHIEF_ROBOT.fan, FAN);
   assert.deepEqual(FAN, { enabled: true, port: 'M1', forward: 105, minPower: 20, coneHalfAngleDeg: 20, reachMm: 300 });
-  assert.equal(FLAME_SENSOR.forward, FIRE_CHIEF_ROBOT.chassisFront);
+  assert.equal(COLOR_SENSOR.mount!.forward, FIRE_CHIEF_ROBOT.chassisFront);
   assert.equal(FAN.forward, FIRE_CHIEF_ROBOT.chassisFront);
-  assert.ok(FLAME_SENSOR.height <= SENSOR_MAX_HEIGHT);
+  // the organiser took the flame sensor out of the game: the robot has nothing that is called one
+  assert.deepEqual(
+    Object.keys(FIRE_CHIEF_ROBOT).filter((part) => /flame/i.test(part)),
+    [],
+  );
+  assert.deepEqual(Object.keys(FIRE_CHIEF_ROBOT.noise).sort(), ['sensor', 'ultrasonicCm', 'wheelSlip']);
+  assert.ok(FIRE_CHIEF_ROBOT.frontColorSensor.mount!.height <= SENSOR_MAX_HEIGHT);
   assert.ok(FIRE_CHIEF_ROBOT.ultrasonic.height <= SENSOR_MAX_HEIGHT);
   assert.ok(FIRE_CHIEF_ROBOT.chassisHeight <= SENSOR_MAX_HEIGHT);
   // the ultrasonic sensor is low enough to see the walls and the target

@@ -2,11 +2,12 @@
  * MakeX Lebanon 2027 - Fire Chief (Dynamic Maze Challenge, ages 14-17): the field.
  *
  * Every measure of the field, of its walls and of the fire target is in this one file. (The
- * measures of the robot's flame sensor and fan are in ./robot.ts, the limits of the referee in
- * ./game.ts.) Some of them come from the print file of the map ("Maze 14-17yo makex 2027",
- * page 2) and from the draft rules. Some are DECISIONS of the organiser, given since the draft
- * (the thickness of the walls, the wall around the field, the width and the height of the fire
- * target). The others are ASSUMPTIONS, because the organiser has not published them yet. Each
+ * measures of the robot's colour sensor and fan are in ./robot.ts, the limits of the referee in
+ * ./game.ts.) Some of them come from the print file of the map ("Maze 14-17yo
+ * makex 2027", page 2) and from the draft rules. Some are DECISIONS of the organiser, given
+ * since the draft (the thickness of the walls, the wall around the field, the width and the
+ * height of the fire target). The others are ASSUMPTIONS, because the organiser has not
+ * published them yet - what a colour sensor reads on the target and on a wall among them. Each
  * decision and each assumption says so in its comment, and changing it here changes it
  * everywhere. The ONE list of all assumptions and decisions of this game - the ones of this
  * file, of the robot, of the referee and of the engine - is at the top of ./game.ts.
@@ -25,8 +26,9 @@
  *  5 |        |        | START  |        |        |     row 4
  *    +--------+--------+--------+--------+--------+
  */
+import { classifyColor } from '../core/engine-sensors';
 import type { Rect, Vec2 } from '../core/geometry';
-import type { FixedWall, MatVector, RGB } from '../core/types';
+import type { ColorName, FixedWall, MatVector, RGB, SensorColor } from '../core/types';
 
 // =============================================================================================
 // The mat (measured from the print file)
@@ -160,8 +162,21 @@ export const OUTER_WALLS = true;
  */
 export const WALL_LENGTH = CELL_SIZE + WALL_THICKNESS;
 
-/** CSS colour used to draw a wall. */
-const WALL_FILL = '#c9a26b';
+/** The colour of the wood the walls are made of: what a wall is drawn with, and what a colour sensor looks at. */
+export const WALL_WOOD: RGB = { r: 201, g: 162, b: 107 };
+/** CSS colour used to draw a wall: the wood colour, written as '#rrggbb' ('#c9a26b'). */
+const WALL_FILL = `#${[WALL_WOOD.r, WALL_WOOD.g, WALL_WOOD.b].map((part) => part.toString(16).padStart(2, '0')).join('')}`;
+/**
+ * ASSUMPTION: what a colour sensor reads on a wall (the organiser has not said). The simulator
+ * asks its own colour naming - classifyColor() in core/engine-sensors.ts, the one the Quad RGB
+ * sensor uses - for the name of the wood colour. Light wood is a pale orange, and that naming
+ * counts orange as yellow: a wall reads "yellow", inner and outer walls alike.
+ *
+ * It must never be "red": "red" is how a program tells the fire target from everything else.
+ * (A test holds that. Whoever changes the wood to a colour that would read "red" has to write
+ * another honest answer here instead of the naming.)
+ */
+export const WALL_COLOR_NAME: SensorColor = classifyColor(WALL_WOOD);
 
 /** There are 40 places where an inner wall can stand: one on every boundary between two cells. */
 export const INNER_WALL_COUNT = 2 * GRID_CELLS * (GRID_CELLS - 1);
@@ -258,6 +273,7 @@ export function innerWall(position: WallPosition): FixedWall {
     l: upright ? WALL_LENGTH : WALL_THICKNESS,
     h: WALL_HEIGHT,
     fill: WALL_FILL,
+    colorName: WALL_COLOR_NAME,
   };
 }
 
@@ -280,6 +296,7 @@ export function outerWalls(): FixedWall[] {
     l,
     h: WALL_HEIGHT,
     fill: WALL_FILL,
+    colorName: WALL_COLOR_NAME,
   });
   return [
     make('top', mid, -t / 2, long, t),
@@ -292,9 +309,11 @@ export function outerWalls(): FixedWall[] {
 // =============================================================================================
 // The fire target
 // =============================================================================================
-// Rules: "a wooden flame-shaped piece with an embedded infrared emitter". The organiser has
-// decided its width and its height. Its depth, its weight, its emitter and the places where it
-// may stand are not published yet: those are assumptions.
+// Draft rules: "a wooden flame-shaped piece with an embedded infrared emitter". The organiser
+// has decided its width and its height - and, after the draft, that it is red and that the
+// robot finds it with a colour sensor, not with a flame sensor: the target of the simulator has
+// no emitter. Its depth, its weight, the places where it may stand and which of its faces are
+// red are not published yet: those are assumptions.
 
 /** DECISION of the organiser: the target is 60 mm wide ... */
 export const TARGET_WIDTH = 60;
@@ -308,13 +327,12 @@ export const TARGET_HEIGHT = 120;
  * drives squarely into it does not move it at all (the wall holds it).
  */
 export const TARGET_MASS = 1;
-/** ASSUMPTION: the infrared emitter sits in the middle of the front face, 60 mm above the mat ... */
-export const EMITTER_HEIGHT = 60;
 /**
- * ... and shines forward into a cone of 70 degrees to each side. (In the outer quarter of the
- * cone the light fades out: EMITTER_FADE in core/engine-sensors.ts.)
+ * ASSUMPTION: the target is red on EVERY face - front, back and both ends - so a colour sensor
+ * that is close enough reads "red" from whichever side the robot comes. (The organiser has only
+ * said that the target is red.)
  */
-export const EMITTER_HALF_ANGLE_DEG = 70;
+export const TARGET_COLOR: ColorName = 'red';
 
 /**
  * ASSUMPTION: the three places of a room where the target can stand. It always stands against

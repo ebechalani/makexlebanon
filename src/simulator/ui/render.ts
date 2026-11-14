@@ -3,8 +3,8 @@
  * the optional helpers (zones, sensor view, driven path, ruler).
  *
  * What is drawn follows from the simulation, not from the name of a game: the walls it has
- * (World.walls), a body that glows in infrared (Body.infrared - "the flame"), and the parts of
- * the robot (RobotConfig: gripper, fan, flame sensor).
+ * (World.walls), what kind of thing a body is (Body.kind: a person, a fire target), and the
+ * parts of the robot (RobotConfig: gripper, fan, a colour sensor fixed to the front).
  *
  * Everything is drawn in MILLIMETRES: drawStage() first sets a transform that maps mat
  * millimetres to screen pixels, so the numbers below are real sizes (a 70 mm tower is drawn 70
@@ -299,8 +299,8 @@ function drawWalls(ctx: CanvasRenderingContext2D, walls: readonly FixedWall[], v
 /**
  * What can be reached in a straight line from `origin` inside a cone: the cone is `halfAngle`
  * (radians) wide to each side of `heading` and `range` mm long, and every ray of it ends at the
- * first wall it meets. Returns the outline, starting at `origin` - for the air of a fan and for
- * what a sensor sees, neither of which goes through a wall.
+ * first wall it meets. Returns the outline, starting at `origin` - for the air of a fan, which
+ * does not go through a wall.
  */
 export function sightPolygon(origin: Vec2, heading: number, halfAngle: number, range: number, walls: readonly FixedWall[] | undefined, rays = 41): Vec2[] {
   const points: Vec2[] = [{ x: origin.x, y: origin.y }];
@@ -345,13 +345,20 @@ function flamePath(ctx: CanvasRenderingContext2D, cx: number, cy: number, height
   ctx.closePath();
 }
 
-/** A body that glows in infrared is "the fire": the smallest size (screen pixels) its flame sign is drawn at. */
+/**
+ * The kind of body that is "the fire": the wooden flame of Fire Chief (KIND_FIRE_TARGET in
+ * fire-chief/game.ts - a test keeps the two words the same). The stage draws a flame sign
+ * around it.
+ */
+export const FIRE_KIND = 'fire-target';
+
+/** The smallest size (screen pixels) the flame sign of the fire is drawn at ... */
 const FLAME_SIGN_MIN_PIXELS = 24;
 /** ... and its size on a large stage (mm). */
 const FLAME_SIGN_MM = 90;
 
 /**
- * The sign of a body that glows in infrared: a flame, drawn around the middle of the body.
+ * The sign of the fire: a flame, drawn around the middle of the body.
  *
  * The body itself is small (the fire target of Fire Chief is 60 x 20 mm seen from above: a few
  * pixels on a phone) and it stands in a room whose printed picture shows a fireplace or a candle
@@ -437,16 +444,6 @@ export function drawBody(ctx: CanvasRenderingContext2D, body: Body, devicePerMm:
     ctx.strokeStyle = edge;
     ctx.stroke();
     ink = rgbCss(shade(fill, -0.2));
-  } else if (body.infrared) {
-    // fire target: a wooden board seen from above, with the infrared light in the middle of the side it faces
-    const forward = Math.max(-l / 2, Math.min(l / 2, body.infrared.forward));
-    ctx.beginPath();
-    ctx.arc(0, -forward, Math.min(4.5, size * 0.3), 0, Math.PI * 2);
-    ctx.fillStyle = '#fef08a';
-    ctx.fill();
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = edge;
-    ctx.stroke();
   } else if (body.grippable) {
     // bucket: an open container, darker inside
     ctx.beginPath();
@@ -460,8 +457,7 @@ export function drawBody(ctx: CanvasRenderingContext2D, body: Body, devicePerMm:
   }
 
   // label, always upright so it can be read whichever way the element is turned
-  // (a body that glows has its flame sign instead: a letter on a 20 mm board could not be read)
-  if (body.label && !body.infrared) {
+  if (body.label) {
     ctx.rotate(-body.angle);
     const fontSize = body.platform ? size * 0.34 : size * 0.44;
     ctx.font = `700 ${fontSize}px ${FONT}`;
@@ -642,15 +638,29 @@ function drawRobot(ctx: CanvasRenderingContext2D, sim: StageSim, devicePerMm: nu
     ctx.fill();
   }
 
-  // flame sensor (a robot that has one): a small dark module with a red eye, beside the ultrasonic sensor
-  if (c.flameSensor && c.flameSensor.enabled) {
-    roundRect(ctx, 37, -front + 1.5, 17, 13, 3);
-    ctx.fillStyle = '#111827';
+  // colour sensor (a robot that has one fixed to its front): a small white module between the
+  // two eyes of the ultrasonic sensor, its face on the front edge where the sensor looks out.
+  // Its eye is drawn in three colours (red, green, blue), so that it is not taken for a third
+  // eye of the ultrasonic sensor.
+  const colourSensor = c.frontColorSensor;
+  if (colourSensor.enabled && colourSensor.mount) {
+    const faceY = -colourSensor.mount.forward;
+    roundRect(ctx, -7, faceY, 14, 12, 2.5);
+    ctx.fillStyle = '#f8fafc';
     ctx.fill();
-    ctx.beginPath();
-    ctx.arc(45.5, -front + 7, 3.6, 0, Math.PI * 2);
-    ctx.fillStyle = '#ef4444';
-    ctx.fill();
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = '#0c4a6e';
+    ctx.stroke();
+    const eyeColours = ['#ef4444', '#22c55e', '#3b82f6'];
+    for (let part = 0; part < 3; part++) {
+      const from = -Math.PI / 2 + (part * Math.PI * 2) / 3;
+      ctx.beginPath();
+      ctx.moveTo(0, faceY + 6);
+      ctx.arc(0, faceY + 6, 4, from, from + (Math.PI * 2) / 3);
+      ctx.closePath();
+      ctx.fillStyle = eyeColours[part];
+      ctx.fill();
+    }
   }
 
   // gripper arm: neck and palm (the fingers come later, on top of whatever they hold)
@@ -792,67 +802,6 @@ function keptOnStage(at: Vec2, textWidth: number, fontSize: number, view: StageV
     x: Math.max(corner.x + half, Math.min(corner.x + view.cssWidth / view.scale - half, at.x)),
     y: Math.max(corner.y + fontSize, Math.min(corner.y + view.cssHeight / view.scale - fontSize, at.y)),
   };
-}
-
-/** The colour of everything the flame sensor shows on the stage: infrared is drawn red. */
-const FLAME_VIEW_RGB = '225, 29, 72';
-
-/**
- * What the flame sensor can see, drawn under the game elements like the cone of the ultrasonic
- * sensor: its field of view, cut off at the walls (infrared light does not pass a wall) and
- * fading out with the distance as its value does. The stronger the reading, the stronger the
- * colour. It shows where the sensor looks, not where the flame is - a real flame sensor does not
- * know that either.
- */
-function drawFlameView(ctx: CanvasRenderingContext2D, sim: StageSim, sensors: SensorSnapshot, view: StageView): void {
-  const f = sim.robotConfig.flameSensor;
-  if (!f || !f.enabled || !(f.rangeMm > 0)) return;
-  const pose = sim.world.robot.pose;
-  const origin = localToWorld(pose, f.forward, 0);
-  const outline = sightPolygon(origin, pose.heading, f.halfAngleDeg * DEG, f.rangeMm, sim.world.walls, 61);
-  const strength = Math.max(0, Math.min(1, sensors.flame / 100));
-  const near = 0.16 + 0.3 * strength;
-  ctx.save();
-  polygon(ctx, outline);
-  const fade = ctx.createRadialGradient(origin.x, origin.y, 0, origin.x, origin.y, f.rangeMm);
-  // (the value of the sensor falls with the distance like this: see flameSignal in core/engine-sensors.ts)
-  const power = f.distancePower !== undefined && f.distancePower > 0 ? f.distancePower : 2;
-  for (const t of [0, 0.15, 0.3, 0.5, 0.7, 1]) fade.addColorStop(t, `rgba(${FLAME_VIEW_RGB}, ${(near * Math.pow(1 - t, power)).toFixed(3)})`);
-  ctx.fillStyle = fade;
-  ctx.fill();
-  if (sensors.flameDetected) {
-    // "a flame is detected": the two edges of the field of view are drawn, like the arc of the ultrasonic beam
-    ctx.beginPath();
-    ctx.moveTo(outline[1].x, outline[1].y);
-    ctx.lineTo(origin.x, origin.y);
-    ctx.lineTo(outline[outline.length - 1].x, outline[outline.length - 1].y);
-    const edge = ctx.createRadialGradient(origin.x, origin.y, 0, origin.x, origin.y, f.rangeMm);
-    edge.addColorStop(0, `rgba(${FLAME_VIEW_RGB}, 0.9)`);
-    edge.addColorStop(0.6, `rgba(${FLAME_VIEW_RGB}, 0)`);
-    ctx.strokeStyle = edge;
-    ctx.lineWidth = 2 / view.scale;
-    ctx.stroke();
-  }
-  ctx.restore();
-}
-
-/** The value of the flame sensor, written beside the robot's nose (to the left; the ultrasonic distance is on the right). */
-function drawFlameLabel(ctx: CanvasRenderingContext2D, sim: StageSim, sensors: SensorSnapshot, view: StageView): void {
-  const f = sim.robotConfig.flameSensor;
-  if (!f || !f.enabled || !(sensors.flame >= 0.05)) return;
-  const pose = sim.world.robot.pose;
-  const at = localToWorld(pose, f.forward + 22 / view.scale, -(sim.robotConfig.chassisWidth / 2 + 20 / view.scale));
-  const fontSize = 11 / view.scale;
-  const label = `flame ${sensors.flame < 10 ? sensors.flame.toFixed(1) : Math.round(sensors.flame)}`;
-  ctx.save();
-  ctx.font = `700 ${fontSize}px ${FONT}`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  // The fire stands at the edge of the field, so a robot that looks at it is often in a corner
-  // of the picture: the number is moved until all of it is on the stage.
-  const shown = keptOnStage(at, ctx.measureText(label).width, fontSize, view);
-  haloText(ctx, label, shown.x, shown.y, '#9f1239', 'rgba(255, 255, 255, 0.95)', 3.5 / view.scale);
-  ctx.restore();
 }
 
 /**
@@ -1206,7 +1155,7 @@ function drawRuler(ctx: CanvasRenderingContext2D, ruler: Ruler, view: StageView)
 export interface StageOptions {
   /** coloured zones of the game (start, pick-up, delivery, tower areas) */
   overlays: boolean;
-  /** what the sensors see: line sensor dots, the ultrasonic beam and (a robot that has one) the view of the flame sensor */
+  /** what the sensors see: line sensor dots and the ultrasonic beam */
   sensors: boolean;
   /** the path the robot has driven */
   trail: boolean;
@@ -1274,11 +1223,10 @@ export function drawStage(ctx: CanvasRenderingContext2D, scene: StageScene): voi
 
   const sensors = options.sensors ? sim.readSensors() : null;
   const beam = sensors ? beamOf(sim, sensors) : null;
-  if (sensors) drawFlameView(ctx, sim, sensors, view);
   if (beam) drawUltrasonicBeam(ctx, beam, view);
 
   for (const body of standing) {
-    if (body.infrared) {
+    if (body.kind === FIRE_KIND) {
       // the fire: its sign first, then the body itself on top, with an outline that shows on a small stage too
       drawFlameSign(ctx, body, view);
       drawBody(ctx, body, devicePerMm, 1.25 / view.scale);
@@ -1290,7 +1238,6 @@ export function drawStage(ctx: CanvasRenderingContext2D, scene: StageScene): voi
   drawFanAir(ctx, sim, view);
   if (sensors) drawProbes(ctx, sim, sensors);
   if (sensors && beam) drawUltrasonicLabel(ctx, sim, sensors, beam, view);
-  if (sensors) drawFlameLabel(ctx, sim, sensors, view);
   if (scene.ghost) drawGhost(ctx, sim.robotConfig, scene.ghost, view);
   if (scene.ruler) drawRuler(ctx, scene.ruler, view);
 }

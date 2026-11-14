@@ -62,9 +62,9 @@
  *
  *     'chief-first-wall'     Stop in front of the first wall               (starter)
  *     'chief-count-lines'    Count grid lines to drive two cells           (starter)
- *     'chief-flame-fan'      A first look at the flame sensor and the fan  (starter)
+ *     'chief-flame-fan'      Read red, then start the fan                  (starter)
  *     'chief-wall-follow'    Follow the right-hand wall to a room          (intermediate)
- *     'chief-face-flame'     Find the flame and turn to face it            (intermediate)
+ *     'chief-face-flame'     Find the fire in a room and check its colour  (intermediate)
  *     'chief-full-mission'   The whole mission on any maze                 (advanced)
  *
  * Mind the two that look alike: 'full-mission' is the one of Fire Rescue, 'chief-full-mission'

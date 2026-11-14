@@ -22,11 +22,11 @@ import { createSimulation } from '../core/simulation';
 import type { FixedWall, Pose, ProgramJson, RobotConfig, ScoreReport, Simulation } from '../core/types';
 import { PROBE_NAMES, SERVO_PORTS } from '../core/types';
 import { START_RECT, roomRect } from '../fire-chief/field';
-import { clock, fireChiefGame } from '../fire-chief/game';
+import { clock, fireChiefGame, KIND_FIRE_TARGET } from '../fire-chief/game';
 import { FIRE_CHIEF_ROBOT, START_POSE } from '../fire-chief/robot';
 import { PLAYABLE_MAZE_COUNT, decodeScenario, defaultScenario, encodeScenario, openField, scenarioProblems, withFire, type FireChiefScenario } from '../fire-chief/scenario';
 import { fireRescueGame, startPoseFor } from '../fire-rescue/game';
-import { arm, dcMotor, flameSize, gripper, gt, moveCm, program, repeatUntil, script, setServo, stopDcMotor, turn, wait, whenStart } from '../vm/builder';
+import { arm, clawColorIs, colorSensorColor, colorSensorDetects, dcMotor, gripper, ifThen, moveCm, print, program, repeatUntil, script, setServo, stopDcMotor, turn, wait, whenStart } from '../vm/builder';
 import { ConsolePanel } from './ConsolePanel';
 import { ControlBar, type ControlBarProps } from './ControlBar';
 import { MAZE_CHOICES, mazeChoiceOf, ROOM_LABEL, SPOT_LABEL, withMaze } from './fire-chief/maze-choices';
@@ -34,8 +34,8 @@ import { FIRE_CHIEF_START_ZONE, FIRE_CHIEF_WORDS } from './fire-chief/words';
 import { bodyName, describeEvent, finishText, formatRefereeTime, formatStamp, restartFacts, restartLine, restartsLeftText, timeTextOf, type LogLine } from './format';
 import { finishSentence, restartButton, restartSummary } from './match-words';
 import { foreignBlocks, gameNameFromId, otherGameNote, parseProgramFile, serializeProgramFile } from './program-file';
-import { fitView, placeZoneLabels, sightPolygon, viewToMat, wallDrawBox, WALL_MIN_PIXELS } from './render';
-import { dcMotorUse, robotParts, sensorSummary, sensorsViewHint } from './robot-parts';
+import { FIRE_KIND, fitView, placeZoneLabels, sightPolygon, viewToMat, wallDrawBox, WALL_MIN_PIXELS } from './render';
+import { dcMotorUse, robotParts, sensorSummary } from './robot-parts';
 import { addRulerPoint, EMPTY_RULER, rulerText } from './ruler';
 import { lineMark, linePoints, lineTime, ScoreSheet, StatusLine, type StatusLineProps } from './ScoreSheet';
 import { capital, DEFAULT_WORDS, screenWords } from './screen-words';
@@ -88,10 +88,11 @@ const TO_LIVING_ROOM = [
   moveCm('forward', 30),
 ];
 
-/** A whole mission on the default maze: to the living room, turn to the flame, blow for 3 seconds. */
-const MISSION: ProgramJson = program([
-  script(whenStart(), [...TO_LIVING_ROOM, repeatUntil(gt(flameSize(), 75), [turn('right', 3), wait(0.1)]), dcMotor('M1', 100), wait(3.2), stopDcMotor('M1')]),
-]);
+/**
+ * A whole mission on the default maze: to the living room, turn to the fire in its corner, blow
+ * for 3 seconds. (It reads no sensor: the referee counts the position only.)
+ */
+const MISSION: ProgramJson = program([script(whenStart(), [...TO_LIVING_ROOM, turn('right', 45), dcMotor('M1', 100), wait(3.2), stopDcMotor('M1')])]);
 
 /** Play a Fire Chief attempt without a screen, up to `seconds` of match time (or to its end). */
 function playChief(prog: ProgramJson, options: { scenario?: FireChiefScenario; seconds?: number; startPose?: Pose; restartAt?: number } = {}): Simulation<FireChiefScenario> {
@@ -580,65 +581,86 @@ test('sheet: Fire Rescue has no times, and its sheet is drawn exactly as before'
 // The Sensors panel: what this robot has
 // =============================================================================================
 
-test('robot parts: Fire Rescue has the gripper and the claw colour; Fire Chief the flame sensor and the fan', () => {
+test('robot parts: Fire Rescue has the gripper and the claw colour; Fire Chief the colour sensor at its front and the fan', () => {
   const rescue = robotParts(DEFAULT_ROBOT_CONFIG);
-  assert.deepEqual({ gripper: rescue.gripper, clawColour: rescue.clawColour, flame: rescue.flameSensor, fan: rescue.fan, dc: rescue.dcMotors }, { gripper: true, clawColour: true, flame: null, fan: null, dc: [] });
+  assert.deepEqual(rescue, { gripper: true, clawColour: true, frontColour: null, fan: null, dcMotors: [] });
   const chief = robotParts(FIRE_CHIEF_ROBOT);
   assert.equal(chief.gripper, false);
+  // one colour sensor, and it is not at a claw: on the front face, 60 mm up, seeing 15 mm far
   assert.equal(chief.clawColour, false);
-  assert.equal(chief.flameSensor, FIRE_CHIEF_ROBOT.flameSensor);
+  assert.deepEqual(chief.frontColour, { forward: FIRE_CHIEF_ROBOT.chassisFront, height: 60, rangeMm: 15 });
+  // a colour sensor that is switched off counts as not there, whichever kind it is
+  const noColour = robotParts({ ...FIRE_CHIEF_ROBOT, frontColorSensor: { ...FIRE_CHIEF_ROBOT.frontColorSensor, enabled: false } });
+  assert.deepEqual({ claw: noColour.clawColour, front: noColour.frontColour }, { claw: false, front: null });
+  assert.equal(robotParts({ ...DEFAULT_ROBOT_CONFIG, frontColorSensor: { enabled: false, rangeMm: 35 } }).clawColour, false);
   assert.equal(chief.fan, FIRE_CHIEF_ROBOT.fan);
+  // that is all the screen knows of a robot: no part of it is a flame sensor
+  assert.deepEqual(Object.keys(chief).sort(), ['clawColour', 'dcMotors', 'fan', 'frontColour', 'gripper']);
   assert.deepEqual(chief.dcMotors, ['M1', 'M2']);
   assert.equal(dcMotorUse(chief, 'M1'), 'fan');
   assert.equal(dcMotorUse(chief, 'M2'), '');
   // a part that is fitted but switched off counts as not there
-  const off = robotParts({ ...FIRE_CHIEF_ROBOT, flameSensor: { ...FIRE_CHIEF_ROBOT.flameSensor!, enabled: false }, fan: { ...FIRE_CHIEF_ROBOT.fan!, enabled: false } });
-  assert.deepEqual({ flame: off.flameSensor, fan: off.fan, dc: off.dcMotors }, { flame: null, fan: null, dc: [] });
+  const off = robotParts({ ...FIRE_CHIEF_ROBOT, fan: { ...FIRE_CHIEF_ROBOT.fan!, enabled: false } });
+  assert.deepEqual({ fan: off.fan, dc: off.dcMotors }, { fan: null, dc: [] });
 });
 
 test('robot parts: the few words on the closed Sensors panel', () => {
-  const reading = { lineStatus: 6, ultrasonicCm: 34.4, frontColor: 'none' as const, flame: 12.34, fanOn: false };
+  const reading = { lineStatus: 6, ultrasonicCm: 34.4, frontColor: 'none' as const, fanOn: false };
   // Fire Rescue: as before
   assert.equal(sensorSummary(robotParts(DEFAULT_ROBOT_CONFIG), reading), 'line 6 · 34 cm · claw empty');
   assert.equal(sensorSummary(robotParts(DEFAULT_ROBOT_CONFIG), { ...reading, frontColor: 'red' }), 'line 6 · 34 cm · claw red');
-  // Fire Chief
-  assert.equal(sensorSummary(robotParts(FIRE_CHIEF_ROBOT), reading), 'line 6 · 34 cm · flame 12 · fan off');
-  assert.equal(sensorSummary(robotParts(FIRE_CHIEF_ROBOT), { ...reading, fanOn: true }), 'line 6 · 34 cm · flame 12 · fan on');
-  assert.equal(sensorsViewHint(robotParts(DEFAULT_ROBOT_CONFIG)), 'Show what the line sensor and the ultrasonic sensor see');
-  assert.equal(sensorsViewHint(robotParts(FIRE_CHIEF_ROBOT)), 'Show what the line sensor, the ultrasonic sensor and the flame sensor see');
+  // Fire Chief: what its colour sensor reads, in the words of the "colour sensor (1) colour" block
+  assert.equal(sensorSummary(robotParts(FIRE_CHIEF_ROBOT), reading), 'line 6 · 34 cm · colour none · fan off');
+  assert.equal(sensorSummary(robotParts(FIRE_CHIEF_ROBOT), { ...reading, fanOn: true }), 'line 6 · 34 cm · colour none · fan on');
+  assert.equal(sensorSummary(robotParts(FIRE_CHIEF_ROBOT), { ...reading, frontColor: 'red' }), 'line 6 · 34 cm · colour red · fan off');
+  // The longest it can get, with the widest readings. (Measured in the browser: this text is
+  // 224 pixels wide; the closed panel has room for 253 on a phone that is 390 wide.)
+  assert.equal(
+    sensorSummary(robotParts(FIRE_CHIEF_ROBOT), { lineStatus: 15, ultrasonicCm: 300, frontColor: 'yellow', fanOn: false }),
+    'line 15 · 300 cm · colour yellow · fan off',
+  );
 });
 
-test('Sensors panel: Fire Chief shows flame sensor, DC motors and fan - and no claw, arm or servo', () => {
+test('Sensors panel: Fire Chief shows colour sensor, DC motors and fan - and no claw, arm, servo or flame sensor', () => {
   const sim = createSimulation({ game: fireChiefGame, scenario: defaultScenario(), program: program([script(whenStart(), [dcMotor('M1', 80), wait(5)])]) });
   sim.start();
   sim.step(20);
   const panel = text(dashboard(sim, FIRE_CHIEF_ROBOT));
-  assert.match(panel, /Flame sensor0\.0no flame/);
+  assert.match(panel, /Colour sensornone/);
   assert.match(panel, /DC motor M1 \(fan\)80%/);
   assert.match(panel, /DC motor M20%/);
   assert.match(panel, /Fanfan on/);
   assert.ok(!/Claw|Arm|S1|S2|servo/i.test(panel), panel);
+  assert.ok(!/flame|infrared/i.test(dashboard(sim, FIRE_CHIEF_ROBOT)), 'no row, no hint and no word of a flame sensor');
   // what every robot has is still there
   for (const row of ['Quad RGB line sensor', 'Ultrasonic', 'Yaw (turned)', 'Timer', 'EM1 angle (left)', 'EM2 speed', 'Variables']) assert.ok(panel.includes(row), row);
   for (const probe of PROBE_NAMES) assert.ok(panel.includes(probe));
 });
 
-test('Sensors panel: the flame value rises when the robot looks at the fire, and "flame detected" follows the threshold', () => {
-  // the open field, fire at the back wall of the living room; the robot stands one cell below the room, facing it
+test('Sensors panel: the colour sensor row of Fire Chief says what the sensor reads - "none", "red" at the target, "yellow" at a wall', () => {
+  // the open field, fire at the back wall of the living room (its front face is at y = 20)
   const scenario = openField('living', 'back');
-  const look = (pose: Pose): { flame: number; panel: string } => {
+  const front = FIRE_CHIEF_ROBOT.chassisFront;
+  const look = (pose: Pose): { colour: string; html: string; panel: string } => {
     const sim = createSimulation({ game: fireChiefGame, scenario, program: {}, startPose: pose });
-    sim.start();
-    return { flame: sim.readSensors().flame, panel: text(dashboard(sim, FIRE_CHIEF_ROBOT)) };
+    const html = dashboard(sim, FIRE_CHIEF_ROBOT);
+    return { colour: sim.readSensors().frontColor, html, panel: text(html) };
   };
-  const away = look({ x: 150, y: 450, heading: 180 * DEG });
-  const aside = look({ x: 150, y: 450, heading: 20 * DEG });
-  const facing = look({ x: 150, y: 450, heading: 0 });
-  assert.equal(away.flame, 0);
-  assert.ok(aside.flame > 0 && facing.flame > aside.flame, `${aside.flame} < ${facing.flame}`);
-  assert.match(away.panel, /Flame sensor0\.0no flame/);
-  assert.match(facing.panel, new RegExp(`Flame sensor${facing.flame.toFixed(1).replace('.', '\\.')}flame detected`));
-  assert.ok(facing.flame > FIRE_CHIEF_ROBOT.flameSensor!.threshold);
+  const far = look({ x: 150, y: 20 + 16 + front, heading: 0 });
+  const atTarget = look({ x: 150, y: 20 + 15 + front, heading: 0 });
+  const atWall = look({ x: 250, y: 10 + front, heading: 0 });
+  assert.deepEqual([far.colour, atTarget.colour, atWall.colour], ['none', 'red', 'yellow']);
+  assert.match(far.panel, /Colour sensornone/);
+  assert.match(atTarget.panel, /Colour sensorred/);
+  assert.match(atWall.panel, /Colour sensoryellow/);
+  // a small dot in the colour that is read; none while it reads "none"
+  assert.match(atTarget.html, /<dt[^>]*>Colour sensor<\/dt><dd[^>]*><span[^>]*style="background:#ef4444"[^>]*><\/span>red<\/dd>/);
+  assert.match(atWall.html, /<dt[^>]*>Colour sensor<\/dt><dd[^>]*><span[^>]*style="background:#facc15"[^>]*><\/span>yellow<\/dd>/);
+  assert.match(far.html, /<dt[^>]*>Colour sensor<\/dt><dd[^>]*>none<\/dd>/);
+  // the hint of the row says how close a thing must be, as a fact about this simulator - not as a rule
+  assert.match(far.html, /title="What the colour sensor at the front of the robot reads\. In this simulator it names the colour of a thing that is 15 mm or less in front of it\. &quot;none&quot; = nothing is that close\."/);
+  // it is not the claw row of Fire Rescue
+  assert.ok(!/Claw colour/.test(far.panel));
 });
 
 test('Sensors panel: Fire Rescue shows what it always showed - claw colour, arm and claw - and nothing of Fire Chief', () => {
@@ -647,7 +669,7 @@ test('Sensors panel: Fire Rescue shows what it always showed - claw colour, arm 
   assert.match(panel, /Claw colournothing/);
   assert.match(panel, /Arm \(S1\)0°/);
   assert.match(panel, /Claw \(S2\)0°/);
-  assert.ok(!/Flame|DC motor|Fan/i.test(panel), panel);
+  assert.ok(!/Flame|DC motor|Fan|Colour sensor/i.test(panel), panel);
 });
 
 // =============================================================================================
@@ -658,18 +680,22 @@ test('palette: Fire Chief has no Gripper group (so the window with the real mBlo
   assert.ok(paletteCategories('fire-rescue').includes('gripper'));
   const chief = paletteCategories('fire-chief');
   for (const group of ['gripper', 'servo', 'colorsensor']) assert.ok(!chief.includes(group as never), group);
-  for (const group of ['extensionport', 'flamesensor', 'chassis', 'quadrgb', 'ultrasonic']) assert.ok(chief.includes(group as never), group);
+  for (const group of ['extensionport', 'frontcolorsensor', 'chassis', 'quadrgb', 'ultrasonic']) assert.ok(chief.includes(group as never), group);
+  assert.ok(!chief.some((group) => /flame/i.test(group)), 'no group of a flame sensor');
+  // the colour sensor of Fire Chief is not the one of Fire Rescue: each game shows its own
+  assert.ok(!paletteCategories('fire-rescue').includes('frontcolorsensor'));
+  assert.ok(paletteCategories('fire-rescue').includes('colorsensor'));
 });
 
 const RESCUE_PROGRAM: ProgramJson = program([script(whenStart(), [moveCm('forward', 10), gripper('close'), arm('raise'), setServo('S1', 45), moveCm('backward', 10)])]);
-const CHIEF_PROGRAM: ProgramJson = program([script(whenStart(), [moveCm('forward', 10), repeatUntil(gt(flameSize(), 5), [turn('right', 10)]), dcMotor('M1', 60), wait(1), stopDcMotor('M1')])]);
+const CHIEF_PROGRAM: ProgramJson = program([script(whenStart(), [moveCm('forward', 10), repeatUntil(colorSensorDetects('red'), [turn('right', 10)]), dcMotor('M1', 60), wait(1), stopDcMotor('M1')])]);
 
 test('other game: the blocks a game does not have are counted, with the names of their groups', () => {
   assert.deepEqual(foreignBlocks(RESCUE_PROGRAM, 'fire-chief'), { count: 3, groups: ['Gripper', 'Servos'] });
   assert.deepEqual(foreignBlocks(RESCUE_PROGRAM, 'fire-rescue'), { count: 0, groups: [] });
   const inRescue = foreignBlocks(CHIEF_PROGRAM, 'fire-rescue');
-  assert.equal(inRescue.count, 3, 'flame size, DC motor on, DC motor off');
-  assert.equal(inRescue.groups.length, 2);
+  assert.equal(inRescue.count, 3, 'colour sensor detects red, DC motor on, DC motor off');
+  assert.deepEqual(inRescue.groups, ['Colour Sensor of the other robot', 'mBot2 Extension Port']);
   assert.deepEqual(foreignBlocks(CHIEF_PROGRAM, 'fire-chief'), { count: 0, groups: [] });
   // the whole mission uses only blocks of Fire Chief
   assert.equal(foreignBlocks(MISSION, 'fire-chief').count, 0);
@@ -677,6 +703,29 @@ test('other game: the blocks a game does not have are counted, with the names of
   assert.deepEqual(foreignBlocks({}, 'fire-chief'), { count: 0, groups: [] });
   assert.deepEqual(foreignBlocks({ blocks: { blocks: [{ type: 'no_such_block', id: 'x' }] } }, 'fire-chief'), { count: 0, groups: [] });
   assert.deepEqual(foreignBlocks({ blocks: { blocks: [{ type: 'gripper_claw', id: 'x', inputs: { A: {} }, next: {} }] } }, 'fire-chief'), { count: 1, groups: ['Gripper'] });
+});
+
+test('other game: both games have a "Colour Sensor", and they are two different sensors - the note says whose it is', () => {
+  // a Fire Chief program that uses its colour sensor, opened in Fire Rescue
+  const chief: ProgramJson = program([script(whenStart(), [ifThen(colorSensorDetects('red'), [print(colorSensorColor())])])]);
+  assert.deepEqual(foreignBlocks(chief, 'fire-chief'), { count: 0, groups: [] });
+  assert.deepEqual(foreignBlocks(chief, 'fire-rescue'), { count: 2, groups: ['Colour Sensor of the other robot'] });
+  assert.equal(
+    otherGameNote(chief, 'fire-chief', 'fire-rescue'),
+    'This program was saved in the Fire Chief simulator. 2 of its blocks are for parts this robot does not have (Colour Sensor of the other robot): they do not work here.',
+  );
+  // a Fire Rescue program that uses the colour sensor at the claw, opened in Fire Chief
+  const rescue: ProgramJson = program([script(whenStart(), [gripper('close'), ifThen(clawColorIs('red'), [arm('raise')])])]);
+  assert.deepEqual(foreignBlocks(rescue, 'fire-rescue'), { count: 0, groups: [] });
+  assert.deepEqual(foreignBlocks(rescue, 'fire-chief'), { count: 3, groups: ['Gripper', 'Colour Sensor of the other robot'] });
+  // and it is true: on the robot of the other game these blocks read "none"
+  const run = (game: typeof fireChiefGame | typeof fireRescueGame, blocks: ProgramJson): string[] => {
+    const sim = createSimulation<unknown>({ game: game as never, scenario: game.defaultScenario(), program: blocks });
+    sim.start();
+    while (sim.status === 'running') sim.step(10);
+    return sim.world.robot.screen.lines;
+  };
+  assert.deepEqual(run(fireRescueGame, program([script(whenStart(), [print(colorSensorColor()), print(colorSensorDetects('red'))])])), ['none', 'false']);
 });
 
 test('other game: opening such a file says in plain words what will not work', () => {
@@ -762,7 +811,7 @@ test('walls: every wall of every Fire Chief maze shows at every stage size, on i
   }
 });
 
-test('cone: what a fan or a sensor reaches ends at the first wall, and is the whole cone without walls', () => {
+test('cone: what a fan reaches ends at the first wall, and is the whole cone without walls', () => {
   const origin = { x: 100, y: 500 };
   const open = sightPolygon(origin, 0, 20 * DEG, 300, [], 21);
   assert.equal(open.length, 22);
@@ -784,22 +833,39 @@ test('cone: what a fan or a sensor reaches ends at the first wall, and is the wh
   assert.ok(halfCut[21].y >= 400 - 1e-6, 'the ray on the far right ends at the wall');
 });
 
-test('cone: in a real maze the view of the flame sensor and the air of the fan stay in front of the walls', () => {
+test('cone: in a real maze the air of the fan - and a much longer and wider cone - stays in front of the walls', () => {
   const walls = fireChiefGame.createWalls?.(defaultScenario()) ?? [];
   const fan = FIRE_CHIEF_ROBOT.fan!;
-  const flame = FIRE_CHIEF_ROBOT.flameSensor!;
+  // (a cone that could cross three cells, to try the walls harder than the 30 cm of the fan do)
+  const long = { halfAngleDeg: 30, rangeMm: 1000 };
   const rng = makeRng(5);
   for (let i = 0; i < 200; i++) {
     // a robot in the middle of a cell, facing any way
     const origin = { x: 150 + 300 * Math.floor(rng() * 5), y: 150 + 300 * Math.floor(rng() * 5) };
     const heading = rng() * Math.PI * 2;
-    for (const [half, range] of [[fan.coneHalfAngleDeg * DEG, fan.reachMm], [flame.halfAngleDeg * DEG, flame.rangeMm]] as const) {
+    for (const [half, range] of [[fan.coneHalfAngleDeg * DEG, fan.reachMm], [long.halfAngleDeg * DEG, long.rangeMm]] as const) {
       for (const p of sightPolygon(origin, heading, half, range, walls, 31)) {
         // the outer walls stand just outside the mat: no point of a cone is beyond them
         assert.ok(p.x >= -3.001 && p.x <= 1503.001 && p.y >= -3.001 && p.y <= 1503.001, JSON.stringify(p));
       }
     }
   }
+});
+
+test('the fire: the stage knows the fire target by its kind - a flame sign is drawn around it, and no letter on it', () => {
+  // (the stage does not import the game: the two words are held together here)
+  assert.equal(FIRE_KIND, KIND_FIRE_TARGET);
+  for (const scenario of [defaultScenario(), openField('bedroom', 'side')]) {
+    const bodies = fireChiefGame.createBodies(scenario);
+    assert.deepEqual(
+      bodies.map((body) => body.kind),
+      [FIRE_KIND],
+    );
+    // a letter on a 20 mm board could not be read: the target carries none
+    assert.equal(bodies[0].label, '');
+  }
+  // nothing of Fire Rescue is a fire: its towers, buckets and people are drawn as they always were
+  assert.ok(!fireRescueGame.createBodies(fireRescueGame.defaultScenario()).some((body) => body.kind === FIRE_KIND));
 });
 
 test('zones: the names of the two rooms are written below them, and all of every name is on the stage', () => {

@@ -8,12 +8,19 @@
  *        - the fire target is 6 cm wide and 12 cm high,
  *        - touching or hitting the target without moving it costs nothing,
  *        - a fan action counts from outside the room when the fan is within 30 cm of the target,
- *        - the 30 points need only the position, not a reading of the flame sensor.
+ *        - the 30 points need only the position: what the colour sensor reads does not matter
+ *          to the referee,
+ *        - the robot finds the fire with a colour sensor that looks forward, and the fire
+ *          target is red. (The draft names a flame sensor and an infrared light in the target.
+ *          This decision overrules it: the game has neither.)
  *      The window marks this part as a draft (FIRE_CHIEF_RULES_NOTE).
  *
  *   2. FIRE_CHIEF_ASSUMPTIONS - "What this simulator assumes": what neither the draft nor the
  *      organiser has said yet and the simulator had to choose, as far as a student can notice
  *      it. Nobody should take one of these for a rule, so they are never mixed into part 1.
+ *      About the colour sensor almost everything is here: which sensor it is, that it names a
+ *      colour only from 15 mm or closer, that the target is red on every side, and what the
+ *      sensor reads on a wall.
  *      The full list, with the constant behind every line, is at the top of
  *      ../../fire-chief/game.ts.
  *
@@ -38,7 +45,7 @@ export const FIRE_CHIEF_RULES: RulesSection[] = [
       'Walls stand on the lines between the cells. They are 15 cm high and 3 mm thick and do not move during an attempt. The outer edge of the field is walled too.',
       'The black lines of the grid are only printed: the robot may drive over a line where no wall stands.',
       'The maze can be different in every round. There is always a way from START to both rooms.',
-      'The fire is a wooden flame with an infrared light in it, 6 cm wide and 12 cm high. It stands in the living room or in the bedroom. The candle and the fireplace printed in the rooms are only pictures.',
+      'The fire is a red wooden flame, 6 cm wide and 12 cm high. It stands in the living room or in the bedroom. The candle and the fireplace printed in the rooms are only pictures.',
       'Teams hand in their robot before the maze and the place of the fire are shown. After that the program must not be changed.',
     ],
   },
@@ -48,7 +55,8 @@ export const FIRE_CHIEF_RULES: RulesSection[] = [
       'It may be at most 18 cm long, 13 cm wide and 30 cm high, at every moment of the attempt.',
       'No sensor and no motor may be higher than 15 cm above the mat: the robot must not look over the walls.',
       'It drives by itself after the start, with its own battery. Remote control and commands from outside are not allowed.',
-      'It must use a flame sensor to find the fire, and it blows at the fire with a fan.',
+      'It has a colour sensor that looks forward, and a fan. The fire target is red: the robot finds it, reads "red" with the colour sensor and blows at it with the fan.',
+      'The draft rules still name a flame sensor. The organiser has decided since then: the game is played with a colour sensor, not with a flame sensor.',
       'It must find its way with its sensors. A program that only repeats a list of moves learned by heart is not what the challenge asks for.',
       'It stays on the mat. It does not climb over walls and does not move them.',
     ],
@@ -67,7 +75,7 @@ export const FIRE_CHIEF_RULES: RulesSection[] = [
     items: [
       '10 points: the whole robot has left the START cell.',
       '20 points: the whole robot is inside the living room or the bedroom. The second room adds nothing.',
-      '30 points: the robot stands still, faces the fire target and its fan is on. The fan must be at most 30 cm from the target, with no wall between them, and the robot must not touch the target. The flame sensor does not have to show anything for these points.',
+      '30 points: the robot stands still, faces the fire target and its fan is on. The fan must be at most 30 cm from the target, with no wall between them, and the robot must not touch the target. Only this position counts: what the colour sensor reads does not matter to the referee.',
       '40 points: the fan keeps blowing at the target like this for 3 seconds without a break.',
       'The fan action also counts from outside the room, when the fan is at most 30 cm from the target. A robot that completes it without ever being completely inside a room ends the attempt with 80 points.',
       'The referee writes down the time of every achievement.',
@@ -122,17 +130,19 @@ export const FIRE_CHIEF_ASSUMPTIONS: RulesPart = {
       items: [
         'It can stand at three places of its room, always against an outer wall and facing into the room: in the corner, in the middle of the back wall (the top edge of the mat) or in the middle of the side wall.',
         'It is 2 cm thick and light: the robot can push it away.',
-        'Its infrared light is in the middle of its front, 6 cm above the mat. It shines forward, up to 70 degrees to each side.',
+        'It is red on every side: the colour sensor reads "red" on its front, on its back and on its two ends.',
         'It counts as moved when one of its corners is more than 5 mm away from its place.',
         'It cannot fall over here. A real target can fall over when the robot hits it.',
         '"Touching" means: closer than 0.5 mm.',
       ],
     },
     {
-      title: 'The flame sensor and the fan',
+      title: 'The colour sensor and the fan',
       items: [
-        'The flame sensor is at the front of the robot, 6 cm above the mat. It sees 30 degrees to each side and up to 100 cm far. Behind a wall it sees nothing.',
-        'Its value goes from 0 (no flame) to 100 (very strong). "Flame detected" means: the value is above 10.',
+        'Which colour sensor the robot gets is not decided yet. Here it is one sensor in the middle of the front of the robot, 6 cm above the mat. It looks straight ahead. In real mBlock its blocks can have other words than here.',
+        'It names a colour only when the thing in front of it is 15 mm away or closer. Further away it reads "none". It does not see through a wall.',
+        'On the fire target it reads "red". On a wall it reads "yellow", never "red".',
+        'When the target stands in a corner, the two walls of the corner stop the robot 15 mm in front of it. There the sensor reads "red" only while the robot touches both walls, or almost touches them.',
         'The fan is on DC motor port M1. It blows when the power of that motor is 20 % or more, forwards or backwards.',
         '"Facing the target" means: the fan points straight at some part of the target, or the middle of the target is at most 20 degrees to the side.',
         'The 30 cm are measured from the fan, at the front of the robot, to the middle of the target. "No wall between" means: no wall on the straight line between these two points.',
@@ -141,7 +151,7 @@ export const FIRE_CHIEF_ASSUMPTIONS: RulesPart = {
     {
       title: 'The robot and the walls',
       items: [
-        'The robot is always the same mBot2: 17.5 cm long and 13 cm wide, with the flame sensor and the fan at its front. Its size is not checked before the start.',
+        'The robot is always the same mBot2: 17.5 cm long and 13 cm wide, with the colour sensor and the fan at its front. Its size is not checked before the start.',
         'The robot is perfect: its wheels do not slip and its sensors make no mistakes. A real robot drifts a little.',
         'Walls cannot be moved here and they are perfectly smooth: a robot that touches a wall slides along it, for as long as it likes. Pushing a wall on purpose is not judged.',
         'Walls close the corners without a gap: no sensor looks through a corner.',

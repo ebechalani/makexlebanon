@@ -560,7 +560,7 @@ describe('the examples stay on the server', () => {
     for (const telling of ["'chief-first-wall'", '"chief-full-mission"', '`chief-flame-fan`', 'the "Follow the right-hand wall to a room" program', 'the whole mission on\n   any maze', 'data-example="chief-count-lines"']) {
       assert.ok(REAL_MARKERS.some((marker) => marker.test(telling)), telling);
     }
-    for (const harmless of ['fire-chief', 'chief', 'the fire chief', 'chief-first-walls', 'the first wall', 'the whole mission', 'count the grid lines', 'the flame sensor and the fan', 'follow the wall to a room']) {
+    for (const harmless of ['fire-chief', 'chief', 'the fire chief', 'chief-first-walls', 'the first wall', 'the whole mission', 'count the grid lines', 'the colour sensor and the fan', 'read red', 'start the fan', 'find the fire', 'follow the wall to a room']) {
       assert.ok(!REAL_MARKERS.some((marker) => marker.test(harmless)), harmless);
     }
   });
@@ -741,7 +741,7 @@ describe('the guard catches a leak', () => {
       ...CHIEF_CATALOG.map((card) => `export const CARDS = [{ id: '${card.id}' }];`),
       'export const hint = "Ask for the whole mission on any maze";',
       "export const title = 'STOP IN FRONT OF THE FIRST WALL';",
-      'export const card = <li>Find the flame\n        and turn to   face it</li>;',
+      'export const card = <li>Find the fire in a room\n        and check   its colour</li>;',
       "export const title = 'Count grid' + ' lines to drive ' + `two cells`;",
       '// the locked card of chief-wall-follow is not drawn\nexport const nothing = 1;',
     ];
@@ -758,7 +758,7 @@ describe('the guard catches a leak', () => {
     // a stylesheet, a file of cards, a file in public/
     for (const [file, text, line] of [
       ['src/simulator/ui/screen.css', '[data-example="chief-full-mission"] { color: red; }', "import './screen.css';"],
-      ['src/simulator/ui/cards.json', '[{ "title": "A first look at the flame sensor and the fan" }]', "import cards from './cards.json';"],
+      ['src/simulator/ui/cards.json', '[{ "title": "Read red, then start the fan" }]', "import cards from './cards.json';"],
     ] as const) {
       const files = withFile(file, text);
       files.set('src/simulator/ui/Screen.tsx', `'use client';\n${line}\nexport const Screen = () => null;\n`);

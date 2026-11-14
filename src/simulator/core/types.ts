@@ -133,25 +133,14 @@ export interface Body {
   mass: number;
   /** where the referee puts it back (restart rule) */
   home: BodyHome;
-  /** an infrared light on this body that a flame sensor can see (the game decides what glows) */
-  infrared?: InfraredEmitter;
-}
-
-/** An infrared light on a body ("the flame"). It shines forward, in the direction the body faces. */
-export interface InfraredEmitter {
-  /** where it sits: mm ahead of the body's centre, along the body's heading (l / 2 = on its front face) */
-  forward: number;
-  /** its height above the base of the body (mm) */
-  height: number;
-  /** it shines into a cone around the body's heading: this far to each side (degrees) */
-  halfAngleDeg: number;
 }
 
 /**
  * A wall that never moves: a box like a Body (footprint w x l centred on (x, y), turned by
  * `angle`) that stands on the mat and is `h` mm high. The robot and everything it pushes are
- * stopped by it and can slide along it, the ultrasonic sensor sees it, infrared light does not
- * pass it. A game returns its walls from Game.createWalls(); the engine never changes them.
+ * stopped by it and can slide along it, the ultrasonic sensor sees it, and a colour sensor that
+ * looks forward sees nothing behind it. A game returns its walls from Game.createWalls(); the
+ * engine never changes them.
  */
 export interface FixedWall {
   /** unique, e.g. 'wall:A1-B1'; reported in 'bump' events */
@@ -169,6 +158,11 @@ export interface FixedWall {
   h: number;
   /** CSS colour used to draw it */
   fill: string;
+  /**
+   * what a colour sensor pointed at it reports (left out = not a recognisable colour: the
+   * sensor reads 'none', and still cannot see what is behind the wall)
+   */
+  colorName?: SensorColor;
 }
 
 // =============================================================================================
@@ -236,14 +230,24 @@ export interface RobotConfig {
     /** half opening angle of the beam, degrees */
     halfAngleDeg: number;
   };
-  /** optional add-on: a colour sensor looking forward at whatever is in the claw */
+  /**
+   * optional add-on: a colour sensor looking forward. There are two kinds:
+   *  - without `mount` (Fire Rescue): it sits on the arm and looks at whatever is in the claw,
+   *    or just ahead of it. It sees only things the gripper can pick up.
+   *  - with `mount` (Fire Chief): it is fixed to the robot and looks straight ahead at
+   *    everything - game elements and walls. See FrontColorMount.
+   */
   frontColorSensor: {
     enabled: boolean;
-    /** how far ahead of the gripping centre it can still recognise an object (mm) */
+    /**
+     * how far it sees (mm). Sensor at the claw: how far ahead of the gripping centre it can
+     * still recognise an object. Fixed sensor (`mount`): the largest distance from the face of
+     * the sensor to the thing it looks at.
+     */
     rangeMm: number;
+    /** where a sensor that is fixed to the robot sits. Left out = the sensor at the claw. */
+    mount?: FrontColorMount;
   };
-  /** optional add-on: a flame (infrared) sensor looking forward. Left out = not fitted. */
-  flameSensor?: FlameSensorConfig;
   /** optional add-on: a fan blowing forward, driven by a DC motor port. Left out = not fitted. */
   fan?: FanConfig;
   gripper: GripperConfig;
@@ -255,35 +259,27 @@ export interface RobotConfig {
     sensor: number;
     /** ultrasonic noise amplitude in cm */
     ultrasonicCm: number;
-    /** flame sensor noise amplitude on its 0-100 value (left out = 0) */
-    flame?: number;
   };
 }
 
 /**
- * A flame sensor: it measures the infrared light of an emitter (Body.infrared) straight ahead
- * and reports 0 (nothing) .. 100 (very strong). How the value is worked out: flameSignal() in
- * core/engine-sensors.ts. (Whether the robot is in front of the emitter is judged from the
- * point the robot turns around, so that the highest value of a turn on the spot points at it.)
+ * A colour sensor that is fixed to the robot (RobotConfig.frontColorSensor.mount).
+ *
+ * It looks along ONE straight line: from its face, straight ahead of the robot. It names the
+ * colour of the NEAREST thing on that line that reaches the height of the sensor and is at most
+ * frontColorSensor.rangeMm away from its face:
+ *   - a game element reads its Body.colorName,
+ *   - a fixed wall reads its FixedWall.colorName,
+ *   - a thing without a colour name reads 'none' - and hides what is behind it, like any other,
+ *   - nothing in range reads 'none'.
+ * So nothing is seen through a wall or behind another thing, and a thing that is lower than
+ * the sensor (or stands on something, above it) is not seen at all.
  */
-export interface FlameSensorConfig {
-  enabled: boolean;
-  /** distance of the sensor ahead of the drive axle (mm) */
+export interface FrontColorMount {
+  /** distance of the face of the sensor ahead of the drive axle (mm), in the middle of the robot */
   forward: number;
   /** height of the sensor above the mat (mm) */
   height: number;
-  /** field of view: it sees this far to each side of straight ahead (degrees) */
-  halfAngleDeg: number;
-  /** from further away than this (mm) it sees nothing */
-  rangeMm: number;
-  /**
-   * how fast the value falls with the distance: straight ahead it is
-   * 100 x (1 - distance / rangeMm) to this power. 1 = a straight line, larger = it falls faster
-   * near the flame and more slowly far away. Left out = 2.
-   */
-  distancePower?: number;
-  /** "a flame is detected" when the value is above this (0-100) */
-  threshold: number;
 }
 
 /** A fan at the front of the robot. It blows while its DC motor runs strongly enough. */
@@ -359,14 +355,12 @@ export interface RobotState {
   /** last ultrasonic reading in cm (for the UI) */
   lastUltrasonicCm: number;
   /**
-   * The DC motor ports M1 / M2. The engine always fills in this and the two fields below; they
+   * The DC motor ports M1 / M2. The engine always fills in this and the field below; they
    * are optional only so that a robot state written by hand (older tests) stays valid.
    */
   dcMotors?: Record<DcMotorPort, DcMotorState>;
   /** true while the fan is blowing (always false on a robot without a fan) */
   fanOn?: boolean;
-  /** last flame sensor reading, 0-100 (for the UI) */
-  lastFlame?: number;
 }
 
 /** One reading of a Quad RGB probe. */
@@ -691,10 +685,6 @@ export interface SensorSnapshot {
   lineOffset: number;
   ultrasonicCm: number;
   frontColor: SensorColor | 'none';
-  /** flame sensor value 0-100 (0 on a robot without one) */
-  flame: number;
-  /** the flame value is above the sensor's threshold */
-  flameDetected: boolean;
   /** power of the DC motor ports M1 / M2, -100..100 */
   dcMotorPower: Record<DcMotorPort, number>;
   /** the fan is blowing */

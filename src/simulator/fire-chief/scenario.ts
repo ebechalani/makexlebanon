@@ -226,7 +226,7 @@ export const NAMED_MAZES: NamedMaze[] = [
     id: 'open',
     name: 'Open field',
     level: 1,
-    about: 'No inner walls. Good for a first drive and for testing the flame sensor and the fan.',
+    about: 'No inner walls. Good for a first drive and for trying the colour sensor and the fan.',
     scenario: openField('living', 'back'),
   },
   {

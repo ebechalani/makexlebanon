@@ -3,20 +3,26 @@
  *
  *   block program (builder)  ->  interpreter  ->  engine (walls, sensors)  ->  Fire Chief referee
  *
- * Every example is played on the default maze, on the five named mazes and on 300 random mazes
- * (seeds 1 to 300 of the game's own generator: both rooms, all three spots of the fire, 4 to 16
- * walls), and each test asserts what the description of that example promises - no more, no less.
- * What an example should do in a maze is worked out here a second time, on squared paper so to
- * say (which sides of a cell are open), without the engine: the two must agree.
+ * Every example is played on the default maze, on the five named mazes with the fire at each of
+ * its six places, and on 300 random mazes (seeds 1 to 300 of the game's own generator: both
+ * rooms, all three places of the fire, 4 to 16 walls), and each test asserts what the
+ * description of that example promises - no more, no less. What an example should do in a maze
+ * is worked out here a second time, on squared paper so to say (which sides of a cell are open,
+ * where the fire stands), without the engine: the two must agree.
  *
  * A hand on the wall nearly always finds the room on its own side first (the right hand the
  * bedroom, the left hand the living room). So the two examples that stop in the first room are
  * also played on 60 more random mazes each, picked because the hand leads to the OTHER room
- * there: both rooms and all three spots of the fire are then seen from the inside.
+ * there: both rooms and all three places of the fire are then seen from the inside.
  *
  * The full mission is also played on the mazes it finds hardest: mazes with one way only
  * ("perfect" mazes), mazes that no generator of the game would draw, and the slowest kind of
  * maze there is.
+ *
+ * The robot finds the fire with its ultrasonic sensor and makes sure with its colour sensor,
+ * which reads "red" on the target from 1.5 cm or less. No example holds a flame sensor block:
+ * a test here says so. (The big measurement - the full mission on many thousand mazes - is not
+ * part of this suite; samples.ts gives its numbers above the full mission.)
  */
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -32,7 +38,7 @@ import { runMatch } from '../core/batch';
 import { DEG, makeRng, wrapAngle } from '../core/geometry';
 import { RasterMatSampler } from '../core/mat';
 import { createSimulation } from '../core/simulation';
-import type { BlockJson, MatSampler, ProgramJson, RGB, ScoreLine, SimEvent, Simulation } from '../core/types';
+import type { BlockJson, Game, MatSampler, ProgramJson, RGB, ScoreLine, SimEvent, Simulation } from '../core/types';
 import { SAMPLE_CATALOG as FIRE_RESCUE_CATALOG } from '../fire-rescue/sample-catalog';
 import { supportsBlock } from '../vm';
 import { changeVar, forever, move, probeDetects, program, script, setVar, waitUntil, whenStart } from '../vm/builder';
@@ -43,30 +49,34 @@ import {
   ROOMS,
   ROOM_IDS,
   START_CELL,
+  TARGET_DEPTH,
+  TARGET_WIDTH,
   cellAt,
   cellCenter,
   cellName,
   isCell,
   sameCell,
-  targetPose,
   type Cell,
+  type FireSpot,
   type RoomId,
 } from './field';
 import { MATCH_DURATION, fireChiefGame, hasLeftStart, roomAround, targetOf, targetShift } from './game';
-import { FAN, FLAME_SENSOR, START_POSE } from './robot';
+import { COLOR_SENSOR_RANGE_MM, FAN, FIRE_CHIEF_ROBOT, START_POSE } from './robot';
 import { EXAMPLE_LEVELS, SAMPLE_CATALOG, exampleCard } from './sample-catalog';
 import {
   AFTER_LINE_CM,
+  APPROACH_RPM,
+  APPROACH_SECONDS,
+  CORNER_PLACE_CM,
   FAN_SECONDS,
+  FIRST_APPROACH_SECONDS,
   FIRST_WALL_STOP_CM,
-  FLAME_SEEN,
   LINE_COUNTER_CELLS,
   LINE_COUNTER_RPM,
-  LOOK_AROUND_RPM,
-  LOOK_STEPS,
-  LOOK_STEP_DEG,
+  OPEN_WAY_CM,
   SAMPLE_PROGRAMS,
   WALL_NEAR_CM,
+  WALL_PLACE_CM,
   getSampleProgram,
   type SampleProgram,
 } from './samples';
@@ -77,10 +87,12 @@ import {
   defaultScenario,
   encodeScenario,
   isValidScenario,
+  openField,
   perfectMazeWalls,
   randomScenario,
   wallBetweenCells,
   wallCount,
+  withFire,
   type FireChiefScenario,
 } from './scenario';
 
@@ -95,11 +107,20 @@ const RANDOM_MAZES = 300;
 /** The 300 random mazes every example is played on: seeds 1 to 300 of the game's own generator. */
 const RANDOM: FireChiefScenario[] = Array.from({ length: RANDOM_MAZES }, (_, i) => randomScenario(makeRng(i + 1)));
 
-/** The default maze and the five named ones. */
+/** The six places where the fire can stand: three in each room. */
+const PLACES: Array<{ room: RoomId; spot: FireSpot }> = ROOM_IDS.flatMap((room) => FIRE_SPOTS.map((spot) => ({ room, spot })));
+
+/** The default maze and the five named ones, the fire where each of them has it. */
 const NAMED: FireChiefScenario[] = [defaultScenario(), ...NAMED_MAZES.map((maze) => maze.scenario)];
 
-/** The mazes every example is played on: 6 + 300. */
-const ALL_MAZES: FireChiefScenario[] = [...NAMED, ...RANDOM];
+/** The five named mazes with the fire at each of its six places: 30 combinations. The default maze is one of them. */
+const NAMED_PLACES: FireChiefScenario[] = NAMED_MAZES.flatMap((maze) => PLACES.map(({ room, spot }) => withFire(maze.scenario, room, spot)));
+
+/** The mazes every example is played on: the named mazes with the fire at every place, and the random ones - 30 + 300. */
+const ALL_MAZES: FireChiefScenario[] = [...NAMED_PLACES, ...RANDOM];
+
+/** The open field: the maze without inner walls. */
+const OPEN_FIELD = NAMED_MAZES.find((maze) => maze.id === 'open')!;
 
 /** Mazes with one way only (16 walls), the fire once in each room: the longest ways along the wall. */
 const PERFECT: FireChiefScenario[] = Array.from({ length: 60 }, (_, i) => perfectMazeWalls(makeRng(100_001 + i))).flatMap((walls, i) =>
@@ -164,24 +185,47 @@ function freeWayOutOfStart(s: FireChiefScenario): number {
   return dir;
 }
 
+/** A cell on the way of the robot, and the way it faced when it drove into it (0 = up, 1 = right, 2 = down, 3 = left). */
+interface Step extends Cell {
+  dir: number;
+}
+
 /** Where a robot with a hand on the wall is after each cell it has driven, from START to the first room. */
-function handOnTheWall(s: FireChiefScenario, hand: 'left' | 'right', until: (cell: Cell) => boolean = (cell) => roomOf(cell) !== null): Cell[] {
+function handOnTheWall(s: FireChiefScenario, hand: 'left' | 'right', until: (cell: Cell) => boolean = (cell) => roomOf(cell) !== null): Step[] {
   const towards = hand === 'left' ? 3 : 1;
   const away = hand === 'left' ? 1 : 3;
   let cell: Cell = { ...START_CELL };
   let dir = 0;
-  const way: Cell[] = [];
+  const way: Step[] = [];
   while (way.length < 200) {
     dir = (dir + towards) % 4;
     for (let look = 0; look < 3 && !isOpen(s, cell, dir); look++) dir = (dir + away) % 4;
     cell = next(cell, dir);
-    way.push(cell);
+    way.push({ ...cell, dir });
     if (until(cell)) return way;
   }
   throw new Error('the hand on the wall never arrives');
 }
 
 const lastOf = <T>(list: readonly T[]): T => list[list.length - 1];
+
+/**
+ * "look for the fire" on paper. A robot that comes into a room facing `dir` looks straight
+ * ahead first (a wall), then into the outer corner, then at the other wall. Which way it turns
+ * for that ("swing": 1 = to the right, -1 = to the left), at which of the three looks it finds
+ * the fire at `spot`, and the way it faces then (degrees, 0 = up, clockwise positive).
+ */
+function lookOnPaper(room: RoomId, dir: number, spot: FireSpot): { swing: number; looks: number; heading: number } {
+  // the two walls with a place: the back wall is up (0), the side wall is to the left (living room) or to the right (bedroom)
+  const side = room === 'living' ? 3 : 1;
+  assert.ok(dir === 0 || dir === side, `a robot comes into the ${room} facing up or facing its side wall, not ${dir}`);
+  const outwards = room === 'living' ? -1 : 1;
+  const swing = dir === 0 ? outwards : -outwards;
+  const ahead: FireSpot = dir === 0 ? 'back' : 'side';
+  const looks = spot === ahead ? 1 : spot === 'corner' ? 2 : 3;
+  const heading = spot === 'back' ? 0 : spot === 'side' ? outwards * 90 : outwards * 45;
+  return { swing, looks, heading };
+}
 
 /**
  * More random mazes (seeds 301, 302, ... of the game's generator), kept when the hand on the
@@ -212,18 +256,24 @@ interface Played {
   events: SimEvent[];
   /** the robot pressed against something at some moment */
   touched: boolean;
-  /** highest flame value the sensor read during the match */
-  maxFlame: number;
+  /** in how many ticks (hundredths of a second) it did */
+  touchTicks: number;
+  /** the colour sensor read red at some moment */
+  sawRed: boolean;
+  /** the furthest (mm) the fire target was from its place at any moment */
+  maxShift: number;
   /** seconds the fan was blowing */
   fanSeconds: number;
   /** all five LEDs were red at some moment */
   ledsWereRed: boolean;
 }
 
+/** Both rooms are in the top row of the field: the robot's turning point is in that row above this line (mm). */
+const ROOM_ROW_BOTTOM = FIELD_SIZE / 5;
+
 const RED: RGB = { r: 255, g: 0, b: 0 };
 const GREEN: RGB = { r: 0, g: 255, b: 0 };
 const BLUE: RGB = { r: 0, g: 0, b: 255 };
-const OFF: RGB = { r: 0, g: 0, b: 0 };
 
 const ledsAre = (sim: Sim, colour: RGB): boolean => sim.world.robot.leds.every((led) => led.r === colour.r && led.g === colour.g && led.b === colour.b);
 
@@ -234,17 +284,23 @@ function sample(id: string): SampleProgram {
 }
 
 /** Play a program from the start signal to the end of the attempt, looking at the robot after every tick. */
-function play(blocks: ProgramJson, scenario: FireChiefScenario, sampler?: MatSampler): Played {
-  const sim = createSimulation({ game: fireChiefGame, scenario, program: blocks, sampler });
-  const played: Played = { sim, events: [], touched: false, maxFlame: 0, fanSeconds: 0, ledsWereRed: false };
+function play(blocks: ProgramJson, scenario: FireChiefScenario, sampler?: MatSampler, game: Game<FireChiefScenario> = fireChiefGame): Played {
+  const sim = createSimulation({ game, scenario, program: blocks, sampler });
+  const played: Played = { sim, events: [], touched: false, touchTicks: 0, sawRed: false, maxShift: 0, fanSeconds: 0, ledsWereRed: false };
+  const target = targetOf(sim.world);
   sim.start();
   while (sim.status === 'running') {
     sim.step(1);
     const robot = sim.world.robot;
-    if (robot.touching) played.touched = true;
+    if (robot.touching) {
+      played.touched = true;
+      played.touchTicks++;
+    }
     if (robot.fanOn) played.fanSeconds += sim.dt;
-    if ((robot.lastFlame ?? 0) > played.maxFlame) played.maxFlame = robot.lastFlame ?? 0;
     if (ledsAre(sim, RED)) played.ledsWereRed = true;
+    if (target) played.maxShift = Math.max(played.maxShift, targetShift(target));
+    // (the colour sensor reads red only 1.5 cm in front of the target: no need to ask it outside the top row)
+    if (!played.sawRed && robot.pose.y < ROOM_ROW_BOTTOM && sim.readSensors().frontColor === 'red') played.sawRed = true;
     const events = sim.drainEvents();
     if (events.length > 0) played.events.push(...events);
   }
@@ -288,25 +344,97 @@ function offCentre(sim: Sim, cell: Cell): number {
 /** Degrees between the way the robot faces and direction 0 = up, 1 = right, 2 = down, 3 = left. */
 const offDirection = (sim: Sim, dir: number): number => Math.abs(wrapAngle(sim.world.robot.pose.heading - (dir * Math.PI) / 2)) / DEG;
 
-/** Degrees between the way the robot faces and the direction from its turning point to the fire target. */
-function aimErrorDeg(sim: Sim): number {
-  const target = targetOf(sim.world);
-  assert.ok(target, 'the fire target is on the field');
+/** What the referee said during the match. */
+const said = (played: Played): string[] => played.events.flatMap((e) => (e.type === 'log' && e.level === 'info' ? [e.text] : []));
+
+/**
+ * How far (mm) the middle of the robot's front face - where the colour sensor sits - is from the
+ * front face of the fire target, worked out on paper: the face of a target at the back wall or
+ * at the side wall lies one target depth in front of that wall; the face of a target in the
+ * corner lies across the corner, (width + depth) / 2 + depth / 2 from it.
+ */
+function noseToTarget(sim: Sim): number {
+  const s = sim.scenario;
   const pose = sim.world.robot.pose;
-  return Math.abs(wrapAngle(Math.atan2(target.x - pose.x, pose.y - target.y) - pose.heading)) / DEG;
+  const front = sim.robotConfig.chassisFront;
+  const nose = { x: pose.x + front * Math.sin(pose.heading), y: pose.y - front * Math.cos(pose.heading) };
+  // how far the nose is from the outer side wall of the room
+  const fromSide = s.fireRoom === 'living' ? nose.x : FIELD_SIZE - nose.x;
+  if (s.fireSpot === 'back') return nose.y - TARGET_DEPTH;
+  if (s.fireSpot === 'side') return fromSide - TARGET_DEPTH;
+  return (fromSide + nose.y) / Math.SQRT2 - ((TARGET_WIDTH + TARGET_DEPTH) / 2 + TARGET_DEPTH / 2);
 }
 
-/** What every example promises: the program has no fault, and the robot touched neither a wall nor the fire target. */
-function assertCleanRun(played: Played, what: string): void {
+/** What every example promises: the program has no fault, the robot never moved the fire target, and the attempt is over in time. */
+function assertNoFault(played: Played, what: string): void {
   const { sim } = played;
   assert.deepEqual(sim.vm.errors(), [], `${what}: the interpreter found no problem`);
   assert.deepEqual(problems(played), [], `${what}: no warning`);
-  assert.equal(played.touched, false, `${what}: the robot touched nothing`);
-  assert.deepEqual(bumps(played), [], `${what}: no bump`);
   const target = targetOf(sim.world);
   assert.ok(target);
+  assert.equal(played.maxShift, 0, `${what}: the fire target never moved`);
   assert.equal(targetShift(target), 0, `${what}: the fire target stands where it stood`);
+  assert.ok(!said(played).some((text) => text.startsWith('The robot touches the fire target')), `${what}: the referee never saw the robot touch the target`);
   assert.ok(sim.world.time < MATCH_DURATION, `${what}: over before the 180 seconds`);
+}
+
+/** ... and, wherever the fire is not in a corner: the robot touched nothing - no wall, not the fire target. */
+function assertCleanRun(played: Played, what: string): void {
+  assertNoFault(played, what);
+  assert.equal(played.touched, false, `${what}: the robot touched nothing`);
+  assert.deepEqual(bumps(played), [], `${what}: no bump`);
+}
+
+/**
+ * A robot that reads red on a target in the corner touches the two walls of that corner: they
+ * stop it when its nose is exactly 1.5 cm from the target, and only then is the colour sensor
+ * close enough. It presses on them for 3 hundredths of a second at most (until it has read red
+ * and its wheels have stopped), and touches nothing else. The engine reports one bump: the wall
+ * that was touched first.
+ */
+function assertTouchedOnlyTheCorner(played: Played, what: string): void {
+  const s = played.sim.scenario;
+  assert.equal(s.fireSpot, 'corner', what);
+  assertNoFault(played, what);
+  assert.ok(played.touchTicks >= 1 && played.touchTicks <= 3, `${what}: pressed on a wall for ${played.touchTicks} ticks`);
+  const cornerWalls = ['wall:top', s.fireRoom === 'living' ? 'wall:left' : 'wall:right'];
+  assert.equal(bumps(played).length, 1, `${what}: bumps ${bumps(played).join(', ')}`);
+  assert.ok(cornerWalls.includes(bumps(played)[0]), `${what}: bumped into ${bumps(played)[0]}`);
+}
+
+/**
+ * The robot has read red and stands in front of the fire: squarely, facing `heading` (degrees),
+ * its nose 1.4 cm from a target at a wall, exactly the 1.5 cm of the colour sensor from a target
+ * in the corner. It touched nothing - but the two walls of the corner, for a target in the corner.
+ */
+function assertStandsAtTheFire(played: Played, heading: number, what: string): void {
+  const { sim } = played;
+  const s = sim.scenario;
+  assert.equal(played.sawRed, true, `${what}: the colour sensor read red`);
+  assert.equal(sim.readSensors().frontColor, 'red', `${what}: it still reads red at the end`);
+  assert.ok(Math.abs(wrapAngle(sim.world.robot.pose.heading - heading * DEG)) / DEG < 0.06, `${what}: facing ${sim.world.robot.pose.heading / DEG} degrees, not ${heading}`);
+  const gap = noseToTarget(sim);
+  if (s.fireSpot === 'corner') {
+    assert.ok(Math.abs(gap - COLOR_SENSOR_RANGE_MM) < 0.01, `${what}: the nose is ${gap.toFixed(3)} mm from the target in the corner`);
+    assertTouchedOnlyTheCorner(played, what);
+  } else {
+    assert.ok(gap > 13.9 && gap < 14.2, `${what}: the nose is ${gap.toFixed(3)} mm from the target`);
+    assertCleanRun(played, what);
+  }
+  // the whole robot is still inside the room
+  assert.equal(roomAround(sim.robotShapes()), s.fireRoom, what);
+}
+
+/** Three seconds of fan, started while standing still: the referee ends the attempt with "mission complete". */
+function assertFanAction(played: Played, what: string): void {
+  const { sim } = played;
+  assert.equal(sim.finishReason, 'mission-complete', what);
+  const fan = lineOf(sim, 'fan-start');
+  const done = lineOf(sim, 'fan-complete');
+  assert.ok(Math.abs(done.time! - fan.time! - 3) < 0.011, what);
+  assert.ok(Math.abs(played.fanSeconds - 3) < 0.03, `${what}: fan on for ${played.fanSeconds} s`);
+  assert.equal(sim.score().time, done.time, what);
+  assert.equal(played.ledsWereRed, true, `${what}: LEDs red before the fan`);
 }
 
 const label = (s: FireChiefScenario): string => `${encodeScenario(s)} (${wallCount(s)} walls)`;
@@ -374,30 +502,38 @@ describe('the list of the examples', () => {
       }
     }
     // the points each one promises, as its tests below measure them
-    const promised: Record<string, RegExp> = {
-      'chief-first-wall': /scores 10 points .* in every maze that can be played/,
-      'chief-count-lines': /scores 10 points .* in every maze that can be played/,
-      'chief-flame-fan': /scores no points/,
-      'chief-wall-follow': /scores 30 points .* in every maze that can be played/,
-      'chief-face-flame': /scores 30 points in every maze that can be played/,
-      'chief-full-mission': /scored 100 points in every maze it was tested on/,
+    const promised: Record<string, RegExp[]> = {
+      'chief-first-wall': [/scores 10 points .* in every maze that can be played/],
+      'chief-count-lines': [/scores 10 points .* in every maze that can be played/],
+      // one maze, one place of the fire: 100 points there, 30 with the fire elsewhere on that maze
+      'chief-flame-fan': [/^First choose the maze "Open field" and put the fire at the "Back wall" of the living room: this program knows one way only, by heart\./, /mission is complete, 100 points/, /With the fire at another place .* scores 30 points/],
+      'chief-wall-follow': [/scores 30 points .* in every maze that can be played/],
+      // 100 points when the fire is in the room the left hand reaches first, 30 points when it is in the other one
+      'chief-face-flame': [/Nothing: the fire is in the other room\. The LEDs turn blue: 30 points\./, /only then starts the fan: 100 points/],
+      'chief-full-mission': [/scored 100 points in all \d+ mazes it was tested on, with the fire at each of its six places, and never moved the target/],
     };
-    for (const s of SAMPLE_PROGRAMS) assert.match(s.description, promised[s.id], s.id);
-    // a program that drives by distance, or that promises never to touch a wall, says that it
-    // needs the robot where the simulator puts it (moved inside START, or turned, it can touch one)
-    for (const id of ['chief-first-wall', 'chief-count-lines', 'chief-wall-follow', 'chief-face-flame', 'chief-full-mission']) {
-      assert.match(sample(id).description, /It needs the robot at its default start position\./, id);
+    for (const s of SAMPLE_PROGRAMS) for (const promise of promised[s.id]) assert.match(s.description, promise, s.id);
+    // every program drives by distance: each one says that it needs the robot where the simulator
+    // puts it (moved inside START, or turned, it can touch a wall - or miss the fire)
+    for (const s of SAMPLE_PROGRAMS) assert.match(s.description, /It needs the robot at its default start position\./, s.id);
+    // no text for students speaks of a flame sensor: the robot finds the fire by its colour
+    for (const s of SAMPLE_PROGRAMS) {
+      assert.doesNotMatch(`${s.title} ${s.description} ${JSON.stringify(s.program)}`, /flame/i, s.id);
     }
-    // the starter that only turns on the spot and promises nothing about walls does not need it
-    assert.doesNotMatch(sample('chief-flame-fan').description, /default start position/);
+    // the three programs that read red say how near the colour sensor must be - the number of the robot
+    assert.equal(COLOR_SENSOR_RANGE_MM, 15);
+    assert.match(sample('chief-flame-fan').description, /The sensor names a colour only from 1\.5 cm or less/);
+    assert.match(sample('chief-face-flame').description, /the sensor is close enough \(1\.5 cm\) only when the two walls stop the robot: it touches them for a moment/);
+    // what a robot does at the corner is said where it is done, with the rule about walls beside it
+    assert.match(sample('chief-face-flame').description, /On a real field, ask the referee first: the rules allow a light touch of a wall only by accident\./);
+    assert.match(sample('chief-full-mission').description, /With the target in a corner it touches the two walls of that corner for a moment; otherwise it touched nothing\./);
     // what the simulator does differently from a real field is said where a student meets walls first
     assert.match(
       sample('chief-first-wall').description,
       /Walls in the simulator are perfectly smooth: a robot that touches one slides along it, also while it turns\. A real robot gets stuck there, so keep away from the walls\./,
     );
     // only a target that is moved ends the attempt (a touch that does not move it costs nothing: game.test.ts)
-    assert.match(sample('chief-full-mission').description, /moving the fire target would end the attempt/);
-    assert.doesNotMatch(sample('chief-full-mission').description, /pushing the fire target/);
+    assert.match(sample('chief-flame-fan').description, /pushing the target away ends the attempt/);
   });
 });
 
@@ -528,16 +664,20 @@ describe('the blocks of the examples', () => {
 
   test('each example shows the blocks it is about', () => {
     const uses = (id: string): Set<string> => new Set(blocksOf(sample(id).program).map((block) => block.type));
+    const COLOUR = 'sensing_colorsensor_color_is';
+    const FAN_BLOCKS = ['mbot2_dc_motor_power', 'mbot2_dc_motor_stop'];
+    const TIMER = ['cyberpi_reset_timer', 'cyberpi_timer'];
     assert.ok(uses('chief-first-wall').has('sensing_ultrasonic_distance'));
     assert.ok(uses('chief-count-lines').has('sensing_quadrgb_probe_detects'));
-    for (const type of ['sensing_flame_detected', 'sensing_flame_size', 'mbot2_dc_motor_power', 'mbot2_dc_motor_stop']) {
-      assert.ok(uses('chief-flame-fan').has(type), type);
+    // the two that do not look for the fire use neither the colour sensor nor the fan
+    for (const id of ['chief-first-wall', 'chief-count-lines', 'chief-wall-follow']) {
+      for (const type of [COLOUR, ...FAN_BLOCKS]) assert.ok(!uses(id).has(type), `${id}: ${type}`);
     }
-    assert.ok(uses('chief-wall-follow').has('sensing_ultrasonic_distance') && !uses('chief-wall-follow').has('sensing_flame_size'));
-    assert.ok(uses('chief-face-flame').has('sensing_flame_size') && uses('chief-face-flame').has('cyberpi_rotation_z'));
-    assert.ok(!uses('chief-face-flame').has('mbot2_dc_motor_power'));
-    for (const type of ['sensing_ultrasonic_distance', 'sensing_flame_size', 'mbot2_dc_motor_power', 'mbot2_dc_motor_stop', 'cyberpi_rotation_z']) {
-      assert.ok(uses('chief-full-mission').has(type), type);
+    assert.ok(uses('chief-wall-follow').has('sensing_ultrasonic_distance'));
+    // the three that read red: the colour sensor, the fan, the timer that ends a drive without red -
+    // and the ultrasonic sensor, which looks before the robot drives
+    for (const id of ['chief-flame-fan', 'chief-face-flame', 'chief-full-mission']) {
+      for (const type of [COLOUR, ...FAN_BLOCKS, ...TIMER, 'sensing_ultrasonic_distance', 'mbot2_move_direction']) assert.ok(uses(id).has(type), `${id}: ${type}`);
     }
     // a starter program is short (the line follower of Fire Rescue, a starter too, has 26 blocks); the full mission is the longest
     const size = (id: string): number => blocksOf(sample(id).program).filter((block) => block.type !== 'math_number' && block.type !== 'text').length;
@@ -547,14 +687,31 @@ describe('the blocks of the examples', () => {
     }
   });
 
-  test('no program sets the gyro back: a turn is measured from an angle the program wrote down', () => {
-    // ("reset yaw angle" sets "rotated angle around z axis" back in this simulator; real mBlock has
-    // another block for that. A program that works with the difference is right in both.)
+  test('no example holds a flame sensor block: the robot finds the fire with its ultrasonic sensor and its colour sensor', () => {
     for (const s of SAMPLE_PROGRAMS) {
-      assert.ok(!blocksOf(s.program).some((block) => block.type === 'cyberpi_reset_yaw'), s.id);
+      for (const block of blocksOf(s.program)) assert.ok(!/flame/i.test(block.type), `${s.id} holds ${block.type}`);
     }
-    const lookAround = blocksOf(sample('chief-full-mission').program).filter((block) => block.type === 'data_setvariableto');
-    assert.ok(lookAround.some((block) => block.inputs?.VALUE?.block?.type === 'cyberpi_rotation_z'), 'the start angle is written down');
+    // the colour the three programs wait for is red, on colour sensor number 1 - the one the robot has
+    for (const id of ['chief-flame-fan', 'chief-face-flame', 'chief-full-mission']) {
+      const asked = blocksOf(sample(id).program).filter((block) => block.type === 'sensing_colorsensor_color_is');
+      assert.ok(asked.length >= 2, `${id}: once while it drives, once before the fan`);
+      for (const block of asked) {
+        assert.equal(block.fields?.COLOR, 'red', id);
+        assert.equal(block.inputs?.INDEX?.shadow?.fields?.NUM, 1, id);
+      }
+      // (what the sensor reads on a wall is an assumption of the simulator: no program asks for another colour)
+      assert.ok(!blocksOf(sample(id).program).some((block) => block.type === 'sensing_colorsensor_color'), id);
+    }
+  });
+
+  test('no program sets the gyro back, and none needs the gyro: every turn is a turn by a number of degrees', () => {
+    // ("reset yaw angle" sets "rotated angle around z axis" back in this simulator; real mBlock has
+    // another block for that.)
+    for (const s of SAMPLE_PROGRAMS) {
+      for (const type of ['cyberpi_reset_yaw', 'cyberpi_rotation_z', 'cyberpi_yaw']) {
+        assert.ok(!blocksOf(s.program).some((block) => block.type === type), `${s.id}: ${type}`);
+      }
+    }
   });
 });
 
@@ -564,9 +721,12 @@ describe('the blocks of the examples', () => {
 
 test('the 300 random mazes can all be played and cover both rooms, the three spots and 4 to 16 walls', () => {
   assert.equal(RANDOM.length, 300);
-  assert.equal(ALL_MAZES.length, 306);
-  for (const s of [...ALL_MAZES, ...PERFECT, ...ODD]) assert.ok(isValidScenario(s), label(s));
-  assert.equal(new Set(RANDOM.map(encodeScenario)).size, 300, 'no maze twice');
+  assert.equal(NAMED_PLACES.length, 30);
+  assert.equal(ALL_MAZES.length, 330);
+  for (const s of [...NAMED, ...ALL_MAZES, ...PERFECT, ...ODD]) assert.ok(isValidScenario(s), label(s));
+  assert.equal(new Set(ALL_MAZES.map(encodeScenario)).size, 330, 'no maze twice');
+  // the default maze, and each named maze as it comes, is one of the 30
+  for (const s of NAMED) assert.ok(NAMED_PLACES.some((other) => encodeScenario(other) === encodeScenario(s)), label(s));
   for (const room of ROOM_IDS) {
     for (const spot of FIRE_SPOTS) {
       const count = RANDOM.filter((s) => s.fireRoom === room && s.fireSpot === spot).length;
@@ -631,7 +791,7 @@ describe('chief-first-wall: stop in front of the first wall', () => {
     assert.ok(lineOf(sim, 'leave-start').time! < sim.world.time);
   });
 
-  test('named mazes and 300 random mazes: 10 points in every one, the robot never touches a wall', () => {
+  test('named mazes with the fire at every place and 300 random mazes: 10 points in every one, the robot never touches a wall', () => {
     for (const s of ALL_MAZES) check(s);
   });
 
@@ -744,7 +904,7 @@ describe('chief-count-lines: count grid lines to drive two cells', () => {
     assert.equal(full.extra, 0);
   });
 
-  test('named mazes and 300 random mazes: 10 points in every one; it stops counting where a wall closes the way', () => {
+  test('named mazes with the fire at every place and 300 random mazes: 10 points in every one; it stops counting where a wall closes the way', () => {
     const counted = [0, 0, 0];
     for (const s of ALL_MAZES) counted[check(s).sim.vm.variables().cells as number]++;
     // all three endings happen: no cell (a wall at once), one cell, two cells
@@ -756,78 +916,187 @@ describe('chief-count-lines: count grid lines to drive two cells', () => {
 // 3. chief-flame-fan
 // =============================================================================================
 
-describe('chief-flame-fan: a first look at the flame sensor and the fan', () => {
+describe('chief-flame-fan: read red, then start the fan', () => {
   const blocks = sample('chief-flame-fan').program;
 
-  function check(s: FireChiefScenario): Played {
+  /** What the ultrasonic sensor reads at the start signal: the look the program takes before it drives. */
+  const firstLook = (s: FireChiefScenario): number => createSimulation({ game: fireChiefGame, scenario: s, program: blocks }).readSensors().ultrasonicCm;
+
+  /** On paper: is the way the program knows by heart free? Four cells up from START, then two cells to the left. */
+  function wayIsFree(s: FireChiefScenario): boolean {
+    let cell: Cell = { ...START_CELL };
+    for (const dir of [0, 0, 0, 0, 3, 3]) {
+      if (!isOpen(s, cell, dir)) return false;
+      cell = next(cell, dir);
+    }
+    return roomOf(cell) === 'living';
+  }
+
+  /**
+   * The four things this program can do in a maze:
+   *   'stays'      it sees a wall up the field: "Choose the maze Open field", and it does not move
+   *   'fire'       the way is free and the fire stands at the back wall of the living room: 100 points
+   *   'no red'     the way is free and the fire stands somewhere else: "No red here", 30 points
+   *   'into wall'  it sees no wall, drives off and runs into one (the wall that closes the living room on the right)
+   */
+  type Outcome = 'stays' | 'fire' | 'no red' | 'into wall';
+
+  function check(s: FireChiefScenario): Outcome {
     const what = label(s);
     const played = play(blocks, s);
     const { sim } = played;
+    assertNoFault(played, what);
+
+    if (firstLook(s) < OPEN_WAY_CM) {
+      // a wall up the field, on the way or close beside it: the program ends at once, in START
+      assert.equal(sim.finishReason, 'program-ended', what);
+      assert.ok(sim.world.time < 0.05, `${what}: ${sim.world.time} s`);
+      assert.deepEqual(sim.world.robot.pose, START_POSE, what);
+      assert.deepEqual(screen(sim), ['Choose the maze Open field'], what);
+      assert.deepEqual(points(sim), [0, 0, 0, 0], what);
+      assert.equal(played.touched, false, what);
+      assert.equal(played.fanSeconds, 0, what);
+      return 'stays';
+    }
+    // (whenever a wall stands in the way up, the look sees it: the program never drives into one of those)
+    for (let row = START_CELL.row; row > 0; row--) assert.ok(isOpen(s, { col: START_CELL.col, row }, 0), `${what}: a wall above row ${row} was not seen`);
+
+    if (!wayIsFree(s)) {
+      // the one kind of wall the look does not see: the living room is closed on its right side.
+      // The robot runs into that wall, turns, finds no red and ends without the fan.
+      assert.equal(wallBetweenCells(s.walls, { col: 0, row: 0 }, { col: 1, row: 0 }), true, what);
+      assert.deepEqual([...new Set(bumps(played))], ['wall:A1-B1'], what);
+      assert.equal(played.touched, true, what);
+      assert.equal(sim.finishReason, 'program-ended', what);
+      assert.deepEqual(screen(sim), ['No red here'], what);
+      assert.deepEqual(points(sim), [10, 0, 0, 0], what);
+      assert.equal(played.fanSeconds, 0, what);
+      assert.equal(played.sawRed, false, what);
+      return 'into wall';
+    }
+
+    // the way is free: the robot has come into the living room and has driven at its back wall
+    assert.equal(roomAround(sim.robotShapes()), 'living', what);
+    assert.ok(offDirection(sim, 0) < 0.01, `${what}: facing the back wall`);
+    if (s.fireRoom === 'living' && s.fireSpot === 'back') {
+      // red: it stopped 1.4 cm in front of the target, and the fan blew for 3 seconds
+      assertStandsAtTheFire(played, 0, what);
+      assertFanAction(played, what);
+      assert.deepEqual(points(sim), [10, 20, 30, 40], what);
+      assert.equal(sim.score().complete, true, what);
+      assert.deepEqual(screen(sim), [], what);
+      return 'fire';
+    }
+    // no red within half a second: the robot has stopped short of the wall, and the fan stays off
     assertCleanRun(played, what);
     assert.equal(sim.finishReason, 'program-ended', what);
-    // it stands where it stood and faces up again, after one full turn in 36 steps of 10 degrees
-    assert.ok(offCentre(sim, START_CELL) < 0.01, what);
-    assert.ok(Math.abs(sim.readSensors().yawDeg - 360) < 0.01, `${what}: turned ${sim.readSensors().yawDeg} degrees`);
-    assert.ok(offDirection(sim, 0) < 0.01, what);
-    // the fan blew for one second
-    assert.ok(Math.abs(played.fanSeconds - 1) < 0.02, `${what}: fan on for ${played.fanSeconds} s`);
-    assert.equal(sim.readSensors().fanOn, false, what);
-    // in START the sensor sees no flame: the value on the screen is 0 and the LEDs were never red
-    assert.equal(played.maxFlame, 0, what);
-    assert.deepEqual(sim.world.robot.screen.labels, [{ text: 'flame 0', x: 0, y: 0, size: 16 }], what);
+    assert.equal(played.sawRed, false, what);
+    assert.deepEqual(screen(sim), ['No red here'], what);
+    assert.deepEqual(points(sim), [10, 20, 0, 0], what);
+    assert.equal(played.fanSeconds, 0, what);
     assert.equal(played.ledsWereRed, false, what);
-    assert.ok(ledsAre(sim, OFF), what);
-    assert.deepEqual(screen(sim), ['Done'], what);
-    // no points: it has not left START, and a fan that blows at nothing does not count
-    assert.deepEqual(points(sim), [0, 0, 0, 0], what);
-    assert.equal(sim.score().total, 0, what);
-    return played;
+    // it drove about 3 cm on from the middle of the room: its nose is still 1 cm from the back wall
+    const nose = sim.world.robot.pose.y - sim.robotConfig.chassisFront;
+    assert.ok(nose > 10 && nose < 13, `${what}: the nose is ${nose.toFixed(1)} mm from the back wall`);
+    return 'no red';
   }
 
-  test('default maze: one turn on the spot, flame value 0, fan for one second, no points', () => {
-    const { sim } = check(defaultScenario());
-    assert.ok(sim.world.time > 5 && sim.world.time < 6, `${sim.world.time} s`);
-    assert.equal(LOOK_STEPS * LOOK_STEP_DEG, 360);
+  test('open field, the fire at the back wall of the living room: red after 12.5 seconds, 100 points after 16', () => {
+    const s = OPEN_FIELD.scenario;
+    assert.deepEqual([s.fireRoom, s.fireSpot, wallCount(s)], ['living', 'back', 0], 'the maze "Open field" as it comes');
+    assert.equal(check(s), 'fire');
+    const played = play(blocks, s);
+    assert.ok(lineOf(played.sim, 'fan-start').time! > 12.5 && lineOf(played.sim, 'fan-start').time! < 13, `${lineOf(played.sim, 'fan-start').time} s`);
+    assert.ok(played.sim.world.time > 15.5 && played.sim.world.time < 16, `${played.sim.world.time} s`);
+    // the look before the drive: 124.5 cm free up the open field
+    assert.equal(firstLook(s), 124.5);
   });
 
-  test('named mazes and 300 random mazes: the same everywhere - START is too far from the fire', () => {
-    for (const s of ALL_MAZES) check(s);
-    // why: the sensor sees one metre, and none of the six places of the target is nearer to START than that
-    assert.equal(FLAME_SENSOR.rangeMm, 1000);
-    for (const room of ROOM_IDS) {
-      for (const spot of FIRE_SPOTS) {
-        const target = targetPose(room, spot);
-        const away = Math.hypot(target.x - START_POSE.x, target.y - START_POSE.y) - FLAME_SENSOR.forward;
-        assert.ok(away > FLAME_SENSOR.rangeMm + 200, `${room} ${spot}: ${Math.round(away)} mm`);
-      }
+  test('open field, the fire at each of the other five places: "No red here", 30 points, the fan stays off', () => {
+    for (const { room, spot } of PLACES) {
+      if (room === 'living' && spot === 'back') continue;
+      assert.equal(check(openField(room, spot)), 'no red', `${room} ${spot}`);
     }
   });
 
-  test('the same blocks next to the fire: the value goes up and the LEDs turn red', () => {
-    // (what the description suggests to try: on the open field, 120 cm forward, a quarter turn to the left, 60 cm forward)
-    assert.match(sample('chief-flame-fan').description, /open field .* 120 cm forward, a quarter turn to the left, 60 cm forward/);
-    const s = NAMED_MAZES.find((maze) => maze.id === 'open')!.scenario;
-    const original = sample('chief-flame-fan').program.blocks!.blocks![0];
-    const inFront: ProgramJson = JSON.parse(JSON.stringify(sample('chief-flame-fan').program)) as ProgramJson;
-    const hat = inFront.blocks!.blocks![0];
-    const drive = (id: string, type: string, fields: Record<string, string>, slot: string, value: number, then: BlockJson | undefined): BlockJson => ({
-      type,
-      id,
-      fields,
-      inputs: { [slot]: { shadow: { type: 'math_number', id: `${id}n`, fields: { NUM: value } } } },
-      next: then ? { block: then } : undefined,
-    });
-    hat.next = {
-      block: drive('d1', 'mbot2_straight_cm', { DIRECTION: 'forward' }, 'DISTANCE', 120, drive('d2', 'mbot2_turn_deg', { DIRECTION: 'left' }, 'ANGLE', 90, drive('d3', 'mbot2_straight_cm', { DIRECTION: 'forward' }, 'DISTANCE', 60, original.next!.block))),
-    };
-    const played = play(inFront, s);
-    assert.deepEqual(played.sim.vm.errors(), []);
-    assert.equal(roomAround(played.sim.robotShapes()), 'living');
-    assert.ok(played.maxFlame > 80, `flame value up to ${played.maxFlame}`);
-    assert.equal(played.ledsWereRed, true);
-    assert.equal(played.touched, false, 'the robot turns in the room without touching the target');
-    // the fan blows away from the fire there (the turn ends where it began, facing the side wall): still no fan points
-    assert.deepEqual(points(played.sim), [10, 20, 0, 0]);
+  test('the try of the description: without the last turn the robot finds the fire at the side wall of the living room', () => {
+    assert.match(sample('chief-flame-fan').description, /Try the fire at the side wall of the living room: which block do you take away\?$/);
+    // take away "turns right 90": the robot then faces the side wall, where it came in
+    const changed = JSON.parse(JSON.stringify(blocks)) as ProgramJson;
+    const stack = blocksOf(changed).filter((block) => block.type === 'mbot2_turn_deg' || block.type === 'mbot2_straight_cm');
+    assert.deepEqual(stack.map((block) => `${block.type} ${block.fields?.DIRECTION}`), ['mbot2_straight_cm forward', 'mbot2_turn_deg left', 'mbot2_straight_cm forward', 'mbot2_turn_deg right']);
+    const before = stack[2];
+    assert.equal(before.next?.block, stack[3]);
+    before.next = stack[3].next;
+    const atTheSide = play(changed, openField('living', 'side'));
+    assertStandsAtTheFire(atTheSide, -90, 'fire at the side wall');
+    assertFanAction(atTheSide, 'fire at the side wall');
+    assert.deepEqual(points(atTheSide.sim), [10, 20, 30, 40]);
+    // and with the turn left in, the same fire is not found
+    assert.equal(check(openField('living', 'side')), 'no red');
+  });
+
+  test('the default maze and the named mazes with the fire at every place: it stays in START where it sees a wall; in "Two doors" it runs into one', () => {
+    assert.equal(check(defaultScenario()), 'stays');
+    const outcomes: Record<string, Outcome[]> = {};
+    for (const maze of NAMED_MAZES) outcomes[maze.id] = PLACES.map(({ room, spot }) => check(withFire(maze.scenario, room, spot)));
+    const all = (outcome: Outcome): Outcome[] => PLACES.map(() => outcome);
+    assert.deepEqual(outcomes.crossroads, all('stays'));
+    assert.deepEqual(outcomes.detour, all('stays'));
+    assert.deepEqual(outcomes['one-way'], all('stays'));
+    assert.deepEqual(outcomes['two-doors'], all('into wall'), 'as the description says');
+    assert.deepEqual(outcomes.open, ['no red', 'fire', 'no red', 'no red', 'no red', 'no red'], 'in the order of the six places: living room corner, back, side; bedroom corner, back, side');
+    assert.match(sample('chief-flame-fan').description, /if it sees a wall, it stays in START\. It does not see every wall: in the maze "Two doors" it runs into one\./);
+  });
+
+  /**
+   * More random mazes (seeds 301, 302, ...), kept when the look up the field sees no wall: the
+   * program drives off in them. (Such mazes are rare: about 4 in 100.)
+   */
+  const NO_WALL_SEEN: FireChiefScenario[] = (() => {
+    const out: FireChiefScenario[] = [];
+    for (let seed = RANDOM_MAZES + 1; out.length < 60; seed++) {
+      assert.ok(seed < 100_000, 'enough mazes are found long before');
+      const s = randomScenario(makeRng(seed));
+      if (firstLook(s) >= OPEN_WAY_CM) out.push(s);
+    }
+    return out;
+  })();
+
+  test('300 random mazes, and 60 more in which it sees no wall: it stays in START, or drives its way and blows only where it reads red', (t) => {
+    const counts: Record<Outcome, number> = { stays: 0, fire: 0, 'no red': 0, 'into wall': 0 };
+    for (const s of RANDOM) counts[check(s)]++;
+    t.diagnostic(`300 random mazes: stays in START in ${counts.stays}, 100 points in ${counts.fire}, "No red here" in ${counts['no red']}, into a wall in ${counts['into wall']}`);
+    // nearly every maze with inner walls has one that the look up the field sees
+    assert.ok(counts.stays >= 270, `${counts.stays} of 300`);
+    const driven: Record<Outcome, number> = { stays: 0, fire: 0, 'no red': 0, 'into wall': 0 };
+    for (const s of NO_WALL_SEEN) driven[check(s)]++;
+    t.diagnostic(`60 mazes in which it sees no wall: 100 points in ${driven.fire}, "No red here" in ${driven['no red']}, into a wall in ${driven['into wall']}`);
+    assert.equal(driven.stays, 0);
+    assert.ok(driven.fire >= 3 && driven['no red'] >= 20 && driven['into wall'] >= 3, JSON.stringify(driven));
+  });
+
+  test('the numbers of the program: the look before the drive, the slow drive, and the half second without red', () => {
+    // from anywhere inside START the open field reads 120 cm or more, and a wall on the way up 102.4 cm at most
+    assert.equal(OPEN_WAY_CM, 110);
+    const fromStart = (y: number, s: FireChiefScenario): number =>
+      createSimulation({ game: fireChiefGame, scenario: s, program: blocks, startPose: { ...START_POSE, y } }).readSensors().ultrasonicCm;
+    // (the whole robot inside START: its turning point is 105 mm to 230 mm below the top of the cell)
+    const top = START_POSE.y - 45;
+    const bottom = START_POSE.y + 80;
+    assert.ok(fromStart(top, OPEN_FIELD.scenario) >= OPEN_WAY_CM + 10 && fromStart(bottom, OPEN_FIELD.scenario) >= OPEN_WAY_CM + 10);
+    const wallAtTheTop = withFire(OPEN_FIELD.scenario, 'living', 'back');
+    wallAtTheTop.walls = wallAtTheTop.walls.map((_, i) => i === 20 + 2); // the wall between C1 and C2: the furthest one on the way up
+    assert.equal(wallBetweenCells(wallAtTheTop.walls, { col: 2, row: 0 }, { col: 2, row: 1 }), true);
+    assert.ok(fromStart(bottom, wallAtTheTop) <= OPEN_WAY_CM - 5 && fromStart(top, wallAtTheTop) <= OPEN_WAY_CM - 5, `${fromStart(bottom, wallAtTheTop)} cm`);
+    // half a second at 20 RPM is 3.3 cm: more than the 1 cm to red, less than the 4.5 cm to the wall
+    assert.equal(APPROACH_RPM, 20);
+    assert.equal(FIRST_APPROACH_SECONDS, 0.5);
+    const mmPerSecond = (APPROACH_RPM / 60) * Math.PI * FIRE_CHIEF_ROBOT.wheelDiameter;
+    assert.ok(mmPerSecond < 100, 'less than 1 mm between two looks at the sensor (a hundredth of a second apart)');
+    const driven = mmPerSecond * FIRST_APPROACH_SECONDS;
+    const noseToWall = 150 - FIRE_CHIEF_ROBOT.chassisFront;
+    assert.ok(driven > noseToWall - TARGET_DEPTH - COLOR_SENSOR_RANGE_MM + 10 && driven < noseToWall - 10, `${driven.toFixed(1)} mm`);
   });
 });
 
@@ -873,7 +1142,7 @@ describe('chief-wall-follow: follow the right-hand wall to a room', () => {
   /** 60 more mazes in which the right hand leads to the living room first (it nearly always finds the bedroom). */
   const TO_THE_LIVING_ROOM = mazesWhereTheHandFinds('right', 'living');
 
-  test('named mazes and 300 random mazes: 30 points in every one, in the room the right hand reaches first', (t) => {
+  test('named mazes with the fire at every place and 300 random mazes: 30 points in every one, in the room the right hand reaches first', (t) => {
     const rooms = { living: 0, bedroom: 0 };
     const times: number[] = [];
     for (const s of ALL_MAZES) {
@@ -883,7 +1152,7 @@ describe('chief-wall-follow: follow the right-hand wall to a room', () => {
     }
     t.diagnostic(`${ALL_MAZES.length} mazes: 30 points in every one (bedroom ${rooms.bedroom}, living room ${rooms.living}), median ${median(times).toFixed(1)} s, slowest ${Math.max(...times).toFixed(1)} s`);
     // the right hand nearly always leads to the bedroom, which is on the right
-    assert.deepEqual(rooms, { living: 9, bedroom: 297 });
+    assert.deepEqual(rooms, { living: 9, bedroom: 321 });
     assert.ok(Math.max(...times) < 110, `slowest ${Math.max(...times)} s`);
   });
 
@@ -925,95 +1194,181 @@ describe('chief-wall-follow: follow the right-hand wall to a room', () => {
 // 5. chief-face-flame
 // =============================================================================================
 
-describe('chief-face-flame: find the flame and turn to face it', () => {
+/** The same game with a fire target that has no colour: the colour sensor reads nothing on it. (For the "not red" branch.) */
+const GREY_TARGET_GAME: Game<FireChiefScenario> = {
+  ...fireChiefGame,
+  createBodies: (s) => fireChiefGame.createBodies(s).map((body) => ({ ...body, colorName: undefined })),
+};
+
+describe('chief-face-flame: find the fire in a room and check its colour', () => {
   const blocks = sample('chief-face-flame').program;
 
   function check(s: FireChiefScenario): Played {
     const what = label(s);
     const played = play(blocks, s);
     const { sim } = played;
-    const room = roomOf(lastOf(handOnTheWall(s, 'left')));
+    const arrived = lastOf(handOnTheWall(s, 'left'));
+    const room = roomOf(arrived);
     assert.ok(room);
-    assertCleanRun(played, what);
-    assert.equal(sim.finishReason, 'program-ended', what);
-    assert.equal(roomAround(sim.robotShapes()), room, `${what}: the room the left hand leads to first`);
-    assert.ok(offCentre(sim, ROOMS[room].cell) < 0.1, what);
-    assert.deepEqual(points(sim), [10, 20, 0, 0], what);
-    assert.equal(played.fanSeconds, 0, what);
     const variables = sim.vm.variables();
-    const best = variables.best as number;
+    assert.deepEqual([variables.col, variables.row], [ROOMS[room].cell.col, 0], `${what}: it knows that it is in the ${room}`);
     if (room === s.fireRoom) {
-      // the fire is here: the robot faces the target, LEDs red
-      assert.ok(best > 80 && best === played.maxFlame, `${what}: highest flame value ${best}`);
-      assert.ok(aimErrorDeg(sim) < 1, `${what}: ${aimErrorDeg(sim).toFixed(2)} degrees off the target`);
-      assert.ok(ledsAre(sim, RED), what);
-      assert.deepEqual(screen(sim), [`Fire! Flame value ${best}`], what);
-      assert.ok(sim.readSensors().flame > 80, `${what}: the sensor looks at the flame`);
-      assert.equal(sim.readSensors().flameDetected, true, what);
+      // the fire is here: the ultrasonic sensor found its place, the colour sensor read red, the fan blew
+      const paper = lookOnPaper(room, arrived.dir, s.fireSpot);
+      assert.deepEqual([variables.fire, variables.swing], [1, paper.swing], what);
+      assertStandsAtTheFire(played, paper.heading, what);
+      assertFanAction(played, what);
+      assert.deepEqual(points(sim), [10, 20, 30, 40], what);
+      assert.equal(sim.score().complete, true, what);
+      assert.deepEqual(screen(sim), ['Red: fan on'], what);
     } else {
-      // the fire is in the other room, more than a metre away: no flame, LEDs blue,
-      // and the robot faces again the way it came in ("look around" ends where it began)
-      assert.equal(best, 0, what);
-      assert.equal(played.maxFlame, 0, what);
+      // the fire is in the other room: nothing at any of the three places, LEDs blue, and the
+      // robot stands in the middle of the room, facing again the way it came in
+      assertCleanRun(played, what);
+      assert.equal(sim.finishReason, 'program-ended', what);
+      assert.equal(roomAround(sim.robotShapes()), room, what);
+      assert.ok(offCentre(sim, ROOMS[room].cell) < 0.1, what);
+      assert.equal(variables.fire, 0, what);
+      assert.equal(variables.dir, arrived.dir, what);
+      assert.ok(offDirection(sim, arrived.dir) < 0.01, `${what}: "dir" is the way it faces`);
       assert.ok(ledsAre(sim, BLUE), what);
       assert.deepEqual(screen(sim), ['No fire in this room'], what);
-      // (to a twentieth of a degree: the gyro block gives tenths)
-      assert.ok(offDirection(sim, variables.dir as number) < 0.06, `${what}: "dir" is the way it faces`);
+      assert.deepEqual(points(sim), [10, 20, 0, 0], what);
+      assert.equal(played.fanSeconds, 0, what);
+      assert.equal(played.sawRed, false, what);
     }
     return played;
   }
 
-  test('default maze: the left hand leads to the living room; the robot ends facing the fire in its corner', () => {
+  test('default maze: the left hand leads to the living room; the robot reads red on the fire in its corner: 100 points after 34 seconds', () => {
     const s = defaultScenario();
-    const { sim } = check(s);
+    const { sim, touchTicks } = check(s);
     assert.equal(roomAround(sim.robotShapes()), 'living');
-    assert.ok(ledsAre(sim, RED));
-    // the corner target is up and to the left: the robot faces north-west
-    assert.ok(Math.abs(sim.world.robot.pose.heading / DEG + 45) < 1, `heading ${sim.world.robot.pose.heading / DEG}`);
-    assert.ok(sim.world.time > 30 && sim.world.time < 40, `${sim.world.time} s`);
+    assert.equal(s.fireSpot, 'corner');
+    // the corner target is up and to the left: the robot faces north-west, against the two walls of the corner
+    assert.ok(Math.abs(sim.world.robot.pose.heading / DEG + 45) < 0.06, `heading ${sim.world.robot.pose.heading / DEG}`);
+    assert.equal(touchTicks, 3, 'it pressed on the walls for 3 hundredths of a second');
+    const told = /In the default maze the left hand leads to the fire: 100 points after (\d+) seconds\./.exec(sample('chief-face-flame').description);
+    assert.ok(told);
+    assert.equal(Number(told[1]), Math.round(sim.world.time), `${sim.world.time} s`);
   });
 
   /** 60 more mazes in which the left hand leads to the bedroom first (it nearly always finds the living room). */
   const TO_THE_BEDROOM = mazesWhereTheHandFinds('left', 'bedroom');
 
-  test('named mazes, 300 random mazes and 60 where the left hand leads to the bedroom: 30 points in every one; it faces the fire whenever the fire is in that room', (t) => {
+  test('named mazes with the fire at every place, 300 random mazes and 60 where the left hand leads to the bedroom: 100 points where the fire is in that room, 30 where it is not', (t) => {
     let empty = 0;
-    const faced: Record<string, number> = {};
+    const found: Record<string, number> = {};
     const times: number[] = [];
-    let worstAim = 0;
     for (const s of [...ALL_MAZES, ...TO_THE_BEDROOM]) {
       const { sim } = check(s);
       times.push(sim.world.time);
-      if (ledsAre(sim, RED)) {
-        faced[`${s.fireRoom} ${s.fireSpot}`] = (faced[`${s.fireRoom} ${s.fireSpot}`] ?? 0) + 1;
-        worstAim = Math.max(worstAim, aimErrorDeg(sim));
-      } else empty++;
+      if (sim.score().total === 100) found[`${s.fireRoom} ${s.fireSpot}`] = (found[`${s.fireRoom} ${s.fireSpot}`] ?? 0) + 1;
+      else empty++;
     }
-    const facedTotal = Object.values(faced).reduce((sum, n) => sum + n, 0);
+    const foundTotal = Object.values(found).reduce((sum, n) => sum + n, 0);
     t.diagnostic(
-      `${times.length} mazes: 30 points in every one; faced the fire in ${facedTotal} (at most ${worstAim.toFixed(2)} degrees off), ` +
-        `found the room empty in ${empty}; median ${median(times).toFixed(1)} s, slowest ${Math.max(...times).toFixed(1)} s`,
+      `${times.length} mazes: read red and blew in ${foundTotal} (100 points), found the room empty in ${empty} (30 points); ` +
+        `median ${median(times).toFixed(1)} s, slowest ${Math.max(...times).toFixed(1)} s`,
     );
-    assert.ok(facedTotal >= 150 && empty >= 150, `faced the fire in ${facedTotal} mazes, found the room empty in ${empty}`);
-    // both rooms, all three spots - each of the six in at least 12 mazes
-    for (const room of ROOM_IDS) {
-      for (const spot of FIRE_SPOTS) assert.ok((faced[`${room} ${spot}`] ?? 0) >= 12, `${faced[`${room} ${spot}`] ?? 0} mazes with the fire in the ${room}, ${spot}`);
-    }
-    assert.equal(FLAME_SEEN, FLAME_SENSOR.threshold, 'the program uses the threshold of the "detects flame?" block');
+    assert.ok(foundTotal >= 150 && empty >= 150, `found the fire in ${foundTotal} mazes, found the room empty in ${empty}`);
+    // both rooms, all three places - each of the six in at least 12 mazes
+    for (const { room, spot } of PLACES) assert.ok((found[`${room} ${spot}`] ?? 0) >= 12, `${found[`${room} ${spot}`] ?? 0} mazes with the fire in the ${room}, ${spot}`);
+    assert.ok(Math.max(...times) < 115, `slowest ${Math.max(...times)} s`);
   });
 
-  test('"look around" measures its turn from the angle at which it began, and ends where it began', () => {
-    assert.equal(LOOK_AROUND_RPM, 30);
-    // default maze: the robot comes into the living room from the right, facing left: the gyro has
-    // counted a quarter turn to the left by then. The fire in the corner is 45 degrees to its right.
-    const inTheCorner = play(blocks, defaultScenario()).sim.vm.variables();
-    assert.equal(inTheCorner['start angle'], -90);
-    assert.ok(Math.abs((inTheCorner['best turn'] as number) - 45) < 1, `best turn ${inTheCorner['best turn']}`);
-    assert.equal(inTheCorner.dir, 3);
-    // open field: it comes in from below, and the fire at the back wall is straight ahead
-    const straightAhead = play(blocks, NAMED_MAZES.find((maze) => maze.id === 'open')!.scenario).sim.vm.variables();
-    assert.equal(straightAhead['start angle'], 0);
-    assert.equal(straightAhead['best turn'], 0);
+  test('"look for the fire": the robot comes in facing a wall or facing up, and finds each place at the first, second or third look', () => {
+    // every way of coming into a room, with the fire at every place of that room: (room, direction, place) -> the look that finds it
+    const seen = new Set<string>();
+    for (const s of [...ALL_MAZES, ...TO_THE_BEDROOM]) {
+      const arrived = lastOf(handOnTheWall(s, 'left'));
+      const room = roomOf(arrived);
+      if (room !== s.fireRoom) continue;
+      const paper = lookOnPaper(room, arrived.dir, s.fireSpot);
+      seen.add(`${room} ${arrived.dir} ${s.fireSpot} ${paper.looks}`);
+    }
+    // The left hand comes into the living room facing up or facing left, and into the bedroom
+    // facing up: 3 ways x 3 places. (It comes into the bedroom facing right when it has been in the
+    // living room before: the full mission, below, does.)
+    assert.deepEqual([...seen].sort(), [
+      'bedroom 0 back 1', 'bedroom 0 corner 2', 'bedroom 0 side 3',
+      'living 0 back 1', 'living 0 corner 2', 'living 0 side 3',
+      'living 3 back 3', 'living 3 corner 2', 'living 3 side 1',
+    ]); // prettier-ignore
+    // the fire in the corner of the default maze is found at the second look, half a quarter turn to the right
+    const corner = play(blocks, defaultScenario()).sim.vm.variables();
+    assert.deepEqual([corner.dir, corner.swing, corner.fire], [3, 1, 1]);
+    // the same maze with the fire at the back wall: the third look, a quarter turn to the right
+    const atTheBack = withFire(defaultScenario(), 'living', 'back');
+    assert.deepEqual(lookOnPaper('living', lastOf(handOnTheWall(atTheBack, 'left')).dir, 'back'), { swing: 1, looks: 3, heading: 0 });
+    assert.ok(offDirection(play(blocks, atTheBack).sim, 0) < 0.06);
+    // open field: the left hand leads up the left side, the robot comes in facing the back wall and finds the fire there at the first look
+    assert.deepEqual(lookOnPaper('living', lastOf(handOnTheWall(OPEN_FIELD.scenario, 'left')).dir, 'back'), { swing: -1, looks: 1, heading: 0 });
+    assert.deepEqual(play(blocks, OPEN_FIELD.scenario).sim.vm.variables().swing, -1);
+  });
+
+  test('the numbers of "look for the fire": what the ultrasonic sensor reads at the three places, with the target and without', () => {
+    // the robot in the middle of a room, looking at a place: straight at a wall, or into the corner
+    const reading = (room: RoomId, look: FireSpot, fire: FireChiefScenario): number => {
+      const outwards = room === 'living' ? -1 : 1;
+      const heading = (look === 'back' ? 0 : look === 'side' ? outwards * 90 : outwards * 45) * DEG;
+      const sim = createSimulation({ game: fireChiefGame, scenario: fire, program: blocks, startPose: { ...cellCenter(ROOMS[room].cell), heading } });
+      // (from there the colour sensor reads nothing: the target is more than 1.5 cm away)
+      assert.equal(sim.readSensors().frontColor, 'none', `${room} ${look}`);
+      return sim.readSensors().ultrasonicCm;
+    };
+    for (const room of ROOM_IDS) {
+      const other: RoomId = room === 'living' ? 'bedroom' : 'living';
+      for (const look of FIRE_SPOTS) {
+        const limit = look === 'corner' ? CORNER_PLACE_CM : WALL_PLACE_CM;
+        // the target at this place: clearly less than the limit
+        const withTarget = reading(room, look, openField(room, look));
+        assert.equal(withTarget, look === 'corner' ? 5.7 : 3, `${room} ${look}`);
+        assert.ok(withTarget < limit - 0.9, `${room} ${look}: ${withTarget} cm`);
+        // the target at another place of the room, or in the other room: the bare wall, clearly more
+        for (const elsewhere of [...FIRE_SPOTS.filter((spot) => spot !== look).map((spot) => openField(room, spot)), openField(other, look)]) {
+          const bare = reading(room, look, elsewhere);
+          assert.equal(bare, look === 'corner' ? 9 : 4.5, `${room} ${look}, fire ${elsewhere.fireRoom} ${elsewhere.fireSpot}`);
+          assert.ok(bare > limit + 0.4, `${room} ${look}: ${bare} cm`);
+        }
+      }
+    }
+    assert.deepEqual([WALL_PLACE_CM, CORNER_PLACE_CM], [4, 7.5]);
+    // the notes on the blocks give these numbers
+    const notes = blocksOf(blocks).map((block) => (block.icons as { comment?: { text?: string } } | undefined)?.comment?.text ?? '');
+    assert.ok(notes.some((text) => /a wall, 4\.5 cm away\..*\(3 cm, its smallest value\)\. Less than 4 cm/.test(text)), 'the note on the first look');
+    assert.ok(notes.some((text) => /The empty corner reads 9 cm, the target in it 5\.7 cm\. Less than 7\.5 cm/.test(text)), 'the note on the look into the corner');
+  });
+
+  test('the try of the description: the default maze with the fire in the bedroom - "No fire in this room", 30 points', () => {
+    assert.match(sample('chief-face-flame').description, /Try the default maze with the fire in the bedroom: what does the robot show\?$/);
+    for (const spot of FIRE_SPOTS) {
+      const { sim } = check(withFire(defaultScenario(), 'bedroom', spot));
+      assert.equal(roomAround(sim.robotShapes()), 'living');
+      assert.deepEqual(screen(sim), ['No fire in this room']);
+      assert.equal(sim.score().total, 30);
+    }
+  });
+
+  test('"make sure before you blow": a thing that does not read red gets no fan', () => {
+    // the same maze with a target the colour sensor cannot name: the ultrasonic sensor finds it,
+    // the robot drives at it for 3 seconds, reads no red - and leaves the fan off
+    assert.equal(APPROACH_SECONDS, 3);
+    for (const spot of FIRE_SPOTS) {
+      const s = withFire(defaultScenario(), 'living', spot);
+      const played = play(blocks, s, undefined, GREY_TARGET_GAME);
+      const { sim } = played;
+      const what = `a target without colour, ${spot}`;
+      assert.deepEqual(sim.vm.errors(), [], what);
+      assert.equal(sim.vm.variables().fire, 1, `${what}: the ultrasonic sensor found it`);
+      assert.equal(played.sawRed, false, what);
+      assert.deepEqual(screen(sim), ['Not red: no fan'], what);
+      assert.equal(played.fanSeconds, 0, what);
+      assert.equal(sim.finishReason, 'program-ended', what);
+      assert.deepEqual(points(sim), [10, 20, 0, 0], what);
+      // head-on, a target that stands flat against its wall does not move (the wall holds it); in the corner the walls stop the robot
+      assert.ok(played.maxShift < 1e-9, `${what}: the target moved ${played.maxShift} mm`);
+    }
   });
 });
 
@@ -1032,58 +1387,58 @@ describe('chief-full-mission: the whole mission on any maze', () => {
     const what = label(s);
     const played = play(blocks, s);
     const { sim } = played;
-    assertCleanRun(played, what);
     // 100 points, and the referee ends the attempt: mission complete
     assert.deepEqual(points(sim), [10, 20, 30, 40], what);
-    assert.equal(sim.finishReason, 'mission-complete', what);
     assert.equal(sim.score().complete, true, what);
-    // it stands in the middle of the fire room and faces the target
-    assert.equal(roomAround(sim.robotShapes()), s.fireRoom, what);
-    assert.ok(offCentre(sim, ROOMS[s.fireRoom].cell) < 1, `${what}: ${offCentre(sim, ROOMS[s.fireRoom].cell).toFixed(2)} mm from the middle`);
-    assert.ok(aimErrorDeg(sim) < 1, `${what}: ${aimErrorDeg(sim).toFixed(2)} degrees off the target`);
-    // three seconds of fan, started while standing still
-    const fan = lineOf(sim, 'fan-start');
-    const done = lineOf(sim, 'fan-complete');
-    assert.ok(Math.abs(done.time! - fan.time! - 3) < 0.011, what);
-    assert.ok(Math.abs(played.fanSeconds - 3) < 0.03, `${what}: fan on for ${played.fanSeconds} s`);
-    assert.equal(sim.score().time, done.time, what);
-    // the screen shows the highest flame value of every room it looked around in: the room without
-    // fire first (0), if the way along the wall led through it, then the fire room
-    const best = sim.vm.variables().best as number;
-    assert.ok(best > 80 && best === played.maxFlame, `${what}: highest flame value ${best}`);
-    assert.deepEqual(screen(sim), otherRoomFirst(s) ? ['Flame value in this room: 0', `Flame value in this room: ${best}`] : [`Flame value in this room: ${best}`], what);
+    assertFanAction(played, what);
+    // it found the place of the fire where the paper says, read red there, and stands 1.4 cm in
+    // front of the target (1.5 cm, against the two walls, in a corner)
+    const arrived = lastOf(handOnTheWall(s, 'left', (cell) => roomOf(cell) === s.fireRoom));
+    const paper = lookOnPaper(s.fireRoom, arrived.dir, s.fireSpot);
+    assert.deepEqual([sim.vm.variables().fire, sim.vm.variables().swing], [1, paper.swing], what);
+    assertStandsAtTheFire(played, paper.heading, what);
+    // the screen says what it found in every room it looked into: the room without fire first, if
+    // the way along the wall led through it, then the fire
+    assert.deepEqual(screen(sim), otherRoomFirst(s) ? ['No fire in this room', 'Red: fan on'] : ['Red: fan on'], what);
     return played;
   }
 
-  /** The times the description names: "The default maze takes 37 seconds, the slowest maze found 139 of the 180 seconds". */
-  const told = /The default maze takes (\d+) seconds, the slowest maze found (\d+) of the 180 seconds/.exec(sample('chief-full-mission').description);
+  /** The numbers the description names: how many mazes, and the two times. */
+  const description = sample('chief-full-mission').description;
+  const counted = /It scored 100 points in all (\d+) mazes it was tested on, with the fire at each of its six places/.exec(description);
+  const told = /The default maze takes (\d+) seconds, the slowest maze found (\d+) of the 180 seconds/.exec(description);
 
-  test('default maze: 100 points after 37 seconds, as the description says', () => {
+  test('default maze: 100 points after 34 seconds, as the description says', () => {
     const { sim } = check(defaultScenario());
-    assert.ok(sim.world.time > 35 && sim.world.time < 40, `${sim.world.time} s`);
+    assert.ok(sim.world.time > 33 && sim.world.time < 36, `${sim.world.time} s`);
     assert.equal(sim.restarts, 0);
     assert.ok(told, 'the description names the two times');
     assert.equal(Number(told[1]), Math.round(sim.world.time), `${sim.world.time} s`);
   });
 
-  test('the five named mazes, from the open field to the maze with one way only: 100 points', () => {
-    for (const maze of NAMED_MAZES) check(maze.scenario);
+  test('the five named mazes, from the open field to the maze with one way only, the fire at each of its six places: 100 points', () => {
+    for (const s of NAMED_PLACES) check(s);
   });
 
   test('300 random mazes: 100 points in every one, the slowest well inside the 180 seconds', (t) => {
-    const times = RANDOM.map((s) => check(s).sim.world.time);
+    const runs = RANDOM.map((s) => check(s));
+    const times = runs.map((played) => played.sim.world.time);
     t.diagnostic(`300 random mazes: 300 of 300 complete with 100 points, median ${median(times).toFixed(1)} s, slowest ${Math.max(...times).toFixed(1)} s`);
-    assert.ok(median(times) > 35 && median(times) < 55, `median ${median(times)} s`);
-    assert.ok(Math.max(...times) < 145, `slowest ${Math.max(...times)} s`);
+    assert.ok(median(times) > 30 && median(times) < 50, `median ${median(times)} s`);
+    assert.ok(Math.max(...times) < 140, `slowest ${Math.max(...times)} s`);
     // the room without fire came first in about half of them
     const through = RANDOM.filter(otherRoomFirst).length;
     assert.ok(through >= 100 && through <= 200, `${through} mazes with the other room first`);
+    // the robot touched the walls of a corner in the mazes with the fire in a corner, and nothing in the others
+    const corners = RANDOM.filter((s) => s.fireSpot === 'corner').length;
+    assert.ok(corners >= 80, `${corners} mazes with the fire in a corner`);
+    assert.equal(runs.filter((played) => played.touched).length, corners);
   });
 
   test('120 mazes with one way only (the longest ways), the fire once in each room: 100 points', (t) => {
     const times = PERFECT.map((s) => check(s).sim.world.time);
     t.diagnostic(`120 one-way mazes: 120 of 120 complete with 100 points, median ${median(times).toFixed(1)} s, slowest ${Math.max(...times).toFixed(1)} s`);
-    assert.ok(Math.max(...times) < 145, `slowest ${Math.max(...times)} s`);
+    assert.ok(Math.max(...times) < 140, `slowest ${Math.max(...times)} s`);
   });
 
   test('120 mazes no generator draws - closed-off cells, loose walls, up to 25 walls: 100 points', (t) => {
@@ -1091,28 +1446,41 @@ describe('chief-full-mission: the whole mission on any maze', () => {
     t.diagnostic(`120 odd mazes: 120 of 120 complete with 100 points, median ${median(times).toFixed(1)} s, slowest ${Math.max(...times).toFixed(1)} s`);
   });
 
-  test('the slowest kind of maze (42 cells and 84 quarter turns before the fire room): 100 points after 139 seconds, as the description says', () => {
+  test('the slowest kind of maze (42 cells and 84 quarter turns before the fire room): 100 points after 134 seconds, as the description says', () => {
     const s = decodeScenario(SLOWEST_MAZE);
     assert.ok(s);
     const way = handOnTheWall(s, 'left', (cell) => roomOf(cell) === s.fireRoom);
     assert.equal(way.length, 42);
     assert.equal(otherRoomFirst(s), true, 'and the room without fire is on the way');
     const times = FIRE_SPOTS.map((fireSpot) => check({ ...s, fireSpot }).sim.world.time);
-    for (const time of times) assert.ok(time > 136 && time < 140, `${time} s`);
+    for (const time of times) assert.ok(time > 131 && time < 135, `${time} s`);
     assert.ok(told, 'the description names the two times');
-    assert.equal(Number(told[2]), Math.ceil(Math.max(...times)), `the slowest of the three spots: ${Math.max(...times)} s`);
+    assert.equal(Number(told[2]), Math.ceil(Math.max(...times)), `the slowest of the three places: ${Math.max(...times)} s`);
     // no maze of these tests is slower
     for (const other of [...ALL_MAZES, ...PERFECT, ...ODD]) {
       assert.ok(handOnTheWall(other, 'left', (cell) => roomOf(cell) === other.fireRoom).length <= 42, label(other));
     }
   });
 
-  test('the description counts the mazes of these tests', () => {
-    // "... the default maze, 300 random mazes and 240 of the hardest kinds ..."
-    const counted = /the default maze, (\d+) random mazes and (\d+) of the hardest kinds/.exec(sample('chief-full-mission').description);
+  test('the description counts the mazes of these tests, and they have the fire at each of its six places', () => {
+    // "... in all 570 mazes it was tested on ...": the named mazes with the fire at every place
+    // (the default maze is one of them), the random ones, the ones with one way only and the odd ones
+    const tested = [...NAMED_PLACES, ...RANDOM, ...PERFECT, ...ODD];
     assert.ok(counted);
-    assert.equal(Number(counted[1]), RANDOM.length);
-    assert.equal(Number(counted[2]), PERFECT.length + ODD.length);
+    assert.equal(Number(counted[1]), tested.length);
+    assert.equal(new Set(tested.map(encodeScenario)).size, tested.length, 'no maze twice');
+    assert.ok(tested.some((s) => encodeScenario(s) === encodeScenario(defaultScenario())));
+    for (const set of [NAMED_PLACES, RANDOM, PERFECT, ODD]) {
+      for (const { room, spot } of PLACES) {
+        assert.ok(set.some((s) => s.fireRoom === room && s.fireSpot === spot), `${room} ${spot}`);
+      }
+    }
+    // and the robot comes into the fire room in each of the four ways there are - the living room
+    // facing up or left, the bedroom facing up or right - with the fire at each of the three places
+    const ways = new Set(
+      tested.map((s) => `${s.fireRoom} ${lastOf(handOnTheWall(s, 'left', (cell) => roomOf(cell) === s.fireRoom)).dir} ${s.fireSpot}`),
+    );
+    assert.equal(ways.size, 12, [...ways].sort().join(' | '));
   });
 
   test('the right hand, as the description suggests to try: 100 points as well, faster in some mazes and slower in others', () => {
@@ -1124,7 +1492,9 @@ describe('chief-full-mission: the whole mission on any maze', () => {
       assert.deepEqual(right.sim.vm.errors(), [], label(s));
       assert.equal(right.sim.finishReason, 'mission-complete', label(s));
       assert.deepEqual(points(right.sim), [10, 20, 30, 40], label(s));
-      assert.equal(right.touched, false, label(s));
+      assert.equal(right.sawRed, true, label(s));
+      assert.equal(right.maxShift, 0, label(s));
+      assert.equal(right.touched, s.fireSpot === 'corner', label(s));
       const left = play(blocks, s).sim.world.time;
       if (right.sim.world.time < left) faster++;
       if (right.sim.world.time > left) slower++;
@@ -1132,25 +1502,44 @@ describe('chief-full-mission: the whole mission on any maze', () => {
     assert.ok(faster >= 10 && slower >= 10, `the right hand is faster in ${faster} mazes and slower in ${slower}`);
   });
 
-  test('the fan blows a little longer than the 3 seconds of the rules, from the port of the fan', () => {
+  test('the fan blows a little longer than the 3 seconds of the rules, from the port of the fan, and only after red', () => {
     assert.ok(FAN_SECONDS > 3 && FAN_SECONDS <= 4);
     const fanBlock = blocksOf(blocks).find((block) => block.type === 'mbot2_dc_motor_power');
     assert.equal(fanBlock?.fields?.PORT, FAN.port);
     assert.equal(blocksOf(blocks).find((block) => block.type === 'mbot2_dc_motor_stop')?.fields?.PORT, FAN.port);
     assert.equal(WALL_NEAR_CM, 20);
+    // in each of the three programs that use the fan, the one "fan on" block sits inside "if the colour sensor detects red"
+    for (const id of ['chief-flame-fan', 'chief-face-flame', 'chief-full-mission']) {
+      const all = blocksOf(sample(id).program);
+      const guarded = all.filter((block) => block.type === 'control_if_else' && block.inputs?.CONDITION?.block?.type === 'sensing_colorsensor_color_is');
+      assert.equal(guarded.length, 1, id);
+      const inside = blocksOf({ blocks: { blocks: [guarded[0].inputs!.SUBSTACK!.block!] } });
+      assert.equal(all.filter((block) => block.type === 'mbot2_dc_motor_power').length, 1, id);
+      assert.ok(inside.some((block) => block.type === 'mbot2_dc_motor_power'), id);
+    }
+  });
+
+  test('a target that does not read red: the robot leaves the fan off and says so', () => {
+    const played = play(blocks, defaultScenario(), undefined, GREY_TARGET_GAME);
+    assert.deepEqual(played.sim.vm.errors(), []);
+    assert.deepEqual(screen(played.sim), ['Not red: no fan']);
+    assert.equal(played.fanSeconds, 0);
+    assert.deepEqual(points(played.sim), [10, 20, 0, 0]);
+    assert.equal(played.sim.finishReason, 'program-ended');
   });
 
   test('with the one restart of the rules the program begins again at START and still completes the mission', () => {
     // (the restart clears the points and the clock keeps running; the program must not rely on what it knew before)
-    const halfTurned = (sim: Sim): boolean => {
-      const began = sim.vm.variables()['start angle'];
-      return typeof began === 'number' && sim.readSensors().yawDeg - began > 150;
+    /** The robot is in the middle of "look for the fire": it faces a corner, half a quarter turn off the grid. */
+    const lookingIntoACorner = (sim: Sim): boolean => {
+      const offGrid = Math.abs(wrapAngle(sim.world.robot.pose.heading * 4)) / 4 / DEG;
+      return sim.world.robot.pose.y < ROOM_ROW_BOTTOM && Math.abs(offGrid - 45) < 1 && sim.world.robot.left.rpm === 0;
     };
     const cases: Array<[FireChiefScenario, (sim: Sim) => boolean]> = [
       // on the way, after 20 seconds
       [defaultScenario(), (sim) => sim.world.time >= 20],
-      // in the middle of "look around" in the room without fire: the robot is taken away half turned
-      [NAMED_MAZES.find((maze) => maze.id === 'two-doors')!.scenario, halfTurned],
+      // in the room without fire, while it looks into the corner: the robot is taken away half turned
+      [NAMED_MAZES.find((maze) => maze.id === 'two-doors')!.scenario, lookingIntoACorner],
     ];
     for (const [s, now] of cases) {
       const sim = createSimulation({ game: fireChiefGame, scenario: s, program: blocks });
@@ -1170,7 +1559,7 @@ describe('chief-full-mission: the whole mission on any maze', () => {
       assert.equal(sim.restarts, 1, label(s));
       assert.equal(sim.finishReason, 'mission-complete', label(s));
       assert.deepEqual(points(sim), [10, 20, 30, 40], label(s));
-      assert.equal(touched, false, label(s));
+      assert.equal(touched, s.fireSpot === 'corner', label(s));
       // the whole way a second time: the time of the first try is lost, no more
       const alone = play(blocks, s).sim.world.time;
       assert.ok(Math.abs(sim.world.time - (restartAt + alone)) < 0.05, `${sim.world.time} s, alone ${alone} s after ${restartAt} s`);
@@ -1287,7 +1676,10 @@ describe('the examples on the real mat picture', () => {
       assert.deepEqual(onPicture.sim.vm.errors(), [], s.id);
       assert.equal(onPicture.sim.score().total, onDrawing.sim.score().total, s.id);
       assert.equal(onPicture.sim.finishReason, onDrawing.sim.finishReason, s.id);
-      assert.equal(onPicture.touched, false, s.id);
+      // (in the default maze the fire stands in a corner: the two programs that read red touch its walls, on the picture as on the drawing)
+      assert.equal(onPicture.touchTicks, onDrawing.touchTicks, s.id);
+      assert.equal(onPicture.touched, s.id === 'chief-face-flame' || s.id === 'chief-full-mission', s.id);
+      assert.equal(onPicture.maxShift, 0, s.id);
       const a = onPicture.sim.world.robot.pose;
       const b = onDrawing.sim.world.robot.pose;
       // only the line counter looks at the floor: every other example ends in exactly the same place

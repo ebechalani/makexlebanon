@@ -120,7 +120,7 @@ export const seasons: Season[] = [
           href: '/training/simulator/fire-chief',
           summary:
             'Build a program with mBlock-style blocks and watch the mBot2 find its way through the ' +
-            'Fire Chief maze to the fire, with a flame sensor and a fan — in any maze you build or ' +
+            'Fire Chief maze to the fire, with a colour sensor and a fan — in any maze you build or ' +
             'draw, scored by the draft rules of the category. ' +
             'It runs in the browser: no robot and no installation needed.',
           mat: '/simulator/fire-chief/mat.webp',
