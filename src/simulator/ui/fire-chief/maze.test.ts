@@ -29,7 +29,7 @@ import {
   wallIndexBetween,
   type Cell,
 } from '../../fire-chief/field';
-import { fireChiefGame } from '../../fire-chief/game';
+import { TARGET_FILL, fireChiefGame } from '../../fire-chief/game';
 import {
   NAMED_MAZES,
   PERFECT_MAZE_WALLS,
@@ -869,6 +869,10 @@ test('editor: every wall place is a button with a name, pressed or not, and one 
 test('editor: the fire, the ready-made mazes and the level are on it; a practice maze gets its note', () => {
   const html = editorHtml(withFire(defaultScenario(), 'bedroom', 'side'));
   assert.match(html, /data-fire="bedroom-side"/);
+  // the target on the plan has the red of the target on the stage (the rules call it red, and the colour sensor reads "red" on it)
+  assert.equal(TARGET_FILL, '#dc2626');
+  assert.match(html, /<g data-fire="bedroom-side"><rect [^>]*fill="#dc2626"/);
+  assert.ok(!/<g data-fire="[^"]*"><rect [^>]*fill="#f97316"/.test(html), 'not orange');
   // room and place: two groups of which one choice is checked
   assert.match(html, /role="radiogroup" aria-label="Room of the fire"/);
   assert.match(html, /role="radiogroup" aria-label="Place of the fire in its room"/);

@@ -522,11 +522,37 @@ describe('the list of the examples', () => {
     }
     // the three programs that read red say how near the colour sensor must be - the number of the robot
     assert.equal(COLOR_SENSOR_RANGE_MM, 15);
-    assert.match(sample('chief-flame-fan').description, /The sensor names a colour only from 1\.5 cm or less/);
-    assert.match(sample('chief-face-flame').description, /the sensor is close enough \(1\.5 cm\) only when the two walls stop the robot: it touches them for a moment/);
-    // what a robot does at the corner is said where it is done, with the rule about walls beside it
+    // ... and say that this number is the simulator's own: it is an assumption, not a fact about the real sensor
+    assert.match(sample('chief-flame-fan').description, /In this simulator the sensor names a colour only from 1\.5 cm or less/);
+    assert.match(sample('chief-face-flame').description, /the sensor is close enough \(1\.5 cm in this simulator\) only when the two walls stop the robot: it touches them for a moment/);
+    for (const s of SAMPLE_PROGRAMS) {
+      // (wherever "1.5 cm" is written - in a description or in a note on a block - "in this simulator" stands in the same sentence)
+      const texts = [s.description, ...notesOf(s.program)];
+      for (const text of texts) {
+        for (const sentence of text.split(/(?<=[.?!])\s+/)) {
+          if (/1\.5 cm/.test(sentence)) assert.match(sentence, /[Ii]n this simulator/, `${s.id}: "${sentence}"`);
+        }
+      }
+    }
+    assert.equal(SAMPLE_PROGRAMS.filter((s) => [s.description, ...notesOf(s.program)].some((text) => /1\.5 cm/.test(text))).length, 3, 'the three examples that read red');
+    // what a robot does at the corner is said where it is done, with the rule about walls beside it -
+    // in both examples that go into the corner: "ask the referee first"
     assert.match(sample('chief-face-flame').description, /On a real field, ask the referee first: the rules allow a light touch of a wall only by accident\./);
-    assert.match(sample('chief-full-mission').description, /With the target in a corner it touches the two walls of that corner for a moment; otherwise it touched nothing\./);
+    assert.match(sample('chief-full-mission').description, /With the target in a corner it touches the two walls of that corner for a moment; otherwise it touched nothing\. On a real field, ask the referee about that first\./);
+    // the two examples that find the fire in many mazes say on their first block that their points are the points of a robot that does not drift
+    for (const id of ['chief-face-flame', 'chief-full-mission']) {
+      assert.ok(
+        notesOf(sample(id).program).some((text) => /the robot of the simulator drives exactly\. A real robot drifts a little/.test(text)),
+        `${id}: the note about a real robot`,
+      );
+    }
+    // the note on "moves forward" in front of the target names what decides: slowly, and straight at it
+    for (const id of ['chief-flame-fan', 'chief-face-flame', 'chief-full-mission']) {
+      assert.ok(
+        notesOf(sample(id).program).some((text) => /^Slowly, and straight at it: a robot that comes at a slant pushes the target with its front corner/.test(text)),
+        `${id}: the note about coming straight at the target`,
+      );
+    }
     // what the simulator does differently from a real field is said where a student meets walls first
     assert.match(
       sample('chief-first-wall').description,
@@ -628,6 +654,13 @@ function blocksOf(blocks: ProgramJson): BlockJson[] {
   };
   (blocks.blocks?.blocks ?? []).forEach(visit);
   return out;
+}
+
+/** The notes a student reads on the blocks of a program (the comment bubbles), in the order of the blocks. */
+function notesOf(blocks: ProgramJson): string[] {
+  return blocksOf(blocks)
+    .map((block) => (block.icons as { comment?: { text?: string } } | undefined)?.comment?.text ?? '')
+    .filter((text) => text !== '');
 }
 
 /**
@@ -775,7 +808,7 @@ describe('chief-first-wall: stop in front of the first wall', () => {
     const gap = sim.readSensors().ultrasonicCm;
     assert.ok(gap < FIRST_WALL_STOP_CM && gap > FIRST_WALL_STOP_CM - 1, `${what}: ${gap} cm from the wall`);
     // the screen shows the distance at which it stands (it was measured after the robot had come to rest)
-    assert.deepEqual(screen(sim), [`Wall ahead, cm: ${Math.round(gap * 10) / 10}`], what);
+    assert.deepEqual(screen(sim), [`Wall, cm: ${Math.round(gap * 10) / 10}`], what);
     assert.equal(sim.world.robot.left.rpm, 0, what);
     assert.ok(ledsAre(sim, GREEN), `${what}: LEDs green`);
     // 10 points: the robot has left START completely - in every maze
@@ -934,7 +967,7 @@ describe('chief-flame-fan: read red, then start the fan', () => {
 
   /**
    * The four things this program can do in a maze:
-   *   'stays'      it sees a wall up the field: "Choose the maze Open field", and it does not move
+   *   'stays'      it sees a wall up the field: "Choose: Open field", and it does not move
    *   'fire'       the way is free and the fire stands at the back wall of the living room: 100 points
    *   'no red'     the way is free and the fire stands somewhere else: "No red here", 30 points
    *   'into wall'  it sees no wall, drives off and runs into one (the wall that closes the living room on the right)
@@ -952,7 +985,7 @@ describe('chief-flame-fan: read red, then start the fan', () => {
       assert.equal(sim.finishReason, 'program-ended', what);
       assert.ok(sim.world.time < 0.05, `${what}: ${sim.world.time} s`);
       assert.deepEqual(sim.world.robot.pose, START_POSE, what);
-      assert.deepEqual(screen(sim), ['Choose the maze Open field'], what);
+      assert.deepEqual(screen(sim), ['Choose: Open field'], what);
       assert.deepEqual(points(sim), [0, 0, 0, 0], what);
       assert.equal(played.touched, false, what);
       assert.equal(played.fanSeconds, 0, what);
@@ -1232,7 +1265,7 @@ describe('chief-face-flame: find the fire in a room and check its colour', () =>
       assert.equal(variables.dir, arrived.dir, what);
       assert.ok(offDirection(sim, arrived.dir) < 0.01, `${what}: "dir" is the way it faces`);
       assert.ok(ledsAre(sim, BLUE), what);
-      assert.deepEqual(screen(sim), ['No fire in this room'], what);
+      assert.deepEqual(screen(sim), ['No fire here'], what);
       assert.deepEqual(points(sim), [10, 20, 0, 0], what);
       assert.equal(played.fanSeconds, 0, what);
       assert.equal(played.sawRed, false, what);
@@ -1340,12 +1373,12 @@ describe('chief-face-flame: find the fire in a room and check its colour', () =>
     assert.ok(notes.some((text) => /The empty corner reads 9 cm, the target in it 5\.7 cm\. Less than 7\.5 cm/.test(text)), 'the note on the look into the corner');
   });
 
-  test('the try of the description: the default maze with the fire in the bedroom - "No fire in this room", 30 points', () => {
+  test('the try of the description: the default maze with the fire in the bedroom - "No fire here", 30 points', () => {
     assert.match(sample('chief-face-flame').description, /Try the default maze with the fire in the bedroom: what does the robot show\?$/);
     for (const spot of FIRE_SPOTS) {
       const { sim } = check(withFire(defaultScenario(), 'bedroom', spot));
       assert.equal(roomAround(sim.robotShapes()), 'living');
-      assert.deepEqual(screen(sim), ['No fire in this room']);
+      assert.deepEqual(screen(sim), ['No fire here']);
       assert.equal(sim.score().total, 30);
     }
   });
@@ -1399,7 +1432,7 @@ describe('chief-full-mission: the whole mission on any maze', () => {
     assertStandsAtTheFire(played, paper.heading, what);
     // the screen says what it found in every room it looked into: the room without fire first, if
     // the way along the wall led through it, then the fire
-    assert.deepEqual(screen(sim), otherRoomFirst(s) ? ['No fire in this room', 'Red: fan on'] : ['Red: fan on'], what);
+    assert.deepEqual(screen(sim), otherRoomFirst(s) ? ['No fire here', 'Red: fan on'] : ['Red: fan on'], what);
     return played;
   }
 
@@ -1596,6 +1629,51 @@ async function loadBlocklyWithDom(): Promise<BlocklyApi> {
   }
   return (await import('blockly')) as unknown as BlocklyApi;
 }
+
+describe('what the examples print', () => {
+  /** How many characters one row of the simulator's CyberPi screen holds (read from the panel itself: a longer text is broken there). */
+  const columns = Number(/const SCREEN_COLUMNS = (\d+);/.exec(readFileSync(new URL('../ui/CyberPiPanel.tsx', import.meta.url), 'utf8'))?.[1]);
+
+  /** One slot of a block: the text written into it, or the block that is plugged into it. */
+  type Slot = { shadow?: BlockJson; block?: BlockJson } | undefined;
+
+  /**
+   * The longest text a slot can give, in characters: the written text, the two halves of a
+   * "join" together - or, for a value that is measured or counted, the longest number it can
+   * be: "123.4" for the ultrasonic sensor (up to 300 cm, one decimal), three digits for a variable.
+   */
+  function longest(slot: Slot, where: string): number {
+    const block = slot?.block;
+    if (!block) return String(slot?.shadow?.fields?.TEXT ?? '').length;
+    if (block.type === 'operator_join') return longest(block.inputs?.STRING1, where) + longest(block.inputs?.STRING2, where);
+    if (block.type === 'sensing_ultrasonic_distance') return 5;
+    if (block.type === 'data_variable') return 3;
+    assert.fail(`${where}: this test does not know how long the value of a "${block.type}" block can be`);
+  }
+
+  test('every text an example prints fits on one row of the CyberPi screen: no word and no number is cut in two', () => {
+    assert.equal(columns, 18, 'the CyberPi screen of the simulator is 18 characters wide');
+    let seen = 0;
+    for (const s of SAMPLE_PROGRAMS) {
+      for (const block of blocksOf(s.program)) {
+        if (block.type !== 'cyberpi_print') continue;
+        const length = longest(block.inputs?.TEXT, s.id);
+        assert.ok(length > 0, `${s.id}: a print block has a text`);
+        assert.ok(length <= columns, `${s.id}: a print block shows up to ${length} characters - more than one row of the screen (${columns}): ${JSON.stringify(block.inputs?.TEXT).slice(0, 200)}`);
+        seen++;
+      }
+    }
+    assert.equal(seen, 12, 'every print block of the six examples was looked at');
+  });
+
+  test('the first starter shows the distance on one row: "Wall, cm: 7.5"', () => {
+    const { sim } = play(sample('chief-first-wall').program, defaultScenario());
+    const lines = sim.world.robot.screen.lines;
+    assert.equal(lines.length, 1);
+    assert.match(lines[0], /^Wall, cm: \d+(\.\d)?$/);
+    assert.ok(lines[0].length <= columns, `"${lines[0]}" fits one row`);
+  });
+});
 
 describe('the examples in the block editor', () => {
   test('every example loads into the Fire Chief editor, and what Blockly saves plays the same match', async () => {

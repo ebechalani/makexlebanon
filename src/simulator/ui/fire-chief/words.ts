@@ -18,6 +18,8 @@ export const FIRE_CHIEF_WORDS: Partial<ScreenWords> = {
   match: 'attempt',
   goal: 'achievement',
   goals: 'achievements',
+  // (on the closed Score sheet: "0 / 100 points · 0 of 4 done" - "achievements" does not fit a phone that is 360 wide)
+  goalsShort: 'done',
   zonesHint: 'Colour START and the two rooms. The room with the fire is orange.',
   finishedHint: 'Tell the referee "Finished": the robot stops and the attempt ends with the points earned so far',
   resetHint: 'Put the fire target and the robot back where they started, ready for a new start.',

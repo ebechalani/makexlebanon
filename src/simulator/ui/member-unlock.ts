@@ -115,6 +115,30 @@ export interface ExamplesSource {
   game: ExamplesGame;
 }
 
+/**
+ * The game an answer is about when it does not say: Fire Rescue. A server from before there was
+ * a second game does not know "game" - it ignores the name in the request, answers with the
+ * examples of Fire Rescue and says no name back. (The same name as GAME_WHEN_NONE_IS_NAMED in
+ * ../members/unlock.ts, which is the server's and cannot be imported here; a test holds the two
+ * together.)
+ */
+export const GAME_OF_AN_UNNAMED_ANSWER: ExamplesGame = 'fire-rescue';
+
+/**
+ * True when an answer of the server is about the game that was asked for.
+ *
+ * The server says the game of the request back ("game" in its answer). An answer that names
+ * another game is not an answer to this question. An answer that names no game comes from a
+ * server of before the second game (a tab that stayed open while the website was put back to an
+ * older state): it holds the examples of Fire Rescue, so only the page of Fire Rescue may take
+ * it. Without this check the page of another game would show the cards of Fire Rescue and load
+ * its programs - for a robot this game does not have.
+ */
+export function answerIsAbout(answer: unknown, game: ExamplesGame): boolean {
+  const named = isRecord(answer) ? answer.game : undefined;
+  return named === undefined ? game === GAME_OF_AN_UNNAMED_ANSWER : named === game;
+}
+
 /** How long an answer may take before the question is given up, in milliseconds. */
 export const UNLOCK_TIMEOUT_MS = 15_000;
 
@@ -127,7 +151,8 @@ export const UNLOCK_TIMEOUT_MS = 15_000;
  *   rejected      the server says no: the code is not (or no longer) accepted
  *   busy          too many wrong codes came from this network; the server asks to wait
  *                 (`waitSeconds`: for how long, when the server said so)
- *   unreachable   no answer, or an answer that makes no sense - nothing is known
+ *   unreachable   no answer, an answer that makes no sense, or an answer about another game
+ *                 than the one that was asked for - nothing is known
  */
 export type UnlockOutcome =
   | ({ kind: 'examples'; member: boolean } & ExampleShelf)
@@ -193,8 +218,10 @@ export async function requestUnlock(
       // not JSON: an error page of the server or of something in between
     }
     const outcome = readUnlockAnswer(response.status, answer);
-    // the answer must fit the question: "member" for a code, "not a member" without one
+    // the answer must fit the question: "member" for a code, "not a member" without one ...
     if (outcome.kind === 'examples' && outcome.member !== (code !== null)) return { kind: 'unreachable' };
+    // ... and about the game that was asked for (see answerIsAbout)
+    if (outcome.kind === 'examples' && !answerIsAbout(answer, from.game)) return { kind: 'unreachable' };
     if (outcome.kind === 'busy') {
       // how long to wait is in the "Retry-After" header of the answer, in seconds
       const wait = Number(response.headers?.get('Retry-After'));
@@ -278,4 +305,46 @@ export const SAVED_CODE_KEY = storageKey('fire-rescue', 'member-code');
 /** What is kept in the browser: `{ "code": "FIRE-7K2M-9QXD" }`. */
 export function isSavedCode(value: unknown): value is { code: string } {
   return isRecord(value) && typeof value.code === 'string' && normalizeCode(value.code) !== null;
+}
+
+/**
+ * What another tab of the same browser did to the saved code:
+ *
+ *   none        nothing that matters here (another key, or the code this tab already has)
+ *   forgotten   the code was taken away ("Forget this code on this device", or the browser's
+ *               data was cleared): this tab must lock what the code opened, at once
+ *   code        another code was saved (somebody typed one there and the server accepted it):
+ *               this tab asks the server what that code opens in its own game
+ */
+export type SavedCodeChange = { kind: 'none' } | { kind: 'forgotten' } | { kind: 'code'; code: string };
+
+/**
+ * Read a "storage" event of the browser: it tells every OTHER open tab of this website that
+ * something was written to, or taken out of, the browser's memory.
+ *
+ * The code is saved once for all games, and somebody often has one tab per game open. Without
+ * this, "Forget this code on this device" in one tab would leave the examples open in the
+ * other one - advanced examples included - until that tab is loaded again: on a shared
+ * computer the next person would find them open.
+ *
+ * @param key       the key of the event; null when the whole memory was cleared
+ * @param newValue  what stands under the key now, as text; null when it was taken out
+ * @param mine      the code this tab has saved (FIRE-7K2M-9QXD), or null
+ */
+export function savedCodeChange(key: string | null, newValue: string | null, mine: string | null): SavedCodeChange {
+  const forgotten: SavedCodeChange = mine === null ? { kind: 'none' } : { kind: 'forgotten' };
+  // (key null: everything was cleared, the code with it)
+  if (key === null) return forgotten;
+  if (key !== SAVED_CODE_KEY) return { kind: 'none' };
+  if (newValue === null) return forgotten;
+  let value: unknown;
+  try {
+    value = JSON.parse(newValue);
+  } catch {
+    // what stands there now is no code: the next visit would find none
+    return forgotten;
+  }
+  const code = isSavedCode(value) ? tidyCode(value.code) : null;
+  if (code === null) return forgotten;
+  return code === mine ? { kind: 'none' } : { kind: 'code', code };
 }

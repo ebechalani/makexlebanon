@@ -12,9 +12,24 @@ import { before, describe, test } from 'node:test';
 import { ALL_GAMES, FIRE_CHIEF, FIRE_RESCUE } from '../members/all-examples';
 import { fingerprintOf } from '../members/code-fingerprint.mjs';
 import { normalizeCode } from '../members/code-format.mjs';
-import { handleUnlockRequest, type UnlockSetup } from '../members/unlock';
+import { GAME_WHEN_NONE_IS_NAMED, handleUnlockRequest, type UnlockSetup } from '../members/unlock';
 import { blankProgram } from './program-file';
-import { hiddenCode, isSavedCode, readUnlockAnswer, requestUnlock, requestUnlockPatiently, tidyCode, CODE_LOOKS_LIKE, CODE_PLACEHOLDER, EXAMPLES_GAMES, SAVED_CODE_KEY, type ExamplesSource } from './member-unlock';
+import {
+  answerIsAbout,
+  hiddenCode,
+  isSavedCode,
+  readUnlockAnswer,
+  requestUnlock,
+  requestUnlockPatiently,
+  savedCodeChange,
+  tidyCode,
+  CODE_LOOKS_LIKE,
+  CODE_PLACEHOLDER,
+  EXAMPLES_GAMES,
+  GAME_OF_AN_UNNAMED_ANSWER,
+  SAVED_CODE_KEY,
+  type ExamplesSource,
+} from './member-unlock';
 import { storageKey } from './storage';
 
 const CODE = 'FIRE-AAAA-2222';
@@ -416,6 +431,78 @@ describe('two games behind one address', () => {
     for (const code of [CODE, 'FIRE-CCCC-4444', null]) assert.deepEqual(await requestUnlock(CHIEF, code, rescueOnly.fetch), { kind: 'unreachable' }, String(code));
     assert.deepEqual(readUnlockAnswer(400, { ok: false, reason: 'unknown-game' }), { kind: 'unreachable' });
   });
+
+  /**
+   * A pretend server of BEFORE the second game - what a browser tab talks to when it stayed open
+   * while the website was put back to an older state. It does not look at "game": it has the
+   * examples of Fire Rescue alone, answers every request with them, and says no game back.
+   */
+  function serverOfBefore(setup: UnlockSetup): typeof fetch {
+    const pretend = async (_input: Parameters<typeof fetch>[0], init?: RequestInit): Promise<Response> => {
+      const sent = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as Record<string, unknown>;
+      delete sent.game;
+      const answer = await handleUnlockRequest(
+        { method: 'POST', body: JSON.stringify(sent), contentType: 'application/json', client: 'test' },
+        { ...setup, games: [FIRE_RESCUE] },
+      );
+      return Response.json(answer.body, { status: answer.status, headers: answer.headers });
+    };
+    return pretend as typeof fetch;
+  }
+
+  test('the page of Fire Chief does not take the examples of Fire Rescue from a server of before the second game: "nothing is known"', async () => {
+    const before = serverOfBefore(setup);
+    // without a code, with a member code, with an advanced code: never a card of Fire Rescue on the Fire Chief page
+    for (const code of [null, CODE, ADVANCED_CODE]) {
+      assert.deepEqual(await requestUnlock(CHIEF, code, before), { kind: 'unreachable' }, `Fire Chief, ${code ?? 'no code'}`);
+    }
+    // ... also when a short wait is waited out
+    assert.deepEqual(await requestUnlockPatiently(CHIEF, CODE, before), { kind: 'unreachable' });
+    // a wrong code is still a wrong code: that answer is the same in every game
+    assert.deepEqual(await requestUnlock(CHIEF, 'FIRE-CCCC-4444', before), { kind: 'rejected' });
+    // the page of Fire Rescue goes on working with that server, exactly as it did: its answer names no game, and is about Fire Rescue
+    const counts: string[] = [];
+    for (const code of [null, CODE, ADVANCED_CODE]) {
+      const outcome = await requestUnlock(RESCUE, code, before);
+      assert.ok(outcome.kind === 'examples', `Fire Rescue, ${code ?? 'no code'}`);
+      counts.push(`${outcome.cards.length} / ${outcome.examples.length}`);
+    }
+    assert.deepEqual(counts, ['5 / 3', '5 / 5', '7 / 7']);
+  });
+
+  test('an answer about another game than the one that was asked for is not taken, in either direction', async () => {
+    const server = pretendServer(setup);
+    // a server (or something in between) that answers every question with the answer about the other game
+    const crossed = (async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+      const sent = JSON.parse(String(init?.body)) as { game: string };
+      const other = sent.game === 'fire-chief' ? 'fire-rescue' : 'fire-chief';
+      return server.fetch(input, { ...init, body: JSON.stringify({ ...sent, game: other }) });
+    }) as typeof fetch;
+    for (const from of [RESCUE, CHIEF]) {
+      for (const code of [null, CODE, ADVANCED_CODE]) {
+        assert.deepEqual(await requestUnlock(from, code, crossed), { kind: 'unreachable' }, `${from.game}, ${code ?? 'no code'}`);
+      }
+    }
+    // the server of today says the game back, and both pages take its answers
+    for (const from of [RESCUE, CHIEF]) assert.equal((await requestUnlock(from, null, server.fetch)).kind, 'examples', from.game);
+  });
+
+  test('which game an answer is about: the one it names, or - when it names none - Fire Rescue', () => {
+    assert.ok(answerIsAbout({ ok: true, game: 'fire-chief' }, 'fire-chief'));
+    assert.ok(answerIsAbout({ ok: true, game: 'fire-rescue' }, 'fire-rescue'));
+    assert.ok(!answerIsAbout({ ok: true, game: 'fire-rescue' }, 'fire-chief'));
+    assert.ok(!answerIsAbout({ ok: true, game: 'fire-chief' }, 'fire-rescue'));
+    // no name: a server of before the second game, which only ever had Fire Rescue
+    assert.ok(answerIsAbout({ ok: true }, 'fire-rescue'));
+    assert.ok(!answerIsAbout({ ok: true }, 'fire-chief'));
+    // a name that is no name is not "no name"
+    for (const game of [null, '', 'Fire-Chief', 7, ['fire-chief'], { game: 'fire-chief' }]) {
+      for (const page of EXAMPLES_GAMES) assert.ok(!answerIsAbout({ ok: true, game }, page), `${JSON.stringify(game)} for ${page}`);
+    }
+    for (const nothing of [null, undefined, 'fire-chief', []]) assert.ok(!answerIsAbout(nothing, 'fire-chief'), String(nothing));
+    // the browser and the server mean the same game by "no name"
+    assert.equal(GAME_OF_AN_UNNAMED_ANSWER, GAME_WHEN_NONE_IS_NAMED);
+  });
 });
 
 describe('the code as it is typed, shown and remembered', () => {
@@ -445,6 +532,35 @@ describe('the code as it is typed, shown and remembered', () => {
     assert.equal(SAVED_CODE_KEY, storageKey('fire-rescue', 'member-code'));
     // it is not the place a game's own things are kept in, for any other game
     assert.notEqual(SAVED_CODE_KEY, storageKey('fire-chief', 'member-code'));
+  });
+
+  test('another tab forgot the code, or had another one accepted: this tab is told what to do', () => {
+    const mine = 'FIRE-7K2M-9QXD';
+    const other = 'FIRE-BBBB-3333';
+    const saved = (code: string): string => JSON.stringify({ code });
+    // "Forget this code on this device" in another tab: the key is taken out
+    assert.deepEqual(savedCodeChange(SAVED_CODE_KEY, null, mine), { kind: 'forgotten' });
+    // the browser's whole memory for this website was cleared (the event then names no key)
+    assert.deepEqual(savedCodeChange(null, null, mine), { kind: 'forgotten' });
+    // what stands there now is no code any more: the next visit would find none
+    for (const damaged of ['', 'not json', '{}', '{"code":7}', '{"code":"FIRE-7K2M"}', '[]', 'null']) {
+      assert.deepEqual(savedCodeChange(SAVED_CODE_KEY, damaged, mine), { kind: 'forgotten' }, damaged);
+    }
+    // a tab that has no code has nothing to lock
+    assert.deepEqual(savedCodeChange(SAVED_CODE_KEY, null, null), { kind: 'none' });
+    assert.deepEqual(savedCodeChange(null, null, null), { kind: 'none' });
+    // another code was accepted in another tab: ask the server about it - in its handed-out form, however it was written
+    assert.deepEqual(savedCodeChange(SAVED_CODE_KEY, saved(other), mine), { kind: 'code', code: other });
+    assert.deepEqual(savedCodeChange(SAVED_CODE_KEY, saved(other), null), { kind: 'code', code: other });
+    assert.deepEqual(savedCodeChange(SAVED_CODE_KEY, saved('fire bbbb 3333'), null), { kind: 'code', code: other });
+    // the code this tab already has: nothing to do (so two tabs never keep asking each other)
+    assert.deepEqual(savedCodeChange(SAVED_CODE_KEY, saved(mine), mine), { kind: 'none' });
+    assert.deepEqual(savedCodeChange(SAVED_CODE_KEY, saved('fire-7k2m-9qxd'), mine), { kind: 'none' });
+    // other things the simulator keeps in the browser are nobody's code
+    for (const key of [storageKey('fire-rescue', 'workspace'), storageKey('fire-chief', 'settings'), storageKey('fire-chief', 'member-code'), 'something-else']) {
+      assert.deepEqual(savedCodeChange(key, null, mine), { kind: 'none' }, key);
+      assert.deepEqual(savedCodeChange(key, saved(other), mine), { kind: 'none' }, key);
+    }
   });
 
   test('the texts that show what a code looks like have the shape of a code', () => {

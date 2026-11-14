@@ -22,8 +22,21 @@
  *     anywhere, even in a comment: so a list of titles copied into a file of the screen by
  *     hand is caught as well. That goes for files that are not code too - a .json file of
  *     cards, a stylesheet - and for a title written in small letters, broken over two lines or
- *     spelt with escapes. The examples of ALL games are looked for in ALL files: the screen of
- *     one game must not hold a title of another game either.
+ *     spelt with escapes or with a page's own signs for a blank ("&nbsp;"). The examples of ALL
+ *     games are looked for in ALL files: the screen of one game must not hold a title of
+ *     another game either;
+ *   - any such file in which a sentence of the DESCRIPTION of an example is written: the text
+ *     that explains a locked example is as much the example as its title.
+ *
+ * "Not a test" means: a file named *.test.* that nothing of the browser imports. The name
+ * alone protects nothing - a file of the screen can import "titles.test.ts" like any other
+ * file, and the build would pack it - so a test file that the browser's code reaches is looked
+ * at like every other file.
+ *
+ * What it cannot see (so this still needs the eyes of whoever reviews a change): a program
+ * pasted as plain data without its texts, a sentence that only hints at an example ("six
+ * examples, one of them for the best teams"), and the bare word "Advanced" on a page outside
+ * the simulator - the website itself uses that word.
  *
  * Where it starts from ("what the browser gets"):
  *   - every file that begins with 'use client', and everything those import;
@@ -48,6 +61,7 @@ import ts from 'typescript';
 
 import { EXAMPLE_LEVELS as CHIEF_LEVELS, SAMPLE_CATALOG as CHIEF_CATALOG } from '../fire-chief/sample-catalog';
 import { EXAMPLE_LEVELS as RESCUE_LEVELS, SAMPLE_CATALOG as RESCUE_CATALOG } from '../fire-rescue/sample-catalog';
+import { ALL_GAMES } from './all-examples';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -112,8 +126,36 @@ function exampleMarkers(cards: ReadonlyArray<{ id: string; title: string }>): Re
   return markers;
 }
 
+/** A sentence of a description counts as "telling" from this many words on: "Then it stops." is plain English. */
+const TELLING_SENTENCE_WORDS = 6;
+
+/**
+ * What gives the DESCRIPTION of an example away: every sentence of it that is long enough to
+ * be nobody else's sentence (TELLING_SENTENCE_WORDS words or more). Like a title, a sentence is
+ * found in capitals or small letters and with any blanks between its words.
+ */
+function descriptionMarkers(examples: ReadonlyArray<{ description: string }>): RegExp[] {
+  const escape = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const markers: RegExp[] = [];
+  for (const example of examples) {
+    // (a sentence ends at ". ", "! ", "? " or ": " - or at the end of the text)
+    for (const sentence of example.description.split(/(?<=[.!?:])\s+/)) {
+      const words = sentence
+        .replace(/[.!?:]+$/, '')
+        .trim()
+        .split(/\s+/);
+      if (words.length >= TELLING_SENTENCE_WORDS) markers.push(new RegExp(words.map(escape).join('\\s+'), 'i'));
+    }
+  }
+  return markers;
+}
+
 /** The titles and ids of the real examples, of every game. */
-const REAL_MARKERS = exampleMarkers(SAMPLE_CATALOG);
+const TITLE_MARKERS = exampleMarkers(SAMPLE_CATALOG);
+/** The sentences of the descriptions of the real examples, of every game. */
+const DESCRIPTION_MARKERS = descriptionMarkers(ALL_GAMES.flatMap((game) => game.examples));
+/** Everything that gives a real example away when it is written in a file. */
+const REAL_MARKERS = [...TITLE_MARKERS, ...DESCRIPTION_MARKERS];
 
 const SOURCE_FILE = /\.(?:ts|tsx|mts|cts|js|jsx|mjs|cjs)$/;
 const TEST_FILE = /\.test\.[a-z]+$/;
@@ -303,19 +345,38 @@ function forbiddenFiles(files: Files, graph: Graph, markers: RegExp[] = REAL_MAR
   const forbidden = new Map<string, string>();
   for (const [file, why] of Object.entries(HOLDERS)) if (files.has(file)) forbidden.set(file, why);
   for (const file of SERVER_ONLY) if (files.has(file)) forbidden.set(file, 'belongs to the server');
+  // A test may build programs and name every example - as long as it is only a test. A file
+  // named *.test.* that the browser's code imports is packed like any other file, so it is
+  // looked at like any other file.
+  const reached = reachedByBrowser(files, graph);
+  const onlyATest = (file: string): boolean => TEST_FILE.test(file) && !reached.has(file);
   for (const [file, targets] of graph.edges) {
-    if (!TEST_FILE.test(file) && file !== BUILDER && targets.includes(BUILDER) && !forbidden.has(file)) {
+    if (!onlyATest(file) && file !== BUILDER && targets.includes(BUILDER) && !forbidden.has(file)) {
       forbidden.set(file, 'imports the program builder, so it holds programs');
     }
   }
   for (const [file, text] of files) {
-    if (TEST_FILE.test(file) || forbidden.has(file)) continue;
-    // as it is written, and as it reads: 'Full\u0020mission' and 'Full ' + 'mission' are that title too
-    const read = SOURCE_FILE.test(file) ? `${text}\n${spokenText(text)}` : text;
+    if (onlyATest(file) || forbidden.has(file)) continue;
+    // as it is written, and as it reads: 'Full\u0020mission', 'Full ' + 'mission' and "Full&nbsp;mission" are that title too
+    const read = SOURCE_FILE.test(file) ? `${text}\n${spokenText(text)}` : withoutEntities(text);
     const found = markers.find((marker) => marker.test(read));
-    if (found) forbidden.set(file, `holds the title or the id of an example: it says "${found.exec(read)?.[0].replace(/\s+/g, ' ')}"`);
+    if (found) forbidden.set(file, `holds the title or the id of an example, or a sentence that explains one: it says "${found.exec(read)?.[0].replace(/\s+/g, ' ')}"`);
   }
   return forbidden;
+}
+
+/**
+ * A text with the signs a page uses for single characters written out: "&nbsp;" and "&#160;"
+ * are blanks, "&#x41;" is an A, "&amp;" is "&". (Between the tags of a page a title can be
+ * written with them, and it reads the same on the screen.)
+ */
+function withoutEntities(text: string): string {
+  const named: Record<string, string> = { nbsp: ' ', ensp: ' ', emsp: ' ', thinsp: ' ', amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", colon: ':', comma: ',', hyphen: '-', dash: '-', ndash: '-', mdash: '-' };
+  return text.replace(/&(?:#(\d+)|#x([0-9a-f]+)|([a-z]+));/gi, (whole, decimal?: string, hex?: string, name?: string) => {
+    if (decimal !== undefined) return String.fromCodePoint(Number(decimal));
+    if (hex !== undefined) return String.fromCodePoint(Number.parseInt(hex, 16));
+    return named[(name as string).toLowerCase()] ?? whole;
+  });
 }
 
 /**
@@ -327,11 +388,13 @@ function spokenText(text: string): string {
   const source = ts.createSourceFile('file.tsx', text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const parts: string[] = [];
   const visit = (node: ts.Node): void => {
-    if (ts.isStringLiteralLike(node) || ts.isTemplateHead(node) || ts.isTemplateMiddle(node) || ts.isTemplateTail(node) || ts.isJsxText(node)) parts.push(node.text);
+    if (ts.isStringLiteralLike(node) || ts.isTemplateHead(node) || ts.isTemplateMiddle(node) || ts.isTemplateTail(node)) parts.push(node.text);
+    // (between tags, and in the value of an attribute, a page writes some characters as "&nbsp;", "&#32;" ...)
+    else if (ts.isJsxText(node)) parts.push(withoutEntities(node.text));
     ts.forEachChild(node, visit);
   };
   visit(source);
-  return parts.join(' ');
+  return withoutEntities(parts.join(' '));
 }
 
 /** The one address of the website that may hand out examples: it is the server's side, not something a browser gets. */
@@ -367,6 +430,14 @@ function reachableFrom(graph: Graph, root: string): Map<string, string[]> {
     }
   }
   return chains;
+}
+
+/** Every file the browser's code reaches: the roots themselves and everything they import, directly or through other files. */
+function reachedByBrowser(files: Files, graph: Graph): Set<string> {
+  const roots = browserRoots(files);
+  const reached = new Set<string>();
+  for (const root of [...roots.client, ...roots.pages]) for (const file of reachableFrom(graph, root).keys()) reached.add(file);
+  return reached;
 }
 
 /** Every way from the browser's code to a forbidden file, as readable lines. Empty when all is well. */
@@ -417,8 +488,19 @@ function levelMarkersInText(levels: ReadonlyArray<{ id: string; title: string; a
   return levels.flatMap((level) => [new RegExp(`(?<![\\w])${escape(level.id)}(?![\\w])`, 'i'), new RegExp(escape(level.about))]);
 }
 
-/** The files in which a level of the examples must not be named: the simulator's own, and the pages it stands on. */
+/**
+ * The files in which a level of the examples must not be named: the simulator's own, and the
+ * pages it stands on. (Another page of the website may say "advanced": the website has
+ * "advanced" categories.) The few words after a heading are another matter: they are the
+ * simulator's own words, and they are looked for in every file the browser gets.
+ */
 const SIMULATOR_FILES = ['src/simulator/', 'src/app/training/simulator/'];
+
+/** The words after the headings alone ("explore, find the fire and blow it out"). */
+function aboutMarkers(levels: ReadonlyArray<{ about: string }>): RegExp[] {
+  const escape = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return levels.map((level) => new RegExp(escape(level.about)));
+}
 
 /** Every file of the simulator the browser gets in which a level of the examples is named, as readable lines. */
 function findLevelNames(files: Files, levels: ReadonlyArray<{ id: string; title: string; about: string }> = EXAMPLE_LEVELS): string[] {
@@ -426,14 +508,17 @@ function findLevelNames(files: Files, levels: ReadonlyArray<{ id: string; title:
   const roots = browserRoots(files);
   const markers = levelMarkers(levels);
   const markersInText = levelMarkersInText(levels);
+  const markersElsewhere = aboutMarkers(levels);
   const found = new Map<string, string>();
   for (const root of [...roots.client, ...roots.pages]) {
     for (const [file, chain] of reachableFrom(graph, root)) {
-      if (found.has(file) || !SIMULATOR_FILES.some((folder) => file.startsWith(folder))) continue;
+      if (found.has(file)) continue;
       // (of a file of code its code, not its comments; of a stylesheet or a data file every letter)
       const isCode = SOURCE_FILE.test(file);
       const code = isCode ? codeOnly(files.get(file) ?? '') : (files.get(file) ?? '');
-      const marker = (isCode ? markers : markersInText).find((m) => m.test(code));
+      // in the simulator's own files: every name of a level; anywhere else: the words after a heading
+      const lookFor = !SIMULATOR_FILES.some((folder) => file.startsWith(folder)) ? markersElsewhere : isCode ? markers : markersInText;
+      const marker = lookFor.find((m) => m.test(code));
       if (marker) found.set(file, `${chain.join('  ->  ')}   (${file} says ${marker.exec(code)?.[0]})`);
     }
   }
@@ -502,17 +587,39 @@ describe('the examples stay on the server', () => {
       'and the import that brings it in is followed',
     );
     assert.ok(roots.client.length >= 15, `${roots.client.length} files begin with 'use client'`);
-    for (const screen of ['src/simulator/ui/SimulatorApp.tsx', 'src/simulator/ui/ExamplesDialog.tsx', 'src/simulator/ui/fire-rescue/FireRescueSimulator.tsx', 'src/simulator/ui/fire-rescue/FireRescueLoader.tsx']) {
+    for (const screen of [
+      'src/simulator/ui/SimulatorApp.tsx',
+      'src/simulator/ui/ExamplesDialog.tsx',
+      'src/simulator/ui/fire-rescue/FireRescueSimulator.tsx',
+      'src/simulator/ui/fire-rescue/FireRescueLoader.tsx',
+      'src/simulator/ui/fire-chief/FireChiefSimulator.tsx',
+      'src/simulator/ui/fire-chief/FireChiefLoader.tsx',
+      'src/simulator/ui/fire-chief/MazeEditor.tsx',
+    ]) {
       assert.ok(roots.client.includes(screen), `${screen} begins with 'use client'`);
     }
-    assert.ok(roots.pages.includes('src/app/training/simulator/fire-rescue/page.tsx'));
-    // the page reaches the screen (through a dynamic import), and the screen reaches what asks the server
-    const fromPage = reachableFrom(graph, 'src/app/training/simulator/fire-rescue/page.tsx');
-    assert.ok(fromPage.has('src/simulator/ui/SimulatorApp.tsx'), 'page -> loader -> import() -> simulator');
-    assert.ok(fromPage.has('src/simulator/ui/ExamplesDialog.tsx'), 'the Examples window');
-    assert.ok(fromPage.has('src/simulator/ui/member-unlock.ts'));
-    for (const catalog of CATALOGS) assert.ok(!fromPage.has(catalog.file) && !fromPage.has(catalog.samples), `the screen holds no list of examples, and no example: not of ${catalog.game}`);
-    assert.ok(reachableFrom(graph, 'src/simulator/ui/fire-rescue/FireRescueSimulator.tsx').has('src/simulator/vm/index.ts'), 'and the interpreter');
+    // the page of every game reaches its screen (through a dynamic import), and the screen reaches what asks the server
+    for (const [page, loader, simulator, own] of [
+      ['src/app/training/simulator/fire-rescue/page.tsx', 'src/simulator/ui/fire-rescue/FireRescueLoader.tsx', 'src/simulator/ui/fire-rescue/FireRescueSimulator.tsx', 'src/simulator/fire-rescue/game.ts'],
+      ['src/app/training/simulator/fire-chief/page.tsx', 'src/simulator/ui/fire-chief/FireChiefLoader.tsx', 'src/simulator/ui/fire-chief/FireChiefSimulator.tsx', 'src/simulator/fire-chief/game.ts'],
+    ]) {
+      assert.ok(roots.pages.includes(page), page);
+      const fromPage = reachableFrom(graph, page);
+      assert.ok(fromPage.has(loader) && fromPage.has(simulator), `${page} -> loader -> import() -> the screen of its game`);
+      assert.ok(fromPage.has('src/simulator/ui/SimulatorApp.tsx'), `${page} -> the simulator`);
+      assert.ok(fromPage.has('src/simulator/ui/ExamplesDialog.tsx'), `${page}: the Examples window`);
+      assert.ok(fromPage.has('src/simulator/ui/member-unlock.ts'), page);
+      assert.ok(fromPage.has(own), `${page}: the game itself`);
+      for (const catalog of CATALOGS) assert.ok(!fromPage.has(catalog.file) && !fromPage.has(catalog.samples), `${page}: the screen holds no list of examples, and no example: not of ${catalog.game}`);
+      assert.ok(reachableFrom(graph, simulator).has('src/simulator/vm/index.ts'), `${simulator}: and the interpreter`);
+    }
+    // the Fire Chief screen has files of its own: its words, its rules window and its maze panel are looked at too
+    const chiefScreen = reachableFrom(graph, 'src/simulator/ui/fire-chief/FireChiefSimulator.tsx');
+    for (const file of ['src/simulator/ui/fire-chief/words.ts', 'src/simulator/ui/fire-chief/rules.ts', 'src/simulator/ui/fire-chief/MazeEditor.tsx', 'src/simulator/ui/fire-chief/maze-words.ts']) {
+      assert.ok(chiefScreen.has(file), `the Fire Chief screen -> ${file}`);
+    }
+    // the page that lists the simulators is a page of the website like any other
+    assert.ok(roots.pages.includes('src/app/training/simulator/page.tsx'));
   });
 
   test('the files that hold the examples are known to the guard', () => {
@@ -543,8 +650,21 @@ describe('the examples stay on the server', () => {
     assert.match(forbidden.get('scripts/generate-simulator-codes.mjs') ?? '', /holds the title or the id of an example/);
     assert.equal(exampleMarkers(RESCUE_CATALOG).length, 7 + 2 + 6, 'Fire Rescue: seven titles, two first halves of a title, six ids of more than one word');
     assert.equal(exampleMarkers(CHIEF_CATALOG).length, 6 + 0 + 6, 'Fire Chief: six titles (none with a colon), six ids of more than one word');
-    assert.equal(REAL_MARKERS.length, 15 + 12, 'and the guard looks for all of them');
+    assert.equal(TITLE_MARKERS.length, 15 + 12, 'and the guard looks for all of them');
     assert.equal(SAMPLE_CATALOG.length, 7 + 6);
+    // ... and for the sentences of every description: of all thirteen examples, several each
+    const everyExample = ALL_GAMES.flatMap((game) => game.examples);
+    assert.equal(everyExample.length, 7 + 6);
+    for (const example of everyExample) {
+      const mine = descriptionMarkers([example]);
+      assert.ok(mine.length >= 2, `${example.id}: ${mine.length} sentences of its description are looked for`);
+      // its first sentence that is long enough is one of them, however it is written
+      const first = example.description.split(/(?<=[.!?:])\s+/).find((sentence) => sentence.split(/\s+/).length >= TELLING_SENTENCE_WORDS);
+      assert.ok(first, example.id);
+      assert.ok(REAL_MARKERS.some((marker) => marker.test(`about: '${first}'`)), `${example.id}: ${first}`);
+      assert.ok(REAL_MARKERS.some((marker) => marker.test(first.toUpperCase().replace(/ /g, '\n  '))), `${example.id}, in capitals and over many lines`);
+    }
+    assert.equal(REAL_MARKERS.length, TITLE_MARKERS.length + DESCRIPTION_MARKERS.length);
     for (const card of SAMPLE_CATALOG) {
       assert.ok(REAL_MARKERS.some((marker) => marker.test(`title: '${card.title}'`)), card.title);
       assert.ok(REAL_MARKERS.some((marker) => marker.test(card.title.toUpperCase())), `${card.title}, in capitals`);
@@ -792,6 +912,84 @@ describe('the guard catches a leak', () => {
       assert.deepEqual(findLevelNames(withFile('src/simulator/ui/Screen.tsx', `'use client';\n// ${level.about}\nexport const Screen = () => null;\n`)), [], level.about);
       assert.deepEqual(findLevelNames(withFile('src/simulator/members/server-helper.ts', `export const about = '${level.about}';\n`)), [], level.about);
     }
+  });
+
+  test('a sentence of the description of an example written into a file the browser gets is caught - of every example of both games', () => {
+    assert.deepEqual(findLeaks(base()), [], 'the tree is clean with the real descriptions');
+    for (const game of ALL_GAMES) {
+      for (const example of game.examples) {
+        const sentence = example.description.split(/(?<=[.!?:])\s+/).find((one) => one.split(/\s+/).length >= TELLING_SENTENCE_WORDS);
+        assert.ok(sentence, example.id);
+        // (written as a page would write it: between tags, so that quotes in the sentence do no harm)
+        for (const file of ['src/simulator/ui/fire-chief/words.tsx', 'src/simulator/ui/fire-rescue/FireRescueSimulator.tsx', 'src/components/Footer.tsx']) {
+          const leaks = findLeaks(withFile(file, `'use client';\nexport const Hint = () => <p>{'x'} ${sentence.replace(/[{}<>]/g, ' ')}</p>;\n`));
+          assert.ok(leaks.some((leak) => leak.startsWith(file) && leak.includes('a sentence that explains one')), `${file}: ${example.id}: ${sentence}`);
+        }
+        // on the server it is nobody's business
+        assert.deepEqual(findLeaks(withFile('src/simulator/members/server-helper.tsx', `export const Hint = () => <p>${sentence.replace(/[{}<>]/g, ' ')}</p>;\n`)), [], example.id);
+      }
+    }
+    // a short sentence, and words about the game that are no sentence of a description, are plain English
+    for (const line of ["export const hint = 'Then it stops.';", "export const text = 'The robot drives through the maze and looks for the fire with its colour sensor.';"]) {
+      assert.deepEqual(findLeaks(withFile('src/simulator/ui/fire-chief/words.ts', `'use client';\n${line}\n`)), [], line);
+    }
+  });
+
+  test('a file named *.test.* is only a test as long as nothing of the browser imports it', () => {
+    const title = "export const TITLES = ['The whole mission on any maze'];\n";
+    // nobody imports it: a test may name every example
+    assert.deepEqual(findLeaks(withFile('src/simulator/ui/fire-chief/titles.test.ts', title)), []);
+    // a file of the screen imports it: now it is packed for the browser like any other file
+    const imported = withFile('src/simulator/ui/fire-chief/titles.test.ts', title);
+    imported.set('src/simulator/ui/Screen.tsx', "'use client';\nimport { TITLES } from './fire-chief/titles.test';\nexport const Screen = () => TITLES;\n");
+    const leaks = findLeaks(imported);
+    assert.ok(leaks.some((leak) => leak.startsWith('src/simulator/ui/Screen.tsx  ->  src/simulator/ui/fire-chief/titles.test.ts') && leak.includes('holds the title or the id of an example')), leaks.join('\n'));
+    // the same through a helper, from a page, and for a "test" that builds a program
+    const viaHelper = withFile('src/simulator/ui/fire-chief/titles.test.ts', title);
+    viaHelper.set('src/simulator/ui/helper.ts', "export * from './fire-chief/titles.test';\n");
+    viaHelper.set('src/app/training/page.tsx', "import { TITLES } from '@/simulator/ui/helper';\nexport default function Page() { return TITLES.length; }\n");
+    assert.ok(findLeaks(viaHelper).some((leak) => leak.startsWith('src/app/training/page.tsx  ->  src/simulator/ui/helper.ts  ->  src/simulator/ui/fire-chief/titles.test.ts')));
+    const built = withFile('src/simulator/ui/programs.test.ts', "import { program } from '../vm/builder';\nexport const EXTRA = program([]);\n");
+    assert.deepEqual(findLeaks(built), [], 'a test that builds programs and is only a test');
+    built.set('src/simulator/ui/Screen.tsx', "'use client';\nimport { EXTRA } from './programs.test';\nexport const Screen = () => EXTRA;\n");
+    assert.ok(findLeaks(built).some((leak) => leak.includes('programs.test.ts') && leak.includes('imports the program builder')));
+    // the real test that reads the examples stays a test
+    assert.deepEqual(findLeaks(base()), []);
+  });
+
+  test("a title written with a page's signs for single characters (&nbsp;, &#32;, &#x20;) is caught", () => {
+    for (const line of [
+      'export const Card = () => <p>The whole mission on any&nbsp;maze</p>;',
+      'export const Card = () => <p>The&#32;whole&#x20;mission on any maze</p>;',
+      'export const Card = () => <p>The whole mission on any&#160;maze</p>;',
+      "export const card = 'The whole mission on any&nbsp;maze';",
+    ]) {
+      for (const file of ['src/app/training/simulator/fire-chief/page.tsx', 'src/simulator/ui/Screen.tsx']) {
+        const leaks = findLeaks(withFile(file, `${file.includes('/ui/') ? "'use client';\n" : ''}${line}\nexport default function Page() { return null; }\n`));
+        assert.ok(leaks.some((leak) => leak.startsWith(file) && leak.includes('holds the title or the id of an example')), `${file}: ${line}`);
+      }
+    }
+    // a text file the screen imports (a drawing with a caption), and what is plain text with such a sign
+    const drawing = withFile('src/simulator/ui/help.svg', '<svg><text>The whole mission on any&nbsp;maze</text></svg>');
+    drawing.set('src/simulator/ui/Screen.tsx', "'use client';\nconst help = new URL('./help.svg', import.meta.url);\nexport const Screen = () => help;\n");
+    assert.ok(findLeaks(drawing).some((leak) => leak.includes('help.svg')));
+    assert.deepEqual(findLeaks(withFile('src/simulator/ui/Screen.tsx', "'use client';\nexport const Card = () => <p>Fire&nbsp;Chief: find the fire &amp; blow it out</p>;\n")), []);
+    assert.equal(withoutEntities('a&nbsp;b&#32;c&#x20;d &amp; e &unknown; f'), 'a b c d & e &unknown; f');
+  });
+
+  test('the words after a heading are looked for in every file the browser gets, not only in the simulator\'s own', () => {
+    for (const level of [...RESCUE_LEVELS, ...CHIEF_LEVELS]) {
+      for (const file of ['src/components/Footer.tsx', 'src/app/season/page.tsx']) {
+        const named = findLevelNames(withFile(file, `export default function View() { return '${level.title}: ${level.about}'; }\n`));
+        assert.equal(named.length, 1, `${file}: ${level.about}`);
+      }
+      // content that a page imports
+      const content = withFile('content/seasons.ts', `export const teaser = '${level.about}';\n`);
+      content.set('src/app/season/page.tsx', "import { teaser } from '@content/seasons';\nexport default function Page() { return teaser; }\n");
+      assert.equal(findLevelNames(content).length, 1, `content: ${level.about}`);
+    }
+    // the bare name of a level stays the business of the simulator's files: the website has "advanced" categories
+    assert.deepEqual(findLevelNames(withFile('src/components/Footer.tsx', "export default function View() { return 'Advanced: explore the maze'; }\n")), []);
   });
 
   test('a title or an id of an example written into a file of the screen is caught without any import', () => {

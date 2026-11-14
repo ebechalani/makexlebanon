@@ -363,6 +363,38 @@ function lookForTheFireBlocks(): DefinitionNode[] {
 }
 
 /**
+ * The note on "moves forward at APPROACH_RPM" in front of the target. It names both things that
+ * decide whether the target stays in its place: the speed - and, more than the speed, the
+ * direction. Measured with these blocks (perfect robot, target flat against a wall): square on,
+ * the robot reads red without touching the target up to 90 RPM; 15 degrees off square its front
+ * corner touches the target when it aims 24 mm or more beside the middle; 20 degrees off it
+ * reads red without a touch only within 8 mm of the middle and pushes the target out from 20 mm.
+ */
+const SLOWLY_AND_STRAIGHT_NOTE =
+  'Slowly, and straight at it: a robot that comes at a slant pushes the target with its front corner before the sensor is close enough. ' +
+  'A target that is pushed away ends the attempt.';
+
+/**
+ * One sentence for the examples that read the target in a corner: there the colour sensor is
+ * close enough only while the robot rests against the two walls of the corner, and whether
+ * that is allowed is a question for the organiser (draft rules §11: only "minor accidental
+ * contact with a wall"). The simulator does not judge it.
+ */
+const ASK_THE_REFEREE = 'On a real field, ask the referee first: the rules allow a light touch of a wall only by accident.';
+
+/**
+ * The note on the first block of the two examples that find the fire in many mazes by driving
+ * exact distances from cell to cell: the points their descriptions promise are the points of
+ * the simulator's perfect robot. (Measured with wheels that slip by half a percent: the
+ * intermediate example reached 100 points in about 1 of 5 of the mazes where the perfect robot
+ * does, the advanced one in about 3 of 10. The descriptions have no room for this - they must
+ * stay short - so it stands on the block a student sees first; the rules window says it for the
+ * whole simulator: "The robot is perfect ... A real robot drifts a little.")
+ */
+const REAL_ROBOT_DRIFTS_NOTE =
+  'These blocks drive from cell to cell by distance, and the robot of the simulator drives exactly. A real robot drifts a little: there it has to correct its way with its sensors.';
+
+/**
  * My-block "go close": drive slowly at the thing straight ahead until the colour sensor reads
  * red, and stop. It gives up after APPROACH_SECONDS; the caller asks the sensor again.
  */
@@ -372,11 +404,11 @@ function goCloseBlock(): DefinitionNode {
       resetTimer(),
       note(
         move('forward', APPROACH_RPM),
-        `Slowly: at ${APPROACH_RPM} RPM the robot moves less than 1 mm between two looks at the sensor, and stops in time. Do not drive at the fire target fast: a target that is pushed away ends the attempt.`,
+        SLOWLY_AND_STRAIGHT_NOTE,
       ),
       note(
         waitUntil(or(seesRed(), gt(timer(), APPROACH_SECONDS))),
-        `The colour sensor names a colour only from 1.5 cm or less. Wait until it reads red - or until ${APPROACH_SECONDS} seconds are over: then this is not the fire.`,
+        `In this simulator the colour sensor names a colour only from 1.5 cm or less. Wait until it reads red - or until ${APPROACH_SECONDS} seconds are over: then this is not the fire.`,
       ),
       stopMotors('all'),
     ]),
@@ -426,7 +458,8 @@ const firstWall: SampleProgram = {
       stopMotors('all'),
       note(wait(0.5), 'A robot does not stop at once. Wait until it stands still, then measure.'),
       ledColor('all', GREEN),
-      print(join('Wall ahead, cm: ', ultrasonic())),
+      // (short enough for one line of the CyberPi screen: "Wall, cm: 7.5" - a longer text would break the number in two)
+      print(join('Wall, cm: ', ultrasonic())),
     ]),
   ]),
 };
@@ -507,9 +540,9 @@ const redAndFan: SampleProgram = {
     'First choose the maze "Open field" and put the fire at the "Back wall" of the living room: this program knows one way only, by heart. ' +
     'The robot drives 120 cm up, turns left, drives 60 cm and turns right: now it faces that wall. ' +
     'It drives on slowly until its colour sensor reads red, and stops. ' +
-    'The sensor names a colour only from 1.5 cm or less, and pushing the target away ends the attempt. ' +
+    'In this simulator the sensor names a colour only from 1.5 cm or less, and pushing the target away ends the attempt. ' +
     'Then the fan blows: 3 seconds later the mission is complete, 100 points. ' +
-    'With the fire at another place it reads no red: the robot shows "No red here", leaves the fan off and scores 30 points. ' +
+    'With the fire at another place it reads no red, shows "No red here" and scores 30 points. ' +
     'Before it drives off it looks up the field with the ultrasonic sensor: if it sees a wall, it stays in START. ' +
     'It does not see every wall: in the maze "Two doors" it runs into one. ' +
     'It needs the robot at its default start position. ' +
@@ -517,7 +550,7 @@ const redAndFan: SampleProgram = {
   program: program([
     script(note(whenStart(), ONE_WAY_NOTE), [
       note(
-        ifThen(lt(ultrasonic(), OPEN_WAY_CM), [print('Choose the maze Open field'), stop('all')]),
+        ifThen(lt(ultrasonic(), OPEN_WAY_CM), [print('Choose: Open field'), stop('all')]),
         `Look before you drive: on the open field the way up is free for 124 cm. Less than ${OPEN_WAY_CM} cm: the sensor sees a wall on the way or close beside it. This is not the open field, and the program stops here.`,
       ),
       note(moveCm('forward', 120), 'The way, learned by heart: 120 cm up, a quarter turn to the left, 60 cm. A cell is 30 cm wide.'),
@@ -527,11 +560,11 @@ const redAndFan: SampleProgram = {
       resetTimer(),
       note(
         move('forward', APPROACH_RPM),
-        `Slowly: at ${APPROACH_RPM} RPM the robot moves less than 1 mm between two looks at the sensor, and stops in time. Do not drive at the fire target fast: a target that is pushed away ends the attempt.`,
+        SLOWLY_AND_STRAIGHT_NOTE,
       ),
       note(
         waitUntil(or(seesRed(), gt(timer(), FIRST_APPROACH_SECONDS))),
-        `The colour sensor names a colour only from 1.5 cm or less. Wait until it reads red - or until ${FIRST_APPROACH_SECONDS} seconds are over: by then the robot has moved 3 cm, and no fire stands here.`,
+        `In this simulator the colour sensor names a colour only from 1.5 cm or less. Wait until it reads red - or until ${FIRST_APPROACH_SECONDS} seconds are over: by then the robot has moved 3 cm, and no fire stands here.`,
       ),
       stopMotors('all'),
       note(
@@ -579,12 +612,12 @@ const wallFollow: SampleProgram = {
 const findFire: SampleProgram = {
   ...exampleCard('chief-face-flame'),
   description:
-    'First the robot follows the wall to a room, with its left hand on the wall. ' +
-    'There it looks at the three places where the fire target can stand, with the ultrasonic sensor: where something stands in front of a wall, the sensor reads less. ' +
+    'First the robot follows the wall to a room, its left hand on the wall. ' +
+    'There it looks at the three places where the fire can stand, with the ultrasonic sensor: where something stands in front of a wall, the sensor reads less. ' +
     'Nothing: the fire is in the other room. The LEDs turn blue: 30 points. ' +
     'Something: it drives at it slowly until the colour sensor reads red, stops, and only then starts the fan: 100 points. ' +
-    'At a wall it touches nothing. In the corner the sensor is close enough (1.5 cm) only when the two walls stop the robot: it touches them for a moment. ' +
-    'On a real field, ask the referee first: the rules allow a light touch of a wall only by accident. ' +
+    'At a wall it touches nothing. In the corner the sensor is close enough (1.5 cm in this simulator) only when the two walls stop the robot: it touches them for a moment. ' +
+    `${ASK_THE_REFEREE} ` +
     'In the default maze the left hand leads to the fire: 100 points after 34 seconds. ' +
     'It needs the robot at its default start position. ' +
     'Try the default maze with the fire in the bedroom: what does the robot show?',
@@ -592,7 +625,7 @@ const findFire: SampleProgram = {
     ...movingBlocks(),
     ...lookForTheFireBlocks(),
     goCloseBlock(),
-    script(whenStart(), [
+    script(note(whenStart(), REAL_ROBOT_DRIFTS_NOTE), [
       ...rememberStart(),
       repeatUntil(inARoom(), wallStep('left')),
       call('look for the fire'),
@@ -606,7 +639,7 @@ const findFire: SampleProgram = {
               'Make sure before you blow: the fan starts only when the colour sensor reads red.',
             ),
           ],
-          [ledColor('all', BLUE), print('No fire in this room')],
+          [ledColor('all', BLUE), print('No fire here')],
         ),
         'Something stands at one of the three places: go close and read its colour. Nothing: the fire is in the other room.',
       ),
@@ -641,12 +674,12 @@ const fullMission: SampleProgram = {
   ...exampleCard('chief-full-mission'),
   description:
     'The whole mission, for any maze. The robot follows the wall with its left hand, cell by cell. ' +
-    'In a room it looks at the three places where the fire target can stand, with the ultrasonic sensor. ' +
+    'In a room it looks at the three places where the fire can stand, with the ultrasonic sensor. ' +
     'Nothing there: it follows the wall on to the other room. ' +
-    'Something there: it drives at it slowly until the colour sensor reads red, stops and lets the fan blow. ' +
-    'After 3 seconds the referee ends the attempt: mission complete. ' +
+    'Something there: it drives at it slowly until the colour sensor reads red, stops and lets the fan blow for 3 seconds: mission complete. ' +
     'It scored 100 points in all 570 mazes it was tested on, with the fire at each of its six places, and never moved the target. ' +
     'With the target in a corner it touches the two walls of that corner for a moment; otherwise it touched nothing. ' +
+    'On a real field, ask the referee about that first. ' +
     'The default maze takes 34 seconds, the slowest maze found 134 of the 180 seconds. ' +
     'It needs the robot at its default start position. ' +
     'Try the right hand (swap "turn left" and "turn right" in the loop): in which mazes is it faster?',
@@ -654,7 +687,7 @@ const fullMission: SampleProgram = {
     ...movingBlocks(),
     ...lookForTheFireBlocks(),
     goCloseBlock(),
-    script(whenStart(), [
+    script(note(whenStart(), REAL_ROBOT_DRIFTS_NOTE), [
       ...rememberStart(),
       setVar('fire', 0),
       note(setVar('room seen', NO_ROOM), `The column of the room the robot has already looked for the fire in. ${NO_ROOM} means: none yet.`),
@@ -665,7 +698,7 @@ const fullMission: SampleProgram = {
             ifThen(and(inARoom(), not(eq(v('col'), v('room seen')))), [
               call('look for the fire'),
               setVar('room seen', v('col')),
-              ifThen(eq(v('fire'), 0), [print('No fire in this room')]),
+              ifThen(eq(v('fire'), 0), [print('No fire here')]),
             ]),
             'In a room - and not the one the robot has looked for the fire in before (the way along the wall can lead through it twice): look at its three places.',
           ),
