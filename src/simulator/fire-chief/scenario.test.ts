@@ -34,6 +34,7 @@ import {
   openField,
   perfectMazeWalls,
   randomScenario,
+  scenarioOfCode,
   scenarioProblems,
   shortestWay,
   stepsFrom,
@@ -423,6 +424,44 @@ test('code: the code of a maze that cannot be played is refused', () => {
   // all 40 walls up
   assert.equal(decodeScenario('LC-ZZZZ-ZZZZ'), null);
   assert.equal(decodeScenario('BS-ZZZZ-ZZZZ'), null);
+});
+
+test('code: an editor can read what a code says also when its maze cannot be played; a text that is no code is null for it too', () => {
+  // a maze in which the living room is closed, and all 40 walls up: decodeScenario refuses both ...
+  const noLiving = fieldWith(between([0, 0], [1, 0]), between([0, 0], [0, 1]));
+  for (const maze of [noLiving, withFire(noLiving, 'bedroom', 'side'), { ...openField('living', 'back'), walls: new Array<boolean>(40).fill(true) }]) {
+    const code = encodeScenario(maze);
+    assert.equal(decodeScenario(code), null);
+    // ... scenarioOfCode hands the maze back as it was written
+    assert.deepEqual(scenarioOfCode(code), maze);
+    assert.deepEqual(scenarioOfCode(code.toLowerCase().replace(/-/g, ' ')), maze);
+    assert.ok(scenarioProblems(scenarioOfCode(code) as FireChiefScenario).length > 0);
+  }
+  // for a maze that can be played the two agree, and decodeScenario is "scenarioOfCode, if it can be played"
+  const rng = makeRng(5);
+  for (let i = 0; i < 2000; i++) {
+    const code = encodeScenario(randomScenario(rng));
+    assert.deepEqual(scenarioOfCode(code), decodeScenario(code));
+  }
+  let unplayable = 0;
+  for (let i = 0; i < 2000; i++) {
+    // any 40 walls: most of these mazes cannot be played
+    const maze: FireChiefScenario = { walls: Array.from({ length: 40 }, () => rng() < 0.5), fireRoom: 'living', fireSpot: 'corner' };
+    const read = scenarioOfCode(encodeScenario(maze));
+    assert.deepEqual(read, maze);
+    const played = decodeScenario(encodeScenario(maze));
+    if (isValidScenario(maze)) assert.deepEqual(played, maze);
+    else {
+      unplayable++;
+      assert.equal(played, null);
+    }
+  }
+  assert.ok(unplayable > 1000, `${unplayable} of 2000 could not be played`);
+  // what is no code at all is null, whatever it is - never an error
+  for (const text of ['', 'hello', 'LC-4406-N0E', 'XC-4406-N0E0', 'LX-4406-N0E0', 'LC-44U6-N0E0', 'LC-4406-N0E0-0', 'x'.repeat(500)]) {
+    assert.equal(scenarioOfCode(text), null, text);
+  }
+  for (const wrong of [undefined, null, 42, {}, []]) assert.equal(scenarioOfCode(wrong as unknown as string), null);
 });
 
 test('code: 20 000 random texts never throw, and whatever is accepted is a playable maze that encodes back', () => {

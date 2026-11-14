@@ -24,13 +24,12 @@ import { PROBE_NAMES, SERVO_PORTS } from '../core/types';
 import { START_RECT, roomRect } from '../fire-chief/field';
 import { clock, fireChiefGame } from '../fire-chief/game';
 import { FIRE_CHIEF_ROBOT, START_POSE } from '../fire-chief/robot';
-import { decodeScenario, defaultScenario, encodeScenario, openField, scenarioProblems, withFire, type FireChiefScenario } from '../fire-chief/scenario';
-import { fireRescueGame } from '../fire-rescue/game';
+import { PLAYABLE_MAZE_COUNT, decodeScenario, defaultScenario, encodeScenario, openField, scenarioProblems, withFire, type FireChiefScenario } from '../fire-chief/scenario';
+import { fireRescueGame, startPoseFor } from '../fire-rescue/game';
 import { arm, dcMotor, flameSize, gripper, gt, moveCm, program, repeatUntil, script, setServo, stopDcMotor, turn, wait, whenStart } from '../vm/builder';
 import { ConsolePanel } from './ConsolePanel';
 import { ControlBar, type ControlBarProps } from './ControlBar';
 import { MAZE_CHOICES, mazeChoiceOf, ROOM_LABEL, SPOT_LABEL, withMaze } from './fire-chief/maze-choices';
-import { FIRE_CHIEF_RULES, FIRE_CHIEF_RULES_NOTE } from './fire-chief/rules';
 import { FIRE_CHIEF_START_ZONE, FIRE_CHIEF_WORDS } from './fire-chief/words';
 import { bodyName, describeEvent, finishText, formatRefereeTime, formatStamp, restartFacts, restartLine, restartsLeftText, timeTextOf, type LogLine } from './format';
 import { finishSentence, restartButton, restartSummary } from './match-words';
@@ -42,7 +41,7 @@ import { lineMark, linePoints, lineTime, ScoreSheet, StatusLine, type StatusLine
 import { capital, DEFAULT_WORDS, screenWords } from './screen-words';
 import { SensorDashboard } from './SensorDashboard';
 import { readyHint } from './stage-view';
-import { centredPose, poseFits } from './start-pose';
+import { centredPose, homeButtonWords, homeKind, homePose, poseFits } from './start-pose';
 import type { RunState, UiSnapshot } from './useSimulation';
 
 // =============================================================================================
@@ -182,11 +181,20 @@ test('words: a game that says nothing gets the words of Fire Rescue, letter for 
     resetHint: 'Put every tower, bucket and person back and the robot into the start zone, ready for a new start.',
     sheetNotesHeading: 'Penalties',
     sheetNote: 'The score is what the field is worth right now. It can never go below 0.',
+    cleanLine: 'No penalty',
     randomLabel: 'Random',
     randomHint: 'Draw a random combination, like the referee does',
     defaultLabel: 'Default',
     defaultHint: 'The combination drawn in the rule book',
+    scenario: 'combination',
+    scenarios: 'combinations',
+    scenarioTitle: 'Combination',
+    batchHint: 'Run your program on many starting combinations at once',
+    batchIntro:
+      'A good program works whatever the referee draws. Run your blocks on many starting combinations at once and see where they fail. Click a result to load that combination on the stage and watch what happens.',
   });
+  // (the last line of the Combination panel is counted from the game when a game gives no sentence of its own)
+  assert.equal(screenWords().scenarioNote, undefined);
   assert.equal(screenWords(undefined), DEFAULT_WORDS, 'no new object when nothing differs');
 });
 
@@ -198,6 +206,21 @@ test('words: a game changes only what it names; Fire Chief plays an "attempt" wi
   assert.equal(CHIEF_WORDS.goal, 'achievement');
   assert.equal(CHIEF_WORDS.goals, 'achievements');
   assert.equal(CHIEF_WORDS.randomLabel, 'Random maze');
+  assert.equal(CHIEF_WORDS.defaultLabel, 'Default maze');
+  // a starting arrangement is a "maze" there: the panel, the code, the console and the test window say so
+  assert.equal(CHIEF_WORDS.scenario, 'maze');
+  assert.equal(CHIEF_WORDS.scenarios, 'mazes');
+  assert.equal(CHIEF_WORDS.scenarioTitle, 'Maze');
+  assert.equal(CHIEF_WORDS.batchHint, 'Run your program on many mazes at once');
+  assert.match(CHIEF_WORDS.batchIntro, /^A good program finds the fire in every maze\. /);
+  assert.ok(!Object.values(CHIEF_WORDS).some((value) => /combination/i.test(value)), 'no word of the Fire Chief screen speaks of a "combination"');
+  // "more than 100 billion mazes": the number of mazes the game counts
+  assert.equal(CHIEF_WORDS.scenarioNote, 'More than 100 billion mazes have a way from START to both rooms. Changing the maze or the place of the fire puts the field back to the start.');
+  assert.ok(PLAYABLE_MAZE_COUNT > 100e9 && PLAYABLE_MAZE_COUNT < 200e9);
+  // a line of the sheet without points is a note of the referee there, not a penalty
+  assert.equal(CHIEF_WORDS.sheetNotesHeading, 'Notes of the referee');
+  assert.equal(CHIEF_WORDS.cleanLine, 'Nothing to note');
+  assert.ok(!Object.values(CHIEF_WORDS).some((value) => /penalt/i.test(value)), 'a restart costs no points in Fire Chief: no word of the screen calls it a penalty');
   // every word of the screen has a Fire Chief answer that is not about towers, buckets or people
   for (const [key, value] of Object.entries(CHIEF_WORDS)) {
     assert.ok(!/tower|bucket|person|people|water square|rule book/i.test(value), `${key}: "${value}"`);
@@ -666,14 +689,14 @@ test('other game: opening such a file says in plain words what will not work', (
   assert.ok(file.ok);
   assert.equal(
     otherGameNote(file.program, file.game, 'fire-chief'),
-    'This program was saved in the Fire Rescue simulator. 3 of its blocks are for parts this robot does not have (Gripper, Servos): they do nothing here.',
+    'This program was saved in the Fire Rescue simulator. 3 of its blocks are for parts this robot does not have (Gripper, Servos): they do not work here.',
   );
   // the other way round
   const note = otherGameNote(CHIEF_PROGRAM, 'fire-chief', 'fire-rescue');
-  assert.match(note ?? '', /^This program was saved in the Fire Chief simulator\. 3 of its blocks are for parts this robot does not have \(.+\): they do nothing here\.$/);
+  assert.match(note ?? '', /^This program was saved in the Fire Chief simulator\. 3 of its blocks are for parts this robot does not have \(.+\): they do not work here\.$/);
   // one block
   const one = program([script(whenStart(), [gripper('open')])]);
-  assert.equal(otherGameNote(one, null, 'fire-chief'), '1 of its blocks is for parts this robot does not have (Gripper): it does nothing here.');
+  assert.equal(otherGameNote(one, null, 'fire-chief'), '1 of its blocks is for parts this robot does not have (Gripper): it does not work here.');
   // a file of the other game that only uses blocks both games have
   const plain = program([script(whenStart(), [moveCm('forward', 10)])]);
   assert.equal(otherGameNote(plain, 'fire-rescue', 'fire-chief'), 'This program was saved in the Fire Rescue simulator. All its blocks work here too.');
@@ -857,6 +880,47 @@ test('placing: the robot of Fire Chief starts completely inside START, at any an
   assert.equal(readyHint(FIRE_CHIEF_START_ZONE, false, false), 'Ready. Drag the robot inside the START cell; turn it with the buttons below the mat.');
 });
 
+test('placing: the button beside the turning buttons goes to the middle in Fire Rescue, as before', () => {
+  const zone = fireRescueGame.startZone;
+  const start = startPoseFor(DEFAULT_ROBOT_CONFIG);
+  // the default start position of Fire Rescue IS the middle of the Fire Station ...
+  assert.equal(homeKind(DEFAULT_ROBOT_CONFIG, zone, start), 'middle');
+  // ... so the button does what it always did: into the middle, turned as the robot is
+  for (const degrees of [0, 1, 15, 90, 180, 271]) {
+    assert.deepEqual(homePose('middle', DEFAULT_ROBOT_CONFIG, zone, start, degrees * DEG), centredPose(DEFAULT_ROBOT_CONFIG, zone, degrees * DEG), `${degrees} degrees`);
+  }
+  assert.deepEqual(homeButtonWords('middle', 'Fire Station'), { label: 'Put the robot in the middle of the Fire Station', hint: 'Middle of the Fire Station' });
+});
+
+test('placing: in Fire Chief the same button brings the robot back to the default start position', () => {
+  const zone = fireChiefGame.startZone;
+  // The robot of Fire Chief starts with the point it turns around in the middle of START. Its
+  // chassis reaches further forward than back, so that is NOT the place where the robot is centred:
+  const centred = centredPose(FIRE_CHIEF_ROBOT, zone, START_POSE.heading);
+  assert.ok(Math.abs(centred.y - START_POSE.y) > 10, `the two places are ${Math.abs(centred.y - START_POSE.y)} mm apart`);
+  assert.equal(homeKind(FIRE_CHIEF_ROBOT, zone, START_POSE), 'default');
+  // wherever the robot was dragged and however it was turned: one press, and it stands as at the start
+  for (const degrees of [0, 3, 90, 181]) {
+    const home = homePose('default', FIRE_CHIEF_ROBOT, zone, START_POSE, degrees * DEG);
+    assert.deepEqual(home, { x: START_POSE.x, y: START_POSE.y, heading: 0 });
+    assert.ok(poseFits(FIRE_CHIEF_ROBOT, zone, home));
+  }
+  // the simulation takes that pose, and a program that counts on it drives as it was written
+  const sim = createSimulation({ game: fireChiefGame, scenario: defaultScenario(), program: MISSION });
+  assert.equal(sim.setStartPose({ x: 790, y: 1330, heading: 20 * DEG }), true);
+  assert.equal(sim.setStartPose(homePose('default', FIRE_CHIEF_ROBOT, zone, START_POSE, 20 * DEG)), true);
+  sim.start();
+  while (sim.status === 'running') sim.step(1);
+  assert.equal(sim.finishReason, 'mission-complete');
+  assert.equal(sim.score().total, 100);
+  // the button says what it does, without the word "middle"
+  const words = homeButtonWords('default', FIRE_CHIEF_START_ZONE);
+  assert.equal(words.label, 'Put the robot back at its default start position');
+  assert.equal(words.hint, 'Back to the default start position in the START cell');
+  // a game whose default position is half a millimetre from the middle is still "the middle"
+  assert.equal(homeKind(FIRE_CHIEF_ROBOT, zone, { ...centred, y: centred.y + 0.4 }), 'middle');
+});
+
 test('ruler: on the 1500 mm mat of Fire Chief a cell is 30.0 cm, and a point beside the mat lands on its edge', () => {
   const mat = fireChiefGame.mat;
   let line = addRulerPoint(EMPTY_RULER, { x: 750, y: 1350 }, { ...START_POSE }, mat);
@@ -869,10 +933,10 @@ test('ruler: on the 1500 mm mat of Fire Chief a cell is 30.0 cm, and a point bes
 });
 
 // =============================================================================================
-// The small maze panel and the short rules of Fire Chief
+// The ready-made mazes of the Fire Chief maze editor
 // =============================================================================================
 
-test('maze panel: the default maze comes first, the open field is there, and every maze can be played', () => {
+test('ready-made mazes: the default maze comes first, the open field is there, and every maze can be played', () => {
   assert.equal(MAZE_CHOICES[0].label, 'Crossroads (default maze)');
   assert.deepEqual(MAZE_CHOICES[0].walls, defaultScenario().walls);
   assert.ok(MAZE_CHOICES.some((choice) => choice.label === 'Open field' && choice.walls.every((w) => !w)));
@@ -887,7 +951,7 @@ test('maze panel: the default maze comes first, the open field is there, and eve
   }
 });
 
-test('maze panel: picking a maze keeps the fire where the student put it; any other maze is "another maze"', () => {
+test('ready-made mazes: picking one keeps the fire where the student put it; any other maze is none of them', () => {
   const mine = withFire(defaultScenario(), 'bedroom', 'side');
   for (const choice of MAZE_CHOICES) {
     const next = withMaze(mine, choice);
@@ -905,25 +969,5 @@ test('maze panel: picking a maze keeps the fire where the student put it; any ot
   assert.deepEqual(Object.keys(SPOT_LABEL).sort(), ['back', 'corner', 'side']);
 });
 
-test('rules: the short list has the four achievements with their points, the ends and the one restart, and is marked as a draft', () => {
-  assert.match(FIRE_CHIEF_RULES_NOTE, /draft/i);
-  const all = FIRE_CHIEF_RULES.flatMap((section) => [section.title, ...section.items]).join('\n');
-  for (const points of ['10 points', '20 points', '30 points', '40 points']) assert.ok(all.includes(points), points);
-  assert.match(all, /3 minutes/);
-  assert.match(all, /says "Finished"/);
-  assert.match(all, /moves the fire target/);
-  assert.match(all, /One restart is allowed per attempt/);
-  assert.match(all, /points earned so far are cleared/);
-  // what the organiser decided is written as a rule ...
-  assert.match(all, /at most 30 cm from the target/);
-  assert.match(all, /80 points/);
-  assert.match(all, /Touching the target without moving it costs nothing/);
-  assert.match(all, /flame sensor does not have to show anything/);
-  // ... and nothing is called an assumption; what is still open is said as what the simulator does
-  assert.ok(!/assum/i.test(all));
-  assert.match(all, /In the simulator, "moved" means more than 5 mm/);
-  // the numbers are the referee's own
-  assert.equal(fireChiefGame.matchDuration, 180);
-  assert.equal(fireChiefGame.restartRules?.maxRestarts, 1);
-  assert.equal(FIRE_CHIEF_ROBOT.fan?.reachMm, 300);
-});
+// (The rules window of Fire Chief is tested in ./fire-chief/rules.test.ts, the maze editor, the
+// code field and the lists of "Test on many mazes" in ./fire-chief/maze.test.ts.)

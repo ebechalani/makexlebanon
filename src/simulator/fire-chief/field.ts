@@ -4,8 +4,10 @@
  * Every measure of the field, of its walls and of the fire target is in this one file. (The
  * measures of the robot's flame sensor and fan are in ./robot.ts, the limits of the referee in
  * ./game.ts.) Some of them come from the print file of the map ("Maze 14-17yo makex 2027",
- * page 2) and from the draft rules; the others are ASSUMPTIONS, because the organiser has not
- * published them yet. Each assumption says so in its comment, and changing it here changes it
+ * page 2) and from the draft rules. Some are DECISIONS of the organiser, given since the draft
+ * (the thickness of the walls, the wall around the field, the width and the height of the fire
+ * target). The others are ASSUMPTIONS, because the organiser has not published them yet. Each
+ * decision and each assumption says so in its comment, and changing it here changes it
  * everywhere. The ONE list of all assumptions and decisions of this game - the ones of this
  * file, of the robot, of the referee and of the engine - is at the top of ./game.ts.
  *
@@ -145,16 +147,16 @@ export const roomRect = (room: RoomId): Rect => ROOM_RECTS[room];
 
 /** Rules: the walls are 150 mm high. */
 export const WALL_HEIGHT = 150;
-/** Thickness of a wall panel: 3 mm (the organiser's figure). */
+/** DECISION of the organiser: a wall panel is 3 mm thick. */
 export const WALL_THICKNESS = 3;
 /**
- * ASSUMPTION: the outer edge of the field is always closed by walls, so the robot cannot leave
- * the mat. Set to false to play on an open table.
+ * DECISION of the organiser: the outer edge of the field is walled, so the robot cannot leave
+ * the mat. (Set to false to play on an open table.)
  */
 export const OUTER_WALLS = true;
 /**
- * A wall panel is as long as a cell, plus one thickness: so two panels that meet at a corner
- * close the corner completely (no gap for the robot's sensors to look through).
+ * ASSUMPTION: a wall panel is as long as a cell, plus one thickness: so two panels that meet at
+ * a corner close the corner completely (no gap for the robot's sensors to look through).
  */
 export const WALL_LENGTH = CELL_SIZE + WALL_THICKNESS;
 
@@ -290,14 +292,15 @@ export function outerWalls(): FixedWall[] {
 // =============================================================================================
 // The fire target
 // =============================================================================================
-// Rules: "a wooden flame-shaped piece with an embedded infrared emitter". Its measures and the
-// places where it may stand are not published yet, so ALL of the following are assumptions.
+// Rules: "a wooden flame-shaped piece with an embedded infrared emitter". The organiser has
+// decided its width and its height. Its depth, its weight, its emitter and the places where it
+// may stand are not published yet: those are assumptions.
 
-/** ASSUMPTION: the target is 60 mm wide ... */
+/** DECISION of the organiser: the target is 60 mm wide ... */
 export const TARGET_WIDTH = 60;
-/** ... 20 mm deep (front to back) ... */
+/** ASSUMPTION: it is 20 mm deep (front to back). */
 export const TARGET_DEPTH = 20;
-/** ... and 120 mm high. */
+/** DECISION of the organiser: ... and 120 mm high. */
 export const TARGET_HEIGHT = 120;
 /**
  * ASSUMPTION: it is light (as light as a bucket of Fire Rescue): the robot can push it away.

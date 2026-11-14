@@ -11,6 +11,10 @@
  *   game.restartRules,      what the "Restart" button says and when it is off
  *     game.restartPenalty   (with Simulation.restartsLeft)
  *   game.overlays()         the zones of the "Zones" view
+ *   game.startZone          where the robot may be put before the start, and - with the game's default
+ *                           start position - where the button beside the turning buttons puts it
+ *                           (./start-pose.ts: HomeKind)
+ *   game.createReferee      how a moment of a match is written (./format.ts: timeTextOf)
  *   robotConfig             which sensors and motors the Sensors panel and the stage show (./robot-parts.ts)
  *   Simulation.world.walls  the walls on the stage
  *   Simulation.finishDetail the referee's own sentence about the end of a match
@@ -25,7 +29,7 @@ import { DEG } from '../core/geometry';
 import type { GripperVariantId } from '../blocks/gripper-original';
 import { paletteCategories } from '../blocks/palettes';
 import type { Game, Pose, ProgramJson, RobotConfig, Simulation } from '../core/types';
-import { BatchDialog, type BatchPreset } from './BatchDialog';
+import { BatchDialog, type BatchPreset, type BatchRandom } from './BatchDialog';
 import { BlocklyEditor, type BlocklyEditorHandle, type EditorStatus } from './BlocklyEditor';
 import { CombinationPanel } from './CombinationPanel';
 import { ConsolePanel } from './ConsolePanel';
@@ -40,12 +44,13 @@ import { blankProgram, hasRunnableScript, otherGameNote, parseProgramFile, progr
 import type { StageOptions } from './render';
 import { robotParts, sensorSummary, sensorsViewHint } from './robot-parts';
 import { EMPTY_RULER, followRobot, removeLastRulerPoint, rulerText, startsOnRobot, type Ruler } from './ruler';
+import type { CodeReader } from './scenario-code';
 import { ScoreSheet, StatusLine } from './ScoreSheet';
-import { screenWords, type ScreenWords } from './screen-words';
+import { capital, screenWords, type ScreenWords } from './screen-words';
 import { SensorDashboard } from './SensorDashboard';
 import { StageCanvas } from './StageCanvas';
 import { escapeAction, readyHint, sizeButtonHint, tabStop } from './stage-view';
-import { centredPose, headingDegrees, isPose, poseFits, rotatedPose } from './start-pose';
+import { headingDegrees, homeButtonWords, homeKind, homePose, isPose, poseFits, rotatedPose } from './start-pose';
 import { PAGE_FRAME } from './page-frame';
 import { isRecord, loadJson, saveJson, storageKey } from './storage';
 import { TitleBar, titleBarButton } from './TitleBar';
@@ -64,6 +69,17 @@ export interface RulesSection {
   items: string[];
 }
 
+/**
+ * A second part of the rules window with a heading of its own, under the rules - for what is
+ * not a rule: Fire Chief lists there what the simulator assumes where the rules say nothing yet.
+ */
+export interface RulesPart {
+  title: string;
+  /** one sentence under the heading that says what kind of list this is */
+  note?: string;
+  sections: RulesSection[];
+}
+
 export interface SimulatorAppProps<S> {
   game: Game<S>;
   robotConfig: RobotConfig;
@@ -80,6 +96,8 @@ export interface SimulatorAppProps<S> {
   rules: RulesSection[];
   /** one sentence under the heading of the rules, e.g. that they are a draft (left out: no sentence) */
   rulesNote?: string;
+  /** a second part under the rules, with its own heading (left out: the window ends with the rules) */
+  rulesExtra?: RulesPart;
   /**
    * The sentences of the screen that are different in this category (see ./screen-words.ts).
    * Left out, or what is left out of it: the words of Fire Rescue.
@@ -100,7 +118,17 @@ export interface SimulatorAppProps<S> {
   enlargeButtonCorner?: 'top' | 'bottom';
   /** the category's own editor for a combination */
   renderCombinationEditor: (scenario: S, onChange: (next: S) => void) => ReactNode;
+  /**
+   * How this category reads a code that was typed in - and the code it saved for the next visit:
+   * the combination it stands for, or one plain sentence that says why it is none (see
+   * ./scenario-code.ts). Left out: the game decodes it (Game.decodeScenario).
+   * Pass one function that stays the same between renders.
+   */
+  readCode?: CodeReader<S>;
+  /** ready-made lists for "Test on many ..." (left out: random lists only) */
   batchPresets?: BatchPreset<S>[];
+  /** the category's own way to draw the random lists of "Test on many ..." (left out: game.randomScenario) */
+  batchRandom?: BatchRandom<S>;
 }
 
 type SectionId = 'score' | 'combination' | 'sensors' | 'cyberpi' | 'console';
@@ -134,6 +162,20 @@ interface Notice {
   tone: 'info' | 'error';
 }
 
+/** One section of the rules window: its heading and its bullets. */
+function rulesSection(section: RulesSection): ReactNode {
+  return (
+    <div key={section.title} className="mt-3">
+      <p className="text-xs font-bold uppercase tracking-wide text-brand-700">{section.title}</p>
+      <ul className="mt-1 list-disc space-y-1 pl-5 text-sm leading-snug">
+        {section.items.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 /** What is remembered between visits (besides the blocks, which the editor saves itself). */
 interface SavedSettings<S> {
   scenario: S;
@@ -145,9 +187,15 @@ interface SavedSettings<S> {
   rotateStep: number;
 }
 
-function readSettings<S>(game: Game<S>, robotConfig: RobotConfig, fallbackPose: Pose): SavedSettings<S> {
+function readSettings<S>(game: Game<S>, robotConfig: RobotConfig, fallbackPose: Pose, readCode?: CodeReader<S>): SavedSettings<S> {
   const raw = loadJson(storageKey(game.id, 'settings'), isRecord) ?? {};
-  const scenario = (typeof raw.scenario === 'string' ? game.decodeScenario(raw.scenario) : null) ?? game.defaultScenario();
+  // (a category that reads codes its own way reads the saved one that way too: what could be set up before a reload is there after it)
+  const decode = (code: string): S | null => {
+    if (!readCode) return game.decodeScenario(code);
+    const reading = readCode(code);
+    return reading.ok ? reading.scenario : null;
+  };
+  const scenario = (typeof raw.scenario === 'string' ? decode(raw.scenario) : null) ?? game.defaultScenario();
   const safeFallback = poseFits(robotConfig, game.startZone, fallbackPose) ? fallbackPose : game.defaultStartPose;
   const startPose = isPose(raw.startPose) && poseFits(robotConfig, game.startZone, raw.startPose) ? raw.startPose : safeFallback;
   const view = { ...DEFAULT_VIEW };
@@ -179,7 +227,7 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
   // neither the button nor the right-click entry nor the window.
   const hasGripperBlocks = useMemo(() => paletteCategories(game.id).includes('gripper'), [game.id]);
 
-  const [saved] = useState(() => readSettings(game, robotConfig, props.initialStartPose));
+  const [saved] = useState(() => readSettings(game, robotConfig, props.initialStartPose, props.readCode));
   const [scenario, setScenario] = useState<S>(saved.scenario);
   const [view, setView] = useState<StageOptions>(saved.view);
   const [open, setOpen] = useState<Record<SectionId, boolean>>(saved.open);
@@ -222,6 +270,7 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
     getProgram,
     onActiveBlocks: highlightBlocks,
     matchWord: words.match,
+    scenarioWord: words.scenario,
   });
   const { snapshot, setSpeed, setSoundOn, setStartPose } = sim;
   const runState = snapshot.runState;
@@ -294,11 +343,20 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
     [game, robotConfig, setStartPose],
   );
 
+  // The button beside the turning buttons: into the middle of the start zone, or - in a game whose
+  // default start position is not the middle - back to that position (see HomeKind in ./start-pose.ts).
+  const defaultPose = useMemo(
+    () => (poseFits(robotConfig, game.startZone, props.initialStartPose) ? props.initialStartPose : game.defaultStartPose),
+    [game, robotConfig, props.initialStartPose],
+  );
+  const home = useMemo(() => homeKind(robotConfig, game.startZone, defaultPose), [game, robotConfig, defaultPose]);
+  const homeWords = homeButtonWords(home, startZoneName);
+
   const centreRobot = () => {
     const from = ghost ?? sim.startPose;
-    const pose = centredPose(robotConfig, game.startZone, from.heading);
+    const pose = homePose(home, robotConfig, game.startZone, defaultPose, from.heading);
     if (setStartPose(pose)) setGhost(null);
-    else say(`${notAllowed} It does not fit at this angle.`, 'error');
+    else say(home === 'default' ? notAllowed : `${notAllowed} It does not fit at this angle.`, 'error');
   };
 
   const changeScenario = useCallback((next: S) => {
@@ -487,7 +545,7 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
     }
     if (!replaceProgram(parsed.program, `the program from "${fileName}"`)) return;
     // A program made in another game opens here too, but its blocks for parts this robot does
-    // not have do nothing: say so now, in plain words (and long enough to be read).
+    // not have do not work: say so now, in plain words (and long enough to be read).
     const note = otherGameNote(parsed.program, parsed.game, game.id);
     if (note) say(`Opened ${fileName}. ${note}`, 'info', 12000);
     else say(`Opened ${fileName}.`);
@@ -587,10 +645,10 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
           }}
           disabled={!editorReady}
           className={titleBarButton}
-          title="Run your program on many starting combinations at once"
+          title={words.batchHint}
         >
           <TestIcon className="h-4 w-4" />
-          <span className="hidden md:inline">Test on many combinations</span>
+          <span className="hidden md:inline">{`Test on many ${words.scenarios}`}</span>
           <span className="md:hidden">Test</span>
         </button>
         <div className="relative" ref={rules.ref}>
@@ -606,16 +664,15 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
             >
               <p className="text-base font-bold text-ink-900">{props.title}: the rules in short</p>
               {props.rulesNote && <p className="mt-1 rounded-md bg-amber-100 px-2 py-1 text-xs font-semibold leading-snug text-amber-900">{props.rulesNote}</p>}
-              {props.rules.map((section) => (
-                <div key={section.title} className="mt-3">
-                  <p className="text-xs font-bold uppercase tracking-wide text-brand-700">{section.title}</p>
-                  <ul className="mt-1 list-disc space-y-1 pl-5 text-sm leading-snug">
-                    {section.items.map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
+              {props.rules.map(rulesSection)}
+              {/* what is not a rule gets its own heading, clearly apart from the rules above it */}
+              {props.rulesExtra && (
+                <div className="mt-4 border-t-2 border-slate-200 pt-3" data-rules-extra>
+                  <p className="text-base font-bold text-ink-900">{props.rulesExtra.title}</p>
+                  {props.rulesExtra.note && <p className="mt-1 rounded-md bg-sky-100 px-2 py-1 text-xs font-semibold leading-snug text-sky-900">{props.rulesExtra.note}</p>}
+                  {props.rulesExtra.sections.map(rulesSection)}
                 </div>
-              ))}
+              )}
             </div>
           )}
         </div>
@@ -855,7 +912,7 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
                   </option>
                 ))}
               </select>
-              <button type="button" onClick={centreRobot} disabled={!placing} className={button.icon} aria-label={`Put the robot in the middle of the ${startZoneName}`} title={`Middle of the ${startZoneName}`}>
+              <button type="button" onClick={centreRobot} disabled={!placing} className={button.icon} aria-label={homeWords.label} title={homeWords.hint}>
                 <CentreIcon className="h-4 w-4" />
               </button>
             </div>
@@ -876,8 +933,8 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
           </Section>
           </div>
 
-          <Section title="Combination" summary={<span className="font-mono">{game.encodeScenario(scenario)}</span>} open={open.combination} onToggle={toggleSection('combination')}>
-            <CombinationPanel game={game} scenario={scenario} onChange={changeScenario} words={words}>
+          <Section title={words.scenarioTitle} summary={<span className="font-mono">{game.encodeScenario(scenario)}</span>} open={open.combination} onToggle={toggleSection('combination')}>
+            <CombinationPanel game={game} scenario={scenario} onChange={changeScenario} words={words} readCode={props.readCode}>
               {props.renderCombinationEditor(scenario, changeScenario)}
             </CombinationPanel>
           </Section>
@@ -941,11 +998,12 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
           getSampler={sim.getSampler}
           currentScenario={scenario}
           presets={props.batchPresets}
+          random={props.batchRandom}
           words={words}
           onPick={(picked) => {
             setBatchOpen(false);
             changeScenario(picked);
-            say('Combination loaded. Press Start to watch your program on it.');
+            say(`${capital(words.scenario)} loaded. Press Start to watch your program on it.`);
           }}
           onClose={() => setBatchOpen(false)}
         />

@@ -425,11 +425,14 @@ export function encodeScenario(s: FireChiefScenario): string {
 }
 
 /**
- * Read a code back. Letter case, spaces and separators do not matter, and the letters that are
- * easy to mix up are understood (O as 0, I and L as 1). Returns null for anything that is not
- * the code of a combination that can be played - it never throws.
+ * What a code says: the walls and the place of the fire it stands for - whether or not that
+ * maze can be played. Letter case, spaces and separators do not matter, and the letters that
+ * are easy to mix up are understood (O as 0, I and L as 1). Returns null for a text that is no
+ * code at all - it never throws.
+ * (For an editor: a maze that is being built has a code too, and "this is no code" would be
+ * untrue for it. A game is played with decodeScenario() below, which takes playable mazes only.)
  */
-export function decodeScenario(code: string): FireChiefScenario | null {
+export function scenarioOfCode(code: string): FireChiefScenario | null {
   if (typeof code !== 'string' || code.length > 200) return null;
   const compact = code.toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (compact.length !== 2 + WALL_CHARACTERS) return null;
@@ -447,8 +450,16 @@ export function decodeScenario(code: string): FireChiefScenario | null {
       walls[k * WALLS_PER_CHARACTER + bit] = ((value >> (WALLS_PER_CHARACTER - 1 - bit)) & 1) === 1;
     }
   }
-  const s: FireChiefScenario = { walls, fireRoom, fireSpot };
-  return isValidScenario(s) ? s : null;
+  return { walls, fireRoom, fireSpot };
+}
+
+/**
+ * Read a code back (see scenarioOfCode for what may be typed). Returns null for anything that
+ * is not the code of a combination that can be played - it never throws.
+ */
+export function decodeScenario(code: string): FireChiefScenario | null {
+  const s = scenarioOfCode(code);
+  return s !== null && isValidScenario(s) ? s : null;
 }
 
 /** One line for people: where the fire is, how many walls, how far it is. */

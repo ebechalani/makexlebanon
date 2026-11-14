@@ -59,6 +59,41 @@ export function rotatedPose(config: RobotConfig, zone: Rect, from: Pose, heading
   return { pose: turned, legal: false };
 }
 
+/**
+ * The button beside the two turning buttons brings the robot back to a place the student can
+ * count on. Which place that is depends on where the game lets the robot start:
+ *
+ *   'middle'   The game's default start position IS the middle of the start zone (Fire Rescue:
+ *              the robot with its open gripper is centred in the Fire Station). The button puts
+ *              the robot into the middle and leaves it turned as it is.
+ *   'default'  The game's default start position is somewhere else (Fire Chief: the point the
+ *              robot turns around is in the middle of START, so the robot itself stands a little
+ *              ahead of the middle). The ready-made programs of such a game count on exactly
+ *              that position, and once the robot was dragged there would be no way back to it.
+ *              The button puts the robot back there, facing as it faced at the default.
+ */
+export type HomeKind = 'middle' | 'default';
+
+/** Two start positions closer together than this (mm) are the same position for the home button. */
+const SAME_PLACE_MM = 0.5;
+
+export function homeKind(config: RobotConfig, zone: Rect, defaultPose: Pose): HomeKind {
+  const centred = centredPose(config, zone, defaultPose.heading);
+  return Math.hypot(centred.x - defaultPose.x, centred.y - defaultPose.y) <= SAME_PLACE_MM ? 'middle' : 'default';
+}
+
+/** Where the home button puts a robot that now faces `heading` (see HomeKind). */
+export function homePose(kind: HomeKind, config: RobotConfig, zone: Rect, defaultPose: Pose, heading: number): Pose {
+  return kind === 'default' ? { x: defaultPose.x, y: defaultPose.y, heading: wrapAngle(defaultPose.heading) } : centredPose(config, zone, heading);
+}
+
+/** The name of the home button (for screen readers) and what it says when the pointer rests on it. */
+export function homeButtonWords(kind: HomeKind, startZoneName: string): { label: string; hint: string } {
+  return kind === 'default'
+    ? { label: 'Put the robot back at its default start position', hint: `Back to the default start position in the ${startZoneName}` }
+    : { label: `Put the robot in the middle of the ${startZoneName}`, hint: `Middle of the ${startZoneName}` };
+}
+
 /** Heading in whole degrees 0..359 for display (0 = up, 90 = right). */
 export function headingDegrees(heading: number): number {
   // "+ 360, % 360" brings negative angles into 0..359 and also turns the "-0" that JavaScript

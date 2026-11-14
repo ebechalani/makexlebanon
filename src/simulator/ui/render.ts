@@ -989,12 +989,9 @@ export function placeZoneLabels(
   });
 }
 
-function drawOverlays(ctx: CanvasRenderingContext2D, overlays: ZoneOverlay[], view: StageView): void {
-  const fontSize = 10 / view.scale;
+/** The coloured areas of the zones (their names are written by drawZoneNames). */
+function drawZoneAreas(ctx: CanvasRenderingContext2D, overlays: ZoneOverlay[], view: StageView): void {
   ctx.save();
-  ctx.font = `700 ${fontSize}px ${FONT}`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'alphabetic';
   for (const zone of overlays) {
     const { x, y, w, h } = zone.rect;
     ctx.globalAlpha = zone.kind === 'start' ? 0.1 : 0.3;
@@ -1007,7 +1004,19 @@ function drawOverlays(ctx: CanvasRenderingContext2D, overlays: ZoneOverlay[], vi
     ctx.strokeRect(x, y, w, h);
     ctx.setLineDash([]);
   }
-  // the names go on top of all the areas, each where it does not run into another name and all of it is on the stage
+  ctx.restore();
+}
+
+/**
+ * The names of the zones: on top of all the areas, each where it does not run into another name
+ * and all of it is on the stage.
+ */
+function drawZoneNames(ctx: CanvasRenderingContext2D, overlays: ZoneOverlay[], view: StageView): void {
+  const fontSize = 10 / view.scale;
+  ctx.save();
+  ctx.font = `700 ${fontSize}px ${FONT}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
   const corner = viewToMat(view, 0, 0);
   // (the halo of the letters needs a little room too)
   const edge = 3 / view.scale;
@@ -1241,11 +1250,22 @@ export function drawStage(ctx: CanvasRenderingContext2D, scene: StageScene): voi
   ctx.restore();
   scene.mat.paint(ctx, view);
 
-  if (options.overlays) drawOverlays(ctx, scene.overlays, view);
+  // The zones: their coloured areas lie on the mat, under everything else. Their names are
+  // written right after them - except on a field with walls: a name is often wider than its
+  // area (a room of Fire Chief is one cell, "Living room (fire)" is longer than that on a small
+  // stage), so a wall would be drawn across it and hide some of its letters. There the names
+  // are written after the walls.
+  const walls = sim.world.walls ?? [];
+  const namesOverWalls = walls.length > 0;
+  if (options.overlays) {
+    drawZoneAreas(ctx, scene.overlays, view);
+    if (!namesOverWalls) drawZoneNames(ctx, scene.overlays, view);
+  }
   if (scene.placing) drawStartZone(ctx, sim, view, scene.ghost !== null);
   if (options.trail) drawTrail(ctx, scene.trail, view);
   // the fixed walls of the match (a game without walls has none)
-  drawWalls(ctx, sim.world.walls ?? [], view);
+  drawWalls(ctx, walls, view);
+  if (options.overlays && namesOverWalls) drawZoneNames(ctx, scene.overlays, view);
 
   // game elements, lowest first, so that what stands on a tower is drawn over the tower
   const holding = sim.world.robot.gripper.holding;

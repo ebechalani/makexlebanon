@@ -18,12 +18,14 @@ import { wallFootprint } from '../core/walls';
 import {
   FIELD_SIZE,
   FIRE_SPOTS,
+  OUTER_WALLS,
   ROOM_IDS,
   START_RECT,
   TARGET_DEPTH,
   TARGET_HEIGHT,
   TARGET_WIDTH,
   WALL_POSITIONS,
+  WALL_THICKNESS,
   roomRect,
   targetPose,
   wallIndexBetween,
@@ -36,6 +38,7 @@ import {
   MATCH_DURATION,
   MAX_RESTARTS,
   MAX_SCORE,
+  POINTS_ENTER_ROOM,
   START_POSITION_LINE_ID,
   TARGET_BODY_ID,
   TARGET_DISPLACED_MM,
@@ -50,7 +53,7 @@ import {
   targetOf,
   targetShift,
 } from './game';
-import { FIRE_CHIEF_ROBOT, START_POSE } from './robot';
+import { FAN, FIRE_CHIEF_ROBOT, START_POSE } from './robot';
 import {
   NAMED_MAZES,
   defaultScenario,
@@ -1671,24 +1674,54 @@ test('referee: random mazes - the fire target is never where the robot starts, a
 });
 
 // =============================================================================================
-// The one list of assumptions
+// The list of the organiser's decisions and the one list of assumptions
 // =============================================================================================
 
-test('assumptions: the one list at the top of game.ts names every constant that holds an assumption', () => {
+test('decisions and assumptions: the two lists at the top of game.ts name every constant that holds one, each in the right list', () => {
   const read = (file: string): string => readFileSync(fileURLToPath(new URL(file, import.meta.url)), 'utf8');
   const game = read('./game.ts');
   const field = read('./field.ts');
   const robot = read('./robot.ts');
-  // the list is the header comment of game.ts (everything before the first import)
-  const list = game.slice(0, game.indexOf('\nimport '));
-  assert.match(list, /ASSUMPTIONS AND DECISIONS - the one list of everything the draft rules do not say/);
-  // the constants that hold an assumption, a limit of the referee or a number of the robot's add-ons
+  // the lists are in the header comment of game.ts (everything before the first import):
+  // first what the organiser has decided, then what is still assumed
+  const header = game.slice(0, game.indexOf('\nimport '));
+  const decisionsAt = header.indexOf('DECISIONS OF THE ORGANISER - what the organiser has answered since the draft rules');
+  const assumptionsAt = header.indexOf('ASSUMPTIONS - the one list of everything neither the draft rules nor the organiser say');
+  assert.ok(decisionsAt > 0 && assumptionsAt > decisionsAt, 'both lists are there, the decisions first');
+  const decisions = header.slice(decisionsAt, assumptionsAt);
+  const assumptions = header.slice(assumptionsAt);
+  const names = (text: string, name: string): boolean => new RegExp(`\\b${name}\\b`).test(text);
+
+  // ---- the organiser's five answers are decisions, with the constant that holds each ...
+  for (const [said, constants] of [
+    [/D1\. Touching or hitting the fire target without moving it costs nothing\. Only a target\s+\*\s+that is moved ends the attempt/, []],
+    [/D2\. A fan action from outside the room is valid when the fan is within 30 cm/, ['FAN']],
+    [/D3\. The 30 points need only the position[^]*No reading of the flame sensor is needed/, []],
+    [/D4\. The fire target is 60 mm wide and 120 mm high/, ['TARGET_WIDTH', 'TARGET_HEIGHT']],
+    [/D5\. The outer edge of the field is walled/, ['OUTER_WALLS']],
+    [/the walls are 3 mm thick/, ['WALL_THICKNESS']],
+  ] as const) {
+    assert.match(decisions, said);
+    for (const name of constants) assert.ok(names(decisions, name), `${name} is in the list of decisions`);
+  }
+  // ... with the numbers the code really has
+  assert.equal(TARGET_WIDTH, 60);
+  assert.equal(TARGET_HEIGHT, 120);
+  assert.equal(OUTER_WALLS, true);
+  assert.equal(WALL_THICKNESS, 3);
+  assert.equal(FAN.reachMm, 300);
+  assert.equal(MAX_SCORE - POINTS_ENTER_ROOM, 80, 'D2: mission complete without a room is 80 points');
+  // ... and none of them is still called an assumption
+  for (const name of ['OUTER_WALLS', 'TARGET_WIDTH', 'TARGET_HEIGHT', 'WALL_THICKNESS']) {
+    assert.ok(!names(assumptions, name), `${name} is not in the list of assumptions any more`);
+  }
+  assert.ok(!/needs neither the room nor a flame reading/.test(assumptions), 'the fan action from outside the room is a decision now');
+  assert.ok(!/always walled/.test(assumptions));
+
+  // ---- the constants that hold an assumption, a limit of the referee or a number of the robot's add-ons
   for (const name of [
-    'OUTER_WALLS',
     'WALL_LENGTH',
-    'TARGET_WIDTH',
     'TARGET_DEPTH',
-    'TARGET_HEIGHT',
     'TARGET_MASS',
     'EMITTER_HEIGHT',
     'EMITTER_HALF_ANGLE_DEG',
@@ -1699,27 +1732,56 @@ test('assumptions: the one list at the top of game.ts names every constant that 
     'TARGET_DISPLACED_MM',
     'TOUCH_MM',
   ]) {
-    assert.match(list, new RegExp(`\\b${name}\\b`), `${name} is in the list`);
+    assert.ok(names(assumptions, name), `${name} is in the list of assumptions`);
   }
-  // A constant whose own comment says ASSUMPTION is in the list: one that is added later
-  // without a line there fails here. (A comment "ASSUMPTION ..." followed by "... and" comments
-  // covers the constants that follow it, as with the three measures of the target.)
-  for (const [file, source] of [['field.ts', field], ['game.ts', game.slice(list.length)]] as const) {
+
+  // ---- A constant whose own comment says ASSUMPTION is in the list of assumptions, and one
+  // whose comment says DECISION is in the list of decisions - and in that list only. One that
+  // is added later without a line there, or moved without its comment, fails here. (A comment
+  // "ASSUMPTION ..." followed by "... and" comments covers the constants that follow it.)
+  let marked = 0;
+  for (const [file, source] of [['field.ts', field], ['game.ts', game.slice(header.length)]] as const) {
     // (every doc comment that stands directly in front of an exported constant)
-    const marked = [...source.matchAll(/\/\*\*((?:(?!\*\/)[^])*)\*\/\s*export const (\w+)/g)]
-      .filter((m) => m[1].includes('ASSUMPTION'))
-      .map((m) => m[2]);
-    assert.ok(marked.length >= 2, `${file}: ${marked.join(', ')}`);
-    for (const name of marked) assert.match(list, new RegExp(`\\b${name}\\b`), `${file}: ${name} is marked ASSUMPTION but is not in the list`);
+    for (const m of source.matchAll(/\/\*\*((?:(?!\*\/)[^])*)\*\/\s*export const (\w+)/g)) {
+      const assumed = m[1].includes('ASSUMPTION');
+      const decided = m[1].includes('DECISION');
+      if (!assumed && !decided) continue;
+      marked++;
+      assert.ok(!(assumed && decided), `${file}: the comment of ${m[2]} says both ASSUMPTION and DECISION`);
+      if (assumed) {
+        assert.ok(names(assumptions, m[2]), `${file}: ${m[2]} is marked ASSUMPTION but is not in the list of assumptions`);
+        assert.ok(!names(decisions, m[2]), `${file}: ${m[2]} is marked ASSUMPTION but stands in the list of decisions`);
+      } else {
+        assert.ok(names(decisions, m[2]), `${file}: ${m[2]} is marked DECISION but is not in the list of decisions`);
+        assert.ok(!names(assumptions, m[2]), `${file}: ${m[2]} is marked DECISION but stands in the list of assumptions`);
+      }
+    }
   }
-  // the two other files that hold measures point to the list
+  assert.ok(marked >= 10, `${marked} constants carry a mark`);
+  // the marks of the organiser's answers, one by one
+  for (const [name, mark] of [
+    ['OUTER_WALLS', 'DECISION'],
+    ['WALL_THICKNESS', 'DECISION'],
+    ['TARGET_WIDTH', 'DECISION'],
+    ['TARGET_HEIGHT', 'DECISION'],
+    ['TARGET_DEPTH', 'ASSUMPTION'],
+    ['TARGET_MASS', 'ASSUMPTION'],
+    ['WALL_LENGTH', 'ASSUMPTION'],
+  ] as const) {
+    const comment = new RegExp(`\\/\\*\\*((?:(?!\\*\\/)[^])*)\\*\\/\\s*export const ${name}\\b`).exec(field)?.[1] ?? '';
+    assert.ok(comment.includes(mark), `field.ts: the comment of ${name} says ${mark}`);
+    assert.ok(!comment.includes(mark === 'DECISION' ? 'ASSUMPTION' : 'DECISION'), `field.ts: the comment of ${name} says only ${mark}`);
+  }
+
+  // the two other files that hold measures point to the lists
   assert.match(field, /The ONE list of all assumptions and decisions of this game[^]*is at the top of \.\/game\.ts/);
-  assert.match(robot, /the list of every assumption\s+\* of this game is at the top of \.\/game\.ts/);
-  // the decisions of the referee that a reviewer found unnamed are named there
+  assert.match(robot, /the list of every\s+\* assumption and decision of this game is at the top of \.\/game\.ts/);
+  // (the reach of the fan is the one number of the robot that the organiser has decided)
+  assert.match(robot, /300 mm from the fan \(DECISION of the organiser/);
+  // the choices of the referee that a reviewer found unnamed are named in the list of assumptions
   for (const said of [
     /cannot fall over/,
     /"Stationary" \(§7\) = both wheel speeds are 0/,
-    /needs neither the room nor a flame reading/,
     /"mission\s+\*?\s*complete" on that tick wins over "time"/,
     /ScoreReport\.complete is true only with all four achievements/,
     /'program-ended'/,
@@ -1727,6 +1789,6 @@ test('assumptions: the one list at the top of game.ts names every constant that 
     /perfectly smooth/,
     /Rule sentences that are NOT implemented/,
   ]) {
-    assert.match(list, said);
+    assert.match(assumptions, said);
   }
 });

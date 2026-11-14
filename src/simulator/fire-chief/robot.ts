@@ -12,8 +12,9 @@
  * The chassis is 175 mm long and 130 mm wide: inside the 180 x 130 mm limit of the rules.
  *
  * The numbers of the flame sensor and of the fan are ASSUMPTIONS (the organiser has not
- * published a sensor or a fan). They are all here, in one place; the list of every assumption
- * of this game is at the top of ./game.ts.
+ * published a sensor or a fan) - all but one: that a fan action counts within 30 cm of the
+ * target is a DECISION of the organiser. They are all here, in one place; the list of every
+ * assumption and decision of this game is at the top of ./game.ts.
  */
 import { DEFAULT_ROBOT_CONFIG } from '../core/robot';
 import type { FanConfig, FlameSensorConfig, Pose, RobotConfig } from '../core/types';
@@ -67,7 +68,7 @@ export const FAN: FanConfig = {
   // "directed": the middle of the target is at most 20 degrees away from straight ahead
   // (or the fan points straight at some other part of the target) ...
   coneHalfAngleDeg: 20,
-  // ... and at most 300 mm from the fan (ASSUMPTION: about one cell)
+  // ... and at most 300 mm from the fan (DECISION of the organiser: a fan action counts within 30 cm)
   reachMm: 300,
 };
 

@@ -43,6 +43,7 @@ import type {
 import { PROBE_NAMES, SERVO_PORTS } from '../core/types';
 import { appendLog, describeEvent, restartFacts, type LogLine } from './format';
 import { hasHatBlock, hasRunnableScript } from './program-file';
+import { capital } from './screen-words';
 import { Trail } from './trail';
 
 // =============================================================================================
@@ -100,6 +101,8 @@ export interface UseSimulationOptions<S> {
   onActiveBlocks?: (ids: string[]) => void;
   /** what the game calls one scored run, for the lines of the console ("match" when left out) */
   matchWord?: string;
+  /** what the game calls one starting arrangement, for the console line of a start ("combination" when left out) */
+  scenarioWord?: string;
 }
 
 export interface SimulationController<S> {
@@ -402,7 +405,7 @@ export function useSimulation<S>(options: UseSimulationOptions<S>): SimulationCo
     tickDebtRef.current = 0;
 
     logsRef.current = [];
-    addLog({ time: 0, level: 'info', text: `Start! Combination ${game.encodeScenario(scenarioRef.current)}.` });
+    addLog({ time: 0, level: 'info', text: `Start! ${capital(optionsRef.current.scenarioWord ?? 'combination')} ${game.encodeScenario(scenarioRef.current)}.` });
     if (!hasHatBlock(program)) {
       addLog({
         time: 0,

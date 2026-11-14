@@ -35,13 +35,16 @@ export type Category = {
   /**
    * An online simulator for this category. When set, the category page shows a
    * "try the simulator" block, the season page labels the category "Online simulator",
-   * and the season block on the homepage links to it.
+   * the season block on the homepage links to it, and the list of simulators
+   * (/training/simulator) shows it with its picture.
    */
   simulator?: {
     /** The simulator's page on this site. */
     href: string;
     /** One or two sentences shown next to the button. */
     summary: string;
+    /** Picture of the simulator's mat for the list of simulators: a file under public/. */
+    mat?: string;
   };
 };
 
@@ -104,6 +107,7 @@ export const seasons: Season[] = [
             'Build a program with mBlock-style blocks and watch the mBot2 run it on the Fire Rescue ' +
             'mat — on any starting combination the referee could draw, scored by the category rules. ' +
             'It runs in the browser: no robot and no installation needed.',
+          mat: '/simulator/fire-rescue/mat.webp',
         },
       },
       {
@@ -112,6 +116,15 @@ export const seasons: Season[] = [
         ageRange: '14–17 years',
         platform: 'mBot2 + vision',
         summary: 'Two robots. One operation. Command the whole response.',
+        simulator: {
+          href: '/training/simulator/fire-chief',
+          summary:
+            'Build a program with mBlock-style blocks and watch the mBot2 find its way through the ' +
+            'Fire Chief maze to the fire, with a flame sensor and a fan — in any maze you build or ' +
+            'draw, scored by the draft rules of the category. ' +
+            'It runs in the browser: no robot and no installation needed.',
+          mat: '/simulator/fire-chief/mat.webp',
+        },
       },
     ],
   },
@@ -365,6 +378,16 @@ export const trainingTracks: TrainingTrack[] = [
     summary:
       'Program the mBot2 with blocks and watch it run on the 2027 Fire Rescue mat, on any ' +
       'starting combination, scored by the category rules. Works in the browser, no robot needed.',
+    cta: 'Open the simulator',
+  },
+  {
+    name: 'Fire Chief — mBot2 simulator',
+    ageRange: '14–17 years',
+    status: 'available',
+    href: '/training/simulator/fire-chief',
+    summary:
+      'Program the mBot2 with blocks and watch it find the fire in the 2027 Fire Chief maze, in any ' +
+      'maze, scored by the draft rules of the category. Works in the browser, no robot needed.',
     cta: 'Open the simulator',
   },
   { name: 'Inspire — Fruit Wonderland', ageRange: '4–7 years', status: 'coming-soon', summary: 'Introductory driving and mission basics.' },

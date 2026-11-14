@@ -126,8 +126,10 @@ export function programFileName(gameId: string, now: Date = new Date()): string 
 // Every game has its own block palette (../blocks/palettes.ts): Fire Rescue has the Servos and
 // the Gripper, Fire Chief the DC motors and the flame sensor. A program file made in one game
 // opens in the other - every block of the simulator is known to every editor and to the
-// interpreter - but a block for a part this robot does not have does nothing when it runs. The
-// student has to be told, in plain words, at the moment the file is opened.
+// interpreter - but a block for a part this robot does not have does not work when it runs: a
+// Gripper block does nothing, a flame sensor block always reads "no flame", a DC motor block
+// drives a port with nothing on it. The student has to be told, in plain words, at the moment
+// the file is opened.
 
 /** The blocks of a program that this game's palette does not offer. */
 export interface ForeignBlocks {
@@ -193,6 +195,6 @@ export function otherGameNote(program: ProgramJson, fileGame: string | null, gam
   const one = foreign.count === 1;
   return (
     `${from}${foreign.count} of its blocks ${one ? 'is' : 'are'} for parts this robot does not have ` +
-    `(${foreign.groups.join(', ')}): ${one ? 'it does' : 'they do'} nothing here.`
+    `(${foreign.groups.join(', ')}): ${one ? 'it does' : 'they do'} not work here.`
   );
 }

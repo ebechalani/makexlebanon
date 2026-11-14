@@ -1,8 +1,9 @@
 /**
- * What the small maze panel of Fire Chief offers (MazePicker.tsx): the ready-made mazes of the
- * game by name, and the words for the two rooms and the three places of the fire.
+ * What the maze editor of Fire Chief offers ready-made (MazeEditor.tsx): the named mazes of the
+ * game, and the words for the two rooms and the three places of the fire.
  *
- * It is the stand-in until the maze editor exists - nothing here draws or edits a wall.
+ * To add a named maze, draw it in ../../fire-chief/scenario.ts (NAMED_MAZES): it then has a
+ * button here and is part of "Test on many mazes" (./maze-batch.ts) without another change.
  *
  * Plain TypeScript (no DOM, no React), so the tests can read it under Node.
  */
@@ -49,7 +50,7 @@ export const MAZE_CHOICES: MazeChoice[] = (() => {
   return choices.map(({ id, label, about, walls }) => ({ id, label, about, walls }));
 })();
 
-/** The ready-made maze that is on the stage, or null for any other maze (a random one, one from a code). */
+/** The ready-made maze that is on the stage, or null for any other maze (built by hand, a random one, one from a code). */
 export function mazeChoiceOf(scenario: Pick<FireChiefScenario, 'walls'>): MazeChoice | null {
   return MAZE_CHOICES.find((choice) => sameWalls(choice.walls, scenario.walls)) ?? null;
 }
