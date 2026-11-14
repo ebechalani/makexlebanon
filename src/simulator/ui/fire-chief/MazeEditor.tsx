@@ -20,6 +20,7 @@
  */
 import { useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { FIRE_SPOTS, ROOM_IDS, type FireSpot, type RoomId } from '../../fire-chief/field';
+import { TARGET_FILL } from '../../fire-chief/game';
 import { toggleWall, withFire, type FireChiefScenario } from '../../fire-chief/scenario';
 import { MAZE_CHOICES, mazeChoiceOf, ROOM_LABEL, SPOT_LABEL, withMaze } from './maze-choices';
 import { HARDEST_LEVEL, LEVEL_NOTE, levelFacts, levelTitle, mazeFacts, mazeLevel } from './maze-level';
@@ -196,13 +197,14 @@ export function MazeEditor({ scenario, onChange }: MazeEditorProps) {
                 <rect x={0} y={0} width={PLAN_SIZE} height={PLAN_SIZE} fill="none" stroke={INK} strokeWidth="10" strokeLinejoin="round" />
                 {/* the fire target where the game puts it (true to size), and a flame in front of it so that it is seen on a small plan */}
                 <g data-fire={`${scenario.fireRoom}-${scenario.fireSpot}`}>
+                  {/* (red, the colour of the target on the stage and in the rules: the colour sensor reads "red" on it) */}
                   <rect
                     x={fire.x - fire.width / 2}
                     y={fire.y - fire.depth / 2}
                     width={fire.width}
                     height={fire.depth}
-                    fill="#f97316"
-                    stroke="#7c2d12"
+                    fill={TARGET_FILL}
+                    stroke="#7f1d1d"
                     strokeWidth="1.5"
                     transform={`rotate(${fire.turn} ${fire.x} ${fire.y})`}
                   />

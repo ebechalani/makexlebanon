@@ -7,23 +7,10 @@
  * (./robot-parts.ts): the colour in the claw and the two servos of the gripper, or the colour
  * sensor at the front, the DC motor ports and the fan.
  */
-import { PROBE_NAMES, type ProbeName, type ProbeReading, type RobotConfig, type Scalar, type SensorColor } from '../core/types';
+import { PROBE_NAMES, type ProbeName, type ProbeReading, type RobotConfig, type Scalar } from '../core/types';
 import { formatNumber, rgbCss } from './format';
-import { dcMotorUse, robotParts } from './robot-parts';
+import { colourRangeNote, dcMotorUse, robotParts, SENSOR_COLOR_CSS } from './robot-parts';
 import type { UiSnapshot } from './useSimulation';
-
-/** CSS colours for the colour names a sensor can report. */
-const SENSOR_COLOR_CSS: Record<SensorColor | 'none', string> = {
-  black: '#111827',
-  white: '#ffffff',
-  red: '#ef4444',
-  yellow: '#facc15',
-  green: '#22c55e',
-  cyan: '#22d3ee',
-  blue: '#3b82f6',
-  purple: '#a855f7',
-  none: 'transparent',
-};
 
 const PROBE_HINT: Record<ProbeName, string> = {
   L2: 'far left',
@@ -109,6 +96,31 @@ export function SensorDashboard({ snapshot, robotConfig }: SensorDashboardProps)
         </dl>
       </div>
 
+      {/* The colour sensor at the front (a robot that has one) gets a row of the full width, with a
+          sentence under it that is always to be read: how close a thing must be. Without it a
+          student sees "none" while the robot stands right in front of the target, and cannot
+          know why - a hint that needs a mouse is no help on a tablet. */}
+      {parts.frontColour && (
+        <dl>
+          <div
+            className="flex flex-wrap items-center justify-between gap-x-2 border-b border-slate-100 py-1"
+            title={`What the colour sensor at the front of the robot reads. In this simulator it names the colour of a thing that is ${formatNumber(parts.frontColour.rangeMm)} mm or less in front of it. "none" = nothing is that close.`}
+          >
+            <dt className="text-xs text-ink-500">Colour sensor</dt>
+            {/* (the words are the ones the "colour sensor (1) colour" block gives: a colour name, or "none") */}
+            <dd className="flex items-center gap-1.5 text-sm font-semibold text-ink-900">
+              {s.frontColor !== 'none' && (
+                <span className="h-3.5 w-3.5 rounded-full ring-1 ring-slate-400" style={{ background: SENSOR_COLOR_CSS[s.frontColor] }} aria-hidden="true" />
+              )}
+              {s.frontColor}
+            </dd>
+            <dd className="basis-full text-[11px] leading-snug text-ink-500" data-colour-range>
+              {colourRangeNote(parts.frontColour)}
+            </dd>
+          </div>
+        </dl>
+      )}
+
       <dl className="grid grid-cols-2 gap-x-4">
         <Value
           label="Ultrasonic"
@@ -123,21 +135,6 @@ export function SensorDashboard({ snapshot, robotConfig }: SensorDashboardProps)
                 <span className="h-3.5 w-3.5 rounded-full ring-1 ring-slate-400" style={{ background: SENSOR_COLOR_CSS[s.frontColor] }} aria-hidden="true" />
               )}
               {s.frontColor === 'none' ? 'nothing' : s.frontColor}
-            </dd>
-          </div>
-        )}
-        {parts.frontColour && (
-          <div
-            className="flex items-center justify-between gap-2 border-b border-slate-100 py-1"
-            title={`What the colour sensor at the front of the robot reads. In this simulator it names the colour of a thing that is ${formatNumber(parts.frontColour.rangeMm)} mm or less in front of it. "none" = nothing is that close.`}
-          >
-            <dt className="text-xs text-ink-500">Colour sensor</dt>
-            {/* (the words are the ones the "colour sensor (1) colour" block gives: a colour name, or "none") */}
-            <dd className="flex items-center gap-1.5 text-sm font-semibold text-ink-900">
-              {s.frontColor !== 'none' && (
-                <span className="h-3.5 w-3.5 rounded-full ring-1 ring-slate-400" style={{ background: SENSOR_COLOR_CSS[s.frontColor] }} aria-hidden="true" />
-              )}
-              {s.frontColor}
             </dd>
           </div>
         )}

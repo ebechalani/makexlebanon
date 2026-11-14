@@ -56,6 +56,11 @@ const BIG =
 
 /** Smaller buttons of the second row; their icons are dropped when the column is narrow. */
 const SMALL = `${button.plain} px-2`;
+/**
+ * The same button when it is off but must keep the keyboard focus (see `usedUp` below): the look
+ * of a button that is switched off, and no change of colour under the pointer or a finger.
+ */
+const SMALL_USED_UP = `${SMALL.replace(/ (?:hover|active):\S+/g, '')} cursor-not-allowed opacity-40`;
 /** The same button when it is the natural next step (Reset field once the match is over). */
 const SMALL_NEXT = `${button.accent} px-2`;
 const SMALL_ICON = `hidden h-4 w-4 @[34rem]:block`;
@@ -80,6 +85,16 @@ export function ControlBar(props: ControlBarProps) {
   const { match } = words;
   const restart = restartButton({ penalty: props.restartPenalty, rules: props.restartRules }, props.restartsLeft ?? Infinity, match);
   const smallIcon = restart.tone === 'cost' ? SMALL_ICON : SMALL_ICON_LATER;
+
+  // In a game that allows only so many restarts, the last one switches the "Restart" button off
+  // in the middle of a match. A button that is really switched off (`disabled`) while it has
+  // the keyboard focus drops the focus to the page, and somebody who works with the keyboard
+  // has to find their way back. So during a match a used-up button is "off" in every way but
+  // that one: it looks off, it says that it is off (aria-disabled) and why (its hint), a press
+  // does nothing - and the focus stays on it. (The focus is not moved on to "Finished" instead:
+  // somebody who holds the Enter key a moment too long would end the attempt with it.)
+  // A game without a limit never switches the button off during a match: nothing changes there.
+  const usedUp = active && !restart.allowed;
 
   const speedPicker = (
     <div className="flex items-center gap-2">
@@ -182,9 +197,10 @@ export function ControlBar(props: ControlBarProps) {
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
-          onClick={props.onRestart}
-          disabled={!active || !restart.allowed}
-          className={SMALL}
+          onClick={usedUp ? undefined : props.onRestart}
+          disabled={!active}
+          aria-disabled={usedUp ? true : undefined}
+          className={usedUp ? SMALL_USED_UP : SMALL}
           title={restart.hint}
         >
           <RestartIcon className={`${smallIcon} text-amber-600`} />

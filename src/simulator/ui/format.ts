@@ -200,6 +200,21 @@ export function wrapScreenLines(lines: readonly string[], columns: number): stri
   return rows;
 }
 
+/** What the head of the closed CyberPi panel says when it lists what the panel holds. */
+export const CYBERPI_PANEL_HOLDS = 'screen, LEDs, buttons A / B, joystick';
+
+/**
+ * The few words on the closed CyberPi panel. They list what the panel holds - or, in a game
+ * that asks for it (`showLastPrint`), they show the last line the program printed on the
+ * screen: 'screen: "Choose: Open field"'. A program that only prints a message and ends would
+ * otherwise say it where nobody looks: the panel is closed until a student opens it.
+ */
+export function cyberPiSummary(lines: readonly string[], showLastPrint: boolean): string {
+  if (!showLastPrint) return CYBERPI_PANEL_HOLDS;
+  const last = [...lines].reverse().find((line) => line.trim() !== '');
+  return last === undefined ? CYBERPI_PANEL_HOLDS : `screen: "${last.trim()}"`;
+}
+
 export type LogLevel = 'info' | 'warn' | 'error' | 'event';
 
 export interface LogLine {

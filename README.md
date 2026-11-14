@@ -384,15 +384,18 @@ it is typed once per device, and the simulator checks it with the server again o
 
 The code is remembered once for both games. Somebody who typed a code in Fire Rescue — also
 long ago, before Fire Chief existed — finds the examples of Fire Chief open in the same
-browser without typing anything, and the other way round. (A page of the other game that is
-already open in another tab shows it after it is loaded again.)
+browser without typing anything, and the other way round. Other tabs of the same browser that
+have a simulator open follow at once: a code that is accepted in one tab opens the examples in
+the others too (each asks the server what the code opens in its own game).
 
 - **A member who gets an advanced code later** presses **Use a different code** in the same
   window and types the new one. Nothing has to be forgotten first. If the new code is
   accepted it takes the place of the old one; if it is not — a typing mistake — everything
   stays as it was.
 - **"Forget this code on this device"**, in the same window, removes the code from the
-  browser — useful on a shared computer. It is then forgotten for both games.
+  browser — useful on a shared computer. It is then forgotten for both games, and every other
+  tab of that browser that has a simulator open locks its examples in the same moment (also
+  the advanced ones): nobody has to remember to close or reload the other tab.
 
 #### What you change, and where
 
@@ -504,6 +507,14 @@ which kind was made. Then commit and push `content/simulator-codes.ts`.
   line of one of the two lists of codes was damaged while editing (a lost quote or bracket,
   for instance). It then changes nothing and writes no CSV file. Undo your last edit of
   `content/simulator-codes.ts` and run it again.
+- If `content/simulator-codes.ts` is not there at all, the script writes a new one: with the
+  same explanations, with the starter examples of both games open to everyone and the advanced
+  examples of both games kept for advanced codes — and with no code on it but the new ones, so
+  every code handed out before stops working. (You never need this; it is what happens after
+  the file was deleted.) The text of that new file is inside the script. **When an example is
+  added to a game, or its id, title or level changes, change `content/simulator-codes.ts` and
+  the same lines in `scripts/generate-simulator-codes.mjs`**: a test compares the two, and
+  another one makes a new file and checks that it hides every advanced example of both games.
 
 **Never commit the plain codes.** `content/simulator-codes.ts` holds only *fingerprints*: rows
 of letters and digits worked out from the codes, from which a code cannot be read back. The
@@ -530,7 +541,9 @@ The honest limits:
   stay open — in both games, and the advanced ones too, if it was an advanced code — for
   everybody who uses that browser on that computer afterwards, until somebody presses "Forget
   this code on this device", or you cancel the code. On school computers, ask people to press
-  it when they are done.
+  it when they are done. (Pressing it in one tab locks the examples in every open tab of that
+  browser. A very old browser that does not tell its other tabs still shows them there until
+  the tab is loaded again.)
 - **Forgetting a code does not empty the workspace.** A program that was loaded stays in the
   blocks — and is saved in that browser — until somebody presses **New** or loads something
   else. That goes for an advanced example as well.
@@ -557,7 +570,7 @@ The honest limits:
 npm run test:sim
 ```
 
-It runs more than nine hundred checks; among them, every example program of both games is
+It runs about a thousand checks; among them, every example program of both games is
 played on the real engine with the real referee and its score is compared. They also check
 `content/simulator-codes.ts` (a misspelt example id, an example that is on both lists, a
 damaged line, a code that is on both lists of codes) and that nothing about an example —
@@ -695,9 +708,10 @@ simulator: {
 The same entry puts the "Try the simulator" link on the homepage, the "Online simulator" label
 on the season page and the simulator block on the category page. The card on the Training page
 is the entry in `trainingTracks` (same file), and the two lines of the **Training** menu are in
-`content/site.ts`. The menu has one line per simulator, so that each is one click away; the
-list page is for visitors who come to `/training/simulator` itself (it used to send them on to
-Fire Rescue) and for search engines.
+`content/site.ts`. The menu has one line per simulator, so that each is one click away. The
+list page is linked from the Training page ("All mBot2 simulators", under the cards); it is
+also what visitors get who come to `/training/simulator` itself (that address used to send
+them on to Fire Rescue) and what search engines find.
 
 ### How the game is put together
 
@@ -806,12 +820,28 @@ Each answer turns an assumption into a decision (see the next section for the st
 5. **Can the target really stand in a corner?** With the three assumptions above, a 130 mm
    wide robot that drives at a corner target is stopped by the two walls of the corner when
    its nose is exactly 15 mm from the target. So it reads "red" there only while it touches
-   both walls (or is 2.5 mm from them at most), and with no margin at all. A sensor that sees
-   a few millimetres further, or no corner place, would remove this.
+   both walls (or is 2.5 mm from them at most), and with no margin at all: with a sensor that
+   reads from 14.999 mm the advanced example scores 30 points on the default maze, with 15 mm
+   100. A sensor that sees a few millimetres further, or no corner place, would remove this
+   (measured: a range of 20 mm leaves 4.9 mm to the walls, 25 mm leaves 8.4 mm, 30 mm 11.6 mm).
+   Three questions in one:
+   - **May a robot rest against the two walls of a corner?** The draft allows only "minor
+     accidental contact with a wall" (§11). The simulator does not judge it; the two examples
+     that go into the corner say "ask the referee first".
+   - **How far does the real sensor read?**
+   - **Does the corner place stay?**
 6. **Where may the target stand**, how deep and how heavy is it, and how far may it be pushed
    before it counts as moved? (Assumed: three places per room, 20 mm, light, 5 mm.)
 7. The exact texts of the DC motor blocks and of the colour sensor blocks in mBlock (the
    table above).
+8. **What "directed towards the wooden flame" means** (§7). The simulator counts a fan action
+   when the straight-ahead line of the fan hits the target, or the middle of the target is at
+   most 20 degrees to the side. A robot turned by exactly 20 degrees counts. The sentence of
+   the referee says "in this simulator" with that number, because it is no rule.
+9. **The words that introduce the category on the website.** `content/seasons.ts` said "Two
+   robots. One operation. Command the whole response." on the platform "mBot2 + vision" — the
+   teaser from before the draft rules. It now says what the draft rules say (one robot, a maze
+   that changes, find the fire; platform "mBot2"): see "Things left to fill in".
 
 #### When the organiser decides something
 
@@ -938,7 +968,12 @@ Use only blocks of the Fire Chief palette — blocks that exist in real mBlock. 
 Described in full in "Member codes for the simulator examples" above. In short:
 
 - **One address, two games.** Both simulators ask `/api/simulator/unlock`, and each says which
-  game it is. The answer holds the cards and the programs of that game only.
+  game it is. The answer holds the cards and the programs of that game only, and says the name
+  of the game back. A page takes an answer only when it is about its own game: should a tab
+  stay open while the website is put back to a state from before Fire Chief, that older server
+  answers every question with the examples of Fire Rescue — the Fire Chief page then shows
+  "could not be reached" instead of the cards of the other game. (An answer without a name
+  counts as Fire Rescue's, so the Fire Rescue page goes on working with such a server.)
 - **One set of codes.** A member code opens the member examples of both games, an advanced
   code shows every example of both. There is nothing to make or to hand out for Fire Chief.
 - **Typed once.** The browser keeps the code in one place for both games.
@@ -962,11 +997,30 @@ Described in full in "Member codes for the simulator examples" above. In short:
   reads "red" only while it touches the two walls of that corner (question 5 above).
 - **No reading of the colour sensor is worth a point.** The referee counts the position only,
   so a program that never reads a colour scores the same.
+- **The colour sensor reads only from 1.5 cm**, and on the screen that is a few dots: a robot
+  that looks as if it stood at the target can read "none". The screen says so in four places:
+  under the "Colour sensor" row of the Sensors panel (always to be read), on the closed
+  Sensors panel when the robot is close to something and reads "none" ("colour none (needs
+  1.5 cm)"), as a short line in front of the robot in the **Sensors** view (exactly as
+  long as the range; it takes the colour that is read), and in the Rules window.
+- **Walls are drawn thicker than they are** (6 dots at least, the real wall is 3 mm), around
+  their true middle line. The robot stops at the real wall, and the ruler measures the real
+  field: measured to the edge of a drawn wall it reads up to 1.5 cm short. The Rules window
+  says to measure to the middle of a drawn wall.
+- **The air of the fan is drawn 20 degrees to each side**, and the referee asks for the
+  *middle* of the target within those 20 degrees (or for the straight-ahead line of the fan to
+  hit the target). So the drawn air can lie on a part of the target while the fan action does
+  not count; the sentence of the referee then gives the angle. While the fan blows, the fan on
+  the robot has a bright ring: close to the target the air itself is hidden.
+- **The line above the mat says the end of an attempt in the referee's first words** ("Mission
+  complete at 0:14.4 with 80 of 100 points."), on two lines at most where the stage stands
+  beside the blocks. The whole sentence is at the top of the Score sheet and in the Console.
 - **A program that still holds flame sensor blocks** (saved in a browser or in a file while
   the page was being built) opens without them: the blocks are taken out, the rest of the
-  program stays, and one sentence at the bottom of the screen says so ("2 flame sensor blocks
-  were taken out of this program, because the simulator has no flame sensor any more: their
-  places are empty now."). Without this, Blockly would refuse the whole program. The code is
+  program stays, and two sentences at the bottom of the screen say so ("2 flame sensor blocks
+  were taken out of this program, because the simulator has no flame sensor any more. Look at
+  the places where they were: a slot there is empty now, or shows a number or a text that you
+  did not choose."). Without this, Blockly would refuse the whole program. The code is
   `withoutRetiredBlocks` in `src/simulator/ui/program-file.ts`; the page with the flame sensor
   was never published, so it can go once nobody can hold such a program any more.
 - **The level of a maze** is counted from its walls and its shortest way. It says nothing
@@ -1051,12 +1105,17 @@ These are marked with `TODO` or `NOTE` comments in `content/seasons.ts`:
   photographs on the Drive are not. See "Still not imported" above.
 - **Ranking-card captions** — each 2026 gallery has a `captions.json` describing the division
   and age band. Edit it to add winner names, which become the alt text.
-- **The Fire Chief category text** — `content/seasons.ts` still introduces Fire Chief as "Two
-  robots. One operation. Command the whole response." on the platform "mBot2 + vision". The
-  draft rules of the category describe one robot in a maze, with a fan and a sensor that finds
-  the fire (the organiser has since decided for a colour sensor and a red fire target). The
-  category page now shows that older line directly above the simulator block: change
-  `summary` and `platform` when the category is announced in full.
+- **The Fire Chief category text — to confirm.** `content/seasons.ts` introduced Fire Chief as
+  "Two robots. One operation. Command the whole response." on the platform "mBot2 + vision":
+  the teaser from before the draft rules. The draft rules of the category describe one robot
+  in a maze that changes, with a fan and a sensor that finds the fire, and no camera — and the
+  category page shows the simulator, which plays exactly that, right under the teaser. So the
+  teaser now reads "A maze that changes every round. One robot, on its own. Find the fire."
+  on the platform "mBot2", and the introduction of the 2027 season ends "… to a robot that
+  finds the fire in a maze that keeps changing" instead of "… to a coordinated two-robot rescue
+  operation". These three wordings are not the organiser's own: they say only what the draft
+  rules say. Replace them (`summary`, `platform`, and `intro` of the 2027 season) with the
+  organiser's words when the category is announced in full.
 - **Training tracks** — four of the seven are marked `coming-soon`. Write the content, then
   change `status` to `available` and add an `href` in `content/seasons.ts`. (A track can also
   set `cta` to change the wording of its link — the simulator's card says "Open the simulator"

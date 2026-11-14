@@ -55,6 +55,9 @@ export default function FireChiefSimulator() {
       words={FIRE_CHIEF_WORDS}
       // in the middle of START, facing up the mat: the place the examples count on
       initialStartPose={START_POSE}
+      // A program of this game often says what it found on the CyberPi screen ("No red here",
+      // "Choose: Open field") and ends: the closed CyberPi panel shows the last line it printed.
+      showLastPrint
       // the fire can stand in either top corner of the mat: the "Enlarge" button lies on the bottom corner
       enlargeButtonCorner="bottom"
       renderCombinationEditor={renderCombinationEditor}

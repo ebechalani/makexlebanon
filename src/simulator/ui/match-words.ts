@@ -84,3 +84,28 @@ export function finishSentence(reason: FinishReason | null, detail: string | nul
   if (own) return /[.!?]$/.test(own) ? own : `${own}.`;
   return `${finishText(reason)} at ${timeText(time)}.`;
 }
+
+/**
+ * The first statement of the referee's sentence about the end of a match, for the status line
+ * above the mat:
+ *
+ *   "Mission complete at 0:14.4 with 80 of 100 points: the fan blew ... Not earned: ..."
+ *       -> "Mission complete at 0:14.4 with 80 of 100 points."
+ *   "The robot pushed the fire target out of its place (by 6 mm). The attempt ends here; ..."
+ *       -> "The robot pushed the fire target out of its place (by 6 mm)."
+ *
+ * The status line has room for two lines of text; a longer one pushes the mat and the buttons
+ * under it down, out of a small window. So it says how the match ended in the referee's first
+ * words, and the whole sentence stands on the score sheet (which the button beside the status
+ * line opens) and in the console.
+ *
+ * It ends where the first sentence ends, or at the first colon that is followed by a blank
+ * (the colon inside a time, "0:14.4", is not one).
+ */
+export function finishHeadline(detail: string): string {
+  const own = detail.trim();
+  const end = /[.!?](?=\s|$)|:(?=\s)/.exec(own);
+  if (!end) return own === '' ? '' : `${own}.`;
+  const head = own.slice(0, end.index);
+  return `${head}${end[0] === ':' ? '.' : end[0]}`;
+}

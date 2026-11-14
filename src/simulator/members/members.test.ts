@@ -879,8 +879,18 @@ describe('two games behind one address: Fire Rescue and Fire Chief', () => {
     assert.equal(response.status, 200);
     assert.ok(response.body.ok);
     assert.equal(response.headers['Cache-Control'], 'no-store');
-    assert.deepEqual(Object.keys(response.body).sort(), ['cards', 'examples', 'levels', 'member', 'ok'], 'the same five fields as ever, in every game');
+    // the same five fields as ever, in every game - and, in front of them, the name of the game when the request gave one
+    const fields = Object.keys(response.body);
+    assert.deepEqual(fields.filter((field) => field !== 'game').sort(), ['cards', 'examples', 'levels', 'member', 'ok']);
+    if (fields.includes('game')) assert.deepEqual(fields.slice(0, 2), ['ok', 'game'], 'the name of the game stands right after "ok"');
     return response.body;
+  }
+
+  /** An answer without the name of its game: what the same answer is to a request that names no game. */
+  function withoutGame(response: UnlockResponse): UnlockResponse {
+    if (!response.body.ok) return response;
+    const { game: _named, ...rest } = response.body;
+    return { ...response, body: rest };
   }
 
   /** A text as it stands inside an answer: with its quotes and line breaks written the JSON way. */
@@ -955,8 +965,16 @@ describe('two games behind one address: Fire Rescue and Fire Chief', () => {
         for (const word of words) assert.ok(!text.includes(word), `${who}, ${game.game}: the answer does not hold "${word}" of ${other.game}`);
       }
     }
-    // (nor the name of a game: an answer is about the game that was asked for, and does not say which others there are)
-    for (const other of ALL_GAMES) assert.ok(!text.includes(other.game), `${who}, ${game.game}: the answer does not name the game "${other.game}"`);
+    // (nor the name of another game: an answer is about the game that was asked for, and does not say which others there are.
+    //  Its own game it names once at most - the name the request gave, said back in "game" - and nowhere else.)
+    for (const other of ALL_GAMES) {
+      const times = text.split(other.game).length - 1;
+      if (other !== game) assert.equal(times, 0, `${who}, ${game.game}: the answer does not name the game "${other.game}"`);
+      else {
+        const named = response.body.ok && response.body.game !== undefined;
+        assert.equal(times, named ? 1 : 0, `${who}, ${game.game}: the answer names its own game ${named ? 'once, in "game"' : 'nowhere: the request named none'}`);
+      }
+    }
   }
 
   for (const rule of RULE) {
@@ -968,6 +986,7 @@ describe('two games behind one address: Fire Rescue and Fire Chief', () => {
     test(`${name}, no code: ${rule.forMembers.length} cards, the ${rule.starters.length} starters to open - and nothing else of either game`, async () => {
       const response = await ask(name, null);
       const body = yes(response);
+      assert.equal(body.game, name, 'the answer says which game it is about: the one the request named');
       assert.equal(body.member, false);
       assert.deepEqual(ids(body.cards), rule.forMembers);
       assert.deepEqual(ids(body.examples), rule.starters);
@@ -999,6 +1018,7 @@ describe('two games behind one address: Fire Rescue and Fire Chief', () => {
       for (const code of [CODE_A, CODE_B, 'fire bbbb 3333']) {
         const response = await ask(name, code);
         const body = yes(response);
+        assert.equal(body.game, name);
         assert.equal(body.member, true);
         assert.deepEqual(ids(body.cards), rule.forMembers);
         assert.deepEqual(ids(body.examples), rule.forMembers, 'every card can be opened');
@@ -1015,6 +1035,7 @@ describe('two games behind one address: Fire Rescue and Fire Chief', () => {
       for (const code of [CODE_ADVANCED, CODE_ADVANCED_2, ' dddd-5555 ']) {
         const response = await ask(name, code);
         const body = yes(response);
+        assert.equal(body.game, name);
         assert.equal(body.member, true);
         assert.deepEqual(ids(body.cards), rule.all);
         assert.deepEqual(ids(body.examples), rule.all);
@@ -1106,18 +1127,24 @@ describe('two games behind one address: Fire Rescue and Fire Chief', () => {
       ['a wrong code', CODE_NOT_LISTED],
     ] as const) {
       const unnamed = await ask(undefined, code);
-      assert.deepEqual(unnamed, await ask('fire-rescue', code), `${who}: no "game" is the same as "fire-rescue"`);
+      const named = await ask('fire-rescue', code);
+      // (the one difference: a request that names its game gets the name said back; a request without one does not)
+      assert.deepEqual(unnamed, withoutGame(named), `${who}: no "game" is the same as "fire-rescue"`);
+      if (unnamed.body.ok) {
+        assert.ok(!('game' in unnamed.body), `${who}: the answer to a request without "game" has no "game"`);
+        assert.ok(named.body.ok && named.body.game === 'fire-rescue', `${who}: the answer to "fire-rescue" says "fire-rescue"`);
+      } else assert.deepEqual(unnamed, named, `${who}: a "no" is the same with and without "game"`);
       assert.deepEqual(unnamed, await ask(undefined, code, before), `${who}: the answer of before, to the letter`);
       assert.equal(JSON.stringify(unnamed), JSON.stringify(await ask(undefined, code, before)), `${who}: also in the order of its fields`);
       // (a "no" is the same in every game; a "yes" is about Fire Rescue and not about Fire Chief)
       if (unnamed.body.ok) assert.notDeepEqual(unnamed, await ask('fire-chief', code), `${who}: and not the answer about Fire Chief`);
     }
     // the requests an open page of the live site sends, as its browser writes them - and an empty one
-    const visitor = yes(await ask('fire-rescue', null));
+    const visitor = yes(withoutGame(await ask('fire-rescue', null)));
     for (const body of ['{}', '', '  \n', '{"code":null}', '{"code":""}', '{"other":"field"}']) {
       assert.deepEqual((await handleUnlockRequest(post(body), setup)).body, visitor, body);
     }
-    const member = yes(await ask('fire-rescue', CODE_A));
+    const member = yes(withoutGame(await ask('fire-rescue', CODE_A)));
     assert.deepEqual((await handleUnlockRequest(post(`{"code":"${CODE_A}"}`), setup)).body, member);
     // such an answer holds nothing of Fire Chief
     assertOnlyTheirs(await ask(undefined, null), FIRE_RESCUE, RULE[0].forMembers, RULE[0].starters, 'a visitor who names no game');
@@ -1747,7 +1774,7 @@ describe('src/app/api/simulator/unlock/route.ts, with the owner\'s lists', () =>
     routePost(new Request('http://localhost/api/simulator/unlock', { method: 'POST', headers: contentType === null ? {} : { 'Content-Type': contentType }, body }));
 
   /** What the website's address answers to a visitor without a code, for one game: the text of the answer, and the answer. */
-  async function visitorAnswer(body: string): Promise<{ text: string; body: { ok: boolean; member: boolean; levels: Array<{ id: string; about: string }>; cards: Array<{ id: string }>; examples: Array<{ id: string }> } }> {
+  async function visitorAnswer(body: string): Promise<{ text: string; body: { ok: boolean; game?: string; member: boolean; levels: Array<{ id: string; about: string }>; cards: Array<{ id: string }>; examples: Array<{ id: string }> } }> {
     const response = await ask(body);
     assert.equal(response.status, 200, body);
     assert.equal(response.headers.get('Cache-Control'), 'no-store');
@@ -1758,8 +1785,9 @@ describe('src/app/api/simulator/unlock/route.ts, with the owner\'s lists', () =>
   for (const game of ALL_GAMES) {
     test(`${game.game}, no code: the cards and the examples the owner's two lists allow - and not a word about an example for advanced codes only, or about the other game`, async () => {
       const { text, body } = await visitorAnswer(JSON.stringify({ game: game.game }));
-      assert.deepEqual(Object.keys(body).sort(), ['cards', 'examples', 'levels', 'member', 'ok']);
+      assert.deepEqual(Object.keys(body), ['ok', 'game', 'member', 'levels', 'cards', 'examples']);
       assert.equal(body.ok, true);
+      assert.equal(body.game, game.game, 'the answer says which game it is about');
       assert.equal(body.member, false);
       const shown = game.examples.map((example) => example.id).filter((id) => !examplesForAdvancedCodesOnly.includes(id));
       assert.deepEqual(
@@ -1793,15 +1821,22 @@ describe('src/app/api/simulator/unlock/route.ts, with the owner\'s lists', () =>
     });
   }
 
-  test('a request that names no game gets the answer about Fire Rescue, letter for letter', async () => {
+  test('a request that names no game gets the answer about Fire Rescue, letter for letter - and without "game", as before there was a second game', async () => {
     const named = await visitorAnswer('{"game":"fire-rescue"}');
     assert.deepEqual(
       named.body.cards.map((card) => card.id),
       MENU_ORDER.filter((id) => !examplesForAdvancedCodesOnly.includes(id)),
     );
+    // the answer to a request that names its game says the name back, right after "ok" - and is the same in everything else
+    assert.ok(named.text.startsWith('{"ok":true,"game":"fire-rescue","member":false,'));
+    const unnamedText = named.text.replace('"game":"fire-rescue",', '');
     // what the page of Fire Rescue sent before there was a second game, and an empty request
-    for (const body of ['{}', '', '{"code":null}']) assert.equal((await visitorAnswer(body)).text, named.text, JSON.stringify(body));
-    assert.notEqual((await visitorAnswer('{"game":"fire-chief"}')).text, named.text);
+    for (const body of ['{}', '', '{"code":null}']) {
+      const unnamed = await visitorAnswer(body);
+      assert.equal(unnamed.text, unnamedText, JSON.stringify(body));
+      assert.deepEqual(Object.keys(unnamed.body), ['ok', 'member', 'levels', 'cards', 'examples'], 'the five fields of before, in their order');
+    }
+    assert.notEqual((await visitorAnswer('{"game":"fire-chief"}')).text.replace('"game":"fire-chief",', ''), unnamedText);
   });
 
   test('a code that is on no list, and what is not such a request, are refused as before - in both games', async () => {
@@ -1927,6 +1962,18 @@ function restOf(listText: string): string {
   return emptyListFile(emptyListFile(listText, 'member'), 'advanced');
 }
 
+/** The ids on one of the two lists of examples of a list file, read from its text (a line that is cancelled with "//" does not count). */
+function exampleListOf(listText: string, name: 'examplesOpenToEveryone' | 'examplesForAdvancedCodesOnly'): string[] {
+  const list = new RegExp(`^export const ${name}: string\\[\\] = \\[\\n([\\s\\S]*?)\\n\\];`, 'm').exec(listText);
+  assert.ok(list, `the file has the list "${name}"`);
+  return [...list[1].matchAll(/^[ \t]*'([^']*)',/gm)].map((line) => line[1]);
+}
+
+/** A list file with nothing between the brackets of its two lists of examples: what is left is the explanations (and the codes). */
+function withoutExampleLists(listText: string): string {
+  return listText.replace(/^(export const examples(?:OpenToEveryone|ForAdvancedCodesOnly): string\[\] = \[)\n[\s\S]*?\n\];/gm, '$1];');
+}
+
 describe('scripts/generate-simulator-codes.mjs', () => {
   let folder: string;
   let list: string;
@@ -2029,11 +2076,13 @@ describe('scripts/generate-simulator-codes.mjs', () => {
   });
 
   test('"examplesOpenToEveryone" is never touched: not when codes are added, not with --replace', async () => {
+    // (the owner's own edit of list 1: only two examples open, one of them with a remark)
     const opened = readFileSync(list, 'utf8').replace(
-      "export const examplesOpenToEveryone: string[] = [\n  // (empty: every example needs a code)\n];",
+      /export const examplesOpenToEveryone: string\[\] = \[\n[\s\S]*?\n\];/,
       "export const examplesOpenToEveryone: string[] = [\n  'hello',\n  'line-follow', // for the open day\n];",
     );
     assert.ok(opened.includes("'line-follow', // for the open day"));
+    assert.ok(!opened.includes("'gripper-demo',\n  // Fire Chief: the three starter examples"), 'the list of the template was replaced');
     writeFileSync(list, opened);
     const untouched = (textNow: string): void => {
       assert.ok(textNow.includes("export const examplesOpenToEveryone: string[] = [\n  'hello',\n  'line-follow', // for the open day\n];"));
@@ -2137,12 +2186,13 @@ describe('scripts/generate-simulator-codes.mjs', () => {
     const fresh = freshListFile();
     assert.deepEqual(readListFile(fresh)?.active, 0);
     assert.equal(readListFile(fresh)?.nextNumber, 1);
-    assert.match(fresh, /export const examplesOpenToEveryone: string\[\] = \[\n {2}\/\/ \(empty: every example needs a code\)\n\];/);
-    // a new file keeps the advanced examples for advanced codes: starting over never shows them to everybody
-    assert.match(fresh, /export const examplesForAdvancedCodesOnly: string\[\] = \[\n {2}\/\/ the two advanced examples\n {2}'smart-bucket',\n {2}'full-mission',\n\];/);
+    // a new file opens the starter examples of both games to everyone ...
+    assert.deepEqual(exampleListOf(fresh, 'examplesOpenToEveryone'), ['hello', 'line-follow', 'gripper-demo', 'chief-first-wall', 'chief-count-lines', 'chief-flame-fan']);
+    // ... and keeps the advanced examples of both games for advanced codes: starting over never shows them to everybody
+    assert.deepEqual(exampleListOf(fresh, 'examplesForAdvancedCodesOnly'), ['smart-bucket', 'full-mission', 'chief-full-mission']);
     assert.deepEqual(readListFile(fresh, 'advanced')?.active, 0);
     assert.equal(readListFile(fresh, 'advanced')?.nextNumber, 1);
-    for (const id of MENU_ORDER) assert.ok(fresh.includes(`'${id}'`), `the explanation lists '${id}'`);
+    for (const game of ALL_GAMES) for (const { id } of game.examples) assert.ok(fresh.includes(`'${id}'`), `the explanation lists '${id}'`);
     const fingerprint = 'ab'.repeat(32);
     const added = addToListFile(fresh, [{ no: 1, fingerprint }]);
     assert.deepEqual(entriesOf(added), [{ no: 1, fingerprint }]);
@@ -2160,6 +2210,87 @@ describe('scripts/generate-simulator-codes.mjs', () => {
     assert.equal(emptyListFile(both, 'advanced'), added);
     assert.equal(emptyListFile(emptyListFile(both, 'member'), 'advanced'), fresh);
     assert.equal(readListFile('nothing of the kind', 'advanced'), null);
+  });
+
+  // ------------------------------------------------------------------------------------------
+  // A list file made anew (the template), and every game of the simulator
+  // ------------------------------------------------------------------------------------------
+
+  test('a list file the script makes anew hides, in every game, every example the real file hides - from a visitor and from a member code', async () => {
+    // (the script writes a new file from its template when there is none: a list in a place of its own)
+    const anew = path.join(folder, 'made-anew.ts');
+    assert.ok(!existsSync(anew));
+    const csv = path.join(folder, 'made-anew.csv');
+    await generateCodes(['--list', anew, '--count', '1', '--out', csv], print);
+    const listText = readFileSync(anew, 'utf8');
+    const memberCode = rowsOf(readFileSync(csv, 'utf8'))[0].code;
+    const openToEveryone = exampleListOf(listText, 'examplesOpenToEveryone');
+    const advancedOnly = exampleListOf(listText, 'examplesForAdvancedCodesOnly');
+    // the website would be built with this file ...
+    assert.deepEqual(mistakesInSetup({ games: ALL_GAMES, advancedOnly }), []);
+    const setup: UnlockSetup = { codes: entriesOf(listText), advancedCodes: [], games: ALL_GAMES, openToEveryone, advancedOnly };
+
+    assert.ok(ALL_GAMES.length >= 2, 'both games');
+    for (const game of ALL_GAMES) {
+      // ... so it must hide what the owner's file hides, and whatever a game calls "advanced"
+      const mustBeHidden = game.examples.filter((example) => examplesForAdvancedCodesOnly.includes(example.id) || example.level === 'advanced');
+      assert.ok(mustBeHidden.length > 0, `${game.game} has an example that is kept for advanced codes`);
+      const mayBeSeen = game.examples.filter((example) => !mustBeHidden.includes(example));
+      for (const [who, code] of [
+        ['a visitor', null],
+        ['a member', memberCode],
+      ] as const) {
+        const response = await handleUnlockRequest(post(code === null ? { game: game.game } : { game: game.game, code }), setup);
+        assert.ok(response.body.ok, `${game.game}, ${who}`);
+        assert.deepEqual(
+          response.body.cards.map((card) => card.id),
+          mayBeSeen.map((example) => example.id),
+          `${game.game}, ${who}: the cards`,
+        );
+        assert.ok(!response.body.levels.some((level) => level.id === 'advanced'), `${game.game}, ${who}: no heading "Advanced"`);
+        const answer = JSON.stringify(response);
+        for (const example of mustBeHidden) {
+          for (const secret of [`"${example.id}"`, example.title, example.description.slice(0, 60)]) {
+            assert.ok(!answer.includes(secret), `${game.game}, ${who}: the answer does not hold ${secret}`);
+          }
+        }
+      }
+    }
+  });
+
+  test('the template for a new list file follows the organiser\'s rule in every game: starter examples open to everyone, advanced examples for advanced codes only', () => {
+    const fresh = freshListFile();
+    const everyExample = ALL_GAMES.flatMap((game) => game.examples);
+    assert.deepEqual(
+      exampleListOf(fresh, 'examplesOpenToEveryone'),
+      everyExample.filter((example) => example.level === 'starter').map((example) => example.id),
+      'list 1 of a new file: the starter examples of every game, and no other',
+    );
+    assert.deepEqual(
+      exampleListOf(fresh, 'examplesForAdvancedCodesOnly'),
+      everyExample.filter((example) => example.level === 'advanced').map((example) => example.id),
+      'list 2 of a new file: the advanced examples of every game, and no other',
+    );
+  });
+
+  test('the template explains the two lists of examples in the very words of the real file - so it names every example of both games', () => {
+    const real = readFileSync(path.join(REPO_ROOT, 'content', 'simulator-codes.ts'), 'utf8');
+    // the real file with its code lines taken out and its two next numbers back at 1 ...
+    const realWithoutCodes = emptyListFile(emptyListFile(real, 'member'), 'advanced');
+    // ... is the template, letter for letter - but for what stands on the two lists of examples,
+    // which the owner may change in the real file (the test before this one holds the template's)
+    assert.equal(withoutExampleLists(freshListFile()), withoutExampleLists(realWithoutCodes));
+    assert.notEqual(withoutExampleLists(freshListFile()), freshListFile(), 'the comparison did leave the lists out');
+    // and no text of the script speaks of one game only any more
+    const script = readFileSync(path.join(REPO_ROOT, 'scripts', 'generate-simulator-codes.mjs'), 'utf8');
+    assert.ok(!script.includes('the Fire Rescue simulator'), 'the script is about the codes of both games');
+    assert.ok(!/\bseven ready-made\b|The seven ids|the same seven\b/.test(script), 'not "seven" examples: there are thirteen');
+  });
+
+  test('--help says that the codes are for both games', async () => {
+    const shown: string[] = [];
+    await generateCodes(['--help'], (line: string) => shown.push(line));
+    assert.match(shown.join('\n'), /Fire Rescue and Fire Chief/);
   });
 
   // ------------------------------------------------------------------------------------------

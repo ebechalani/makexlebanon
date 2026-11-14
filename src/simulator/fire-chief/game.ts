@@ -103,7 +103,10 @@
  *  13. "Directed towards the wooden flame" (§7) = the straight-ahead line of the fan hits the
  *      target, or the middle of the target is at most 20 degrees away from that line. The
  *      30 cm of D2 are measured from the fan to the middle of the target. "No wall between" =
- *      no wall on the straight line from the fan to the middle of the target.
+ *      no wall on the straight line from the fan to the middle of the target. A measure that
+ *      is exactly on its limit counts (20 degrees, 300 mm): LIMIT_SLACK keeps the last digit
+ *      of the arithmetic from deciding. The sentences for students say "in this simulator"
+ *      with the 20 degrees, because they are this assumption and no rule.
  *                                                                  lookAtFan(), checkFan()
  *  14. A fan action begins at the beginning of the first tick in which everything was right;
  *      that moment is the time written on the 30 points.                           observe()
@@ -239,6 +242,13 @@ export const TARGET_DISPLACED_MM = 5;
 export const TOUCH_MM = 0.5;
 /** The referee says "the robot touches the target" once per touch; touches less than this (seconds) apart are one touch. */
 const TOUCH_QUIET_SECONDS = 0.5;
+/**
+ * A measure counts as "over its limit" only when it is over by more than this (mm for the reach
+ * of the fan, degrees for its direction). A robot that is turned by exactly 20 degrees comes out
+ * as 20.000000000000004 in the arithmetic: it stands ON the limit, and that counts. (The 3
+ * seconds of the fan action are compared the same way.)
+ */
+const LIMIT_SLACK = 1e-6;
 
 // =============================================================================================
 // The field at the start of an attempt
@@ -430,7 +440,8 @@ function issueText(issue: FanIssue, past = false): string {
     case 'far':
       return `the fire ${past ? 'was' : 'is'} too far from the fan (${overLimit(issue.value, issue.limit)} mm, at most ${issue.limit} mm)`;
     case 'aim':
-      return `the fan ${past ? 'did not point' : 'does not point'} at the fire (${overLimit(issue.value, issue.limit)} degrees off, at most ${issue.limit})`;
+      // (the 20 degrees are an assumption of the simulator, not a rule: the sentence says so)
+      return `the fan ${past ? 'did not point' : 'does not point'} at the fire (${overLimit(issue.value, issue.limit)} degrees off; in this simulator at most ${issue.limit})`;
   }
 }
 
@@ -471,7 +482,7 @@ function checkFan(ctx: ScoreContext<FireChiefScenario>, still: boolean, issue: F
     issue.kind = 'wall';
     return false;
   }
-  if (view.distance > fan.reachMm) {
+  if (view.distance > fan.reachMm + LIMIT_SLACK) {
     issue.kind = 'far';
     issue.value = view.distance;
     issue.limit = fan.reachMm;
@@ -479,7 +490,7 @@ function checkFan(ctx: ScoreContext<FireChiefScenario>, still: boolean, issue: F
   }
   // A robot that stands squarely in front of any part of the target points at it, however
   // close it is: the middle of a 60 mm wide target is easily more than 20 degrees away then.
-  if (!view.pointsAt && view.offDeg > fan.coneHalfAngleDeg) {
+  if (!view.pointsAt && view.offDeg > fan.coneHalfAngleDeg + LIMIT_SLACK) {
     issue.kind = 'aim';
     issue.value = view.offDeg;
     issue.limit = fan.coneHalfAngleDeg;
@@ -569,6 +580,18 @@ export function clock(seconds: number): string {
 /** Seconds with one decimal, cut off: 1.49 -> "1.4". */
 const oneDecimal = (seconds: number): string => (Math.floor(seconds * 10 + 1e-6) / 10).toFixed(1);
 
+/**
+ * How long a fan action lasted, for a sentence: seconds with one decimal, cut off - but in the
+ * last tenth before the full time with two decimals (2.98 -> "2.98", not "2.9"). A program that
+ * says "fan on, wait 3 seconds, fan off" can end up two hundredths short, and "2.9 of 3
+ * seconds" would hide how little was missing.
+ */
+function actionLength(seconds: number): string {
+  const tenths = Math.floor(seconds * 10 + 1e-6);
+  if (tenths !== FAN_ACTION_SECONDS * 10 - 1) return (tenths / 10).toFixed(1);
+  return (Math.floor(seconds * 100 + 1e-6) / 100).toFixed(2);
+}
+
 function createReferee(_scenario: FireChiefScenario): Referee<FireChiefScenario> {
   /** when each achievement was earned (match time, seconds); not in the map = not earned */
   const earned = new Map<AchievementId, number>();
@@ -590,8 +613,17 @@ function createReferee(_scenario: FireChiefScenario): Referee<FireChiefScenario>
   const issue = newIssue();
   /** the last time the fan blew without counting: when, and why */
   const miss = { seen: false, time: 0, issue: newIssue() };
-  /** the last fan action that broke before its 3 seconds were over: how long it had lasted, and why it broke */
-  const broke = { seen: false, seconds: 0, issue: newIssue() };
+  /**
+   * The fan action that is going on began later than the fan: on the tick before it began the
+   * fan was already blowing, but it did not count (`issue`: why not - mostly the robot was still
+   * rolling). A team that reads "2.98 of 3 seconds" after "wait 3 seconds" needs to be told.
+   */
+  const late = { seen: false, issue: newIssue() };
+  /**
+   * The last fan action that broke before its 3 seconds were over: how long it had lasted, why
+   * it broke, when its count began - and, when that was later than the fan, why (see `late`).
+   */
+  const broke = { seen: false, seconds: 0, issue: newIssue(), since: 0, late: false, lateIssue: newIssue() };
   /** match time of the last tick in which the robot touched the target */
   let lastTouch = -Infinity;
   /** set when the attempt is over: how long the fan action that was going on had lasted (null = none was) */
@@ -599,11 +631,18 @@ function createReferee(_scenario: FireChiefScenario): Referee<FireChiefScenario>
   /** the robot is nearer to the target than this (mm, middle of the axle to middle of the target) when it can touch it */
   let touchRange = -1;
 
-  const copyIssue = (to: FanIssue): void => {
-    to.kind = issue.kind;
-    to.value = issue.value;
-    to.limit = issue.limit;
+  const copyIssue = (to: FanIssue, from: FanIssue = issue): void => {
+    to.kind = from.kind;
+    to.value = from.value;
+    to.limit = from.limit;
   };
+
+  /**
+   * The sentence for an action whose count began later than the fan: when it began, and what
+   * was not right before. Empty when the count began with the fan.
+   */
+  const lateStart = (): string =>
+    broke.late ? ` The count began at ${clock(broke.since)}, not when the fan started: before that, ${issueText(broke.lateIssue, true)}.` : '';
 
   /** what the referee says on this tick (almost always nothing) */
   let say: string[] | null = null;
@@ -711,7 +750,12 @@ function createReferee(_scenario: FireChiefScenario): Referee<FireChiefScenario>
     if (robot.fanOn !== true && actionSince === null) {
       // (almost every tick of an attempt: the fan is off and no action is going on - nothing to look at)
     } else if (checkFan(ctx, still, issue)) {
-      if (actionSince === null) actionSince = tickBegan;
+      if (actionSince === null) {
+        actionSince = tickBegan;
+        // (was the fan already blowing on the tick before, without counting? Then the count begins later than the fan)
+        late.seen = miss.seen && Math.abs(miss.time - tickBegan) < 1e-9;
+        if (late.seen) copyIssue(late.issue, miss.issue);
+      }
       if (!earned.has('fan-start')) {
         award('fan-start', actionSince, 'the robot stands still, faces the fire and the fan is on.');
       }
@@ -742,9 +786,12 @@ function createReferee(_scenario: FireChiefScenario): Referee<FireChiefScenario>
         broke.seen = true;
         broke.seconds = tickBegan - actionSince;
         copyIssue(broke.issue);
+        broke.since = actionSince;
+        broke.late = late.seen;
+        if (late.seen) copyIssue(broke.lateIssue, late.issue);
         speak(
-          `The fan action stopped after ${oneDecimal(broke.seconds)} s: ${issueText(issue)}. ` +
-            `The ${FAN_ACTION_SECONDS} seconds start again.`,
+          `The fan action stopped after ${actionLength(broke.seconds)} s: ${issueText(issue)}. ` +
+            `The ${FAN_ACTION_SECONDS} seconds start again.${lateStart()}`,
         );
         actionSince = null;
       }
@@ -764,6 +811,7 @@ function createReferee(_scenario: FireChiefScenario): Referee<FireChiefScenario>
     restartAt = ctx.world.time;
     miss.seen = false;
     broke.seen = false;
+    late.seen = false;
     lastTouch = -Infinity;
   }
 
@@ -788,7 +836,7 @@ function createReferee(_scenario: FireChiefScenario): Referee<FireChiefScenario>
     if (broke.seen) {
       // (why it broke then - not what the robot is doing now)
       return (
-        `the fan action stopped after ${oneDecimal(broke.seconds)} of ${FAN_ACTION_SECONDS} seconds (${issueText(broke.issue, true)}) - ` +
+        `the fan action stopped after ${actionLength(broke.seconds)} of ${FAN_ACTION_SECONDS} seconds (${issueText(broke.issue, true)}) - ` +
         `hold it for ${FAN_ACTION_SECONDS} seconds without a break`
       );
     }
@@ -800,22 +848,39 @@ function createReferee(_scenario: FireChiefScenario): Referee<FireChiefScenario>
    * now (the simulation has stopped the robot and its fan): it says what the referee saw.
    */
   function notEarned(id: AchievementId, ctx: ScoreContext<FireChiefScenario>, actionSeconds: number | null): string {
-    if (id === 'leave-start') return 'not earned - the robot never left the START cell completely';
-    if (id === 'enter-room') return 'not earned - the robot was never completely inside the living room or the bedroom';
+    // A restart clears the points, and the referee's memory with them: what the sheet says is
+    // about the time after the restart. "Never" would be wrong then - the robot may well have
+    // left START, or blown at the fire, before the restart (the console still shows it).
+    const restarted = restartAt !== null;
+    if (id === 'leave-start') {
+      return restarted
+        ? 'not earned - after the restart the robot did not leave the START cell completely'
+        : 'not earned - the robot never left the START cell completely';
+    }
+    if (id === 'enter-room') {
+      return restarted
+        ? 'not earned - after the restart the robot was not completely inside the living room or the bedroom'
+        : 'not earned - the robot was never completely inside the living room or the bedroom';
+    }
     if (id === 'fan-start') {
       const fan = ctx.robotConfig.fan;
       if (!fan || !fan.enabled) return 'not earned - this robot has no fan';
-      if (!miss.seen) return 'not earned - the fan never blew';
+      if (!miss.seen) return restarted ? 'not earned - after the restart the fan did not blow' : 'not earned - the fan never blew';
       return `not earned - the fan blew, but it did not count. The last time, at ${clock(miss.time)}: ${issueText(miss.issue, true)}`;
     }
     // fan-complete
     if (actionSeconds !== null) {
-      return `not earned - the fan action was ${oneDecimal(actionSeconds)} of ${FAN_ACTION_SECONDS} seconds long when the attempt ended`;
+      return `not earned - the fan action was ${actionLength(actionSeconds)} of ${FAN_ACTION_SECONDS} seconds long when the attempt ended`;
     }
     if (broke.seen) {
-      return `not earned - the fan action stopped after ${oneDecimal(broke.seconds)} of ${FAN_ACTION_SECONDS} seconds: ${issueText(broke.issue, true)}`;
+      return (
+        `not earned - the fan action stopped after ${actionLength(broke.seconds)} of ${FAN_ACTION_SECONDS} seconds: ` +
+        `${issueText(broke.issue, true)}.${lateStart()}`
+      ).replace(/\.$/, '');
     }
-    return `not earned - the fan never blew at the fire for ${FAN_ACTION_SECONDS} seconds without a break`;
+    return restarted
+      ? `not earned - after the restart the fan did not blow at the fire for ${FAN_ACTION_SECONDS} seconds without a break`
+      : `not earned - the fan never blew at the fire for ${FAN_ACTION_SECONDS} seconds without a break`;
   }
 
   function score(ctx: ScoreContext<FireChiefScenario>): ScoreReport {

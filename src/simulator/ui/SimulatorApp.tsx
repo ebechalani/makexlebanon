@@ -36,17 +36,17 @@ import { ConsolePanel } from './ConsolePanel';
 import { ControlBar } from './ControlBar';
 import { CyberPiPanel, HoldButton } from './CyberPiPanel';
 import { EditorToolbar } from './EditorToolbar';
-import { timeTextOf } from './format';
+import { cyberPiSummary, timeTextOf } from './format';
 import { GripperCodeDialog } from './GripperCodeDialog';
 import { CentreIcon, EnlargeIcon, RotateLeftIcon, RotateRightIcon, RulerIcon, RulesIcon, SensorsIcon, ShrinkIcon, TestIcon, TrailIcon, ZonesIcon } from './icons';
 import type { ExampleProgram } from './member-unlock';
 import { blankProgram, hasRunnableScript, otherGameNote, parseProgramFile, programFileName, retiredBlocksNote, serializeProgramFile, withoutRetiredBlocks } from './program-file';
 import type { StageOptions } from './render';
-import { robotParts, sensorSummary } from './robot-parts';
+import { robotParts, sensorSummary, sensorsViewHint } from './robot-parts';
 import { EMPTY_RULER, followRobot, removeLastRulerPoint, rulerText, startsOnRobot, type Ruler } from './ruler';
 import type { CodeReader } from './scenario-code';
 import { ScoreSheet, StatusLine } from './ScoreSheet';
-import { capital, screenWords, type ScreenWords } from './screen-words';
+import { capital, scoreSheetSummary, screenWords, type ScreenWords } from './screen-words';
 import { SensorDashboard } from './SensorDashboard';
 import { StageCanvas } from './StageCanvas';
 import { escapeAction, readyHint, sizeButtonHint, tabStop } from './stage-view';
@@ -116,6 +116,13 @@ export interface SimulatorAppProps<S> {
    * starts at the bottom too, and the message would lie on it).
    */
   enlargeButtonCorner?: 'top' | 'bottom';
+  /**
+   * True: the head of the closed CyberPi panel shows the last line the program printed on the
+   * CyberPi screen. Left out: it lists what the panel holds, as it always did. (For a category
+   * whose programs often print what they found and end: the panel is closed until a student
+   * opens it, and the message would be said where nobody looks.)
+   */
+  showLastPrint?: boolean;
   /** the category's own editor for a combination */
   renderCombinationEditor: (scenario: S, onChange: (next: S) => void) => ReactNode;
   /**
@@ -162,11 +169,21 @@ interface Notice {
   tone: 'info' | 'error';
 }
 
-/** One section of the rules window: its heading and its bullets. */
-function rulesSection(section: RulesSection): ReactNode {
+/**
+ * One section of the rules window: its heading and its bullets.
+ *
+ * `asHeading`: the heading is a real heading of the page (<h3>), not a paragraph that only looks
+ * like one. A window with two parts - the rules, and under them what is not a rule - is long,
+ * and somebody who listens to the page with a screen reader finds a section, and the border
+ * between the two parts, by its headings. (A window with one part keeps the markup it always
+ * had. Both look the same: the classes are the same, and the website's stylesheet gives a
+ * heading no look of its own.)
+ */
+function rulesSection(section: RulesSection, asHeading: boolean): ReactNode {
+  const Heading = asHeading ? 'h3' : 'p';
   return (
     <div key={section.title} className="mt-3">
-      <p className="text-xs font-bold uppercase tracking-wide text-brand-700">{section.title}</p>
+      <Heading className="text-xs font-bold uppercase tracking-wide text-brand-700">{section.title}</Heading>
       <ul className="mt-1 list-disc space-y-1 pl-5 text-sm leading-snug">
         {section.items.map((item) => (
           <li key={item}>{item}</li>
@@ -628,6 +645,10 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
     </button>
   );
 
+  // the rules window: with a second part under the rules, its titles are real headings (see rulesSection)
+  const twoPartRules = props.rulesExtra !== undefined;
+  const RulesTitle = twoPartRules ? 'h2' : 'p';
+
   /** The small message of the simulator (see `say`). */
   const message = notice && (
     <p
@@ -667,15 +688,16 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
               aria-label="Rules in short"
               className="mbot2-rules-panel absolute right-0 top-full z-40 mt-2 w-[min(30rem,calc(100vw-1.5rem))] overflow-y-auto rounded-card border border-slate-200 bg-white p-4 text-ink-800 shadow-2xl"
             >
-              <p className="text-base font-bold text-ink-900">{props.title}: the rules in short</p>
+              {/* (a window with two parts has real headings: see rulesSection) */}
+              <RulesTitle className="text-base font-bold text-ink-900">{props.title}: the rules in short</RulesTitle>
               {props.rulesNote && <p className="mt-1 rounded-md bg-amber-100 px-2 py-1 text-xs font-semibold leading-snug text-amber-900">{props.rulesNote}</p>}
-              {props.rules.map(rulesSection)}
+              {props.rules.map((section) => rulesSection(section, twoPartRules))}
               {/* what is not a rule gets its own heading, clearly apart from the rules above it */}
               {props.rulesExtra && (
                 <div className="mt-4 border-t-2 border-slate-200 pt-3" data-rules-extra>
-                  <p className="text-base font-bold text-ink-900">{props.rulesExtra.title}</p>
+                  <h2 className="text-base font-bold text-ink-900">{props.rulesExtra.title}</h2>
                   {props.rulesExtra.note && <p className="mt-1 rounded-md bg-sky-100 px-2 py-1 text-xs font-semibold leading-snug text-sky-900">{props.rulesExtra.note}</p>}
-                  {props.rulesExtra.sections.map(rulesSection)}
+                  {props.rulesExtra.sections.map((section) => rulesSection(section, true))}
                 </div>
               )}
             </div>
@@ -785,6 +807,8 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
             restartsLeft={snapshot.restartsLeft}
             words={words}
             timeText={timeText}
+            // (a referee that writes its own sentences can write long ones: the line keeps to their first words)
+            briefEnding={game.createReferee !== undefined}
             readyHint={readyHint(startZoneName, rulerOn, isEnlarged)}
             placingProblem={placing && ghost ? `Not allowed: ${notAllowed.charAt(0).toLowerCase()}${notAllowed.slice(1)} It stays where it was.` : null}
             onShowSheet={showScoreSheet}
@@ -854,7 +878,7 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
                 <ZonesIcon className={VIEW_ICON} />
                 Zones
               </button>
-              <button type="button" aria-pressed={view.sensors} onClick={toggleView('sensors')} className={toggleClass(view.sensors)} title="Show what the line sensor and the ultrasonic sensor see">
+              <button type="button" aria-pressed={view.sensors} onClick={toggleView('sensors')} className={toggleClass(view.sensors)} title={sensorsViewHint(parts)}>
                 <SensorsIcon className={VIEW_ICON} />
                 Sensors
               </button>
@@ -931,11 +955,12 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
           <div ref={scoreSheetRef} className="scroll-mb-3 scroll-mt-24 lg:scroll-mt-3">
           <Section
             title="Score sheet"
-            summary={`${snapshot.score.total} / ${snapshot.score.max} points · ${missionsDone} of ${missions.length} ${words.goals}`}
+            summary={scoreSheetSummary(snapshot.score, missionsDone, missions.length, words)}
             open={open.score}
             onToggle={toggleSection('score')}
           >
-            <ScoreSheet score={snapshot.score} words={words} />
+            {/* (the referee's whole sentence about the end stands on the sheet: the status line shows its first words) */}
+            <ScoreSheet score={snapshot.score} words={words} ending={runState === 'finished' ? snapshot.finishDetail : null} />
           </Section>
           </div>
 
@@ -959,7 +984,7 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
             </p>
           </Section>
 
-          <Section title="CyberPi" summary="screen, LEDs, buttons A / B, joystick" open={open.cyberpi} onToggle={toggleSection('cyberpi')}>
+          <Section title="CyberPi" summary={cyberPiSummary(snapshot.screenLines, props.showLastPrint === true)} open={open.cyberpi} onToggle={toggleSection('cyberpi')}>
             <CyberPiPanel
               lines={snapshot.screenLines}
               labels={snapshot.screenLabels}
