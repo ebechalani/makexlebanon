@@ -806,8 +806,8 @@ Each answer turns an assumption into a decision (see the next section for the st
 5. **Can the target really stand in a corner?** With the three assumptions above, a 130 mm
    wide robot that drives at a corner target is stopped by the two walls of the corner when
    its nose is exactly 15 mm from the target. So it reads "red" there only while it touches
-   both walls (or is less than about 1 mm from them), and with no margin at all. A sensor
-   that sees a few millimetres further, or no corner place, would remove this.
+   both walls (or is 2.5 mm from them at most), and with no margin at all. A sensor that sees
+   a few millimetres further, or no corner place, would remove this.
 6. **Where may the target stand**, how deep and how heavy is it, and how far may it be pushed
    before it counts as moved? (Assumed: three places per room, 20 mm, light, 5 mm.)
 7. The exact texts of the DC motor blocks and of the colour sensor blocks in mBlock (the

@@ -82,10 +82,11 @@
  *      simulator takes the far end and no more, because a stricter simulator is the safe side
  *      (a program that works at 15 mm also works with a sensor that sees further). The near
  *      end is not modelled: it also reads a thing it touches.          COLOR_SENSOR_RANGE_MM
- *      (What follows from 3, 7 and the 130 mm wide chassis together: a robot that drives at a
- *      target in a corner is stopped by the two walls of that corner when its nose is exactly
- *      15 mm from the target. So that target is read only by a robot that touches both walls,
- *      or is less than about 1 mm away from them.)
+ *      (What follows from 3, 7 and the 130 mm wide chassis together: a robot that drives
+ *      straight at a target in a corner is stopped by the two walls of that corner when its
+ *      nose is exactly 15 mm from the target. So that target is read only by a robot that
+ *      touches both walls or nearly does: in every pose that reads "red" there, both walls
+ *      are 2.5 mm away or nearer.)
  *   8. The fan: on port M1, blowing from 20 % power, 20 degrees to each side. (How far it
  *      reaches, 300 mm, is decision D2.)                                                FAN
  *

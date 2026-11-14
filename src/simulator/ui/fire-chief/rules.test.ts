@@ -102,7 +102,7 @@ const CHECKS: NumberCheck[] = [
   // ---- the colour sensor and the fan
   { find: /one sensor in the middle of the front of the robot, (\d+) cm above the mat/, values: [cm(COLOR_SENSOR.mount!.height)], part: 'assumed' },
   { find: /the thing in front of it is (\d+) mm away or closer/, values: [COLOR_SENSOR_RANGE_MM], part: 'assumed' },
-  { find: /stop the robot (\d+) mm in front of it/, values: [COLOR_SENSOR_RANGE_MM], part: 'assumed' },
+  { find: /(\d+) mm in front of it when the robot comes straight at it/, values: [COLOR_SENSOR_RANGE_MM], part: 'assumed' },
   { find: /power of that motor is (\d+) % or more/, values: [FAN.minPower], part: 'assumed' },
   { find: /at most (\d+) degrees to the side/, values: [FAN.coneHalfAngleDeg], part: 'assumed' },
   { find: /The (\d+) cm are measured from the fan/, values: [cm(FAN.reachMm)], part: 'assumed' },
@@ -223,9 +223,12 @@ test('rules: sentences that can be tried out are true on the real engine and ref
   assert.equal(reads({ x: 10 + FRONT, y: 220, heading: -Math.PI / 2 }), 'yellow');
   // "it is red on every side": one of its two ends, looked at along the top wall
   assert.equal(reads({ x: back.x + TARGET_WIDTH / 2 + 10 + FRONT, y: back.y, heading: -Math.PI / 2 }), 'red');
-  // "when the target stands in a corner, the two walls of the corner stop the robot 15 mm in
-  // front of it. There the sensor reads red only while the robot touches both walls, or almost
-  // touches them": a robot that drives at it along the diagonal of the room
+  // "when the target stands in a corner, the two walls of the corner stop the robot before it
+  // reaches the target: 15 mm in front of it when the robot comes straight at it. There the
+  // sensor reads red only while the robot touches both walls, or almost touches them": a robot
+  // that drives at it along the diagonal of the room. (A search over every pose near the
+  // corner, on a grid of 0.5 mm and 0.5 degrees, found red only with both walls 2.5 mm away or
+  // nearer - too slow for this suite.)
   const corner = targetPose('living', 'corner');
   const diagonal = corner.angle + Math.PI; // looking squarely at the front of the target
   const cornerFace = { x: corner.x + (TARGET_DEPTH / 2) * Math.sin(corner.angle), y: corner.y - (TARGET_DEPTH / 2) * Math.cos(corner.angle) };

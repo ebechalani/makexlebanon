@@ -142,7 +142,7 @@ export const FIRE_CHIEF_ASSUMPTIONS: RulesPart = {
         'Which colour sensor the robot gets is not decided yet. Here it is one sensor in the middle of the front of the robot, 6 cm above the mat. It looks straight ahead. In real mBlock its blocks can have other words than here.',
         'It names a colour only when the thing in front of it is 15 mm away or closer. Further away it reads "none". It does not see through a wall.',
         'On the fire target it reads "red". On a wall it reads "yellow", never "red".',
-        'When the target stands in a corner, the two walls of the corner stop the robot 15 mm in front of it. There the sensor reads "red" only while the robot touches both walls, or almost touches them.',
+        'When the target stands in a corner, the two walls of the corner stop the robot before it reaches the target: 15 mm in front of it when the robot comes straight at it. There the sensor reads "red" only while the robot touches both walls, or almost touches them.',
         'The fan is on DC motor port M1. It blows when the power of that motor is 20 % or more, forwards or backwards.',
         '"Facing the target" means: the fan points straight at some part of the target, or the middle of the target is at most 20 degrees to the side.',
         'The 30 cm are measured from the fan, at the front of the robot, to the middle of the target. "No wall between" means: no wall on the straight line between these two points.',
