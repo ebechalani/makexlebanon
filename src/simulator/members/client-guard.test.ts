@@ -372,9 +372,11 @@ function forbiddenFiles(files: Files, graph: Graph, markers: RegExp[] = REAL_MAR
  */
 function withoutEntities(text: string): string {
   const named: Record<string, string> = { nbsp: ' ', ensp: ' ', emsp: ' ', thinsp: ' ', amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", colon: ':', comma: ',', hyphen: '-', dash: '-', ndash: '-', mdash: '-' };
+  // (a number that is no character - "&#99999999;" - stays as it is written: it must not stop the guard)
+  const character = (code: number, whole: string): string => (Number.isInteger(code) && code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : whole);
   return text.replace(/&(?:#(\d+)|#x([0-9a-f]+)|([a-z]+));/gi, (whole, decimal?: string, hex?: string, name?: string) => {
-    if (decimal !== undefined) return String.fromCodePoint(Number(decimal));
-    if (hex !== undefined) return String.fromCodePoint(Number.parseInt(hex, 16));
+    if (decimal !== undefined) return character(Number(decimal), whole);
+    if (hex !== undefined) return character(Number.parseInt(hex, 16), whole);
     return named[(name as string).toLowerCase()] ?? whole;
   });
 }
@@ -975,6 +977,8 @@ describe('the guard catches a leak', () => {
     assert.ok(findLeaks(drawing).some((leak) => leak.includes('help.svg')));
     assert.deepEqual(findLeaks(withFile('src/simulator/ui/Screen.tsx', "'use client';\nexport const Card = () => <p>Fire&nbsp;Chief: find the fire &amp; blow it out</p>;\n")), []);
     assert.equal(withoutEntities('a&nbsp;b&#32;c&#x20;d &amp; e &unknown; f'), 'a b c d & e &unknown; f');
+    // a number that is no character does not stop the guard
+    assert.equal(withoutEntities('a&#99999999999;b&#xFFFFFFFF;c'), 'a&#99999999999;b&#xFFFFFFFF;c');
   });
 
   test('the words after a heading are looked for in every file the browser gets, not only in the simulator\'s own', () => {

@@ -841,7 +841,9 @@ Each answer turns an assumption into a decision (see the next section for the st
 9. **The words that introduce the category on the website.** `content/seasons.ts` said "Two
    robots. One operation. Command the whole response." on the platform "mBot2 + vision" — the
    teaser from before the draft rules. It now says what the draft rules say (one robot, a maze
-   that changes, find the fire; platform "mBot2"): see "Things left to fill in".
+   that can change between rounds, find the fire; platform "mBot2"), in words that are not
+   the organiser's: see "Things left to fill in". Are these words right, or what should stand
+   there?
 
 #### When the organiser decides something
 
@@ -1110,12 +1112,13 @@ These are marked with `TODO` or `NOTE` comments in `content/seasons.ts`:
   the teaser from before the draft rules. The draft rules of the category describe one robot
   in a maze that changes, with a fan and a sensor that finds the fire, and no camera — and the
   category page shows the simulator, which plays exactly that, right under the teaser. So the
-  teaser now reads "A maze that changes every round. One robot, on its own. Find the fire."
-  on the platform "mBot2", and the introduction of the 2027 season ends "… to a robot that
-  finds the fire in a maze that keeps changing" instead of "… to a coordinated two-robot rescue
-  operation". These three wordings are not the organiser's own: they say only what the draft
-  rules say. Replace them (`summary`, `platform`, and `intro` of the 2027 season) with the
-  organiser's words when the category is announced in full.
+  teaser now reads "One robot, on its own. A maze that can change between rounds. Find the
+  fire." on the platform "mBot2", and the introduction of the 2027 season ends "… to a robot
+  that finds the fire on its own, in a maze that can change between rounds" instead of "… to a
+  coordinated two-robot rescue operation". These three wordings are not the organiser's own:
+  they say only what the draft rules say. Ask the organiser, then replace them (`summary`,
+  `platform`, and `intro` of the 2027 season) with the organiser's words — or put the old
+  ones back.
 - **Training tracks** — four of the seven are marked `coming-soon`. Write the content, then
   change `status` to `available` and add an `href` in `content/seasons.ts`. (A track can also
   set `cta` to change the wording of its link — the simulator's card says "Open the simulator"

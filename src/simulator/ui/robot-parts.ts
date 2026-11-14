@@ -115,7 +115,8 @@ export function sensorSummary(parts: RobotParts, sensors: Pick<SensorSnapshot, '
   if (parts.clawColour) words.push(`claw ${sensors.frontColor === 'none' ? 'empty' : sensors.frontColor}`);
   // (the word the "colour sensor (1) colour" block gives: a colour name, or "none")
   // ("needs 1.5 cm": the shortest words that say it. Measured in the browser, the whole text is
-  // then 246 dots wide, and the closed panel of a phone that is 390 wide has room for 253.)
+  // then 241 dots wide, and the closed panel of a phone that is 390 wide has room for 253. On a
+  // phone that is 360 wide there is room for 223: there the end of the text, the fan, is cut off.)
   if (parts.frontColour) words.push(closer ? `colour none (needs ${colourRangeText(parts.frontColour)})` : `colour ${sensors.frontColor}`);
   if (parts.fan) words.push(`fan ${sensors.fanOn ? 'on' : 'off'}`);
   return words.join(' · ');
