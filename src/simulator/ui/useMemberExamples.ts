@@ -23,8 +23,10 @@
  * The code is remembered in one place for all games of the simulator (SAVED_CODE_KEY in
  * ./member-unlock.ts): a code typed in one game is there on the next visit of any other, and
  * "forget" forgets it for all of them. What it opens is asked game by game, on each game's page.
- * (A page that is already open does not notice a code typed on another one until it is loaded
- * again.)
+ * Other tabs of the same browser that have the simulator open are told at once (the browser's
+ * "storage" event): when the code is forgotten in one tab, every other tab locks what the code
+ * opened, and when a code is accepted in one tab, the others ask the server what it opens in
+ * their game.
  *
  * Somebody whose examples are open can type a different code in the place of the one in use.
  * Nothing changes until the server has accepted the different code: when it is refused, or the
@@ -36,6 +38,7 @@ import {
   requestUnlock,
   requestUnlockPatiently,
   SAVED_CODE_KEY,
+  savedCodeChange,
   tidyCode,
   type ExampleCard,
   type ExampleLevel,
@@ -251,16 +254,36 @@ export function useMemberExamples(config: ExamplesConfig): MemberExamples {
     if (savedCode) askCode(savedCode, 'saved');
   }, [askCode, savedCode]);
 
-  const forget = useCallback(() => {
+  /** Lock what the code opened and know no code any more. (The browser's memory is not touched here.) */
+  const lockAgain = useCallback(() => {
     codeQuestion.current++;
     codeInUse.current = null;
-    removeKey(SAVED_CODE_KEY);
     setSavedCode(null);
     setRemembered(true);
-    setDraft('');
     setForCode(null);
     setStatus({ phase: 'none', about: 'saved' });
   }, []);
+
+  const forget = useCallback(() => {
+    removeKey(SAVED_CODE_KEY);
+    setDraft('');
+    lockAgain();
+  }, [lockAgain]);
+
+  // Another tab of this browser forgot the code, or had another one accepted: the code is saved
+  // once for all games, so what happens to it there happens here too (see savedCodeChange).
+  // Forgetting must not wait for this tab to be loaded again: on a shared computer the examples
+  // the code opened - advanced ones included - would stay open for the next person.
+  useEffect(() => {
+    const onStorage = (event: StorageEvent): void => {
+      const change = savedCodeChange(event.key, event.newValue, savedCode);
+      if (change.kind === 'forgotten') lockAgain();
+      // (the code opens nothing here until the server has said so for this game)
+      else if (change.kind === 'code') askCode(change.code, 'saved');
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [askCode, lockAgain, savedCode]);
 
   const startChange = useCallback(() => {
     if (!unlocked) return;

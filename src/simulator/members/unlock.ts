@@ -20,6 +20,9 @@
  * which game it is about, and its answer holds the examples of that game and not a word about
  * another one. The code is the same for every game - there is no code "for a game" - and so is
  * the count of wrong codes (see AttemptLimiter): asking about another game gives no new tries.
+ * The answer to a request that names its game names that game again ("game"), so that a page can
+ * tell that it got what it asked for: a server from before there was a second game knows
+ * nothing of "game" and answers every request with the examples of Fire Rescue.
  *
  * It is written as one plain function, handleUnlockRequest(), that gets everything it needs as
  * arguments (the lists of fingerprints, the examples, the clock), so the tests can try every
@@ -282,6 +285,12 @@ export type UnlockRefusal = 'invalid-code' | 'bad-request' | 'unknown-game' | 't
 export type UnlockAnswer =
   | {
       ok: true;
+      /**
+       * The game this answer is about - the name the request gave it. It is there when the
+       * request named its game, and only then: the answer to a request without "game" is, field
+       * for field, what it was while Fire Rescue was the only game.
+       */
+      game?: string;
       /** true: the code is on a list. false: there was no code */
       member: boolean;
       /** the headings of the levels that have a card below, in the order of the Examples window */
@@ -421,13 +430,16 @@ function refuse(status: number, reason: UnlockRefusal, headers: Record<string, s
  *
  * @param visible  the examples whose cards are shown
  * @param open     the ones of them that can be opened (a part of `visible`)
+ * @param named    the game as the request named it; undefined when the request named none
  */
-function hand(member: boolean, visible: readonly UnlockedExample[], open: readonly UnlockedExample[], levels: readonly LevelHeading[]): UnlockResponse {
+function hand(member: boolean, visible: readonly UnlockedExample[], open: readonly UnlockedExample[], levels: readonly LevelHeading[], named: string | undefined): UnlockResponse {
   return {
     status: 200,
     headers: { ...NO_STORE },
     body: {
       ok: true,
+      // (said back only to a request that named its game: see UnlockAnswer.game)
+      ...(named === undefined ? {} : { game: named }),
       member,
       // (everything is copied field by field: nothing but these ever leaves the server)
       // a heading goes out only together with a card of its level
@@ -479,12 +491,12 @@ function sentRequest(body: string): Sent | 'bad' {
 /**
  * Answer one request to /api/simulator/unlock.
  *
- *   POST { "game": "fire-chief" }                      ->  200  { ok: true, member: false, levels, cards, examples }
+ *   POST { "game": "fire-chief" }                      ->  200  { ok: true, game: "fire-chief", member: false, levels, cards, examples }
  *                                                               cards: what a visitor may see; examples: the ones open to everyone
  *   POST { "game": "fire-chief", "code": "FIRE-7K2M-9QXD" }
- *     a member code of the list                        ->  200  { ok: true, member: true, levels, cards, examples }
+ *     a member code of the list                        ->  200  { ok: true, game: "fire-chief", member: true, levels, cards, examples }
  *                                                               the same cards, and every one of them as an example
- *     an advanced code of its list                     ->  200  { ok: true, member: true, levels, cards, examples }
+ *     an advanced code of its list                     ->  200  { ok: true, game: "fire-chief", member: true, levels, cards, examples }
  *                                                               every example of that game
  *     a code on neither list                           ->  403  { ok: false, reason: "invalid-code" }       never any example
  *     too many wrong codes just now                    ->  429  { ok: false, reason: "too-many-attempts" }  the code was not looked at
@@ -493,7 +505,9 @@ function sentRequest(body: string): Sent | 'bad' {
  *
  * "game" is the name of a game of the setup ("fire-rescue", "fire-chief"), written exactly like
  * that. A request WITHOUT "game" is about Fire Rescue (see GAME_WHEN_NONE_IS_NAMED): `{}` and
- * `{ "code": "..." }` are answered as they always were.
+ * `{ "code": "..." }` are answered as they always were - without "game" in the answer. A request
+ * that names its game gets the name back, so that its page can see that the answer is about the
+ * game it asked for.
  *
  * A level is { id, title, about }, a card { id, title, level }, an example
  * { id, title, level, description, program }. Every one of them belongs to the game the
@@ -521,6 +535,8 @@ export async function handleUnlockRequest(request: UnlockRequest, setup: UnlockS
   const game = setup.games.find((one) => one.game === name);
   if (!game) return refuse(400, 'unknown-game');
   const { code } = sent;
+  /** the name to say back: the game's own, and only when the request gave one */
+  const named = sent.game === undefined ? undefined : game.game;
 
   // what everybody without an advanced code may see: every example of this game that is not kept for advanced codes
   const hidden = new Set(setup.advancedOnly);
@@ -534,6 +550,7 @@ export async function handleUnlockRequest(request: UnlockRequest, setup: UnlockS
       forMembers,
       forMembers.filter((example) => open.has(example.id)),
       game.levels,
+      named,
     );
   }
 
@@ -552,5 +569,5 @@ export async function handleUnlockRequest(request: UnlockRequest, setup: UnlockS
   // a right code never counts
   turn.giveBack();
   const theirs = kind === 'advanced' ? game.examples : forMembers;
-  return hand(true, theirs, theirs, game.levels);
+  return hand(true, theirs, theirs, game.levels, named);
 }

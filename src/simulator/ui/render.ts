@@ -29,6 +29,7 @@ import {
   type ZoneOverlay,
 } from '../core/types';
 import { inkOn, parseHex, rgbCss, shade } from './format';
+import { SENSOR_COLOR_CSS } from './robot-parts';
 import { rulerLabels, type Ruler, type RulerLabel } from './ruler';
 import type { Trail } from './trail';
 
@@ -615,14 +616,25 @@ function drawRobot(ctx: CanvasRenderingContext2D, sim: StageSim, devicePerMm: nu
   if (c.fan && c.fan.enabled) {
     const fanY = -front + 40;
     const fanRadius = Math.min(17, innerHalf - 4);
+    const blowing = robot.fanOn === true;
+    if (blowing) {
+      // A light glow around the guard while the fan blows. The air in front of the robot is not
+      // always seen: close to the target (where the colour sensor reads it) the air is cut off
+      // after a few millimetres and lies under the target's sign. The glow and the bright ring
+      // are on the robot itself, so "the fan is on" can be seen wherever the robot stands.
+      ctx.beginPath();
+      ctx.arc(0, fanY, fanRadius + 9, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(186, 230, 253, 0.6)';
+      ctx.fill();
+    }
     ctx.beginPath();
     ctx.arc(0, fanY, fanRadius, 0, Math.PI * 2);
     ctx.fillStyle = '#0f172a';
     ctx.fill();
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = '#cbd5e1';
+    // the ring of the guard: grey while the fan is off, bright and thicker while it blows
+    ctx.lineWidth = blowing ? 4 : 2;
+    ctx.strokeStyle = blowing ? '#38bdf8' : '#cbd5e1';
     ctx.stroke();
-    const blowing = robot.fanOn === true;
     // (one turn in 0.3 s of match time: fast enough to look like a fan, slow enough to be seen turning)
     const spin = blowing ? ((sim.world.time / 0.3) % 1) * Math.PI * 2 : 0.5;
     ctx.fillStyle = blowing ? '#7dd3fc' : '#94a3b8';
@@ -845,6 +857,66 @@ function drawFanAir(ctx: CanvasRenderingContext2D, sim: StageSim, view: StageVie
     ctx.stroke();
     ctx.lineWidth = 1.8 / view.scale;
     ctx.strokeStyle = '#334155';
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/**
+ * How far the colour sensor at the front reads (a robot that has one fixed to its front): a
+ * short line straight ahead of the sensor, exactly as long as its range, with a bar across its
+ * end. It has the colour the sensor reads, or it is white while the sensor reads "none".
+ *
+ * The range is short (15 mm in Fire Chief: a few dots on the screen), and a robot that looks
+ * as if it stood at the target can still be too far away. The line shows where "close enough"
+ * ends: the sensor names a colour when the thing in front of it reaches into the line.
+ */
+export interface ColourSight {
+  /** the face of the sensor, and the point straight ahead of it where its range ends (mm on the mat) */
+  from: Vec2;
+  to: Vec2;
+  /** the two ends of the bar across that point */
+  left: Vec2;
+  right: Vec2;
+}
+
+/**
+ * Where that line is drawn for a robot that stands at `pose`: null for a robot without a colour
+ * sensor fixed to its front (the sensor at the claw of Fire Rescue has no such line).
+ * `scale`: screen dots per millimetre - the bar across the end is at least 9 dots wide.
+ */
+export function colourSight(config: RobotConfig, pose: Pose, scale: number): ColourSight | null {
+  const sensor = config.frontColorSensor;
+  if (!sensor.enabled || !sensor.mount || !(sensor.rangeMm > 0)) return null;
+  const face = sensor.mount.forward;
+  const half = Math.max(6, 4.5 / scale);
+  return {
+    from: localToWorld(pose, face, 0),
+    to: localToWorld(pose, face + sensor.rangeMm, 0),
+    left: localToWorld(pose, face + sensor.rangeMm, -half),
+    right: localToWorld(pose, face + sensor.rangeMm, half),
+  };
+}
+
+function drawColourSight(ctx: CanvasRenderingContext2D, sim: StageSim, sensors: SensorSnapshot, view: StageView): void {
+  const sight = colourSight(sim.robotConfig, sim.world.robot.pose, view.scale);
+  if (!sight) return;
+  const { from, to, left, right } = sight;
+  const reads = sensors.frontColor;
+  ctx.save();
+  ctx.lineCap = 'round';
+  // drawn twice: a dark edge first, then the colour on top of it, so that it shows on every background
+  for (const [width, colour] of [
+    [4.5 / view.scale, '#0f172a'],
+    [2.2 / view.scale, reads === 'none' ? '#ffffff' : SENSOR_COLOR_CSS[reads]],
+  ] as const) {
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+    ctx.moveTo(left.x, left.y);
+    ctx.lineTo(right.x, right.y);
+    ctx.lineWidth = width;
+    ctx.strokeStyle = colour;
     ctx.stroke();
   }
   ctx.restore();
@@ -1155,7 +1227,7 @@ function drawRuler(ctx: CanvasRenderingContext2D, ruler: Ruler, view: StageView)
 export interface StageOptions {
   /** coloured zones of the game (start, pick-up, delivery, tower areas) */
   overlays: boolean;
-  /** what the sensors see: line sensor dots and the ultrasonic beam */
+  /** what the sensors see: line sensor dots, the ultrasonic beam, and how far a colour sensor at the front reads */
   sensors: boolean;
   /** the path the robot has driven */
   trail: boolean;
@@ -1236,6 +1308,7 @@ export function drawStage(ctx: CanvasRenderingContext2D, scene: StageScene): voi
   }
   drawRobot(ctx, sim, devicePerMm);
   drawFanAir(ctx, sim, view);
+  if (sensors) drawColourSight(ctx, sim, sensors, view);
   if (sensors) drawProbes(ctx, sim, sensors);
   if (sensors && beam) drawUltrasonicLabel(ctx, sim, sensors, beam, view);
   if (scene.ghost) drawGhost(ctx, sim.robotConfig, scene.ghost, view);

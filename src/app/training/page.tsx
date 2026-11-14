@@ -53,6 +53,16 @@ export default function TrainingPage() {
                 </li>
               ))}
             </ul>
+            {/* the page that lists the simulators side by side (nothing else links to it) */}
+            <p className="mt-6">
+              <Link
+                href="/training/simulator"
+                className="group inline-flex items-center gap-2 text-sm font-semibold text-brand-600 hover:text-brand-700"
+              >
+                All mBot2 simulators
+                <ArrowIcon className="transition-transform group-hover:translate-x-0.5" />
+              </Link>
+            </p>
           </>
         ) : null}
 

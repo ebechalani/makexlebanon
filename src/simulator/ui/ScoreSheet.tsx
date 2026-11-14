@@ -14,7 +14,7 @@ import type { ReactNode } from 'react';
 import type { FinishReason, RestartRules, ScoreLine, ScoreReport } from '../core/types';
 import { finishText, formatRefereeTime, formatStamp, type TimeText } from './format';
 import { CheckIcon, CrossIcon } from './icons';
-import { finishSentence, restartSummary } from './match-words';
+import { finishHeadline, finishSentence, restartSummary } from './match-words';
 import { capital, DEFAULT_WORDS, type ScreenWords } from './screen-words';
 import type { RunState } from './useSimulation';
 
@@ -104,14 +104,28 @@ export interface ScoreSheetProps {
   score: ScoreReport;
   /** the game's words (left out: the words of Fire Rescue) */
   words?: ScreenWords;
+  /**
+   * The referee's whole sentence about the end of the match, when the referee ended it
+   * (Simulation.finishDetail) and the match is over. It stands at the top of the sheet: the
+   * status line above the mat has room for its first words only (see finishHeadline).
+   * Left out or null: the sheet begins with its lines, as it always did.
+   */
+  ending?: string | null;
 }
 
-export function ScoreSheet({ score, words = DEFAULT_WORDS }: ScoreSheetProps) {
+export function ScoreSheet({ score, words = DEFAULT_WORDS, ending = null }: ScoreSheetProps) {
   const missions = score.lines.filter((line) => line.max > 0);
   const penalties = score.lines.filter((line) => line.max === 0);
   const totalTime = typeof score.time === 'number' && Number.isFinite(score.time) ? formatRefereeTime(score.time) : '';
+  const howItEnded = ending?.trim() ?? '';
   return (
     <div>
+      {howItEnded !== '' && (
+        <p className="mb-1 rounded-md bg-brand-50 px-2 py-1.5 text-xs leading-snug text-ink-800" data-ending>
+          <span className="font-bold">{`How the ${words.match} ended: `}</span>
+          {howItEnded}
+        </p>
+      )}
       <ul className="divide-y divide-slate-100">
         {missions.map((line) => (
           <LineRow key={line.id} line={line} />
@@ -163,6 +177,16 @@ export interface StatusLineProps {
   words?: ScreenWords;
   /** how this game writes a moment of the match (left out: rounded time stamps; see timeTextOf in ./format.ts) */
   timeText?: TimeText;
+  /**
+   * True in a game whose referee writes sentences of its own (Game.createReferee). Its sentence
+   * about the end of a match can be long - what happened, what was not earned, what stays - and
+   * the line must not grow with it: side by side with the blocks, a taller line pushes the mat
+   * and the buttons under it out of a small window. So the line then says the end in the
+   * referee's first words (finishHeadline), leaves out what no longer matters once a match is
+   * over ("no restart left"), and never shows more than two lines of text there. The whole
+   * sentence is on the score sheet. Left out: the line is exactly what it always was.
+   */
+  briefEnding?: boolean;
   /** what to tell the student before the start (how to place the robot) */
   readyHint: string;
   /** set when the robot is being put somewhere it may not start: shown in red instead of the hint */
@@ -188,13 +212,15 @@ export function StatusLine({
   restartsLeft,
   words = DEFAULT_WORDS,
   timeText = formatStamp,
+  briefEnding = false,
   readyHint,
   placingProblem,
   onShowSheet,
 }: StatusLineProps) {
   const missions = score.lines.filter((line) => line.max > 0 && line.id !== 'bonus');
   const done = missions.filter((line) => line.ok).length;
-  const penaltyNote = restartSummary(restarts, { penalty: restartPenalty, rules: restartRules }, restartsLeft);
+  // (once a match is over, how many restarts are left is no news: a brief ending leaves it out)
+  const penaltyNote = restartSummary(restarts, { penalty: restartPenalty, rules: restartRules }, briefEnding && runState === 'finished' ? undefined : restartsLeft);
   const Match = capital(words.match);
   // (Below, a sentence with a word of the game in it is written as ONE piece of text, `...${word}...`,
   // not as text around a {word}: the browser fits the letters of each piece of text on their own,
@@ -249,9 +275,9 @@ export function StatusLine({
       <>
         <span className="font-bold">{`${Match} over.`}</span>{' '}
         {finishDetail ? (
-          // the referee ended the match: its own sentence says why (and when)
+          // the referee ended the match: its own sentence says why (and when) - in a brief ending its first words only
           <>
-            {finishSentence(finishReason, finishDetail, time, timeText)} Final score: {points}
+            {briefEnding ? finishHeadline(finishDetail) : finishSentence(finishReason, finishDetail, time, timeText)} Final score: {points}
           </>
         ) : (
           <>
@@ -264,9 +290,13 @@ export function StatusLine({
     );
   }
 
+  // A brief ending keeps to two lines where the stage stands beside the blocks ("lg:"): there the
+  // window does not scroll, and a third line would push the buttons under the mat out of it.
+  // (On a narrow screen the page scrolls anyway, and the whole text is shown.)
+  const twoLines = briefEnding && runState === 'finished' ? ' lg:line-clamp-2' : '';
   return (
     <div className={`flex min-h-12 shrink-0 items-center gap-2 rounded-card border px-3 py-1.5 text-[13px] leading-snug ${tone}`}>
-      <p role="status" aria-live="polite" className="min-w-0 flex-1">
+      <p role="status" aria-live="polite" className={`min-w-0 flex-1${twoLines}`}>
         {content}
       </p>
       {showSheet && (

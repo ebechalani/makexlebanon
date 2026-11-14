@@ -77,7 +77,10 @@ export const seasons: Season[] = [
     status: 'upcoming',
     intro:
       'The alarm sounds in 2027. One city, one emergency — and four ways to answer the call, ' +
-      'from a cadet’s very first mission plan to a coordinated two-robot rescue operation. ' +
+      // TO CONFIRM WITH THE ORGANISER (see the note at Fire Chief below): it said "to a
+      // coordinated two-robot rescue operation" until the draft rules of Fire Chief were
+      // written. They describe one robot in a maze.
+      'from a cadet’s very first mission plan to a robot that finds the fire on its own, in a maze that can change between rounds. ' +
       'The categories are announced below; missions, fields and rules will be revealed soon.',
     categories: [
       {
@@ -114,8 +117,18 @@ export const seasons: Season[] = [
         slug: 'fire-chief',
         name: 'Fire Chief',
         ageRange: '14–17 years',
-        platform: 'mBot2 + vision',
-        summary: 'Two robots. One operation. Command the whole response.',
+        // TO CONFIRM WITH THE ORGANISER - these two lines are NOT the organiser's words. They
+        // were 'mBot2 + vision' and 'Two robots. One operation. Command the whole response.':
+        // the teaser from before the draft rules of the category. The draft rules ("Dynamic
+        // Maze Challenge") describe ONE autonomous robot that finds its way through a maze,
+        // finds the fire and blows at it with a fan. The maze "may change between rounds", and
+        // the draft names no camera. The simulator plays exactly that, and it is offered right
+        // under this teaser, so the old words told a teacher two different things on one page.
+        // The new words say only what the draft rules say, and nothing more certain than they
+        // do. To go back to the old teaser, put the two old strings back here and the old
+        // half-sentence back into `intro` above.
+        platform: 'mBot2',
+        summary: 'One robot, on its own. A maze that can change between rounds. Find the fire.',
         simulator: {
           href: '/training/simulator/fire-chief',
           summary:

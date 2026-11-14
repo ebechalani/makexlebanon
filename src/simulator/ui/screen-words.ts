@@ -20,6 +20,12 @@ export interface ScreenWords {
   goal: string;
   /** ... and several */
   goals: string;
+  /**
+   * The last word of the few words on the closed Score sheet: "0 / 100 points · 0 of 4 ...".
+   * Left out: `goals` ("3 of 9 missions"). A game whose word for a goal is long gives a short
+   * one here - the closed panel is narrow on a phone, and a longer text is cut off there.
+   */
+  goalsShort?: string;
   /** what the "Zones" button colours on the mat */
   zonesHint: string;
   /** what the team's "Finished" call does */
@@ -88,6 +94,14 @@ export const DEFAULT_WORDS: ScreenWords = {
 /** The words of a game: its own where it gave them, the default ones everywhere else. */
 export function screenWords(own?: Partial<ScreenWords>): ScreenWords {
   return own ? { ...DEFAULT_WORDS, ...own } : DEFAULT_WORDS;
+}
+
+/**
+ * The few words on the closed Score sheet: "30 / 180 points · 3 of 9 missions" (Fire Rescue),
+ * "30 / 100 points · 2 of 4 done" (Fire Chief: see ScreenWords.goalsShort).
+ */
+export function scoreSheetSummary(score: { total: number; max: number }, done: number, of: number, words: ScreenWords): string {
+  return `${score.total} / ${score.max} points · ${done} of ${of} ${words.goalsShort ?? words.goals}`;
 }
 
 /** "match" -> "Match": a word at the beginning of a sentence. */

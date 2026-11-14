@@ -624,7 +624,7 @@ test('not 30 points: the target more than 20 degrees away from straight ahead', 
     assert.equal(lineOf(sim, 'fan-start').ok, false, `${off} degrees off`);
     assert.equal(
       lineOf(sim, 'fan-start').detail,
-      `not yet - the fan does not point at the fire (${Math.abs(off)} degrees off, at most 20)`,
+      `not yet - the fan does not point at the fire (${Math.abs(off)} degrees off; in this simulator at most 20)`,
     );
   }
   for (const off of [19, -19, 0]) {
@@ -660,7 +660,7 @@ test('30 points: a robot that stands squarely in front of any part of the target
   for (const [gap, beside] of [[2, 31], [5, 33], [20, 35], [50, 40], [80, -45]]) {
     const sim = stand(gap, beside);
     assert.equal(lineOf(sim, 'fan-start').ok, false, `${gap} mm in front, ${beside} mm beside: the fan points past the target`);
-    assert.match(lineOf(sim, 'fan-start').detail, /^not yet - the fan does not point at the fire \((\d+) degrees off, at most 20\)$/);
+    assert.match(lineOf(sim, 'fan-start').detail, /^not yet - the fan does not point at the fire \((\d+) degrees off; in this simulator at most 20\)$/);
   }
   // further away the cone still decides: 40 mm beside at 120 mm is 17 degrees - inside the cone
   assert.equal(lineOf(stand(120, 40), 'fan-start').ok, true);
@@ -688,16 +688,71 @@ test('reasons: a measure that is just over its limit is not written like the lim
   assert.equal(detail(aimedAt(BACK_TARGET, 300.04)), 'not yet - the fire is too far from the fan (300.1 mm, at most 300 mm)');
   assert.equal(detail(aimedAt(BACK_TARGET, 300.49)), 'not yet - the fire is too far from the fan (300.5 mm, at most 300 mm)');
   assert.equal(detail(aimedAt(BACK_TARGET, 300.6)), 'not yet - the fire is too far from the fan (301 mm, at most 300 mm)');
-  assert.equal(detail(aimedAt(BACK_TARGET, 200, 20.3)), 'not yet - the fan does not point at the fire (20.3 degrees off, at most 20)');
-  assert.equal(detail(aimedAt(BACK_TARGET, 200, 20.49)), 'not yet - the fan does not point at the fire (20.5 degrees off, at most 20)');
-  assert.equal(detail(aimedAt(BACK_TARGET, 200, 20.6)), 'not yet - the fan does not point at the fire (21 degrees off, at most 20)');
+  assert.equal(detail(aimedAt(BACK_TARGET, 200, 20.3)), 'not yet - the fan does not point at the fire (20.3 degrees off; in this simulator at most 20)');
+  assert.equal(detail(aimedAt(BACK_TARGET, 200, 20.49)), 'not yet - the fan does not point at the fire (20.5 degrees off; in this simulator at most 20)');
+  assert.equal(detail(aimedAt(BACK_TARGET, 200, 20.6)), 'not yet - the fan does not point at the fire (21 degrees off; in this simulator at most 20)');
   // exactly on the limit counts
-  for (const pose of [aimedAt(BACK_TARGET, 300), aimedAt(BACK_TARGET, 200, 19.99)]) {
+  for (const pose of [aimedAt(BACK_TARGET, 300), aimedAt(BACK_TARGET, 200, 19.99), aimedAt(BACK_TARGET, 200, 20), aimedAt(BACK_TARGET, 200, -20)]) {
     const { sim } = play(fanOn(), { startPose: pose });
     sim.start();
     sim.step(30);
     assert.equal(lineOf(sim, 'fan-start').ok, true);
   }
+});
+
+test('reasons: a robot turned by exactly 20 degrees stands ON the limit and counts - and no sentence ever shows the limit as the measure', () => {
+  // (a turn of exactly 20 degrees comes out a hair over 20 in the arithmetic: that hair must not decide)
+  for (const distance of [100, 200, 250, 299]) {
+    for (const off of [20, -20]) {
+      const pose = aimedAt(BACK_TARGET, distance, off);
+      const { sim } = play(fanOn(), { startPose: pose });
+      const view = lookAtFan({ scenario: sim.scenario, world: sim.world, robotConfig: sim.robotConfig, restarts: 0, robotShapes: sim.robotShapes() });
+      assert.ok(view && !view.pointsAt, `${distance} mm, ${off} degrees: the straight-ahead line misses the target, so the 20 degrees decide`);
+      near(view.offDeg, 20, 1e-9);
+      sim.start();
+      sim.step(400);
+      assert.equal(sim.finishReason, 'mission-complete', `${distance} mm, ${off} degrees`);
+    }
+  }
+  // the same on the other limit: exactly 300 mm, turned by exactly 20 degrees
+  const corner = play(fanOn(), { startPose: aimedAt(BACK_TARGET, 300, 20) });
+  corner.sim.start();
+  corner.sim.step(400);
+  assert.equal(corner.sim.finishReason, 'mission-complete');
+  // a hair more does not count, and is written as more than the limit
+  for (const [off, written] of [[20.001, '20.1'], [20.04, '20.1'], [20.1, '20.1'], [20.11, '20.2'], [-20.001, '20.1']] as const) {
+    const { sim } = play(fanOn(), { startPose: aimedAt(BACK_TARGET, 200, off) });
+    sim.start();
+    sim.step(30);
+    assert.equal(lineOf(sim, 'fan-start').detail, `not yet - the fan does not point at the fire (${written} degrees off; in this simulator at most 20)`, String(off));
+  }
+  const far = play(fanOn(), { startPose: aimedAt(BACK_TARGET, 300.001) });
+  far.sim.start();
+  far.sim.step(30);
+  assert.equal(lineOf(far.sim, 'fan-start').detail, 'not yet - the fire is too far from the fan (300.1 mm, at most 300 mm)');
+  // whatever the angle: the sentence never reads "20.0 degrees off ... at most 20" or "20 degrees off"
+  for (let off = 19.9; off <= 20.2; off += 0.0125) {
+    const { sim } = play(fanOn(), { startPose: aimedAt(BACK_TARGET, 200, off) });
+    sim.start();
+    sim.step(30);
+    const line = lineOf(sim, 'fan-start');
+    if (!line.ok) assert.doesNotMatch(line.detail, /\((20|20\.0) degrees off/, `${off}: ${line.detail}`);
+  }
+});
+
+test('reasons: the 20 degrees are said as what they are - a limit of this simulator, not of the rules; the 300 mm are a rule', () => {
+  const aside = play(fanOn(), { startPose: aimedAt(BACK_TARGET, 200, 30) });
+  aside.sim.start();
+  aside.sim.step(30);
+  assert.match(lineOf(aside.sim, 'fan-start').detail, /30 degrees off; in this simulator at most 20\)$/);
+  const far = play(fanOn(), { startPose: aimedAt(BACK_TARGET, 320) });
+  far.sim.start();
+  far.sim.step(30);
+  assert.equal(lineOf(far.sim, 'fan-start').detail, 'not yet - the fire is too far from the fan (320 mm, at most 300 mm)');
+  assert.doesNotMatch(lineOf(far.sim, 'fan-start').detail, /simulator/);
+  // ... also on the final sheet
+  aside.sim.declareFinished();
+  assert.match(lineOf(aside.sim, 'fan-start').detail, /the fan did not point at the fire \(30 degrees off; in this simulator at most 20\)$/);
 });
 
 test('not 30 points: a fan that is too weak, or a motor on the other port', () => {
@@ -839,11 +894,86 @@ test('40 points: one tick short of 3 seconds is not enough', () => {
   assert.equal(lineOf(sim, 'fan-start').ok, true);
   assert.equal(lineOf(sim, 'fan-complete').ok, false);
   assert.equal(sim.score().total, 10 + 20 + 30);
-  assert.ok(logOf(events).includes('The fan action stopped after 2.9 s: the fan is off. The 3 seconds start again.'));
+  // (in the last tenth before the 3 seconds the length is written to the hundredth: "2.9" would hide how little was missing)
+  assert.ok(logOf(events).includes('The fan action stopped after 2.99 s: the fan is off. The 3 seconds start again.'));
   assert.equal(
     lineOf(sim, 'fan-complete').detail,
-    'the fan action stopped after 2.9 of 3 seconds (the fan was off) - hold it for 3 seconds without a break',
+    'the fan action stopped after 2.99 of 3 seconds (the fan was off) - hold it for 3 seconds without a break',
   );
+});
+
+test('40 points: "stop, fan on, wait 3 seconds, fan off" while the robot still rolls - the sentences say that the count began later than the fan', () => {
+  // The natural program of a student: drive to the fire, stop, fan on, wait 3 seconds, fan off.
+  // The wheels need a moment to come to rest, so the fan blows for 3.00 s but the action - which
+  // needs a robot that stands still - is a little shorter.
+  const { sim } = play(
+    function* (io) {
+      io.setWheelRpm('left', 20);
+      io.setWheelRpm('right', 20);
+      yield* sleep(150);
+      io.stopWheel('all');
+      io.setDcMotor('M1', 100);
+      yield* sleep(300);
+      io.stopDcMotor('M1');
+      yield* sleep(50);
+    },
+    // (it rolls about 10 cm towards the target and is then completely inside the room, some 10 cm from the target)
+    { startPose: aimedAt(BACK_TARGET, 200) },
+  );
+  const events = runUntil(sim, () => sim.status !== 'running');
+  assert.equal(sim.finishReason, 'program-ended');
+  assert.equal(sim.score().total, 10 + 20 + 30, 'the 40 points are missed');
+  const began = lineOf(sim, 'fan-start').time ?? 0;
+  near(began, 1.5, 0.1);
+  assert.ok(began > 1.5, 'the count began after the fan was switched on (at 1.50 s)');
+  const said = logOf(events).find((text) => text.startsWith('The fan action stopped after'));
+  assert.ok(said, 'the referee says that the action stopped');
+  const written = /^The fan action stopped after (2\.9\d) s: the fan is off\. The 3 seconds start again\. The count began at (0:01\.\d), not when the fan started: before that, the robot was moving - it must stand still\.$/.exec(said);
+  assert.ok(written, said);
+  // the length is the time from the beginning of the count to the moment the fan was switched off (4.50 s), to the hundredth
+  near(Number(written[1]), 4.5 - began, 0.011);
+  assert.equal(written[2], clock(began));
+  assert.equal(
+    lineOf(sim, 'fan-complete').detail,
+    `not earned - the fan action stopped after ${written[1]} of 3 seconds: the fan was off. The count began at ${clock(began)}, not when the fan started: ` +
+      'before that, the robot was moving - it must stand still',
+  );
+  // the same program with a robot that already stands still earns everything: nothing is said about a late count
+  const atRest = play(
+    function* (io) {
+      yield* sleep(150);
+      io.setDcMotor('M1', 100);
+      yield* sleep(300);
+      io.stopDcMotor('M1');
+    },
+    { startPose: aimedAt(BACK_TARGET, 150) },
+  );
+  const quiet = runUntil(atRest.sim, () => atRest.sim.status !== 'running');
+  assert.equal(atRest.sim.finishReason, 'mission-complete');
+  assert.ok(!logOf(quiet).some((text) => text.includes('The count began')));
+});
+
+test('40 points: an action that began with the fan and broke says nothing about a late count; a shorter one keeps one decimal', () => {
+  const { sim } = play(
+    function* (io) {
+      yield* sleep(10);
+      io.setDcMotor('M1', 100);
+      yield* sleep(289); // 2.89 s: not in the last tenth
+      io.stopDcMotor('M1');
+      yield* sleep(20);
+      io.setDcMotor('M1', 100);
+      yield* sleep(290); // 2.90 s: in the last tenth
+      io.stopDcMotor('M1');
+      yield* sleep(20);
+    },
+    { startPose: IN_ROOM },
+  );
+  const events = runUntil(sim, () => sim.status !== 'running');
+  assert.deepEqual(
+    logOf(events).filter((text) => text.startsWith('The fan action stopped')),
+    ['The fan action stopped after 2.8 s: the fan is off. The 3 seconds start again.', 'The fan action stopped after 2.90 s: the fan is off. The 3 seconds start again.'],
+  );
+  assert.equal(lineOf(sim, 'fan-complete').detail, 'not earned - the fan action stopped after 2.90 of 3 seconds: the fan was off');
 });
 
 test('40 points: the sheet names why the action broke, not what the robot does afterwards', () => {
@@ -1217,7 +1347,7 @@ test('final sheet: the time runs out one tick before the 3 seconds are over', ()
   const tooLate = lateFan(299);
   assert.equal(tooLate.finishReason, 'time');
   assert.equal(tooLate.score().total, 60);
-  assert.equal(lineOf(tooLate, 'fan-complete').detail, 'not earned - the fan action was 2.9 of 3 seconds long when the attempt ended');
+  assert.equal(lineOf(tooLate, 'fan-complete').detail, 'not earned - the fan action was 2.99 of 3 seconds long when the attempt ended');
 });
 
 test('final sheet: the fan blew in the empty room until the time was up - the real reason stays on the sheet', () => {
@@ -1267,7 +1397,7 @@ test('final sheet: every other way the fan can blow without counting is remember
   runUntil(aside.sim, () => aside.sim.status !== 'running');
   assert.equal(
     lineOf(aside.sim, 'fan-start').detail,
-    'not earned - the fan blew, but it did not count. The last time, at 0:00.6: the fan did not point at the fire (45 degrees off, at most 20)',
+    'not earned - the fan blew, but it did not count. The last time, at 0:00.6: the fan did not point at the fire (45 degrees off; in this simulator at most 20)',
   );
   // while driving
   const moving = play(
@@ -1330,7 +1460,63 @@ test('final sheet: an action that broke - how long it had lasted and why it brok
   runUntil(sim, () => sim.status !== 'running');
   assert.equal(sim.finishReason, 'program-ended');
   assert.equal(sim.score().total, 60);
-  assert.equal(lineOf(sim, 'fan-complete').detail, 'not earned - the fan action stopped after 2.9 of 3 seconds: the fan was off');
+  assert.equal(lineOf(sim, 'fan-complete').detail, 'not earned - the fan action stopped after 2.99 of 3 seconds: the fan was off');
+});
+
+test('final sheet after a restart: no line says "never" about what did happen before the restart', () => {
+  // 60 points before the restart: out of START, into the room, a fan action that began
+  const { sim } = play(
+    function* (io) {
+      yield* sleep(20);
+      io.setDcMotor('M1', 100);
+      yield* sleep(100);
+      io.stopDcMotor('M1');
+      yield* forever();
+    },
+    { startPose: IN_ROOM },
+  );
+  const before = runUntil(sim, () => sim.world.time >= 2);
+  assert.equal(sim.score().total, 10 + 20 + 30);
+  assert.equal(logOf(before).filter((text) => text.startsWith('+')).length, 3, 'the console shows three achievements');
+  sim.restart();
+  // (the restart puts the robot back where it started - here: in the room, so two achievements are earned again at once)
+  sim.step(5);
+  sim.declareFinished();
+  const sheet = details(sim);
+  for (const line of sheet) assert.doesNotMatch(line, /never/, line);
+  assert.match(sheet[2], /^(done at |not earned - after the restart the fan did not blow$)/);
+  assert.equal(sheet[3], 'not earned - after the restart the fan did not blow at the fire for 3 seconds without a break');
+  assert.equal(lineOf(sim, 'restart').detail, `restart used at ${clock(2)}: the points earned before it were cleared`);
+
+  // the same from START: all four lines are about the time after the restart
+  const fromStart = play(function* (io) {
+    yield* drive(io, 300, 90);
+    yield* forever();
+  });
+  runUntil(fromStart.sim, () => lineOf(fromStart.sim, 'leave-start').ok);
+  assert.equal(fromStart.sim.score().total, 10);
+  fromStart.sim.restart();
+  fromStart.sim.step(5);
+  fromStart.sim.declareFinished();
+  assert.deepEqual(details(fromStart.sim), [
+    'not earned - after the restart the robot did not leave the START cell completely',
+    'not earned - after the restart the robot was not completely inside the living room or the bedroom',
+    'not earned - after the restart the fan did not blow',
+    'not earned - after the restart the fan did not blow at the fire for 3 seconds without a break',
+  ]);
+  // without a restart the words stay "never"
+  const plain = play(function* () {
+    yield* forever();
+  });
+  plain.sim.start();
+  plain.sim.step(50);
+  plain.sim.declareFinished();
+  assert.deepEqual(details(plain.sim), [
+    'not earned - the robot never left the START cell completely',
+    'not earned - the robot was never completely inside the living room or the bedroom',
+    'not earned - the fan never blew',
+    'not earned - the fan never blew at the fire for 3 seconds without a break',
+  ]);
 });
 
 test('final sheet: after every kind of end no line says "not yet" any more', () => {

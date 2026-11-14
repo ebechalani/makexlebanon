@@ -153,26 +153,41 @@ describe('a program with flame sensor blocks: they are taken out, the rest stays
     assert.equal(withoutRetiredBlocks(unknown).program, unknown);
   });
 
-  it('says it in one plain sentence - for a file, and for the blocks the browser saved', () => {
+  it('says it in two plain sentences - what was taken out, and where to look - for a file, and for the blocks the browser saved', () => {
     assert.equal(
       retiredBlocksNote(taken, 'this program'),
-      '5 flame sensor blocks were taken out of this program, because the simulator has no flame sensor any more: their places are empty now.',
+      '5 flame sensor blocks were taken out of this program, because the simulator has no flame sensor any more. ' +
+        'Look at the places where they were: a slot there is empty now, or shows a number or a text that you did not choose.',
     );
     assert.equal(
       retiredBlocksNote(taken, 'your saved program'),
-      '5 flame sensor blocks were taken out of your saved program, because the simulator has no flame sensor any more: their places are empty now.',
+      '5 flame sensor blocks were taken out of your saved program, because the simulator has no flame sensor any more. ' +
+        'Look at the places where they were: a slot there is empty now, or shows a number or a text that you did not choose.',
     );
     const one = withoutRetiredBlocks({ blocks: { blocks: [{ type: 'sensing_flame_size', id: 'x' }] } });
     assert.equal(one.removed, 1);
     assert.equal(
       retiredBlocksNote(one, 'this program'),
-      '1 flame sensor block was taken out of this program, because the simulator has no flame sensor any more: its place is empty now.',
+      '1 flame sensor block was taken out of this program, because the simulator has no flame sensor any more. ' +
+        'Look at the place where it was: a slot there is empty now, or shows a number or a text that you did not choose.',
     );
-    // one sentence: one full stop, at its end
+    // two sentences: two full stops, the second at the end
     for (const note of [retiredBlocksNote(taken, 'this program'), retiredBlocksNote(one, 'your saved program')]) {
-      assert.equal((note ?? '').match(/\./g)?.length, 1);
+      assert.equal((note ?? '').match(/\./g)?.length, 2);
       assert.match(note ?? '', /\.$/);
     }
+    // It does not say that the places are empty: they are not, all of them. Of the five places
+    // of the program above one is really empty ("wait until"), one block stood alone, and three
+    // slots show their white bubble again - with a number or a text the program then runs with.
+    for (const note of [retiredBlocksNote(taken, 'this program'), retiredBlocksNote(one, 'this program')]) assert.doesNotMatch(note ?? '', /(is|are) empty now\.$/);
+    assert.equal(byId(taken.program, 'b4').inputs?.CONDITION, undefined, 'really empty');
+    const bubbles = [byId(taken.program, 'b7').inputs?.VALUE, byId(taken.program, 'b12').inputs?.OPERAND1, byId(taken.program, 'b24').inputs?.STRING2];
+    for (const slot of bubbles) assert.ok(slot?.shadow && slot.block === undefined, 'a white bubble, no block');
+    assert.deepEqual(
+      bubbles.map((slot) => slot?.shadow?.fields?.TEXT),
+      ['0', '', 'banana'],
+      'what the program now runs with in those places',
+    );
   });
 
   it('a program file with such blocks is read like any other file; the page then takes them out', () => {

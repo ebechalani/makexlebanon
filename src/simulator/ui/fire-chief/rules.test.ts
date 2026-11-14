@@ -103,6 +103,7 @@ const CHECKS: NumberCheck[] = [
   { find: /one sensor in the middle of the front of the robot, (\d+) cm above the mat/, values: [cm(COLOR_SENSOR.mount!.height)], part: 'assumed' },
   { find: /the thing in front of it is (\d+) mm away or closer/, values: [COLOR_SENSOR_RANGE_MM], part: 'assumed' },
   { find: /(\d+) mm in front of it when the robot comes straight at it/, values: [COLOR_SENSOR_RANGE_MM], part: 'assumed' },
+  { find: /on the screen the last (\d+) mm are only a few dots wide/, values: [COLOR_SENSOR_RANGE_MM], part: 'assumed' },
   { find: /power of that motor is (\d+) % or more/, values: [FAN.minPower], part: 'assumed' },
   { find: /at most (\d+) degrees to the side/, values: [FAN.coneHalfAngleDeg], part: 'assumed' },
   { find: /The (\d+) cm are measured from the fan/, values: [cm(FAN.reachMm)], part: 'assumed' },
@@ -322,7 +323,7 @@ test('rules: marked as a draft; the organiser\'s decisions are rules; what is as
   assert.equal(FIRE_CHIEF_RULES_NOTE, 'Draft rules, MakeX Lebanon 2027. Timing, scoring and restarts are proposals and can change.');
   assert.deepEqual(
     FIRE_CHIEF_RULES.map((section) => section.title),
-    ['The field', 'The robot', 'The attempt', 'Points - each achievement counts once (100 in all)', 'What does not count', 'An attempt ends when', 'Restart', 'Ranking'],
+    ['The field', 'The robot', 'The attempt', 'Points - each achievement counts once (100 in all)', 'What does not count', 'An attempt ends when', 'Restart', 'Ranking', 'Fair play'],
   );
   // ---- the answers of the organiser (and the thickness of the walls) are in the rules ...
   const decided = [
@@ -406,8 +407,27 @@ test('rules: marked as a draft; the organiser\'s decisions are rules; what is as
     /The clock keeps running/,
     /Every team has two scored attempts\. The better one counts\./,
     /ranked by the most points; then by the shortest time to reach these points/,
+    // draft §6, step 6: "Stop to indicate mission completion"
+    /When the fan action is done, the robot stops\. That shows that its mission is complete\./,
+    // draft §10, §11 and §13, in short
+    /The team touches the robot only when the referee allows it\./,
+    /It must not damage the field, and it must not use a wall that was moved as a shortcut\./,
+    /When equipment of the organiser fails, the referee can give the team a new attempt\./,
+    /Students build, program and run their robot themselves\./,
+    /Coaches and spectators give no directions and send no commands during an attempt\./,
   ]) {
     assert.match(RULES_TEXT, said);
+  }
+  // ---- what the screen does differently from the real field is said among the assumptions:
+  // the simulator stops the robot itself (a real program has to), walls are drawn thicker than
+  // they are, and close to the target the colour sensor can still read "none"
+  for (const said of [
+    /the simulator stops the robot and its fan by itself\. On a real field your program has to stop them\./,
+    /Walls are drawn thicker than they really are, so that you can see them\. The robot stops at the real wall, in the middle of the drawn one\. With the ruler, measure to the middle of a drawn wall\./,
+    /a robot that stands close to the fire target can still read "none"/,
+  ]) {
+    assert.match(ASSUMED_TEXT, said);
+    assert.ok(!said.test(RULES_TEXT), `${said} is about the simulator, not a rule`);
   }
 });
 

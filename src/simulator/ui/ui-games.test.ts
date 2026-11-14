@@ -31,14 +31,14 @@ import { ConsolePanel } from './ConsolePanel';
 import { ControlBar, type ControlBarProps } from './ControlBar';
 import { MAZE_CHOICES, mazeChoiceOf, ROOM_LABEL, SPOT_LABEL, withMaze } from './fire-chief/maze-choices';
 import { FIRE_CHIEF_START_ZONE, FIRE_CHIEF_WORDS } from './fire-chief/words';
-import { bodyName, describeEvent, finishText, formatRefereeTime, formatStamp, restartFacts, restartLine, restartsLeftText, timeTextOf, type LogLine } from './format';
-import { finishSentence, restartButton, restartSummary } from './match-words';
+import { bodyName, CYBERPI_PANEL_HOLDS, cyberPiSummary, describeEvent, finishText, formatRefereeTime, formatStamp, restartFacts, restartLine, restartsLeftText, timeTextOf, type LogLine } from './format';
+import { finishHeadline, finishSentence, restartButton, restartSummary } from './match-words';
 import { foreignBlocks, gameNameFromId, otherGameNote, parseProgramFile, serializeProgramFile } from './program-file';
-import { FIRE_KIND, fitView, placeZoneLabels, sightPolygon, viewToMat, wallDrawBox, WALL_MIN_PIXELS } from './render';
-import { dcMotorUse, robotParts, sensorSummary } from './robot-parts';
+import { colourSight, FIRE_KIND, fitView, placeZoneLabels, sightPolygon, viewToMat, wallDrawBox, WALL_MIN_PIXELS } from './render';
+import { colourNeedsCloser, colourRangeNote, colourRangeText, dcMotorUse, NEAR_FOR_COLOUR_CM, robotParts, sensorSummary, sensorsViewHint } from './robot-parts';
 import { addRulerPoint, EMPTY_RULER, rulerText } from './ruler';
 import { lineMark, linePoints, lineTime, ScoreSheet, StatusLine, type StatusLineProps } from './ScoreSheet';
-import { capital, DEFAULT_WORDS, screenWords } from './screen-words';
+import { capital, DEFAULT_WORDS, scoreSheetSummary, screenWords } from './screen-words';
 import { SensorDashboard } from './SensorDashboard';
 import { readyHint } from './stage-view';
 import { centredPose, homeButtonWords, homeKind, homePose, poseFits } from './start-pose';
@@ -67,6 +67,8 @@ function buttonTag(html: string, name: string): string {
   return found.slice(0, found.indexOf('>') + 1);
 }
 const isDisabled = (tag: string): boolean => /\sdisabled(=""|\s|>)/.test(tag);
+/** A button that cannot be used: switched off for the browser, or marked as off (aria-disabled) while it keeps the keyboard focus. */
+const isOff = (tag: string): boolean => isDisabled(tag) || /\saria-disabled="true"/.test(tag);
 const titleOf = (tag: string): string => (/title="([^"]*)"/.exec(tag)?.[1] ?? '').replace(/&quot;/g, '"').replace(/&#x27;/g, "'");
 
 const CHIEF_WORDS = screenWords(FIRE_CHIEF_WORDS);
@@ -234,6 +236,33 @@ test('words: a game changes only what it names; Fire Chief plays an "attempt" wi
 // Restart
 // =============================================================================================
 
+test('words: the closed Score sheet says "3 of 9 missions" in Fire Rescue and "2 of 4 done" in Fire Chief', () => {
+  assert.equal(scoreSheetSummary({ total: 30, max: 180 }, 3, 9, DEFAULT_WORDS), '30 / 180 points · 3 of 9 missions');
+  assert.equal(DEFAULT_WORDS.goalsShort, undefined, 'Fire Rescue gives no short word: its summary is what it was');
+  assert.equal(scoreSheetSummary({ total: 30, max: 100 }, 2, 4, CHIEF_WORDS), '30 / 100 points · 2 of 4 done');
+  // The longest it can get. (Measured in the browser: with "achievements" the text was 217 dots
+  // wide and the closed panel of a phone that is 360 wide has room for 197.)
+  assert.equal(scoreSheetSummary({ total: 100, max: 100 }, 4, 4, CHIEF_WORDS), '100 / 100 points · 4 of 4 done');
+  // the status line still says the whole word
+  assert.equal(CHIEF_WORDS.goals, 'achievements');
+});
+
+test('CyberPi panel: closed, it lists what it holds - or, in a game that asks for it, shows the last line the program printed', () => {
+  assert.equal(CYBERPI_PANEL_HOLDS, 'screen, LEDs, buttons A / B, joystick');
+  // Fire Rescue (and every game that does not ask): always the list, whatever was printed
+  assert.equal(cyberPiSummary([], false), CYBERPI_PANEL_HOLDS);
+  assert.equal(cyberPiSummary(['Hello', 'mBot2'], false), CYBERPI_PANEL_HOLDS);
+  // Fire Chief: the list until something is printed, then the last line
+  assert.equal(cyberPiSummary([], true), CYBERPI_PANEL_HOLDS);
+  assert.equal(cyberPiSummary(['', '  '], true), CYBERPI_PANEL_HOLDS);
+  assert.equal(cyberPiSummary(['Choose: Open field'], true), 'screen: "Choose: Open field"');
+  assert.equal(cyberPiSummary(['No fire here', 'Red: fan on', ''], true), 'screen: "Red: fan on"');
+  // the starter that knows one way only, on the maze a visitor sees first: it prints its message and ends at once
+  const starter = program([script(whenStart(), [ifThen(colorSensorDetects('red'), []), print('Choose: Open field')])]);
+  const sim = playChief(starter);
+  assert.equal(cyberPiSummary(sim.world.robot.screen.lines, true), 'screen: "Choose: Open field"');
+});
+
 test('restart button: Fire Rescue shows what a restart costs and is never off for lack of restarts', () => {
   const button = restartButton(RESCUE, Infinity, 'match');
   assert.deepEqual(button, {
@@ -280,12 +309,31 @@ test('restart button: once the one restart is used the button is off and says wh
   for (const state of ['running', 'paused'] as RunState[]) {
     const html = chiefBar(state, 0);
     const tag = buttonTag(html, 'Restart');
-    assert.equal(isDisabled(tag), true, state);
+    // Off - but in a way that keeps the keyboard focus on it: the button that was just pressed
+    // must not drop the focus to the page. It says that it is off (aria-disabled), looks off,
+    // and is not switched off for the browser (`disabled` would take the focus away).
+    assert.equal(isOff(tag), true, state);
+    assert.equal(isDisabled(tag), false, `${state}: not "disabled" - it keeps the focus`);
+    assert.match(tag, /aria-disabled="true"/, state);
+    assert.match(tag, /class="[^"]*cursor-not-allowed opacity-40[^"]*"/, `${state}: it looks switched off`);
+    assert.ok(!/hover:|active:/.test(tag), `${state}: and does not change under the pointer`);
     assert.equal(titleOf(tag), button.hint);
     assert.match(text(html), /Restart0 left/);
     // the other buttons of a running attempt still work
     assert.equal(isDisabled(buttonTag(html, 'Finished')), false);
     assert.equal(isDisabled(buttonTag(html, 'Stop')), false);
+  }
+  // before the start and after the end nothing can be restarted anyway: there the button is switched off as ever
+  for (const state of ['ready', 'finished', 'stopped'] as RunState[]) {
+    const tag = buttonTag(chiefBar(state, 0), 'Restart');
+    assert.equal(isDisabled(tag), true, state);
+    assert.ok(!/aria-disabled/.test(tag), state);
+  }
+  // while a restart is left, and in Fire Rescue at any time, the button is a plain button
+  for (const html of [chiefBar('running', 1), controlBar('running'), controlBar('paused')]) {
+    const tag = buttonTag(html, 'Restart');
+    assert.equal(isOff(tag), false);
+    assert.ok(!/aria-disabled/.test(tag) && /hover:bg-slate-50/.test(tag));
   }
 });
 
@@ -389,6 +437,9 @@ test('end: a whole mission ends "mission complete", and the screen says it in th
   assert.match(line, /^Attempt over\. Mission complete at 0:\d\d\.\d: the fan blew at the fire for 3 seconds\. Final score: 100 \/ 100 - a perfect run!/);
   assert.ok(!/Match/.test(line), 'Fire Chief does not call it a match');
   assert.match(line, /Score sheet/);
+  // as the Fire Chief screen draws it: the referee's first words (the whole sentence is on the sheet)
+  const brief = text(statusLine('finished', score, { finishReason: sim.finishReason, finishDetail: sim.finishDetail, time: sim.world.time, words: CHIEF_WORDS, briefEnding: true }));
+  assert.match(brief, /^Attempt over\. Mission complete at 0:\d\d\.\d\. Final score: 100 \/ 100 - a perfect run!Score sheet$/);
 
   // the console gets the same sentence, once
   const finish = { type: 'finish', reason: 'mission-complete', time: sim.world.time, detail: sim.finishDetail } as const;
@@ -403,6 +454,89 @@ test('end: a target that was pushed away ends the attempt, with the reason on th
   const line = text(statusLine('finished', sim.score(), { finishReason: sim.finishReason, finishDetail: sim.finishDetail, time: sim.world.time, words: CHIEF_WORDS }));
   assert.match(line, /^Attempt over\. The robot pushed the fire target out of its place \(by [\d.]+ mm\)\. The attempt ends here; the points earned before stay\. Final score: 10 \/ 100/);
   assert.ok(!/perfect|complete/.test(line));
+  const brief = text(statusLine('finished', sim.score(), { finishReason: sim.finishReason, finishDetail: sim.finishDetail, time: sim.world.time, words: CHIEF_WORDS, briefEnding: true }));
+  assert.match(brief, /^Attempt over\. The robot pushed the fire target out of its place \(by [\d.]+ mm\)\. Final score: 10 \/ 100Score sheet$/);
+});
+
+test('end: the first words of the referee\'s sentence - up to the end of its first statement', () => {
+  assert.equal(finishHeadline('Mission complete at 0:23.0: the fan blew at the fire for 3 seconds.'), 'Mission complete at 0:23.0.');
+  assert.equal(
+    finishHeadline(
+      'Mission complete at 0:14.4 with 80 of 100 points: the fan blew at the fire for 3 seconds. Not earned: Drive completely into the living room or the bedroom (20 points).',
+    ),
+    'Mission complete at 0:14.4 with 80 of 100 points.',
+  );
+  assert.equal(
+    finishHeadline('The robot pushed the fire target out of its place (by 6 mm). The attempt ends here; the points earned before stay.'),
+    'The robot pushed the fire target out of its place (by 6 mm).',
+  );
+  // the colon of a time, and the point of a number, end nothing
+  assert.equal(finishHeadline('Stopped at 1:05.3 after 2.5 seconds! More follows.'), 'Stopped at 1:05.3 after 2.5 seconds!');
+  // one statement stays whole; a sentence without its full stop gets one; nothing stays nothing
+  assert.equal(finishHeadline('The target fell over.'), 'The target fell over.');
+  assert.equal(finishHeadline('  The target fell over  '), 'The target fell over.');
+  assert.equal(finishHeadline(''), '');
+  // every headline is short: with "Attempt over." before it and the score after it, it fits the two lines of the status line
+  for (const sentence of [
+    'Mission complete at 0:23.0: the fan blew at the fire for 3 seconds.',
+    'Mission complete at 2:59.9 with 80 of 100 points: the fan blew at the fire for 3 seconds. Not earned: Drive completely into the living room or the bedroom (20 points).',
+    'The robot pushed the fire target out of its place (by 12.5 mm). The attempt ends here; the points earned before stay.',
+  ]) {
+    assert.ok(finishHeadline(sentence).length <= 64, `${finishHeadline(sentence).length} characters: ${finishHeadline(sentence)}`);
+  }
+});
+
+test('end: the longest end of an attempt - 80 points after a restart - stays short on the line, and whole on the sheet', () => {
+  // a fan action from outside the room after a restart: "mission complete" with 80 points
+  const outside: Pose = { x: 150, y: 10 + 280 + FIRE_CHIEF_ROBOT.chassisFront, heading: 0 };
+  const sim = createSimulation({
+    game: fireChiefGame,
+    scenario: openField('living', 'back'),
+    program: program([script(whenStart(), [wait(1), dcMotor('M1', 100), wait(4)])]),
+    startPose: outside,
+  });
+  sim.start();
+  sim.step(50);
+  sim.restart();
+  while (sim.status === 'running') sim.step(1);
+  assert.equal(sim.finishReason, 'mission-complete');
+  assert.equal(sim.score().total, 80);
+  const detail = sim.finishDetail ?? '';
+  assert.match(detail, /^Mission complete at 0:\d\d\.\d with 80 of 100 points: the fan blew at the fire for 3 seconds\. Not earned: Drive completely into the living room or the bedroom \(20 points\)\.$/);
+  const facts = { restarts: sim.restarts, restartPenalty: fireChiefGame.restartPenalty, restartRules: fireChiefGame.restartRules, restartsLeft: sim.restartsLeft };
+  const props = { finishReason: sim.finishReason, finishDetail: sim.finishDetail, time: sim.world.time, words: CHIEF_WORDS, ...facts };
+  // without the brief ending (what the line would say): every word of the referee, and "no restart left"
+  const long = text(statusLine('finished', sim.score(), props)).replace(/Score sheet$/, '');
+  assert.ok(long.length > 200, `${long.length} characters`);
+  // the Fire Chief screen: the referee's first words, the score, the restart - and nothing about restarts that are left
+  const html = statusLine('finished', sim.score(), { ...props, briefEnding: true });
+  const brief = text(html).replace(/Score sheet$/, '');
+  assert.match(brief, /^Attempt over\. Mission complete at 0:\d\d\.\d with 80 of 100 points\. Final score: 80 \/ 100 \(1 restart: points cleared\)$/);
+  assert.ok(brief.length <= 115, `${brief.length} characters`);
+  // beside the blocks the line never shows more than two lines of text
+  assert.match(html, /<p role="status" aria-live="polite" class="min-w-0 flex-1 lg:line-clamp-2">/);
+  // while the attempt runs the line is what it was: nothing is cut, and "no restart left" is still news
+  const running = statusLine('running', sim.score(), { ...props, briefEnding: true });
+  assert.match(running, /<p role="status" aria-live="polite" class="min-w-0 flex-1">/);
+  assert.match(text(running), /1 restart: points cleared, no restart left\./);
+  // the sheet says the whole sentence, under a heading in the words of the game
+  const sheet = renderToStaticMarkup(createElement(ScoreSheet, { score: sim.score(), words: CHIEF_WORDS, ending: sim.finishDetail }));
+  assert.ok(text(sheet).startsWith(`How the attempt ended: ${detail}`), text(sheet).slice(0, 80));
+  // a sheet without such a sentence begins with its first line, as it always did (and so does every sheet of Fire Rescue)
+  for (const ending of [undefined, null, '', '  ']) {
+    const plain = renderToStaticMarkup(createElement(ScoreSheet, { score: sim.score(), words: CHIEF_WORDS, ending }));
+    assert.ok(!/data-ending|How the/.test(plain), String(ending));
+    assert.equal(plain, renderToStaticMarkup(createElement(ScoreSheet, { score: sim.score(), words: CHIEF_WORDS })));
+  }
+});
+
+test('end: Fire Rescue never gets a brief ending - its line is drawn exactly as before', () => {
+  const score: ScoreReport = { lines: [], total: 40, max: 180, complete: false };
+  const html = statusLine('finished', score, { finishReason: 'time', time: 180, restarts: 2, restartPenalty: 5 });
+  assert.match(html, /<p role="status" aria-live="polite" class="min-w-0 flex-1">/);
+  assert.equal(text(html), 'Match over. Time is up at 3:00.0. Final score: 40 / 180 (2 restarts: -10 points)Score sheet');
+  // (the brief ending changes nothing for a game without a limit on restarts and without a referee's sentence - but for the two lines)
+  assert.equal(text(statusLine('finished', score, { finishReason: 'time', time: 180, restarts: 2, restartPenalty: 5, briefEnding: true })), text(html));
 });
 
 test('end: an end without a referee\'s sentence names the reason in the words of the game', () => {
@@ -621,6 +755,66 @@ test('robot parts: the few words on the closed Sensors panel', () => {
   );
 });
 
+test('robot parts: close to something and still "none" - the closed Sensors panel says how close the colour sensor must be', () => {
+  const chief = robotParts(FIRE_CHIEF_ROBOT);
+  const rescue = robotParts(DEFAULT_ROBOT_CONFIG);
+  assert.equal(colourRangeText(chief.frontColour!), '1.5 cm');
+  assert.equal(NEAR_FOR_COLOUR_CM, 5);
+  // 2.5 cm in front of the fire target: the ultrasonic sensor says 3 cm (it cannot say less), the colour sensor "none"
+  const near = { lineStatus: 0, ultrasonicCm: 3, frontColor: 'none' as const, fanOn: false };
+  assert.equal(colourNeedsCloser(chief, near), true);
+  assert.equal(sensorSummary(chief, near), '3 cm · colour none (needs 1.5 cm) · fan off');
+  assert.equal(sensorSummary(chief, { ...near, ultrasonicCm: 5 }), '5 cm · colour none (needs 1.5 cm) · fan off');
+  // close enough, and it reads: nothing to explain
+  assert.equal(sensorSummary(chief, { ...near, frontColor: 'red' }), 'line 0 · 3 cm · colour red · fan off');
+  assert.equal(sensorSummary(chief, { ...near, frontColor: 'yellow' }), 'line 0 · 3 cm · colour yellow · fan off');
+  // far from everything: "none" needs no explanation
+  assert.equal(sensorSummary(chief, { ...near, ultrasonicCm: 5.1 }), 'line 0 · 5 cm · colour none · fan off');
+  assert.equal(sensorSummary(chief, { ...near, ultrasonicCm: 34.4 }), 'line 0 · 34 cm · colour none · fan off');
+  // the number is the robot's own: another range, other words
+  const far = robotParts({ ...FIRE_CHIEF_ROBOT, frontColorSensor: { ...FIRE_CHIEF_ROBOT.frontColorSensor, rangeMm: 22 } });
+  assert.equal(sensorSummary(far, near), '3 cm · colour none (needs 2.2 cm) · fan off');
+  // Fire Rescue has no such sensor: its words never change, however close the robot is
+  assert.equal(colourNeedsCloser(rescue, near), false);
+  assert.equal(sensorSummary(rescue, near), 'line 0 · 3 cm · claw empty');
+  // the hint of the "Sensors" button under the mat: Fire Rescue's is the sentence it always was
+  assert.equal(sensorsViewHint(rescue), 'Show what the line sensor and the ultrasonic sensor see');
+  assert.equal(sensorsViewHint(chief), 'Show what the line sensor and the ultrasonic sensor see, and how far the colour sensor reads (1.5 cm)');
+  // in a real run: the robot stands 2.5 cm in front of the red target and reads "none"
+  const sim = createSimulation({ game: fireChiefGame, scenario: openField('living', 'back'), program: {}, startPose: { x: 150, y: 20 + 25 + FIRE_CHIEF_ROBOT.chassisFront, heading: 0 } });
+  const read = sim.readSensors();
+  assert.deepEqual([read.frontColor, read.ultrasonicCm], ['none', 3]);
+  assert.equal(sensorSummary(chief, read), '3 cm · colour none (needs 1.5 cm) · fan off');
+});
+
+test('the stage: the short line of the colour sensor is exactly as long as its range - and only a robot with such a sensor has one', () => {
+  const pose: Pose = { x: 400, y: 900, heading: 0 };
+  const sight = colourSight(FIRE_CHIEF_ROBOT, pose, 0.3);
+  assert.ok(sight);
+  // from the face of the sensor (the front of the robot) straight ahead, 15 mm
+  assert.deepEqual(sight.from, { x: 400, y: 900 - FIRE_CHIEF_ROBOT.chassisFront });
+  assert.ok(Math.abs(sight.to.x - 400) < 1e-9 && Math.abs(sight.to.y - (900 - FIRE_CHIEF_ROBOT.chassisFront - 15)) < 1e-9);
+  // the bar across its end: at least 9 screen dots wide, also on a small stage
+  assert.ok(Math.abs(sight.left.y - sight.to.y) < 1e-9 && Math.abs(sight.right.y - sight.to.y) < 1e-9);
+  assert.ok((sight.right.x - sight.left.x) * 0.3 >= 9 - 1e-9);
+  assert.ok(Math.abs((colourSight(FIRE_CHIEF_ROBOT, pose, 2)!.right.x - colourSight(FIRE_CHIEF_ROBOT, pose, 2)!.left.x) - 12) < 1e-9, 'on a large stage: 12 mm');
+  // turned a quarter to the right it points to the right
+  const turned = colourSight(FIRE_CHIEF_ROBOT, { ...pose, heading: 90 * DEG }, 0.3)!;
+  assert.ok(Math.abs(turned.to.x - turned.from.x - 15) < 1e-9 && Math.abs(turned.to.y - turned.from.y) < 1e-9);
+  // the reading and the line agree: red when the target reaches into the line, none when it does not
+  for (const [gap, reads] of [[15, 'red'], [15.5, 'none']] as const) {
+    const at: Pose = { x: 150, y: 20 + gap + FIRE_CHIEF_ROBOT.chassisFront, heading: 0 };
+    const sim = createSimulation({ game: fireChiefGame, scenario: openField('living', 'back'), program: {}, startPose: at });
+    const end = colourSight(FIRE_CHIEF_ROBOT, at, 0.3)!.to;
+    assert.equal(sim.readSensors().frontColor, reads, `${gap} mm`);
+    // (the front face of the target is at y = 20)
+    assert.equal(end.y <= 20 + 1e-9, reads === 'red', `${gap} mm: the end of the line is at y = ${end.y}`);
+  }
+  // Fire Rescue's sensor looks at the claw: no line; and a robot whose sensor is switched off has none
+  assert.equal(colourSight(DEFAULT_ROBOT_CONFIG, pose, 0.3), null);
+  assert.equal(colourSight({ ...FIRE_CHIEF_ROBOT, frontColorSensor: { ...FIRE_CHIEF_ROBOT.frontColorSensor, enabled: false } }, pose, 0.3), null);
+});
+
 test('Sensors panel: Fire Chief shows colour sensor, DC motors and fan - and no claw, arm, servo or flame sensor', () => {
   const sim = createSimulation({ game: fireChiefGame, scenario: defaultScenario(), program: program([script(whenStart(), [dcMotor('M1', 80), wait(5)])]) });
   sim.start();
@@ -659,6 +853,13 @@ test('Sensors panel: the colour sensor row of Fire Chief says what the sensor re
   assert.match(far.html, /<dt[^>]*>Colour sensor<\/dt><dd[^>]*>none<\/dd>/);
   // the hint of the row says how close a thing must be, as a fact about this simulator - not as a rule
   assert.match(far.html, /title="What the colour sensor at the front of the robot reads\. In this simulator it names the colour of a thing that is 15 mm or less in front of it\. &quot;none&quot; = nothing is that close\."/);
+  // ... and the same is written under the row, to be read without a mouse - whatever the sensor reads
+  const note = 'In this simulator it reads a colour only from 1.5 cm or closer. Further away it reads "none".';
+  assert.equal(colourRangeNote(robotParts(FIRE_CHIEF_ROBOT).frontColour!), note);
+  for (const seen of [far, atTarget, atWall]) {
+    assert.ok(seen.panel.includes(note), seen.panel.slice(0, 200));
+    assert.match(seen.html, /<dd class="[^"]*" data-colour-range="true">In this simulator it reads a colour only from 1\.5 cm or closer\. Further away it reads &quot;none&quot;\.<\/dd>/);
+  }
   // it is not the claw row of Fire Rescue
   assert.ok(!/Claw colour/.test(far.panel));
 });

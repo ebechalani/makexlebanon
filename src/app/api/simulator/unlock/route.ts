@@ -4,11 +4,11 @@
  * game of the simulator: a request says which game it is about.
  *
  *   request    { "game": "fire-chief" }                          no code
- *   200        { "ok": true, "member": false, "levels": [ ... ], "cards": [ ... ], "examples": [ ... ] }
+ *   200        { "ok": true, "game": "fire-chief", "member": false, "levels": [ ... ], "cards": [ ... ], "examples": [ ... ] }
  *              cards: the examples of that game a visitor may see; examples: the ones that are open to everyone (often none)
  *
  *   request    { "game": "fire-chief", "code": "FIRE-7K2M-9QXD" }   a code
- *   200        { "ok": true, "member": true, "levels": [ ... ], "cards": [ ... ], "examples": [ ... ] }
+ *   200        { "ok": true, "game": "fire-chief", "member": true, "levels": [ ... ], "cards": [ ... ], "examples": [ ... ] }
  *              a member code of the list: the same cards, every one of them as an example
  *              an advanced code of its list: every example of that game
  *   403        { "ok": false, "reason": "invalid-code" }              the code is on neither list
@@ -22,7 +22,9 @@
  *
  * "game" is "fire-rescue" or "fire-chief". A request without "game" - `{}` or
  * `{ "code": "..." }` - is about Fire Rescue: that is how its page asked while it was the only
- * game, and a page that was loaded then is still open in somebody's browser.
+ * game, and a page that was loaded then is still open in somebody's browser. Its answer has no
+ * "game": it is what it always was. The answer to a request that names its game says the name
+ * back, so that a page never takes the examples of one game for those of another.
  *
  * A level is { id, title, about }, a card { id, title, level }, an example
  * { id, title, level, description, program }. A refusal never carries one, and an answer never

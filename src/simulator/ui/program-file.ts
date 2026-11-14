@@ -289,9 +289,15 @@ export function withoutRetiredBlocks(program: ProgramJson): WithoutRetiredBlocks
 }
 
 /**
- * The one sentence for the student whose program lost such blocks; null when it lost none.
+ * What to tell the student whose program lost such blocks; null when it lost none.
  * `whose`: "this program" for a file that was just opened, "your saved program" for the blocks
  * the browser kept from the last visit.
+ *
+ * Two sentences: what was taken out and why, and where to look. A place where a block was
+ * taken out is not always empty: a slot for a number or a text shows its white bubble again,
+ * with the number or the text of the bubble ("50", "1", "banana") - and the program runs with
+ * that. Only a slot for a yes / no question, and the place of a block that stood alone, are
+ * really empty. So the student is sent to look, not told that the places are empty.
  */
 export function retiredBlocksNote(taken: Pick<WithoutRetiredBlocks, 'removed' | 'parts'>, whose: 'this program' | 'your saved program'): string | null {
   if (taken.removed === 0) return null;
@@ -299,6 +305,7 @@ export function retiredBlocksNote(taken: Pick<WithoutRetiredBlocks, 'removed' | 
   const what = taken.parts.join(' and ');
   return (
     `${taken.removed} ${what} ${one ? 'block was' : 'blocks were'} taken out of ${whose}, ` +
-    `because the simulator has no ${what} any more: ${one ? 'its place is' : 'their places are'} empty now.`
+    `because the simulator has no ${what} any more. ` +
+    `Look at the ${one ? 'place where it was' : 'places where they were'}: a slot there is empty now, or shows a number or a text that you did not choose.`
   );
 }
