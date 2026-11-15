@@ -1269,7 +1269,7 @@ test('kind: every text of the screen that names the numbers of a competition maz
   assert.equal(competitionMazeHas({ walls: 10, bothRooms: false }), COMPETITION_MAZE_HAS);
   assert.equal(screenWords(FIRE_CHIEF_WORDS).randomHint, `Draw a random competition maze (${numbers} inner walls) and a random place for the fire`);
   const rules = FIRE_CHIEF_RULES.flatMap((section) => section.items);
-  assert.ok(rules.includes(`A competition maze has ${numbers} inner walls (the wall around the field is not counted). With fewer inner walls a maze is a practice maze.`));
+  assert.ok(rules.includes(`A competition maze has ${numbers} inner walls (the wall around the field is not counted); any other maze is a practice maze.`));
   assert.ok(
     rules.includes(`${Math.max(...COMPETITION_WALL_COUNTS)} inner walls are the most a maze can have while every cell can still be reached: then it has corridors only, and exactly one way to each room.`),
   );

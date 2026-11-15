@@ -864,6 +864,11 @@ Each answer turns an assumption into a decision (see the next section for the st
 10. **Which number of inner walls is used in which round?** The organiser has decided that a
     competition maze has 13 or 16 inner walls, and has not said which of the two belongs to
     which round. The simulator offers both side by side and says nothing about rounds.
+11. **Must every cell of a competition maze be reachable?** The decision names only the
+    number of walls. The page asks for that number and a way from START to both rooms, so a
+    maze built by hand with 13 or 16 walls and closed-off cells counts as a competition maze.
+    If every cell must be reachable, add that condition to `isCompetitionMaze()` in
+    `scenario.ts` and to `mazeKind()` in `maze-level.ts`.
 
 #### When the organiser decides something
 
@@ -910,15 +915,27 @@ said which of the two numbers is used in which round, so no text of the simulato
   from START to both rooms (`isCompetitionMaze()` in `scenario.ts`; the editor's `mazeKind()`
   in `maze-level.ts` gives the same answer). Every other maze is a **practice maze** — one with
   10 walls as much as one with a closed room. The two words mean this wherever the page says
-  them. (A maze with 16 walls that was built by hand can have a closed-off cell that is no
-  room: by the two conditions it is a competition maze, and the page calls it one, but it does
-  not say "corridors only" about it.)
+  them. (A maze with 13 or 16 walls that was built by hand can have closed-off cells that are
+  no room — `LC-18J6-69T0` has 13 walls and 4 such cells, `LC-Z8G6-69T0` 16 walls and 2: by
+  the two conditions it is a competition maze, and the page calls it one, but it does not say
+  "corridors only" about it. No random draw makes such a maze. See question 11.)
 - **The generator.** `randomScenarioWithWalls(rng, count)` makes a random maze with exactly
   `count` inner walls the way the older `randomScenario()` makes its mixed mazes: a maze with
   corridors only, from which walls are taken away by chance. So every cell of it can be
   reached and it can always be played. `randomScenario()` itself is unchanged — the same seed
   gives the same maze of 4 to 16 walls as before (a test holds it to ten codes that were
-  written down before the change) — but the page does not draw from it any more.
+  written down before the change and to one number made from the codes of seeds 1 to 2000;
+  seeds 0 to 19 999 were also compared once with the website as it was before) — but the page
+  does not draw from it any more.
+- **The random mazes are of one sort.** The maze with corridors only is dug depth first
+  (`perfectMazeWalls()`: one way on until it is stuck, then back), which gives long corridors
+  and few dead ends. Counted on 20 000 mazes of each kind, against mazes drawn evenly among all
+  mazes with corridors only (Wilson's algorithm, then the same walls taken away): 4.3 dead ends
+  on average against 7.8 with 16 walls, 2.8 against 5.2 with 13; START has a single way out in
+  13 % against 31 % of the mazes with 16 walls, 8 % against 20 % with 13. A competition maze
+  built by hand can be of the other sort. The advanced example scored 100 points on those too
+  (1000 of each kind, the fire at all six places: 12 000 attempts), more slowly on average
+  (57.2 s with 13 walls, 74.8 s with 16) and with the same slowest times (116.0 s, 133.6 s).
 - **What the page does with it.** It opens with a competition maze (see "The default maze"
   below); the Maze panel has one button for a random competition maze with 13 inner walls and
   one for 16; the box "How hard is this maze?" names the kind of the maze on the stage; each
@@ -928,16 +945,22 @@ said which of the two numbers is used in which round, so no text of the simulato
   the code of the old default maze, is still "Crossroads" with the fire in the corner of the
   living room, and a visitor whose browser has saved a maze gets that maze back.
 
-**Measured** with the advanced example ("The whole mission on any maze"), on the first 2000
-different mazes of each kind that `randomScenarioWithWalls()` draws from seed 1 on, each maze
-with the fire at all six places (12 000 attempts of each kind, on the simulator's perfect
-robot):
+**Measured** with the advanced example ("The whole mission on any maze"), on one maze from each
+seed 1, 2, 3, … (`randomScenarioWithWalls(makeRng(seed), count)`), the first 5000 different
+ones of each kind, each maze with the fire at all six places (30 000 attempts of each kind, on
+the simulator's perfect robot, which never slips):
 
-| Inner walls | 100 points | Average time | Slowest | Cells the left hand drives to the fire room |
-| --- | --- | --- | --- | --- |
-| 13 | 12 000 of 12 000 | 50.8 s | 116.0 s | 15.0 on average, 36 at most |
-| 16 | 12 000 of 12 000 | 68.6 s | 133.6 s | 20.9 on average, 42 at most |
+| Inner walls | 100 points | Average time | Half of them under | Slowest | Cells the left hand drives to the fire room (on paper) |
+| --- | --- | --- | --- | --- | --- |
+| 13 | 30 000 of 30 000 | 50.7 s | 48.0 s | 116.0 s | 14.9 on average, 36 at most |
+| 16 | 30 000 of 30 000 | 68.2 s | 64.3 s | 133.6 s | 20.8 on average, 42 at most |
 
+In every attempt the mission was complete (3 seconds of fan on the fire) well inside the 180
+seconds. The first 2000 mazes of each kind alone give 50.8 s / 116.0 s and 68.6 s / 133.6 s.
+The test window's own list for seed 1 is another set of mazes (`randomMazes(5000, 1, count)`
+in `maze-batch.ts` draws them all from one run of random numbers): 100 points in all 60 000
+attempts, the same slowest times, averages of 50.8 s and 68.3 s, but half of them under 47.4 s
+and 61.7 s — the middle value depends on the sample more than the others.
 (The suite repeats this on a small scale: 30 mazes of each kind in `samples.test.ts`.)
 
 ### The Maze panel
@@ -997,8 +1020,11 @@ says which kind: **"Competition mazes with: 13 inner walls / 16 inner walls (cor
 only)"** — 13 when the window opens. That is one choice of two for all three lists; six lists
 would have been more to read, and a list that mixed the two kinds could not be asked for 16
 walls alone. The mixed list of before (4 to 16 walls) is gone with the old "Random maze"
-button, for the same reason. With "This maze" chosen and a practice maze on the stage, a line
-says so and what a competition maze has. For every run the table shows the points, the time
+button, for the same reason. Beside the progress ("10 / 10") the results name the kind they
+come from ("Competition mazes with 13 inner walls"), so they cannot be taken for the other kind
+when the choice changes before "Run again" (`batch-window.test.ts` clicks it through in
+jsdom). With "This maze" chosen and a practice maze on the stage, a line says so and what a
+competition maze has. For every run the table shows the points, the time
 at which they were reached (the ranking uses it) and how the attempt ended in the referee's
 own words. The lists are in `src/simulator/ui/fire-chief/maze-batch.ts`; a game hands the
 general window its kinds of random lists as `BatchRandom.kinds` (`BatchDialog.tsx`).

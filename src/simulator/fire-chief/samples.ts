@@ -667,12 +667,12 @@ const findFire: SampleProgram = {
 //   - 10 000 mazes with one way only: 100 points in every one, slowest 133.6 s;
 //   - 5 000 mazes no generator draws (every wall by the throw of a coin): 100 points in every
 //     one, slowest 121.5 s;
-//   - competition mazes as the page draws them (randomScenarioWithWalls; the first 2 000
-//     different mazes of each kind from seed 1 on, every one with the fire at all six places:
-//     12 000 attempts of each kind): 100 points in every one. With 13 inner walls 50.8 s on
-//     average, slowest 116.0 s; with 16 inner walls 68.6 s on average, slowest 133.6 s. (On
-//     paper the left hand drives 15.0 cells to the fire room on average with 13 walls, 36 at
-//     most, and 20.9 with 16 walls, 42 at most.)
+//   - competition mazes from the page's generator (one maze from each seed 1, 2, 3, ...:
+//     randomScenarioWithWalls(makeRng(seed), count), the first 5 000 different ones of each kind,
+//     every one with the fire at all six places: 30 000 attempts of each kind): 100 points in
+//     every one. With 13 inner walls 50.7 s on average, slowest 116.0 s; with 16 inner walls
+//     68.2 s on average, slowest 133.6 s. (On paper the left hand drives 14.9 cells to the fire
+//     room on average with 13 walls, 36 at most, and 20.8 with 16 walls, 42 at most.)
 //   - in every run the colour sensor read red before the fan started, and the target never
 //     moved and was never touched;
 //   - with the fire at a wall (two runs of three) the robot touched nothing; with the fire in a

@@ -139,7 +139,7 @@ const COMPETITION_MAZES = 30;
 
 /**
  * Random competition mazes, as the page draws them: 30 with 13 inner walls and 30 with 16
- * (corridors only), the fire at each of its six places in turn. (The big measurement - 2000
+ * (corridors only), the fire at each of its six places in turn. (The big measurement - 5000
  * mazes of each kind with the fire at all six places - is not part of this suite; the README
  * gives its numbers.)
  */

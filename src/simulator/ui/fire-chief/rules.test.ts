@@ -354,7 +354,7 @@ test('rules: marked as a draft; the organiser\'s decisions are rules; what is as
     /The fire is a red wooden flame/,
     /the game is played with a colour sensor, not with a flame sensor\./,
     // decided after the draft: how many inner walls a competition maze has
-    /A competition maze has 13 or 16 inner walls \(the wall around the field is not counted\)\. With fewer inner walls a maze is a practice maze\./,
+    /A competition maze has 13 or 16 inner walls \(the wall around the field is not counted\); any other maze is a practice maze\./,
   ];
   for (const said of decided) {
     assert.match(RULES_TEXT, said);
@@ -453,7 +453,7 @@ test('rules: marked as a draft; the organiser\'s decisions are rules; what is as
 
 test('rules: a competition maze has 13 or 16 inner walls - the numbers are the game\'s, 16 means corridors only, and nothing is said about rounds', () => {
   const [decision, meaning] = [
-    `A competition maze has ${COMPETITION_WALL_COUNTS.join(' or ')} inner walls (the wall around the field is not counted). With fewer inner walls a maze is a practice maze.`,
+    `A competition maze has ${COMPETITION_WALL_COUNTS.join(' or ')} inner walls (the wall around the field is not counted); any other maze is a practice maze.`,
     `${PERFECT_MAZE_WALLS} inner walls are the most a maze can have while every cell can still be reached: then it has corridors only, and exactly one way to each room.`,
   ];
   // both sentences stand with the field, after "there is always a way from START to both rooms"

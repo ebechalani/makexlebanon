@@ -137,6 +137,8 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
   const kinds = random?.kinds ?? [];
   const [kindId, setKindId] = useState<string | null>(null);
   const kind = kinds.find((k) => k.id === kindId) ?? kinds[0];
+  /** the kind the results on screen come from (null: no choice of kinds was offered for them) - the choice can change after the run */
+  const [ranKind, setRanKind] = useState<string | null>(null);
   const [phase, setPhase] = useState<'idle' | 'running' | 'done' | 'cancelled'>('idle');
   const [total, setTotal] = useState(0);
   const [rows, setRows] = useState<Row<S>[]>([]);
@@ -178,6 +180,7 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
     cancelRef.current = false;
     setProblem(null);
     setRows([]);
+    setRanKind(!preset && kind && kinds.length > 1 ? [random?.kindsLegend, kind.label].filter(Boolean).join(' ') : null);
     setTotal(scenarios.length);
     setPhase('running');
 
@@ -206,7 +209,7 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
       else timerRef.current = setTimeout(slice, 0);
     };
     timerRef.current = setTimeout(slice, 0);
-  }, [choice, currentScenario, game, getProgram, getSampler, kind, presets, random, robotConfig, seed, startPose, words]);
+  }, [choice, currentScenario, game, getProgram, getSampler, kind, kinds.length, presets, random, robotConfig, seed, startPose, words]);
 
   const cancel = () => {
     cancelRef.current = true;
@@ -300,7 +303,8 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
             {choice.startsWith('random-') && kinds.length > 1 && (
               // which kind of random list: a small choice that belongs to the three random lists above
               <div role="radiogroup" aria-label={random?.kindsLegend ?? `Kind of random ${words.scenarios}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-700" data-batch-kinds>
-                {random?.kindsLegend && <span className="font-semibold text-ink-800">{random.kindsLegend}</span>}
+                {/* (on a phone the words stand on a line of their own, and the choices under them) */}
+                {random?.kindsLegend && <span className="w-full font-semibold text-ink-800 sm:w-auto">{random.kindsLegend}</span>}
                 {kinds.map((k) => (
                   <label key={k.id} className="flex cursor-pointer items-center gap-1.5">
                     <input type="radio" name="batch-random-kind" className="accent-brand-600" checked={kind?.id === k.id} onChange={() => setKindId(k.id)} />
@@ -372,6 +376,12 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
                 {phase === 'cancelled' && ' (stopped)'}
               </span>
             </div>
+          )}
+          {/* (which kind of random list these results come from: "Competition mazes with 13 inner walls") */}
+          {phase !== 'idle' && ranKind && (
+            <span className="min-w-0 text-sm text-ink-600" data-batch-ran-kind>
+              {ranKind}
+            </span>
           )}
         </div>
 
