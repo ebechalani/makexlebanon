@@ -31,7 +31,7 @@ import { paletteCategories } from '../blocks/palettes';
 import type { Game, Pose, ProgramJson, RobotConfig, Simulation } from '../core/types';
 import { BatchDialog, type BatchPreset, type BatchRandom } from './BatchDialog';
 import { BlocklyEditor, type BlocklyEditorHandle, type EditorStatus } from './BlocklyEditor';
-import { CombinationPanel } from './CombinationPanel';
+import { CombinationPanel, type RandomDraw } from './CombinationPanel';
 import { ConsolePanel } from './ConsolePanel';
 import { ControlBar } from './ControlBar';
 import { CyberPiPanel, HoldButton } from './CyberPiPanel';
@@ -132,6 +132,12 @@ export interface SimulatorAppProps<S> {
    * Pass one function that stays the same between renders.
    */
   readCode?: CodeReader<S>;
+  /**
+   * The category's own random draws for the panel of the combination, in the place of the one
+   * "Random" button (see ./CombinationPanel.tsx). Left out: that button, with game.randomScenario.
+   * Pass one list that stays the same between renders.
+   */
+  randomDraws?: RandomDraw<S>[];
   /** ready-made lists for "Test on many ..." (left out: random lists only) */
   batchPresets?: BatchPreset<S>[];
   /** the category's own way to draw the random lists of "Test on many ..." (left out: game.randomScenario) */
@@ -969,7 +975,7 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
           </div>
 
           <Section title={words.scenarioTitle} summary={<span className="font-mono">{game.encodeScenario(scenario)}</span>} open={open.combination} onToggle={toggleSection('combination')}>
-            <CombinationPanel game={game} scenario={scenario} onChange={changeScenario} words={words} readCode={props.readCode}>
+            <CombinationPanel game={game} scenario={scenario} onChange={changeScenario} words={words} readCode={props.readCode} randomDraws={props.randomDraws}>
               {props.renderCombinationEditor(scenario, changeScenario)}
             </CombinationPanel>
           </Section>

@@ -5,6 +5,10 @@
  *      Lebanon 2027, Fire Chief, Dynamic Maze Challenge, draft competition rules"), together
  *      with what the organiser has decided since the draft was written:
  *        - the walls are 3 mm thick and the outer edge of the field is walled,
+ *        - a competition maze has 13 or 16 inner walls; with fewer a maze is a practice maze
+ *          (the window says "any other maze", so that the word means what it means everywhere
+ *          on the page; the numbers are the game's: COMPETITION_WALL_COUNTS; nothing is said
+ *          about which number is used in which round, because the organiser has not said it),
  *        - the fire target is 6 cm wide and 12 cm high,
  *        - touching or hitting the target without moving it costs nothing,
  *        - a fan action counts from outside the room when the fan is within 30 cm of the target,
@@ -31,7 +35,9 @@
  *
  * (The referee itself is in ../../fire-chief/game.ts; this is only what students read.)
  */
+import { COMPETITION_WALLS_TEXT, PERFECT_MAZE_WALLS } from '../../fire-chief/scenario';
 import type { RulesPart, RulesSection } from '../SimulatorApp';
+import { KIND_WORD } from './maze-level';
 
 /** The sentence under the heading of the rules window. */
 export const FIRE_CHIEF_RULES_NOTE = 'Draft rules, MakeX Lebanon 2027. Timing, scoring and restarts are proposals and can change.';
@@ -45,6 +51,10 @@ export const FIRE_CHIEF_RULES: RulesSection[] = [
       'Walls stand on the lines between the cells. They are 15 cm high and 3 mm thick and do not move during an attempt. The outer edge of the field is walled too.',
       'The black lines of the grid are only printed: the robot may drive over a line where no wall stands.',
       'The maze can be different in every round. There is always a way from START to both rooms.',
+      // (decided by the organiser; the numbers come from the game, and the larger one is the number of a maze with corridors only)
+      // ("any other maze": a practice maze is what it is everywhere on the page - one with fewer walls, with 14 or 15, or with a room that cannot be reached; ./maze-level.ts)
+      `A ${KIND_WORD.competition} has ${COMPETITION_WALLS_TEXT} inner walls (the wall around the field is not counted); any other maze is a ${KIND_WORD.practice}.`,
+      `${PERFECT_MAZE_WALLS} inner walls are the most a maze can have while every cell can still be reached: then it has corridors only, and exactly one way to each room.`,
       'The fire is a red wooden flame, 6 cm wide and 12 cm high. It stands in the living room or in the bedroom. The candle and the fireplace printed in the rooms are only pictures.',
       'Teams hand in their robot before the maze and the place of the fire are shown. After that the program must not be changed.',
     ],

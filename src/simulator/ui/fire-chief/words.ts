@@ -5,11 +5,20 @@
  *
  * Plain TypeScript (no DOM, no React), so the tests can read it under Node.
  */
-import { PLAYABLE_MAZE_COUNT } from '../../fire-chief/scenario';
+import { COMPETITION_WALLS_TEXT, NAMED_MAZES, PLAYABLE_MAZE_COUNT, defaultScenario, wallCount } from '../../fire-chief/scenario';
 import type { ScreenWords } from '../screen-words';
+import { KIND_WORD, mazeFacts, mazeKind } from './maze-level';
 
 /** How many mazes can be played, said so that it can be read: "more than 100 billion" (a billion is 1 000 000 000). */
 const HUNDREDS_OF_BILLIONS = Math.floor(PLAYABLE_MAZE_COUNT / 100e9) * 100;
+
+/** The default maze in a few words: "Detour, a competition maze with 13 inner walls" (its name, its kind and its walls are read from the game). */
+const DEFAULT_MAZE_IN_WORDS = (() => {
+  const first = defaultScenario();
+  const name = NAMED_MAZES.find((maze) => maze.scenario.walls.every((wall, i) => wall === first.walls[i]))?.name;
+  const kind = `a ${KIND_WORD[mazeKind(mazeFacts(first))]} with ${wallCount(first)} inner walls`;
+  return name ? `${name}, ${kind}` : kind;
+})();
 
 /** What the start zone of this game is called in the sentences about placing the robot. */
 export const FIRE_CHIEF_START_ZONE = 'START cell';
@@ -27,10 +36,11 @@ export const FIRE_CHIEF_WORDS: Partial<ScreenWords> = {
   sheetNote: 'Every achievement is earned once, at the moment the referee sees it. A restart clears the points.',
   // (a line without points is a note of the referee here - a used restart costs no points of its own)
   cleanLine: 'Nothing to note',
-  randomLabel: 'Random maze',
-  randomHint: 'Draw a random maze and a random place for the fire',
+  // (in front of the two buttons that draw one: "13 inner walls", "16 inner walls" - see ./maze-choices.ts)
+  randomLabel: `Random ${KIND_WORD.competition}`,
+  randomHint: `Draw a random ${KIND_WORD.competition} (${COMPETITION_WALLS_TEXT} inner walls) and a random place for the fire`,
   defaultLabel: 'Default maze',
-  defaultHint: 'The default maze (Crossroads) with the fire in the corner of the living room',
+  defaultHint: `The default maze (${DEFAULT_MAZE_IN_WORDS}) with the fire in the corner of the living room`,
   // a starting arrangement is a maze here: its walls and the place of the fire
   scenario: 'maze',
   scenarios: 'mazes',

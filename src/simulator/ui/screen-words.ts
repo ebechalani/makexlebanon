@@ -41,7 +41,11 @@ export interface ScreenWords {
    * is called while nothing is wrong with it. The name of the line follows: "No penalty: restarts".
    */
   cleanLine: string;
-  /** the button of the Combination panel that draws a random combination, and what it does */
+  /**
+   * The button of the Combination panel that draws a random combination, and what it does.
+   * (A game with random draws of its own - CombinationPanel: randomDraws - has these words in
+   * front of its buttons: "Random competition maze".)
+   */
   randomLabel: string;
   randomHint: string;
   /** the button of the Combination panel that goes back to the default combination, and what that is */

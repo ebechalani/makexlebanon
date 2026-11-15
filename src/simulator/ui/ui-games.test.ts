@@ -75,7 +75,18 @@ const CHIEF_WORDS = screenWords(FIRE_CHIEF_WORDS);
 const RESCUE = restartFacts(fireRescueGame);
 const CHIEF = restartFacts(fireChiefGame);
 
-/** From START to the middle of the living room on the default maze, cell by cell (ends facing left). */
+/**
+ * The maze the route below was written for: "Crossroads" (ten walls) with the fire in the corner
+ * of the living room, code LC-4406-N0E0. (It was the default maze until the organiser decided
+ * that a competition maze has 13 or 16 inner walls; the default maze is "Detour" now.)
+ */
+function crossroads(): FireChiefScenario {
+  const maze = decodeScenario('LC-4406-N0E0');
+  assert.ok(maze, 'the code still names the maze "Crossroads"');
+  return maze;
+}
+
+/** From START to the middle of the living room on the maze "Crossroads", cell by cell (ends facing left). */
 const TO_LIVING_ROOM = [
   moveCm('forward', 30),
   turn('left', 90),
@@ -91,14 +102,14 @@ const TO_LIVING_ROOM = [
 ];
 
 /**
- * A whole mission on the default maze: to the living room, turn to the fire in its corner, blow
- * for 3 seconds. (It reads no sensor: the referee counts the position only.)
+ * A whole mission on the maze "Crossroads": to the living room, turn to the fire in its corner,
+ * blow for 3 seconds. (It reads no sensor: the referee counts the position only.)
  */
 const MISSION: ProgramJson = program([script(whenStart(), [...TO_LIVING_ROOM, turn('right', 45), dcMotor('M1', 100), wait(3.2), stopDcMotor('M1')])]);
 
-/** Play a Fire Chief attempt without a screen, up to `seconds` of match time (or to its end). */
+/** Play a Fire Chief attempt without a screen, up to `seconds` of match time (or to its end) - on "Crossroads" when no maze is named. */
 function playChief(prog: ProgramJson, options: { scenario?: FireChiefScenario; seconds?: number; startPose?: Pose; restartAt?: number } = {}): Simulation<FireChiefScenario> {
-  const sim = createSimulation({ game: fireChiefGame, scenario: options.scenario ?? defaultScenario(), program: prog, startPose: options.startPose });
+  const sim = createSimulation({ game: fireChiefGame, scenario: options.scenario ?? crossroads(), program: prog, startPose: options.startPose });
   sim.start();
   let restarted = false;
   while (sim.status === 'running' && sim.world.time < (options.seconds ?? 180)) {
@@ -208,8 +219,12 @@ test('words: a game changes only what it names; Fire Chief plays an "attempt" wi
   assert.equal(CHIEF_WORDS.match, 'attempt');
   assert.equal(CHIEF_WORDS.goal, 'achievement');
   assert.equal(CHIEF_WORDS.goals, 'achievements');
-  assert.equal(CHIEF_WORDS.randomLabel, 'Random maze');
+  // (in front of the two buttons that draw one: "13 inner walls" and "16 inner walls")
+  assert.equal(CHIEF_WORDS.randomLabel, 'Random competition maze');
+  assert.equal(CHIEF_WORDS.randomHint, 'Draw a random competition maze (13 or 16 inner walls) and a random place for the fire');
   assert.equal(CHIEF_WORDS.defaultLabel, 'Default maze');
+  assert.equal(CHIEF_WORDS.defaultHint, 'The default maze (Detour, a competition maze with 13 inner walls) with the fire in the corner of the living room');
+  assert.deepEqual([defaultScenario().fireRoom, defaultScenario().fireSpot], ['living', 'corner']);
   // a starting arrangement is a "maze" there: the panel, the code, the console and the test window say so
   assert.equal(CHIEF_WORDS.scenario, 'maze');
   assert.equal(CHIEF_WORDS.scenarios, 'mazes');
@@ -338,7 +353,7 @@ test('restart button: once the one restart is used the button is off and says wh
 });
 
 test('restart button: the real simulation counts the restarts the button shows', () => {
-  const sim = createSimulation({ game: fireChiefGame, scenario: defaultScenario(), program: MISSION });
+  const sim = createSimulation({ game: fireChiefGame, scenario: crossroads(), program: MISSION });
   assert.equal(restartButton(CHIEF, sim.restartsLeft, 'attempt').badge, '1 left');
   sim.start();
   sim.step(300);
@@ -449,7 +464,7 @@ test('end: a whole mission ends "mission complete", and the screen says it in th
 test('end: a target that was pushed away ends the attempt, with the reason on the screen', () => {
   // the robot slides along the top wall into the target that stands at the back wall of the living room
   const push = program([script(whenStart(), [...TO_LIVING_ROOM.slice(0, 9), turn('left', 60), moveCm('forward', 50)])]);
-  const sim = playChief(push, { scenario: withFire(defaultScenario(), 'living', 'back') });
+  const sim = playChief(push, { scenario: withFire(crossroads(), 'living', 'back') });
   assert.equal(sim.finishReason, 'target-displaced');
   const line = text(statusLine('finished', sim.score(), { finishReason: sim.finishReason, finishDetail: sim.finishDetail, time: sim.world.time, words: CHIEF_WORDS }));
   assert.match(line, /^Attempt over\. The robot pushed the fire target out of its place \(by [\d.]+ mm\)\. The attempt ends here; the points earned before stay\. Final score: 10 \/ 100/);
@@ -1297,7 +1312,7 @@ test('placing: in Fire Chief the same button brings the robot back to the defaul
     assert.ok(poseFits(FIRE_CHIEF_ROBOT, zone, home));
   }
   // the simulation takes that pose, and a program that counts on it drives as it was written
-  const sim = createSimulation({ game: fireChiefGame, scenario: defaultScenario(), program: MISSION });
+  const sim = createSimulation({ game: fireChiefGame, scenario: crossroads(), program: MISSION });
   assert.equal(sim.setStartPose({ x: 790, y: 1330, heading: 20 * DEG }), true);
   assert.equal(sim.setStartPose(homePose('default', FIRE_CHIEF_ROBOT, zone, START_POSE, 20 * DEG)), true);
   sim.start();
@@ -1328,13 +1343,16 @@ test('ruler: on the 1500 mm mat of Fire Chief a cell is 30.0 cm, and a point bes
 // =============================================================================================
 
 test('ready-made mazes: the default maze comes first, the open field is there, and every maze can be played', () => {
-  assert.equal(MAZE_CHOICES[0].label, 'Crossroads (default maze)');
+  assert.equal(MAZE_CHOICES[0].label, 'Detour (default maze)');
+  // the others follow from easy to hard
+  assert.deepEqual(MAZE_CHOICES.map((choice) => choice.id), ['detour', 'open', 'two-doors', 'crossroads', 'one-way']);
   assert.deepEqual(MAZE_CHOICES[0].walls, defaultScenario().walls);
   assert.ok(MAZE_CHOICES.some((choice) => choice.label === 'Open field' && choice.walls.every((w) => !w)));
   assert.equal(MAZE_CHOICES.length, 5);
   assert.equal(new Set(MAZE_CHOICES.map((choice) => choice.label)).size, 5);
   for (const choice of MAZE_CHOICES) {
-    assert.match(choice.about, /^Level [1-5] of 5\. /);
+    // its kind, then its level: "Competition maze. Level 4 of 5. ..."
+    assert.match(choice.about, /^(Competition|Practice) maze\. Level [1-5] of 5\. /);
     const scenario = withMaze(defaultScenario(), choice);
     assert.deepEqual(scenarioProblems(scenario), [], choice.label);
     // its code can be typed back in
@@ -1351,7 +1369,7 @@ test('ready-made mazes: picking one keeps the fire where the student put it; any
     assert.equal(mazeChoiceOf(next)?.id, choice.id);
     assert.notEqual(next.walls, choice.walls, 'a copy: an editor may change it');
   }
-  assert.equal(mazeChoiceOf(defaultScenario())?.label, 'Crossroads (default maze)');
+  assert.equal(mazeChoiceOf(defaultScenario())?.label, 'Detour (default maze)');
   // a maze that is none of the five
   const other = defaultScenario();
   other.walls[0] = !other.walls[0];

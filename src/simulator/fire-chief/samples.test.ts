@@ -17,7 +17,8 @@
  *
  * The full mission is also played on the mazes it finds hardest: mazes with one way only
  * ("perfect" mazes), mazes that no generator of the game would draw, and the slowest kind of
- * maze there is.
+ * maze there is - and on random competition mazes as the page draws them (13 and 16 inner
+ * walls). The default maze is a competition maze too ("Detour", 13 inner walls).
  *
  * The robot finds the fire with its ultrasonic sensor and makes sure with its colour sensor,
  * which reads "red" on the target from 1.5 cm or less. No example holds a flame sensor block:
@@ -81,15 +82,18 @@ import {
   type SampleProgram,
 } from './samples';
 import {
+  COMPETITION_WALL_COUNTS,
   NAMED_MAZES,
   PERFECT_MAZE_WALLS,
   decodeScenario,
   defaultScenario,
   encodeScenario,
+  isCompetitionMaze,
   isValidScenario,
   openField,
   perfectMazeWalls,
   randomScenario,
+  randomScenarioWithWalls,
   wallBetweenCells,
   wallCount,
   withFire,
@@ -122,9 +126,28 @@ const ALL_MAZES: FireChiefScenario[] = [...NAMED_PLACES, ...RANDOM];
 /** The open field: the maze without inner walls. */
 const OPEN_FIELD = NAMED_MAZES.find((maze) => maze.id === 'open')!;
 
+/** "Crossroads" as the game has it (fire in the corner of the living room): the left hand comes into the living room facing left there. */
+const CROSSROADS: FireChiefScenario = NAMED_MAZES.find((maze) => maze.id === 'crossroads')!.scenario;
+
 /** Mazes with one way only (16 walls), the fire once in each room: the longest ways along the wall. */
 const PERFECT: FireChiefScenario[] = Array.from({ length: 60 }, (_, i) => perfectMazeWalls(makeRng(100_001 + i))).flatMap((walls, i) =>
   ROOM_IDS.map((fireRoom): FireChiefScenario => ({ walls: [...walls], fireRoom, fireSpot: FIRE_SPOTS[i % FIRE_SPOTS.length] })),
+);
+
+/** How many random competition mazes of each kind the full mission is played on in this suite. */
+const COMPETITION_MAZES = 30;
+
+/**
+ * Random competition mazes, as the page draws them: 30 with 13 inner walls and 30 with 16
+ * (corridors only), the fire at each of its six places in turn. (The big measurement - 5000
+ * mazes of each kind with the fire at all six places - is not part of this suite; the README
+ * gives its numbers.)
+ */
+const COMPETITION: FireChiefScenario[] = COMPETITION_WALL_COUNTS.flatMap((walls) =>
+  Array.from({ length: COMPETITION_MAZES }, (_, i): FireChiefScenario => {
+    const maze = randomScenarioWithWalls(makeRng(700_001 + i), walls);
+    return withFire(maze, PLACES[i % PLACES.length].room, PLACES[i % PLACES.length].spot);
+  }),
 );
 
 /**
@@ -817,10 +840,10 @@ describe('chief-first-wall: stop in front of the first wall', () => {
     return played;
   }
 
-  test('default maze: one cell up, stops 7 to 8 cm before the bar, 10 points', () => {
+  test('default maze: three cells up the middle, stops 7 to 8 cm before the wall above C2, 10 points', () => {
     const { sim } = check(defaultScenario());
-    assert.equal(cellName(cellOf(sim)), 'C4');
-    assert.ok(sim.world.time < 4, `${sim.world.time} s`);
+    assert.equal(cellName(cellOf(sim)), 'C2');
+    assert.ok(sim.world.time > 5 && sim.world.time < 7, `${sim.world.time} s`);
     assert.ok(lineOf(sim, 'leave-start').time! < sim.world.time);
   });
 
@@ -917,6 +940,9 @@ describe('chief-count-lines: count grid lines to drive two cells', () => {
     const { sim } = check(defaultScenario());
     assert.equal(cellName(cellOf(sim)), 'A4');
     assert.equal(sim.vm.variables().cells, 2);
+    // "... In the default maze that is 2."
+    assert.ok(sample('chief-count-lines').description.includes(`The screen shows how many cells it has counted. In the default maze that is ${LINE_COUNTER_CELLS}. `));
+    assert.deepEqual(screen(sim), ['Cells counted: 2']);
   });
 
   test('the line is where the program thinks: 8.5 + 15 = 23.5 cm after a line the robot is in the middle of the cell', () => {
@@ -1167,9 +1193,10 @@ describe('chief-wall-follow: follow the right-hand wall to a room', () => {
     const s = defaultScenario();
     const { sim } = check(s);
     assert.equal(roomAround(sim.robotShapes()), 'bedroom');
+    assert.match(sample('chief-wall-follow').description, /in the default maze it is the bedroom\. /);
     assert.equal(s.fireRoom, 'living', 'the fire is in the other room: this example does not look for it');
-    assert.equal(handOnTheWall(s, 'right').length, 12, 'twelve cells along the wall');
-    assert.ok(sim.world.time > 30 && sim.world.time < 40, `${sim.world.time} s`);
+    assert.equal(handOnTheWall(s, 'right').length, 10, 'ten cells along the wall');
+    assert.ok(sim.world.time > 28 && sim.world.time < 33, `${sim.world.time} s`);
   });
 
   /** 60 more mazes in which the right hand leads to the living room first (it nearly always finds the bedroom). */
@@ -1273,7 +1300,7 @@ describe('chief-face-flame: find the fire in a room and check its colour', () =>
     return played;
   }
 
-  test('default maze: the left hand leads to the living room; the robot reads red on the fire in its corner: 100 points after 34 seconds', () => {
+  test('default maze: the left hand leads to the living room; the robot reads red on the fire in its corner: 100 points after 41 seconds', () => {
     const s = defaultScenario();
     const { sim, touchTicks } = check(s);
     assert.equal(roomAround(sim.robotShapes()), 'living');
@@ -1284,6 +1311,9 @@ describe('chief-face-flame: find the fire in a room and check its colour', () =>
     const told = /In the default maze the left hand leads to the fire: 100 points after (\d+) seconds\./.exec(sample('chief-face-flame').description);
     assert.ok(told);
     assert.equal(Number(told[1]), Math.round(sim.world.time), `${sim.world.time} s`);
+    assert.equal(Number(told[1]), 41);
+    // twelve cells along the wall: round the bottom left of the field first, then up the left side
+    assert.equal(handOnTheWall(s, 'left').length, 12);
   });
 
   /** 60 more mazes in which the left hand leads to the bedroom first (it nearly always finds the living room). */
@@ -1328,11 +1358,16 @@ describe('chief-face-flame: find the fire in a room and check its colour', () =>
       'living 0 back 1', 'living 0 corner 2', 'living 0 side 3',
       'living 3 back 3', 'living 3 corner 2', 'living 3 side 1',
     ]); // prettier-ignore
-    // the fire in the corner of the default maze is found at the second look, half a quarter turn to the right
+    // default maze: the robot comes into the living room facing up; the fire in the corner is found at the second look, half a quarter turn to the left
+    assert.deepEqual(lookOnPaper('living', lastOf(handOnTheWall(defaultScenario(), 'left')).dir, 'corner'), { swing: -1, looks: 2, heading: -45 });
     const corner = play(blocks, defaultScenario()).sim.vm.variables();
-    assert.deepEqual([corner.dir, corner.swing, corner.fire], [3, 1, 1]);
+    assert.deepEqual([corner.dir, corner.swing, corner.fire], [0, -1, 1]);
+    // the maze "Crossroads": the robot comes in facing left, and the corner is half a quarter turn to the right
+    const fromTheRight = play(blocks, CROSSROADS).sim.vm.variables();
+    assert.deepEqual([CROSSROADS.fireRoom, CROSSROADS.fireSpot], ['living', 'corner']);
+    assert.deepEqual([fromTheRight.dir, fromTheRight.swing, fromTheRight.fire], [3, 1, 1]);
     // the same maze with the fire at the back wall: the third look, a quarter turn to the right
-    const atTheBack = withFire(defaultScenario(), 'living', 'back');
+    const atTheBack = withFire(CROSSROADS, 'living', 'back');
     assert.deepEqual(lookOnPaper('living', lastOf(handOnTheWall(atTheBack, 'left')).dir, 'back'), { swing: 1, looks: 3, heading: 0 });
     assert.ok(offDirection(play(blocks, atTheBack).sim, 0) < 0.06);
     // open field: the left hand leads up the left side, the robot comes in facing the back wall and finds the fire there at the first look
@@ -1441,9 +1476,9 @@ describe('chief-full-mission: the whole mission on any maze', () => {
   const counted = /It scored 100 points in all (\d+) mazes it was tested on, with the fire at each of its six places/.exec(description);
   const told = /The default maze takes (\d+) seconds, the slowest maze found (\d+) of the 180 seconds/.exec(description);
 
-  test('default maze: 100 points after 34 seconds, as the description says', () => {
+  test('default maze: 100 points after 41 seconds, as the description says', () => {
     const { sim } = check(defaultScenario());
-    assert.ok(sim.world.time > 33 && sim.world.time < 36, `${sim.world.time} s`);
+    assert.ok(sim.world.time > 40 && sim.world.time < 42, `${sim.world.time} s`);
     assert.equal(sim.restarts, 0);
     assert.ok(told, 'the description names the two times');
     assert.equal(Number(told[1]), Math.round(sim.world.time), `${sim.world.time} s`);
@@ -1468,6 +1503,32 @@ describe('chief-full-mission: the whole mission on any maze', () => {
     assert.equal(runs.filter((played) => played.touched).length, corners);
   });
 
+  test('60 random competition mazes - 30 with 13 inner walls, 30 with 16 - the fire at each of its six places in turn: 100 points in every one', (t) => {
+    assert.equal(COMPETITION.length, COMPETITION_WALL_COUNTS.length * COMPETITION_MAZES);
+    for (const walls of COMPETITION_WALL_COUNTS) {
+      const mazes = COMPETITION.filter((s) => wallCount(s) === walls);
+      assert.equal(mazes.length, COMPETITION_MAZES, `${walls} walls`);
+      for (const s of mazes) assert.equal(isCompetitionMaze(s), true, label(s));
+      // every place of the fire, five times each
+      for (const { room, spot } of PLACES) assert.equal(mazes.filter((s) => s.fireRoom === room && s.fireSpot === spot).length, COMPETITION_MAZES / PLACES.length);
+      const runs = mazes.map((s) => check(s));
+      const times = runs.map((played) => played.sim.world.time);
+      t.diagnostic(
+        `${mazes.length} competition mazes with ${walls} inner walls: ${runs.length} of ${mazes.length} complete with 100 points, ` +
+          `average ${(times.reduce((sum, time) => sum + time, 0) / times.length).toFixed(1)} s, slowest ${Math.max(...times).toFixed(1)} s`,
+      );
+      assert.ok(Math.max(...times) < 140, `${walls} walls: slowest ${Math.max(...times)} s`);
+      // the robot touched the walls of a corner where the fire stands in one, and nothing in the other mazes
+      assert.equal(runs.filter((played) => played.touched).length, mazes.filter((s) => s.fireSpot === 'corner').length, `${walls} walls`);
+    }
+    // corridors only make the way along the wall longer: 16 walls take longer than 13 on average
+    const average = (walls: number): number => {
+      const times = COMPETITION.filter((s) => wallCount(s) === walls).map((s) => play(blocks, s).sim.world.time);
+      return times.reduce((sum, time) => sum + time, 0) / times.length;
+    };
+    assert.ok(average(16) > average(13), `${average(13)} s with 13 walls, ${average(16)} s with 16`);
+  });
+
   test('120 mazes with one way only (the longest ways), the fire once in each room: 100 points', (t) => {
     const times = PERFECT.map((s) => check(s).sim.world.time);
     t.diagnostic(`120 one-way mazes: 120 of 120 complete with 100 points, median ${median(times).toFixed(1)} s, slowest ${Math.max(...times).toFixed(1)} s`);
@@ -1490,20 +1551,22 @@ describe('chief-full-mission: the whole mission on any maze', () => {
     assert.ok(told, 'the description names the two times');
     assert.equal(Number(told[2]), Math.ceil(Math.max(...times)), `the slowest of the three places: ${Math.max(...times)} s`);
     // no maze of these tests is slower
-    for (const other of [...ALL_MAZES, ...PERFECT, ...ODD]) {
+    for (const other of [...ALL_MAZES, ...PERFECT, ...ODD, ...COMPETITION]) {
       assert.ok(handOnTheWall(other, 'left', (cell) => roomOf(cell) === other.fireRoom).length <= 42, label(other));
     }
   });
 
   test('the description counts the mazes of these tests, and they have the fire at each of its six places', () => {
-    // "... in all 570 mazes it was tested on ...": the named mazes with the fire at every place
-    // (the default maze is one of them), the random ones, the ones with one way only and the odd ones
-    const tested = [...NAMED_PLACES, ...RANDOM, ...PERFECT, ...ODD];
+    // "... in all 630 mazes it was tested on ...": the named mazes with the fire at every place
+    // (the default maze is one of them), the random ones, the ones with one way only, the odd
+    // ones and the random competition mazes
+    const tested = [...NAMED_PLACES, ...RANDOM, ...PERFECT, ...ODD, ...COMPETITION];
+    assert.equal(tested.length, 630);
     assert.ok(counted);
     assert.equal(Number(counted[1]), tested.length);
     assert.equal(new Set(tested.map(encodeScenario)).size, tested.length, 'no maze twice');
     assert.ok(tested.some((s) => encodeScenario(s) === encodeScenario(defaultScenario())));
-    for (const set of [NAMED_PLACES, RANDOM, PERFECT, ODD]) {
+    for (const set of [NAMED_PLACES, RANDOM, PERFECT, ODD, ...COMPETITION_WALL_COUNTS.map((walls) => COMPETITION.filter((s) => wallCount(s) === walls))]) {
       for (const { room, spot } of PLACES) {
         assert.ok(set.some((s) => s.fireRoom === room && s.fireSpot === spot), `${room} ${spot}`);
       }

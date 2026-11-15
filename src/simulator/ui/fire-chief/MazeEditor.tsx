@@ -5,14 +5,17 @@
  *   - a plan of the 5 x 5 field with START and the two rooms, on which each of the 40 places of
  *     an inner wall is a button: a click, a finger or the space bar puts the wall up or takes it
  *     away. The stage shows the change at once.
- *   - the ready-made mazes of the game by name (the default maze, the open field and three more),
+ *   - the ready-made mazes of the game by name (the default maze, the open field and three
+ *     more); each button says whether it is a competition maze or a practice maze,
  *   - the room of the fire and its place in that room, drawn on the plan,
- *   - how hard the maze is, in words, and - for a maze in which a room cannot be reached - what
- *     is wrong, in the game's own words. Such a maze can still be started for practice
- *     (see ./maze-words.ts for why).
+ *   - how hard the maze is, in words, and what kind of maze it is: a competition maze (13 or
+ *     16 inner walls and a way to both rooms) or a practice maze,
+ *   - for a maze in which a room cannot be reached: what is wrong, in the game's own words.
+ *     Such a maze can still be started for practice (see ./maze-words.ts for why).
  *
- * "Random maze", "Default maze", the code of the maze, Copy and the field to type a code in are
- * in the general panel around this editor (../CombinationPanel.tsx).
+ * The two buttons that draw a random competition maze, "Default maze", the code of the maze,
+ * Copy and the field to type a code in are in the general panel around this editor
+ * (../CombinationPanel.tsx).
  *
  * Everything that can be worked out without a screen is in plain files beside this one and is
  * tested there: where the walls lie and where the arrow keys go (./maze-plan.ts), the level
@@ -23,7 +26,7 @@ import { FIRE_SPOTS, ROOM_IDS, type FireSpot, type RoomId } from '../../fire-chi
 import { TARGET_FILL } from '../../fire-chief/game';
 import { toggleWall, withFire, type FireChiefScenario } from '../../fire-chief/scenario';
 import { MAZE_CHOICES, mazeChoiceOf, ROOM_LABEL, SPOT_LABEL, withMaze } from './maze-choices';
-import { HARDEST_LEVEL, LEVEL_NOTE, levelFacts, levelTitle, mazeFacts, mazeLevel } from './maze-level';
+import { HARDEST_LEVEL, LEVEL_NOTE, kindSentence, levelTitle, mazeFacts, mazeKind, mazeLevel, wayFacts } from './maze-level';
 import {
   PLAN_BOX,
   PLAN_CELL,
@@ -113,8 +116,19 @@ export function MazeEditor({ scenario, onChange }: MazeEditorProps) {
           {MAZE_CHOICES.map((choice) => {
             const selected = chosen?.id === choice.id;
             return (
-              <button key={choice.id} type="button" aria-pressed={selected} title={choice.about} onClick={() => onChange(withMaze(scenario, choice))} className={choiceClass(selected)}>
-                {choice.label}
+              <button
+                key={choice.id}
+                type="button"
+                aria-pressed={selected}
+                title={choice.about}
+                onClick={() => onChange(withMaze(scenario, choice))}
+                className={`${choiceClass(selected)} text-left`}
+                data-maze-choice={choice.id}
+                data-choice-kind={choice.kind}
+              >
+                <span className="block">{choice.label}</span>
+                {/* (the kind of the maze, on the button itself: a phone shows no hint) */}
+                <span className={`block text-[11px] font-medium leading-tight ${selected ? 'text-slate-200' : 'text-ink-500'}`}>{choice.kindLabel}</span>
               </button>
             );
           })}
@@ -304,7 +318,7 @@ export function MazeEditor({ scenario, onChange }: MazeEditorProps) {
             </fieldset>
 
             {/* ------------------------------------------------------------ how hard */}
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5" data-maze-level={level ?? 'none'}>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5" data-maze-level={level ?? 'none'} data-maze-kind={mazeKind(facts)}>
               <p className="text-xs font-bold uppercase tracking-wide text-ink-500">How hard is this maze?</p>
               <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-bold text-ink-900">
                 <span data-maze-level-title>{levelTitle(facts)}</span>
@@ -316,8 +330,13 @@ export function MazeEditor({ scenario, onChange }: MazeEditorProps) {
                   </span>
                 )}
               </p>
+              {/* competition maze or practice maze, with its walls - and, for a practice maze, what a competition maze has */}
+              <p className="mt-1 text-xs font-semibold leading-snug text-ink-900" data-maze-kind-sentence>
+                {kindSentence(facts)}
+              </p>
+              {/* what was counted about the ways */}
               <p className="mt-1 text-xs leading-snug text-ink-700" data-maze-facts>
-                {levelFacts(facts)}
+                {wayFacts(facts)}
               </p>
               <p className="mt-1 text-[11px] leading-snug text-ink-500">{LEVEL_NOTE}</p>
             </div>

@@ -11,10 +11,25 @@
  * levels 1 to 5), and goes up by one when the shortest way to the fire is long. The sentence
  * names what was counted, so nobody has to believe the level without seeing why.
  *
+ * And what kind of maze it is: a COMPETITION MAZE (13 or 16 inner walls and a way from START to
+ * both rooms - the organiser's decision, scenario.ts: COMPETITION_WALL_COUNTS) or a PRACTICE
+ * MAZE (every other maze). These two words mean this wherever the screen says them: the box
+ * "How hard is this maze?", the ready-made mazes, "Test on many mazes" and the Rules window
+ * take their sentences from here or from the same constant.
+ *
  * Plain TypeScript (no DOM, no React), so the tests can read it under Node.
  */
 import { CELL_COUNT, CELL_SIZE, GRID_CELLS, ROOMS, ROOM_IDS, START_CELL, cellFromNumber, cellNumber, type Cell } from '../../fire-chief/field';
-import { PERFECT_MAZE_WALLS, stepsFrom, wallBetweenCells, wallCount, type FireChiefScenario } from '../../fire-chief/scenario';
+import {
+  COMPETITION_WALLS_TEXT,
+  PERFECT_MAZE_WALLS,
+  isCompetitionWallCount,
+  stepsFrom,
+  wallBetweenCells,
+  wallCount,
+  type FireChiefScenario,
+} from '../../fire-chief/scenario';
+import { capital } from '../screen-words';
 
 export interface MazeFacts {
   /** inner walls that stand */
@@ -144,12 +159,18 @@ export function levelTitle(facts: MazeFacts): string {
   return level === null ? 'No level' : `Level ${level} of ${HARDEST_LEVEL}: ${LEVEL_WORD[level]}`;
 }
 
+/** "13 inner walls", "1 inner wall", "no inner walls". */
+function wallsInWords(facts: Pick<MazeFacts, 'walls'>): string {
+  return facts.walls === 0 ? 'no inner walls' : count(facts.walls, 'inner wall', 'inner walls');
+}
+
 /**
- * What was counted, as short sentences: the walls, the shortest way to the fire, the dead ends.
+ * What was counted about the ways, as short sentences: the shortest way to the fire, the dead
+ * ends, the closed cells, whether there is one way only.
  * (A cell is 30 cm, so the way is given in cells and in metres.)
  */
-export function levelFacts(facts: MazeFacts): string {
-  const parts: string[] = [facts.walls === 0 ? 'No inner walls.' : `${count(facts.walls, 'inner wall', 'inner walls')}.`];
+export function wayFacts(facts: MazeFacts): string {
+  const parts: string[] = [];
   if (facts.way < 0) {
     parts.push('There is no way from START into the room of the fire.');
   } else {
@@ -163,6 +184,68 @@ export function levelFacts(facts: MazeFacts): string {
   if (facts.closedCells > 0) parts.push(`${count(facts.closedCells, 'cell is', 'cells are')} closed off.`);
   if (facts.walls > 0 && facts.oneWayOnly && facts.bothRooms) parts.push('There is only one way to each room.');
   return parts.join(' ');
+}
+
+/** What was counted, as short sentences: the walls first, then the ways (wayFacts). */
+export function levelFacts(facts: MazeFacts): string {
+  return `${capital(wallsInWords(facts))}. ${wayFacts(facts)}`;
+}
+
+// =============================================================================================
+// Competition maze or practice maze
+// =============================================================================================
+
+export type MazeKind = 'competition' | 'practice';
+
+/** The two kinds as the screen names them (in the middle of a sentence). */
+export const KIND_WORD: Record<MazeKind, string> = {
+  competition: 'competition maze',
+  practice: 'practice maze',
+};
+
+/**
+ * What kind of maze this is: a competition maze has 13 or 16 inner walls AND a way from START
+ * to both rooms; every other maze is a practice maze. (The same answer as the game's own
+ * isCompetitionMaze(), from what the editor has counted already.)
+ */
+export function mazeKind(facts: Pick<MazeFacts, 'walls' | 'bothRooms'>): MazeKind {
+  return isCompetitionWallCount(facts.walls) && facts.bothRooms ? 'competition' : 'practice';
+}
+
+/** A maze with 16 inner walls in which every cell can be reached: it has corridors only, and one way to each room. */
+export function corridorsOnly(facts: Pick<MazeFacts, 'walls' | 'closedCells'>): boolean {
+  return facts.walls === PERFECT_MAZE_WALLS && facts.closedCells === 0;
+}
+
+/** What a competition maze has, in full: "13 or 16 inner walls and a way from START to both rooms". */
+export const COMPETITION_MAZE_HAS = `${COMPETITION_WALLS_TEXT} inner walls and a way from START to both rooms`;
+
+/**
+ * What a competition maze has and this practice maze has not: "13 or 16 inner walls", "a way
+ * from START to both rooms", or both. (For a competition maze: everything, COMPETITION_MAZE_HAS.)
+ */
+export function competitionMazeHas(facts: Pick<MazeFacts, 'walls' | 'bothRooms'>): string {
+  const wallsFit = isCompetitionWallCount(facts.walls);
+  if (wallsFit === facts.bothRooms) return COMPETITION_MAZE_HAS;
+  return wallsFit ? 'a way from START to both rooms' : `${COMPETITION_WALLS_TEXT} inner walls`;
+}
+
+/**
+ * The kind of the maze and its walls, as the first sentences of the box "How hard is this
+ * maze?" (the ways follow: wayFacts):
+ *   "Competition maze: 13 inner walls."
+ *   "Competition maze: 16 inner walls, corridors only."
+ *   "Practice maze: 10 inner walls. A competition maze has 13 or 16 inner walls."
+ *   "Practice maze: 13 inner walls, and a room cannot be reached. A competition maze has a way from START to both rooms."
+ * A practice maze is told what a competition maze has that it has not.
+ */
+export function kindSentence(facts: MazeFacts): string {
+  const walls = wallsInWords(facts);
+  if (mazeKind(facts) === 'competition') {
+    return `${capital(KIND_WORD.competition)}: ${walls}${corridorsOnly(facts) ? ', corridors only' : ''}.`;
+  }
+  const rooms = facts.bothRooms ? '' : ', and a room cannot be reached';
+  return `${capital(KIND_WORD.practice)}: ${walls}${rooms}. A ${KIND_WORD.competition} has ${competitionMazeHas(facts)}.`;
 }
 
 /** What the level is, and is not: it is counted, not measured with a program. */

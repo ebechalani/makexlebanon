@@ -177,8 +177,12 @@ test('game: Fire Chief - 180 s, 100 points, one restart that clears the points, 
   });
   assert.deepEqual(fireChiefGame.defaultScenario(), defaultScenario());
   assert.equal(fireChiefGame.scenarioCount(), 671934664458);
-  assert.equal(fireChiefGame.encodeScenario(defaultScenario()), 'LC-4406-N0E0');
-  assert.deepEqual(fireChiefGame.decodeScenario('LC-4406-N0E0'), defaultScenario());
+  // the default maze: the walls of "Detour" (13 inner walls), the fire in the corner of the living room
+  assert.equal(fireChiefGame.encodeScenario(defaultScenario()), 'LC-H8G6-69T0');
+  assert.deepEqual(fireChiefGame.decodeScenario('LC-H8G6-69T0'), defaultScenario());
+  // (a code names the maze it always named: this was the code of the default maze until the default became "Detour")
+  assert.equal(NAMED_MAZES[2].id, 'crossroads');
+  assert.deepEqual(fireChiefGame.decodeScenario('LC-4406-N0E0'), NAMED_MAZES[2].scenario);
   assert.equal(fireChiefGame.decodeScenario('nonsense'), null);
   assert.match(fireChiefGame.describeScenario(defaultScenario()), /living room/);
   assert.deepEqual(fireChiefGame.randomScenario(makeRng(3)), randomScenario(makeRng(3)));
@@ -200,8 +204,9 @@ test('game: the walls of a combination - four around the field plus the inner wa
   // a maze with all 40 walls would have 44
   const all: FireChiefScenario = { walls: new Array(40).fill(true), fireRoom: 'living', fireSpot: 'corner' };
   assert.equal(fireChiefGame.createWalls?.(all).length, 44);
+  // the default maze has 13 inner walls
   const { sim } = play(function* () {}, { scenario: defaultScenario() });
-  assert.equal(sim.world.walls?.length, 14);
+  assert.equal(sim.world.walls?.length, 17);
 });
 
 test('game: one red fire target, at its spot, clear of the walls', () => {

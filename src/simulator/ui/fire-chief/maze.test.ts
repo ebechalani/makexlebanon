@@ -1,12 +1,15 @@
 /**
  * The Fire Chief maze editor without a screen: the plan's wall places against the game's, the
- * arrow keys, the words about how hard a maze is, the code field, the lists of mazes for "Test
- * on many mazes", and what the editor says about a maze in which a room cannot be reached.
+ * arrow keys, the words about how hard a maze is and what kind of maze it is (a competition
+ * maze or a practice maze), the code field, the lists of mazes for "Test on many mazes", and
+ * what the editor says about a maze in which a room cannot be reached.
  *
  * Run with:  npm run test:sim
  */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { runMatch } from '../../core/batch';
@@ -30,16 +33,21 @@ import {
   type Cell,
 } from '../../fire-chief/field';
 import { TARGET_FILL, fireChiefGame } from '../../fire-chief/game';
+import { FIRE_CHIEF_ROBOT, START_POSE } from '../../fire-chief/robot';
 import {
+  COMPETITION_WALLS_TEXT,
+  COMPETITION_WALL_COUNTS,
   NAMED_MAZES,
   PERFECT_MAZE_WALLS,
   decodeScenario,
   defaultScenario,
   encodeScenario,
+  isCompetitionMaze,
   namedMaze,
   openField,
   perfectMazeWalls,
   randomScenario,
+  randomScenarioWithWalls,
   scenarioOfCode,
   scenarioProblems,
   stepsFrom,
@@ -54,14 +62,45 @@ import { fireRescueGame } from '../../fire-rescue/game';
 import { blankProgram } from '../program-file';
 import { dcMotor, moveCm, program, script, wait, whenStart } from '../../vm/builder';
 import { bestAndWorst, compareRuns, endSentence, scoreTimeText } from '../batch-words';
+import { BatchDialog } from '../BatchDialog';
 import { CombinationPanel } from '../CombinationPanel';
 import { formatRefereeTime } from '../format';
 import { codeReaderOf } from '../scenario-code';
 import { screenWords } from '../screen-words';
-import { FIRE_PLACES, MAZE_BATCH_PRESETS, RANDOM_MAZES_NOTE, namedMazesEverywhere, randomMazes, withEveryFirePlace } from './maze-batch';
-import { MAZE_CHOICES } from './maze-choices';
+import {
+  FIRE_PLACES,
+  MAZE_BATCH_PRESETS,
+  MAZE_BATCH_RANDOM,
+  RANDOM_MAZES_NOTE,
+  RANDOM_MAZE_KINDS,
+  namedKindsSentence,
+  namedMazesEverywhere,
+  randomKindLabel,
+  randomMazes,
+  stageMazeNote,
+  withEveryFirePlace,
+} from './maze-batch';
+import { MAZE_CHOICES, RANDOM_MAZE_DRAWS } from './maze-choices';
 import { EXAMPLE_MAZE_CODE, readMazeCode } from './maze-code';
-import { HARDEST_LEVEL, LEVEL_NOTE, LEVEL_WALLS, LEVEL_WORD, LONG_WAY_CELLS, levelFacts, levelTitle, mazeFacts, mazeLevel, type MazeFacts } from './maze-level';
+import {
+  COMPETITION_MAZE_HAS,
+  HARDEST_LEVEL,
+  KIND_WORD,
+  LEVEL_NOTE,
+  LEVEL_WALLS,
+  LEVEL_WORD,
+  LONG_WAY_CELLS,
+  competitionMazeHas,
+  corridorsOnly,
+  kindSentence,
+  levelFacts,
+  levelTitle,
+  mazeFacts,
+  mazeKind,
+  mazeLevel,
+  wayFacts,
+  type MazeFacts,
+} from './maze-level';
 import {
   PLAN_BOX,
   PLAN_CELL,
@@ -90,6 +129,7 @@ import {
 } from './maze-plan';
 import { OWN_MAZE_ABOUT, PLAN_HINT, practiceNote, wallHint } from './maze-words';
 import { MazeEditor } from './MazeEditor';
+import { FIRE_CHIEF_RULES } from './rules';
 import { FIRE_CHIEF_WORDS } from './words';
 
 const nothing = (): void => undefined;
@@ -115,6 +155,20 @@ function closedBedroom(fireRoom: 'living' | 'bedroom' = 'living'): FireChiefScen
   let s = openField(fireRoom, 'corner');
   const bedroom = ROOMS.bedroom.cell;
   for (const next of neighbours(bedroom)) s = withWall(s, wallIndexBetween(bedroom, next), true);
+  return s;
+}
+
+/**
+ * A maze with 13 inner walls in which the bedroom is closed off: the default maze (13 walls)
+ * with the two doors of the bedroom walled up and the two walls beside START taken away.
+ */
+function thirteenWallsClosedRoom(): FireChiefScenario {
+  let s = defaultScenario();
+  const bedroom = ROOMS.bedroom.cell;
+  for (const next of neighbours(bedroom)) s = withWall(s, wallIndexBetween(bedroom, next), true);
+  for (const next of neighbours(START_CELL)) if (next.row === START_CELL.row) s = withWall(s, wallIndexBetween(START_CELL, next), false);
+  assert.equal(s.walls.filter(Boolean).length, 13);
+  assert.deepEqual(scenarioProblems(s), ['There is no way from START to the bedroom: take a wall away.']);
   return s;
 }
 
@@ -417,13 +471,19 @@ test('level: the five named mazes get the level the game itself gives them', () 
   for (const choice of MAZE_CHOICES) {
     const maze = NAMED_MAZES.find((m) => m.id === choice.id);
     assert.ok(maze);
-    assert.ok(choice.about.startsWith(`Level ${mazeLevel(mazeFacts(maze.scenario))} of ${HARDEST_LEVEL}. `), choice.label);
+    // (after its kind: "Competition maze. Level 4 of 5. ...")
+    assert.ok(choice.about.includes(`maze. Level ${mazeLevel(mazeFacts(maze.scenario))} of ${HARDEST_LEVEL}. `), choice.about);
   }
 });
 
-test('level: what is counted in the default maze and in the open field, checked by hand', () => {
+test('level: what is counted in the default maze, in "Crossroads" and in the open field, checked by hand', () => {
+  // the default maze, "Detour" with the fire in the living room: 13 walls; C5 up to C3, left to A3, up into A1
+  const first = mazeFacts(defaultScenario());
+  assert.deepEqual(first, { walls: 13, way: 6, turns: 2, deadEnds: 0, closedCells: 0, oneWayOnly: false, bothRooms: true });
+  assert.equal(levelTitle(first), 'Level 4 of 5: hard');
+  assert.equal(levelFacts(first), '13 inner walls. The shortest way from START into the room of the fire is 6 cells long (1.8 m) with 2 turns.');
   // Crossroads: 10 walls; C5 up to C4, left to A4, up to A2, right to B2, up to B1, left into A1
-  const crossroads = mazeFacts(defaultScenario());
+  const crossroads = mazeFacts(namedMaze('crossroads') as FireChiefScenario);
   assert.deepEqual(crossroads, { walls: 10, way: 8, turns: 5, deadEnds: 2, closedCells: 0, oneWayOnly: false, bothRooms: true });
   assert.equal(levelTitle(crossroads), 'Level 3 of 5: medium');
   assert.equal(levelFacts(crossroads), '10 inner walls. The shortest way from START into the room of the fire is 8 cells long (2.4 m) with 5 turns. 2 dead ends.');
@@ -545,7 +605,8 @@ test('level: a maze in which the fire cannot be reached has no level, and the wo
 // A maze in which a room cannot be reached: practice
 // =============================================================================================
 
-test('practice maze: what is wrong is said in the game\'s own words, and that an attempt is still possible', () => {
+test('practice maze: a maze with a closed room gets a note - what is wrong in the game\'s own words, and that an attempt is still possible', () => {
+  // (the note is about a room that cannot be reached; what kind of maze it is, every maze is told in the box "How hard is this maze?")
   for (const maze of [defaultScenario(), openField(), ...NAMED_MAZES.map((m) => m.scenario)]) assert.equal(practiceNote(maze), null);
   const closed = closedBedroom();
   const note = practiceNote(closed);
@@ -554,7 +615,8 @@ test('practice maze: what is wrong is said in the game\'s own words, and that an
   assert.deepEqual(note.problems, fireChiefGame.scenarioProblems?.(closed));
   assert.deepEqual(note.problems, ['There is no way from START to the bedroom: take a wall away.']);
   assert.equal(note.title, 'This is a practice maze, not a competition maze.');
-  assert.match(note.meaning, /competition maze has a way from START to both rooms/);
+  assert.equal(note.meaning, 'A competition maze has 13 or 16 inner walls and a way from START to both rooms. You can still start an attempt in this maze to practise.');
+  assert.ok(note.meaning.includes(COMPETITION_MAZE_HAS));
   assert.match(note.meaning, /You can still start an attempt in this maze to practise/);
   // both rooms closed: both sentences
   assert.equal(practiceNote(boxedStart())?.problems.length, 2);
@@ -588,7 +650,9 @@ test('practice maze: an attempt in it runs like any other - nothing breaks, and 
 // =============================================================================================
 
 test('code: every maze the editor can show has a code that reads back to the same maze', () => {
-  const mazes = [defaultScenario(), boxedStart(), closedBedroom('bedroom'), ...namedMazesEverywhere(), ...randomMazes(40, 3)];
+  const mazes = [defaultScenario(), boxedStart(), closedBedroom('bedroom'), ...namedMazesEverywhere(), ...randomMazes(20, 3, 13), ...randomMazes(20, 3, 16)];
+  // (and mazes of the mixed generator, with 4 to 16 walls)
+  for (let seed = 1; seed <= 40; seed++) mazes.push(randomScenario(makeRng(seed)));
   // every single wall on its own
   for (const wall of PLAN_WALLS) mazes.push(toggleWall(openField('bedroom', 'side'), wall.index));
   // all 40 walls
@@ -604,7 +668,13 @@ test('code: every maze the editor can show has a code that reads back to the sam
       assert.ok(again.ok && encodeScenario(again.scenario) === code, typed);
     }
   }
-  assert.equal(EXAMPLE_MAZE_CODE, 'LC-4406-N0E0');
+  // a browser that saved the code of the old default maze gets that maze back: "Crossroads", a practice maze
+  const saved = readMazeCode('LC-4406-N0E0');
+  assert.ok(saved.ok);
+  assert.deepEqual(saved.scenario, namedMaze('crossroads'));
+  assert.equal(kindSentence(mazeFacts(saved.scenario)), 'Practice maze: 10 inner walls. A competition maze has 13 or 16 inner walls.');
+  // the code shown as an example is the code of the default maze
+  assert.equal(EXAMPLE_MAZE_CODE, 'LC-H8G6-69T0');
   assert.equal(EXAMPLE_MAZE_CODE, encodeScenario(defaultScenario()));
 });
 
@@ -635,20 +705,20 @@ test('code: a text that is no code gets one plain sentence that says what a code
     assert.equal(reading.ok, false, typed);
     return reading.ok ? '' : reading.problem;
   };
-  assert.equal(sentence(''), 'Type a maze code into the field. A maze code looks like LC-4406-N0E0.');
-  assert.equal(sentence('   '), 'Type a maze code into the field. A maze code looks like LC-4406-N0E0.');
-  assert.equal(sentence('hello'), 'This is not a maze code: a maze code has 10 letters and digits, and this text has 5. A maze code looks like LC-4406-N0E0.');
-  assert.equal(sentence('LC-4406-N0E'), 'This is not a maze code: a maze code has 10 letters and digits, and this text has 9. A maze code looks like LC-4406-N0E0.');
+  assert.equal(sentence(''), 'Type a maze code into the field. A maze code looks like LC-H8G6-69T0.');
+  assert.equal(sentence('   '), 'Type a maze code into the field. A maze code looks like LC-H8G6-69T0.');
+  assert.equal(sentence('hello'), 'This is not a maze code: a maze code has 10 letters and digits, and this text has 5. A maze code looks like LC-H8G6-69T0.');
+  assert.equal(sentence('LC-4406-N0E'), 'This is not a maze code: a maze code has 10 letters and digits, and this text has 9. A maze code looks like LC-H8G6-69T0.');
   assert.equal(
     sentence('XC-4406-N0E0'),
-    'This is not a maze code: the first letter says where the fire is, L (living room) or B (bedroom). This text begins with X. A maze code looks like LC-4406-N0E0.',
+    'This is not a maze code: the first letter says where the fire is, L (living room) or B (bedroom). This text begins with X. A maze code looks like LC-H8G6-69T0.',
   );
   assert.equal(
     sentence('LX-4406-N0E0'),
-    'This is not a maze code: the second letter says where the fire stands in its room, C (corner), B (back wall) or S (side wall). This text has X there. A maze code looks like LC-4406-N0E0.',
+    'This is not a maze code: the second letter says where the fire stands in its room, C (corner), B (back wall) or S (side wall). This text has X there. A maze code looks like LC-H8G6-69T0.',
   );
-  assert.equal(sentence('LC-44U6-N0E0'), 'This is not a maze code: U is never used in a maze code. Please check the code. A maze code looks like LC-4406-N0E0.');
-  assert.equal(sentence('LC-4406-N0E0'.repeat(30)), 'This text is too long for a maze code. A maze code looks like LC-4406-N0E0.');
+  assert.equal(sentence('LC-44U6-N0E0'), 'This is not a maze code: U is never used in a maze code. Please check the code. A maze code looks like LC-H8G6-69T0.');
+  assert.equal(sentence('LC-4406-N0E0'.repeat(30)), 'This text is too long for a maze code. A maze code looks like LC-H8G6-69T0.');
   // a Fire Rescue code is no maze code
   assert.match(sentence(fireRescueGame.encodeScenario(fireRescueGame.defaultScenario())), /^This is not a maze code/);
   // letters that are easy to mix up are understood, as the game understands them: O as 0, I and L as 1
@@ -678,7 +748,7 @@ test('code: a text that is no code gets one plain sentence that says what a code
       assert.deepEqual(again.scenario, reading.scenario);
     } else {
       assert.match(reading.problem, /^(Type a maze code|This is not a maze code|This text is too long)/, JSON.stringify(typed));
-      assert.match(reading.problem, /A maze code looks like LC-4406-N0E0\.$/);
+      assert.match(reading.problem, /A maze code looks like LC-H8G6-69T0\.$/);
       assert.ok(!/error|exception|undefined|null|NaN|invalid|\[object/i.test(reading.problem), reading.problem);
       assert.ok(reading.problem.length < 220, reading.problem);
     }
@@ -734,31 +804,83 @@ test('test lists: the named mazes are the game\'s five, each with the fire at it
   for (const maze of list) assert.deepEqual(scenarioProblems(maze), []);
 });
 
-test('test lists: random mazes are different, playable, the same for the same seed - and the fire goes round its six places', () => {
-  for (const count of [10, 50, 200]) {
-    const list = randomMazes(count, 1);
-    assert.equal(list.length, count);
-    assert.equal(new Set(list.map((maze) => encodeScenario(maze).slice(3))).size, count, 'no maze twice');
-    for (const maze of list) {
-      assert.deepEqual(scenarioProblems(maze), []);
-      assert.deepEqual(decodeScenario(encodeScenario(maze)), maze);
+test('test lists: random mazes are competition mazes with exactly 13 or 16 inner walls - different, playable, the same for the same seed - and the fire goes round its six places', () => {
+  for (const walls of COMPETITION_WALL_COUNTS) {
+    for (const count of [10, 50, 200]) {
+      const list = randomMazes(count, 1, walls);
+      assert.equal(list.length, count);
+      assert.equal(new Set(list.map((maze) => encodeScenario(maze).slice(3))).size, count, 'no maze twice');
+      for (const maze of list) {
+        assert.equal(maze.walls.filter(Boolean).length, walls, `exactly ${walls} inner walls`);
+        assert.deepEqual(scenarioProblems(maze), []);
+        assert.equal(isCompetitionMaze(maze), true);
+        assert.equal(mazeKind(mazeFacts(maze)), 'competition');
+        assert.equal(mazeFacts(maze).closedCells, 0, 'every cell can be reached');
+        assert.deepEqual(decodeScenario(encodeScenario(maze)), maze);
+      }
+      // both rooms and all three spots, and no place more than once more often than another
+      const perPlace = FIRE_PLACES.map((place) => list.filter((maze) => maze.fireRoom === place.room && maze.fireSpot === place.spot).length);
+      assert.ok(Math.min(...perPlace) >= 1, `${count}: ${perPlace.join(', ')}`);
+      assert.ok(Math.max(...perPlace) - Math.min(...perPlace) <= 1, `${count}: ${perPlace.join(', ')}`);
+      // ... in turn, as the note says: maze 1 has the first place, maze 7 has it again
+      list.forEach((maze, i) => assert.deepEqual([maze.fireRoom, maze.fireSpot], [FIRE_PLACES[i % 6].room, FIRE_PLACES[i % 6].spot]));
+      assert.deepEqual(randomMazes(count, 1, walls), list, 'the same seed, the same list');
+      assert.notDeepEqual(randomMazes(count, 2, walls), list, 'another seed, other mazes');
     }
-    // both rooms and all three spots, and no place more than once more often than another
-    const perPlace = FIRE_PLACES.map((place) => list.filter((maze) => maze.fireRoom === place.room && maze.fireSpot === place.spot).length);
-    assert.ok(Math.min(...perPlace) >= 1, `${count}: ${perPlace.join(', ')}`);
-    assert.ok(Math.max(...perPlace) - Math.min(...perPlace) <= 1, `${count}: ${perPlace.join(', ')}`);
-    assert.deepEqual(randomMazes(count, 1), list, 'the same seed, the same list');
-    assert.notDeepEqual(randomMazes(count, 2), list, 'another seed, other mazes');
+    // odd counts never break it
+    assert.deepEqual(randomMazes(0, 1, walls), []);
+    assert.deepEqual(randomMazes(-3, 1, walls), []);
+    assert.deepEqual(randomMazes(Number.NaN, 1, walls), []);
+    assert.equal(randomMazes(7.9, 1, walls).length, 7);
   }
-  // the mazes are of mixed difficulty: few walls and many
-  const walls = randomMazes(200, 5).map((maze) => maze.walls.filter(Boolean).length);
-  assert.ok(Math.min(...walls) <= 5 && Math.max(...walls) >= 15);
-  // odd counts never break it
-  assert.deepEqual(randomMazes(0, 1), []);
-  assert.deepEqual(randomMazes(-3, 1), []);
-  assert.deepEqual(randomMazes(Number.NaN, 1), []);
-  assert.equal(randomMazes(7.9, 1).length, 7);
+  // with 16 walls every maze of the list has corridors only
+  for (const maze of randomMazes(50, 4, 16)) assert.equal(corridorsOnly(mazeFacts(maze)), true);
+  for (const maze of randomMazes(50, 4, 13)) assert.equal(mazeFacts(maze).oneWayOnly, false);
   assert.match(RANDOM_MAZES_NOTE, /each of its six places in turn/);
+});
+
+test('test lists: the random lists come in two kinds, one for each number of inner walls of a competition maze', () => {
+  // one kind per number of the organiser's constant, in its order; the first one is chosen when the window opens
+  assert.deepEqual(RANDOM_MAZE_KINDS.map((kind) => kind.id), COMPETITION_WALL_COUNTS.map((walls) => `walls-${walls}`));
+  assert.deepEqual(RANDOM_MAZE_KINDS.map((kind) => kind.label), COMPETITION_WALL_COUNTS.map(randomKindLabel));
+  assert.deepEqual(RANDOM_MAZE_KINDS.map((kind) => kind.label), ['13 inner walls', '16 inner walls (corridors only)']);
+  COMPETITION_WALL_COUNTS.forEach((walls, i) => {
+    assert.deepEqual(RANDOM_MAZE_KINDS[i].draw(12, 7), randomMazes(12, 7, walls));
+    assert.ok(RANDOM_MAZE_KINDS[i].draw(12, 7).every((maze) => maze.walls.filter(Boolean).length === walls));
+  });
+  assert.equal(MAZE_BATCH_RANDOM.kinds, RANDOM_MAZE_KINDS);
+  assert.deepEqual(MAZE_BATCH_RANDOM.draw(12, 7), RANDOM_MAZE_KINDS[0].draw(12, 7));
+  assert.equal(MAZE_BATCH_RANDOM.name, 'competition mazes');
+  assert.equal(MAZE_BATCH_RANDOM.kindsLegend, 'Competition mazes with');
+  assert.equal(MAZE_BATCH_RANDOM.note, RANDOM_MAZES_NOTE);
+
+  // the window: three random lists of competition mazes, and one small choice between the two kinds beside the seed
+  const dialog = (game: typeof fireChiefGame, extra: object): string =>
+    renderToStaticMarkup(
+      createElement(BatchDialog<FireChiefScenario>, {
+        game,
+        robotConfig: FIRE_CHIEF_ROBOT,
+        getProgram: () => blankProgram(),
+        startPose: START_POSE,
+        getSampler: () => undefined,
+        currentScenario: defaultScenario(),
+        onPick: nothing,
+        onClose: nothing,
+        ...extra,
+      }),
+    );
+  const html = dialog(fireChiefGame, { presets: MAZE_BATCH_PRESETS, random: MAZE_BATCH_RANDOM, words: screenWords(FIRE_CHIEF_WORDS) });
+  const said = text(html);
+  for (const count of [10, 50, 200]) assert.ok(said.includes(`${count} random competition mazes`), `${count}`);
+  assert.match(html, /role="radiogroup" aria-label="Competition mazes with"/);
+  const kinds = [...html.matchAll(/<input type="radio"[^>]*name="batch-random-kind"[^>]*>([^<]*)/g)].map((m) => ({ tag: m[0], label: m[1] }));
+  assert.deepEqual(kinds.map((kind) => kind.label), ['13 inner walls', '16 inner walls (corridors only)']);
+  assert.deepEqual(kinds.map((kind) => /\schecked=""/.test(kind.tag)), [true, false], 'the first kind is chosen');
+  assert.ok(said.includes(RANDOM_MAZES_NOTE));
+  // a game without kinds (Fire Rescue) has no such choice, and its lists are called what they were
+  const plain = dialog(fireChiefGame, { words: screenWords(FIRE_CHIEF_WORDS) });
+  assert.ok(!plain.includes('batch-random-kind'));
+  assert.ok(text(plain).includes('50 random mazes'));
 });
 
 test('test lists: what the window offers - the numbers in the names are the lengths of the lists', () => {
@@ -767,16 +889,34 @@ test('test lists: what the window offers - the numbers in the names are the leng
   const [named, mine] = MAZE_BATCH_PRESETS;
   assert.equal(named.label, 'The 5 named mazes, fire at every place (30)');
   assert.equal(named.scenarios(stage).length, 30);
-  assert.equal(named.hint, 'Open field, Two doors, Crossroads, Detour, One way only: each one with the fire at its 6 places.');
+  assert.equal(
+    named.hint,
+    'Open field, Two doors, Crossroads, Detour, One way only: each one with the fire at its 6 places. Detour and One way only are competition mazes, the others are practice mazes.',
+  );
+  assert.equal(namedKindsSentence(), 'Detour and One way only are competition mazes, the others are practice mazes.');
+  assert.deepEqual(NAMED_MAZES.filter((maze) => isCompetitionMaze(maze.scenario)).map((maze) => maze.name), ['Detour', 'One way only']);
   assert.equal(mine.label, 'This maze, fire at every place (6)');
   assert.equal(mine.scenarios(stage).length, 6);
   assert.deepEqual(mine.scenarios(stage)[0].walls, stage.walls);
-  // nothing to add about a maze that is fine; a practice maze is called what it is, in the game's words
+  // nothing to add about a competition maze; a practice maze is called what it is, with what a
+  // competition maze has that it has not - and, for a closed room, what is wrong in the game's words
   assert.equal(named.note, undefined);
+  assert.equal(mine.note, stageMazeNote);
   assert.equal(mine.note?.(stage), null);
+  assert.equal(mine.note?.(namedMaze('one-way') as FireChiefScenario), null);
+  assert.equal(
+    mine.note?.(namedMaze('crossroads') as FireChiefScenario),
+    'The maze on the stage is a practice maze, not a competition maze: a competition maze has 13 or 16 inner walls.',
+  );
   assert.equal(
     mine.note?.(closedBedroom()),
-    'The maze on the stage is a practice maze, not a competition maze. There is no way from START to the bedroom: take a wall away.',
+    'The maze on the stage is a practice maze, not a competition maze: a competition maze has 13 or 16 inner walls and a way from START to both rooms. ' +
+      'There is no way from START to the bedroom: take a wall away.',
+  );
+  assert.equal(
+    mine.note?.(thirteenWallsClosedRoom()),
+    'The maze on the stage is a practice maze, not a competition maze: a competition maze has a way from START to both rooms. ' +
+      'There is no way from START to the bedroom: take a wall away.',
   );
   // such a list can be played all the same: six results, no exception
   const results = mine.scenarios(closedBedroom()).map((scenario) => runMatch({ game: fireChiefGame, scenario, program: blankProgram() }));
@@ -849,7 +989,7 @@ test('editor: every wall place is a button with a name, pressed or not, and one 
     // what the pointer is told
     assert.ok(tag.includes(`title="${wallHint(wall.name, maze.walls[index] === true)}"`), tag);
   }
-  assert.equal(standing.length, 10, 'the default maze has ten walls');
+  assert.equal(standing.length, 13, 'the default maze has thirteen walls');
   // the buttons come in the order of the plan's lines
   assert.deepEqual(buttons.map((tag) => Number(/data-wall-index="(\d+)"/.exec(tag)?.[1])), PLAN_WALLS.map((wall) => wall.index));
   // one stop for the Tab key; the arrow keys reach the others
@@ -879,22 +1019,42 @@ test('editor: the fire, the ready-made mazes and the level are on it; a practice
   assert.match(html, /<button[^>]*role="radio"[^>]*aria-checked="true"[^>]*>Bedroom<\/button>/);
   assert.match(html, /<button[^>]*role="radio"[^>]*aria-checked="true"[^>]*>Side wall<\/button>/);
   assert.match(html, /<button[^>]*role="radio"[^>]*aria-checked="false"[^>]*>Living room<\/button>/);
-  // the five ready-made mazes; the one on the plan is pressed
-  for (const choice of MAZE_CHOICES) assert.ok(html.includes(`>${choice.label}</button>`), choice.label);
-  assert.match(html, /<button[^>]*aria-pressed="true"[^>]*>Crossroads \(default maze\)<\/button>/);
-  assert.match(html, /<button[^>]*aria-pressed="false"[^>]*>Open field<\/button>/);
+  // the five ready-made mazes, each with its kind on the button; the one on the plan is pressed
+  const choiceButton = (label: string): string => {
+    const tag = new RegExp(`<button[^>]*data-maze-choice="[a-z-]+"[^>]*>(?:(?!</button>).)*>${label.replace(/[()]/g, '\\$&')}</span>(?:(?!</button>).)*</button>`).exec(html);
+    assert.ok(tag, `the button "${label}"`);
+    return tag[0];
+  };
+  for (const choice of MAZE_CHOICES) {
+    const button = choiceButton(choice.label);
+    assert.ok(button.includes(`data-choice-kind="${choice.kind}"`), choice.label);
+    assert.equal(text(button).trim(), `${choice.label} ${choice.kindLabel}`, 'the name, then the kind');
+    assert.ok(button.includes(`title="${choice.about}"`), choice.label);
+  }
+  assert.match(choiceButton('Detour (default maze)'), /aria-pressed="true"/);
+  assert.match(choiceButton('Open field'), /aria-pressed="false"/);
+  assert.equal(text(choiceButton('Detour (default maze)')).trim(), 'Detour (default maze) competition maze');
+  assert.equal(text(choiceButton('Crossroads')).trim(), 'Crossroads practice maze');
   const said = text(html);
-  assert.ok(said.includes('Level 3 of 5: medium'));
-  assert.ok(said.includes('10 inner walls.'));
+  assert.ok(said.includes('Level 4 of 5: hard'));
+  // the kind of the maze on the stage, with its walls; then the ways
+  assert.match(html, /data-maze-level="4" data-maze-kind="competition"/);
+  assert.ok(said.includes('Competition maze: 13 inner walls. The shortest way from START into the room of the fire is 8 cells long (2.4 m) with 3 turns.'), said);
   assert.ok(said.includes(LEVEL_NOTE));
-  // a maze that can be played has no note - but the place for it is there, so that a screen reader hears it appear
+  // the sentence under the buttons is the one of the maze on the plan
+  assert.ok(said.includes('Competition maze. Level 4 of 5. Thirteen walls. Narrow corridors, two ways to the bedroom and a big dead end.'));
+  // a maze with a way to both rooms has no note - but the place for it is there, so that a screen reader hears it appear
   assert.match(html, /<div role="status" aria-live="polite"><\/div>/);
-  assert.ok(!said.includes('practice maze'));
+  assert.ok(!said.includes('This is a practice maze'));
 
   // a maze of one's own: none of the ready-made ones is pressed
   const own = editorHtml(toggleWall(defaultScenario(), 0));
   assert.ok(text(own).includes(OWN_MAZE_ABOUT));
-  assert.ok(!/<button[^>]*aria-pressed="true"[^>]*>(Crossroads|Open field|Two doors|Detour|One way only)/.test(own));
+  assert.ok(!/<button[^>]*aria-pressed="true"[^>]*data-maze-choice/.test(own));
+  assert.equal((own.match(/data-maze-choice=/g) ?? []).length, 5);
+  // (it has one wall less than the default maze: a practice maze, and the box says what a competition maze has)
+  assert.match(own, /data-maze-kind="practice"/);
+  assert.ok(text(own).includes('Practice maze: 12 inner walls. A competition maze has 13 or 16 inner walls.'));
 
   // a maze in which the bedroom cannot be reached
   const closed = editorHtml(closedBedroom());
@@ -902,6 +1062,9 @@ test('editor: the fire, the ready-made mazes and the level are on it; a practice
   assert.ok(closedSaid.includes('This is a practice maze, not a competition maze.'));
   assert.ok(closedSaid.includes('There is no way from START to the bedroom: take a wall away.'));
   assert.ok(closedSaid.includes('You can still start an attempt in this maze to practise.'));
+  // the box and the note call it the same thing, and say the same about a competition maze
+  assert.ok(closedSaid.includes('Practice maze: 2 inner walls, and a room cannot be reached. A competition maze has 13 or 16 inner walls and a way from START to both rooms.'));
+  assert.equal(closedSaid.split('A competition maze has 13 or 16 inner walls and a way from START to both rooms.').length, 3, 'in the box and in the note');
   assert.match(closed, /data-cell="E1"[^>]*data-closed=""/, 'the closed room is drawn as closed');
   assert.ok(!/data-cell="A1"[^>]*data-closed/.test(closed));
   // and one in which nothing can be reached still draws, with "No level"
@@ -915,10 +1078,13 @@ test('editor: the fire, the ready-made mazes and the level are on it; a practice
 test('panel: in Fire Chief the code is a "maze code"; Fire Rescue keeps every word it had', () => {
   const chiefWords = screenWords(FIRE_CHIEF_WORDS);
   const chief = renderToStaticMarkup(createElement(CombinationPanel<FireChiefScenario>, { game: fireChiefGame, scenario: defaultScenario(), onChange: nothing, words: chiefWords, readCode: readMazeCode }));
-  assert.match(chief, /aria-label="Maze code LC-4406-N0E0"/);
+  assert.match(chief, /aria-label="Maze code LC-H8G6-69T0"/);
   assert.match(chief, /aria-label="Copy the maze code"/);
-  assert.match(chief, />Random maze<\/button>/);
+  // without draws of its own a game has one "Random" button, with the game's word on it
+  assert.match(chief, />Random competition maze<\/button>/);
   assert.match(chief, />Default maze<\/button>/);
+  assert.match(chief, /title="The default maze \(Detour, a competition maze with 13 inner walls\) with the fire in the corner of the living room"/);
+  assert.ok(!chief.includes('data-random-draws'));
   assert.ok(text(chief).includes('More than 100 billion mazes have a way from START to both rooms. Changing the maze or the place of the fire puts the field back to the start.'));
   assert.ok(!/combination/i.test(text(chief)), 'no "combination" on the Fire Chief panel');
   // the code of a practice maze is shown like any other
@@ -932,5 +1098,208 @@ test('panel: in Fire Chief the code is a "maze code"; Fire Rescue keeps every wo
   assert.ok(rescue.includes(' combinations are possible. Changing the combination puts the field back to the start.'));
   assert.ok(rescue.includes(fireRescueGame.scenarioCount().toLocaleString('en')));
   assert.match(rescue, /title="Draw a random combination, like the referee does"/);
+  assert.match(rescue, />Random<\/button>/);
+  assert.ok(!rescue.includes('data-random-draws'));
   assert.ok(!/maze/i.test(rescue));
 });
+
+test('panel: one press gives a random competition maze with 13 inner walls, another one with 16', () => {
+  // the two draws: one for each number of the organiser's constant, with the number on the button
+  assert.deepEqual(RANDOM_MAZE_DRAWS.map((draw) => draw.id), COMPETITION_WALL_COUNTS.map((walls) => `walls-${walls}`));
+  assert.deepEqual(RANDOM_MAZE_DRAWS.map((draw) => draw.label), COMPETITION_WALL_COUNTS.map((walls) => `${walls} inner walls`));
+  assert.deepEqual(RANDOM_MAZE_DRAWS.map((draw) => draw.hint), [
+    'Draw a random competition maze with 13 inner walls and a random place for the fire',
+    'Draw a random competition maze with 16 inner walls (corridors only, one way to each room) and a random place for the fire',
+  ]);
+  COMPETITION_WALL_COUNTS.forEach((walls, i) => {
+    const places = new Set<string>();
+    const codes = new Set<string>();
+    for (let seed = 1; seed <= 300; seed++) {
+      const maze = RANDOM_MAZE_DRAWS[i].draw(makeRng(seed));
+      assert.deepEqual(maze, randomScenarioWithWalls(makeRng(seed), walls));
+      assert.equal(maze.walls.filter(Boolean).length, walls);
+      assert.equal(isCompetitionMaze(maze), true);
+      assert.equal(kindSentence(mazeFacts(maze)), walls === 16 ? 'Competition maze: 16 inner walls, corridors only.' : `Competition maze: ${walls} inner walls.`);
+      places.add(`${maze.fireRoom} ${maze.fireSpot}`);
+      codes.add(encodeScenario(maze));
+    }
+    assert.equal(places.size, 6, 'the fire comes at each of its six places');
+    assert.ok(codes.size >= 299, 'a new maze with every press');
+    // with the page's own random numbers too
+    assert.equal(RANDOM_MAZE_DRAWS[i].draw(Math.random).walls.filter(Boolean).length, walls);
+  });
+
+  // on the panel: the words "Random competition maze:" and the two buttons, in the place of the one "Random" button
+  const words = screenWords(FIRE_CHIEF_WORDS);
+  assert.equal(words.randomLabel, 'Random competition maze');
+  assert.equal(words.randomHint, 'Draw a random competition maze (13 or 16 inner walls) and a random place for the fire');
+  let picked: FireChiefScenario | null = null;
+  const panel = renderToStaticMarkup(
+    createElement(CombinationPanel<FireChiefScenario>, {
+      game: fireChiefGame,
+      scenario: defaultScenario(),
+      onChange: (next: FireChiefScenario) => {
+        picked = next;
+      },
+      words,
+      readCode: readMazeCode,
+      randomDraws: RANDOM_MAZE_DRAWS,
+    }),
+  );
+  assert.equal(picked, null);
+  assert.match(panel, /<div role="group" aria-label="Random competition maze"[^>]*data-random-draws="true">/);
+  assert.ok(text(panel).includes('Random competition maze: 13 inner walls 16 inner walls'), text(panel));
+  const buttons = [...panel.matchAll(/<button[^>]*data-random-draw="([a-z0-9-]+)"[^>]*>/g)];
+  assert.deepEqual(buttons.map((m) => m[1]), ['walls-13', 'walls-16']);
+  for (const [i, m] of buttons.entries()) {
+    assert.ok(m[0].includes(`title="${RANDOM_MAZE_DRAWS[i].hint}"`), m[0]);
+    assert.ok(m[0].includes(`aria-label="${RANDOM_MAZE_DRAWS[i].hint}"`), m[0]);
+    // (the name a screen reader says holds the words on the button)
+    assert.ok(RANDOM_MAZE_DRAWS[i].hint.includes(RANDOM_MAZE_DRAWS[i].label));
+  }
+  // the old button "Random maze" (4 to 16 walls) is gone; "Default maze" is still there
+  assert.ok(!/>Random maze</.test(panel) && !/>Random competition maze<\/button>/.test(panel));
+  assert.match(panel, />Default maze<\/button>/);
+  // and the default maze is a competition maze
+  assert.equal(isCompetitionMaze(fireChiefGame.defaultScenario()), true);
+});
+
+// =============================================================================================
+// Competition maze or practice maze: one meaning on the whole screen
+// =============================================================================================
+
+test('kind: the box says the right kind for the five ready-made mazes', () => {
+  const said = (id: string): string => kindSentence(mazeFacts(namedMaze(id) as FireChiefScenario));
+  assert.equal(said('open'), 'Practice maze: no inner walls. A competition maze has 13 or 16 inner walls.');
+  assert.equal(said('two-doors'), 'Practice maze: 4 inner walls. A competition maze has 13 or 16 inner walls.');
+  assert.equal(said('crossroads'), 'Practice maze: 10 inner walls. A competition maze has 13 or 16 inner walls.');
+  assert.equal(said('detour'), 'Competition maze: 13 inner walls.');
+  assert.equal(said('one-way'), 'Competition maze: 16 inner walls, corridors only.');
+  // the buttons of the ready-made mazes say the same kind, in the same words
+  assert.deepEqual(
+    MAZE_CHOICES.map((choice) => [choice.label, choice.kindLabel]),
+    [
+      ['Detour (default maze)', 'competition maze'],
+      ['Open field', 'practice maze'],
+      ['Two doors', 'practice maze'],
+      ['Crossroads', 'practice maze'],
+      ['One way only', 'competition maze'],
+    ],
+  );
+  for (const choice of MAZE_CHOICES) {
+    const maze = NAMED_MAZES.find((m) => m.id === choice.id);
+    assert.ok(maze);
+    assert.equal(choice.kind, isCompetitionMaze(maze.scenario) ? 'competition' : 'practice', choice.label);
+    assert.equal(choice.kindLabel, KIND_WORD[choice.kind]);
+    assert.ok(choice.about.startsWith(choice.kind === 'competition' ? 'Competition maze. Level ' : 'Practice maze. Level '), choice.about);
+    // on the page: the box of the maze on the stage
+    const html = editorHtml(maze.scenario);
+    assert.ok(html.includes(`data-maze-kind="${choice.kind}"`), choice.label);
+    assert.ok(text(html).includes(kindSentence(mazeFacts(maze.scenario))), choice.label);
+  }
+  // the sentences of the ready-made mazes do not say "perfect maze"
+  for (const maze of NAMED_MAZES) assert.ok(!/perfect/i.test(`${maze.name} ${maze.about}`), maze.about);
+  assert.match(NAMED_MAZES[4].about, /^Sixteen walls: corridors only\./);
+});
+
+test('kind: mazes with 12, 13, 14 and 16 inner walls, and a maze with 13 walls and a closed room', () => {
+  const expected: Record<number, string> = {
+    12: 'Practice maze: 12 inner walls. A competition maze has 13 or 16 inner walls.',
+    13: 'Competition maze: 13 inner walls.',
+    14: 'Practice maze: 14 inner walls. A competition maze has 13 or 16 inner walls.',
+    15: 'Practice maze: 15 inner walls. A competition maze has 13 or 16 inner walls.',
+    16: 'Competition maze: 16 inner walls, corridors only.',
+  };
+  for (const [walls, sentence] of Object.entries(expected)) {
+    for (let seed = 1; seed <= 40; seed++) {
+      const maze = randomScenarioWithWalls(makeRng(seed), Number(walls));
+      const facts = mazeFacts(maze);
+      assert.equal(kindSentence(facts), sentence, `${walls} walls, seed ${seed}`);
+      assert.equal(mazeKind(facts), sentence.startsWith('Competition') ? 'competition' : 'practice');
+      // the editor's answer is the game's
+      assert.equal(mazeKind(facts) === 'competition', isCompetitionMaze(maze));
+      // the level does not depend on the kind: it is counted as before
+      assert.ok(mazeLevel(facts) !== null);
+    }
+    assert.ok(text(editorHtml(randomScenarioWithWalls(makeRng(5), Number(walls)))).includes(sentence), `${walls} walls on the page`);
+  }
+  // 13 inner walls, but the bedroom is closed off: a practice maze - and it is told what a competition maze has that it has not
+  const closed = thirteenWallsClosedRoom();
+  const facts = mazeFacts(closed);
+  assert.deepEqual([facts.walls, facts.bothRooms], [13, false]);
+  assert.equal(mazeKind(facts), 'practice');
+  assert.equal(isCompetitionMaze(closed), false);
+  assert.equal(kindSentence(facts), 'Practice maze: 13 inner walls, and a room cannot be reached. A competition maze has a way from START to both rooms.');
+  assert.equal(competitionMazeHas(facts), 'a way from START to both rooms');
+  const page = text(editorHtml(closed));
+  assert.ok(page.includes(kindSentence(facts)));
+  assert.ok(page.includes('This is a practice maze, not a competition maze.'), 'and the note under the plan says the same');
+  // few walls and a closed room: both things are named
+  assert.equal(kindSentence(mazeFacts(closedBedroom())), 'Practice maze: 2 inner walls, and a room cannot be reached. A competition maze has 13 or 16 inner walls and a way from START to both rooms.');
+  assert.equal(kindSentence(mazeFacts(withWall(openField(), 0, true))), 'Practice maze: 1 inner wall. A competition maze has 13 or 16 inner walls.');
+  // 16 walls with a closed-off cell that is no room: a competition maze by the two conditions, but not "corridors only"
+  let boxed = namedMaze('one-way') as FireChiefScenario;
+  const corner: Cell = { col: 0, row: 4 };
+  for (const next of neighbours(corner)) boxed = withWall(boxed, wallIndexBetween(corner, next), true);
+  // (the box put walls up: take others away until 16 stand again - that can only open more ways)
+  for (let index = 0; boxed.walls.filter(Boolean).length > 16 && index < 40; index++) {
+    if (!boxed.walls[index] || neighbours(corner).some((next) => wallIndexBetween(corner, next) === index)) continue;
+    boxed = withWall(boxed, index, false);
+  }
+  const boxedFacts = mazeFacts(boxed);
+  assert.deepEqual([boxedFacts.walls, boxedFacts.bothRooms, boxedFacts.closedCells > 0], [16, true, true]);
+  assert.equal(corridorsOnly(boxedFacts), false);
+  assert.equal(kindSentence(boxedFacts), 'Competition maze: 16 inner walls.');
+  assert.match(wayFacts(boxedFacts), /\d cells? (is|are) closed off\./);
+  // the box names the walls once: the sentence about the kind has them, the sentences about the ways do not
+  for (const maze of [defaultScenario(), openField(), closedBedroom(), boxedStart()]) {
+    const f = mazeFacts(maze);
+    assert.ok(!/inner wall/.test(wayFacts(f)), wayFacts(f));
+    assert.ok(levelFacts(f).endsWith(wayFacts(f)));
+    assert.match(kindSentence(f), /^(Competition|Practice) maze: (no inner walls|\d+ inner walls?)/);
+  }
+});
+
+test('kind: every text of the screen that names the numbers of a competition maze takes them from the one constant', () => {
+  const numbers = COMPETITION_WALLS_TEXT;
+  assert.equal(numbers, COMPETITION_WALL_COUNTS.join(' or '));
+  // what the screen says, built here a second time from the constant
+  assert.equal(COMPETITION_MAZE_HAS, `${numbers} inner walls and a way from START to both rooms`);
+  assert.equal(competitionMazeHas({ walls: 10, bothRooms: true }), `${numbers} inner walls`);
+  assert.equal(competitionMazeHas({ walls: 10, bothRooms: false }), COMPETITION_MAZE_HAS);
+  assert.equal(screenWords(FIRE_CHIEF_WORDS).randomHint, `Draw a random competition maze (${numbers} inner walls) and a random place for the fire`);
+  const rules = FIRE_CHIEF_RULES.flatMap((section) => section.items);
+  assert.ok(rules.includes(`A competition maze has ${numbers} inner walls (the wall around the field is not counted); any other maze is a practice maze.`));
+  assert.ok(
+    rules.includes(`${Math.max(...COMPETITION_WALL_COUNTS)} inner walls are the most a maze can have while every cell can still be reached: then it has corridors only, and exactly one way to each room.`),
+  );
+  assert.equal(practiceNote(closedBedroom())?.meaning, `A competition maze has ${numbers} inner walls and a way from START to both rooms. You can still start an attempt in this maze to practise.`);
+  assert.equal(stageMazeNote(openField()), `The maze on the stage is a practice maze, not a competition maze: a competition maze has ${numbers} inner walls.`);
+  // one button and one kind of random list for each number, and no other
+  assert.equal(RANDOM_MAZE_DRAWS.length, COMPETITION_WALL_COUNTS.length);
+  assert.equal(RANDOM_MAZE_KINDS.length, COMPETITION_WALL_COUNTS.length);
+  // the default maze and the two ready-made competition mazes have numbers of the constant
+  assert.ok((COMPETITION_WALL_COUNTS as readonly number[]).includes(defaultScenario().walls.filter(Boolean).length));
+  // "corridors only" is said of the larger number: it is the number of a maze with one way only
+  assert.equal(Math.max(...COMPETITION_WALL_COUNTS), PERFECT_MAZE_WALLS);
+
+  // and in the files of the screen no line of code that speaks of walls or of a competition maze
+  // holds one of the numbers as digits or as a word (comments may: they explain)
+  const read = (file: string): string => readFileSync(fileURLToPath(new URL(file, import.meta.url)), 'utf8');
+  const code = (source: string): string[] =>
+    source
+      .replace(/\/\*[^]*?\*\//g, '')
+      .split('\n')
+      .map((line) => line.replace(/(^|\s)\/\/.*$/, ''));
+  const files = ['./rules.ts', './words.ts', './maze-level.ts', './maze-batch.ts', './maze-choices.ts', './maze-words.ts', './maze-code.ts', './MazeEditor.tsx', './FireChiefSimulator.tsx', '../CombinationPanel.tsx', '../BatchDialog.tsx'];
+  for (const file of files) {
+    for (const line of code(read(file))) {
+      if (!/wall|competition|practice/i.test(line)) continue;
+      assert.ok(!/\b(13|16|thirteen|sixteen)\b/i.test(line), `${file}: "${line.trim()}" names a number of walls itself`);
+    }
+  }
+  // (the check does find such a line)
+  assert.ok(code("const a = 'A competition maze has 13 inner walls';").some((line) => /\b13\b/.test(line)));
+  assert.deepEqual(code('/* 13 walls */ const b = 1; // 16 walls'), [' const b = 1;']);
+});
+

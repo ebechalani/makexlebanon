@@ -15,9 +15,15 @@
  * the game's own words (Game.scenarioProblems), that it is no competition maze, and that an
  * attempt in it is practice. The code of such a maze can be copied and typed in like any other.
  *
+ * ("Practice maze" and "competition maze" mean one thing on the whole screen: a competition
+ * maze has 13 or 16 inner walls and a way from START to both rooms, every other maze is a
+ * practice maze - ./maze-level.ts. So a maze with a closed room is one kind of practice maze,
+ * the kind this note is about; the box "How hard is this maze?" names the kind of every maze.)
+ *
  * Plain TypeScript (no DOM, no React), so the tests can read it under Node.
  */
 import { scenarioProblems, type FireChiefScenario } from '../../fire-chief/scenario';
+import { COMPETITION_MAZE_HAS, KIND_WORD } from './maze-level';
 
 /** Under the heading of the plan: how a wall is switched, with a pointer, a finger and the keyboard. */
 export const PLAN_HINT =
@@ -42,16 +48,16 @@ export interface PracticeNote {
 }
 
 /**
- * What the editor says about a maze that the game would not play in a competition, or null for
- * a maze that is fine. (The draft rules, §3: every competition layout has a way from START to
+ * What the editor says about a maze in which a room cannot be reached, or null for a maze with
+ * a way to both rooms. (The draft rules, §3: every competition layout has a way from START to
  * both rooms.)
  */
 export function practiceNote(s: FireChiefScenario): PracticeNote | null {
   const problems = scenarioProblems(s);
   if (problems.length === 0) return null;
   return {
-    title: 'This is a practice maze, not a competition maze.',
+    title: `This is a ${KIND_WORD.practice}, not a ${KIND_WORD.competition}.`,
     problems,
-    meaning: 'The draft rules say that a competition maze has a way from START to both rooms. You can still start an attempt in this maze to practise.',
+    meaning: `A ${KIND_WORD.competition} has ${COMPETITION_MAZE_HAS}. You can still start an attempt in this maze to practise.`,
   };
 }
