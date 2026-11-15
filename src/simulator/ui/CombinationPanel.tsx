@@ -6,7 +6,9 @@
  * code from the board, and - passed in by the game - a small editor to set it up by hand.
  *
  * What the arrangement is called ("combination", "maze") and how a typed code is read are the
- * game's: see ./screen-words.ts and ./scenario-code.ts.
+ * game's: see ./screen-words.ts and ./scenario-code.ts. A game can also put its own random
+ * draws in the place of the one "Random" button (`randomDraws`): Fire Chief draws a random
+ * competition maze with 13 or with 16 inner walls.
  */
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import type { Game } from '../core/types';
@@ -14,6 +16,17 @@ import { CopyIcon, DiceIcon } from './icons';
 import { codeReaderOf, type CodeReader } from './scenario-code';
 import { capital, DEFAULT_WORDS, type ScreenWords } from './screen-words';
 import { button } from './widgets';
+
+/** One way to draw a random combination, as a button of the panel. */
+export interface RandomDraw<S> {
+  id: string;
+  /** the words on the button: "13 inner walls" */
+  label: string;
+  /** what the button gives, as a whole sentence: said when the pointer rests on it, and its name for a screen reader */
+  hint: string;
+  /** the draw (`rng` gives numbers from 0 up to, but not including, 1) */
+  draw: (rng: () => number) => S;
+}
 
 export interface CombinationPanelProps<S> {
   game: Game<S>;
@@ -27,16 +40,24 @@ export interface CombinationPanelProps<S> {
    * sentence of Fire Rescue.
    */
   readCode?: CodeReader<S>;
+  /**
+   * The game's own random draws. They take the place of the one "Random" button, in a row of
+   * their own under the code: the words of that button (words.randomLabel) stand in front of
+   * them, then one button for each draw. Left out, or empty: one button that draws
+   * game.randomScenario.
+   */
+  randomDraws?: RandomDraw<S>[];
   /** the game's own editor for the combination */
   children?: ReactNode;
 }
 
-export function CombinationPanel<S>({ game, scenario, onChange, words = DEFAULT_WORDS, readCode, children }: CombinationPanelProps<S>) {
+export function CombinationPanel<S>({ game, scenario, onChange, words = DEFAULT_WORDS, readCode, randomDraws, children }: CombinationPanelProps<S>) {
   const code = game.encodeScenario(scenario);
   const read = useMemo(() => readCode ?? codeReaderOf(game), [readCode, game]);
   const [typed, setTyped] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const ownDraws = randomDraws && randomDraws.length > 0 ? randomDraws : null;
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -78,15 +99,34 @@ export function CombinationPanel<S>({ game, scenario, onChange, words = DEFAULT_
           </span>
         )}
         <span className="ml-auto flex gap-2">
-          <button type="button" onClick={() => onChange(game.randomScenario(Math.random))} className={button.plain} title={words.randomHint}>
-            <DiceIcon className="h-4 w-4 text-brand-600" />
-            {words.randomLabel}
-          </button>
+          {!ownDraws && (
+            <button type="button" onClick={() => onChange(game.randomScenario(Math.random))} className={button.plain} title={words.randomHint}>
+              <DiceIcon className="h-4 w-4 text-brand-600" />
+              {words.randomLabel}
+            </button>
+          )}
           <button type="button" onClick={() => onChange(game.defaultScenario())} className={button.plain} title={words.defaultHint}>
             {words.defaultLabel}
           </button>
         </span>
       </div>
+
+      {/* The game's own random draws: what they give stands in front of them, in words, and each
+          button says the rest. (A row of its own: on a phone the words and the buttons do not fit
+          beside the code.) */}
+      {ownDraws && (
+        <div role="group" aria-label={words.randomLabel} title={words.randomHint} className="flex flex-wrap items-center gap-x-2 gap-y-1.5" data-random-draws>
+          <span className="text-sm font-semibold text-ink-700">{words.randomLabel}:</span>
+          <span className="flex flex-wrap gap-2">
+            {ownDraws.map((choice) => (
+              <button key={choice.id} type="button" onClick={() => onChange(choice.draw(Math.random))} className={button.plain} title={choice.hint} aria-label={choice.hint} data-random-draw={choice.id}>
+                <DiceIcon className="h-4 w-4 text-brand-600" />
+                {choice.label}
+              </button>
+            ))}
+          </span>
+        </div>
+      )}
 
       {children}
 

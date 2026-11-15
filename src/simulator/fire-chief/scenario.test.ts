@@ -1,6 +1,6 @@
 /**
  * Fire Chief combinations: which mazes can be played, the hand-made mazes, the random generator,
- * and the short code.
+ * the competition mazes (13 or 16 inner walls) and the short code.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -19,6 +19,9 @@ import {
   type Cell,
 } from './field';
 import {
+  COMPETITION_WALLS_TEXT,
+  COMPETITION_WALL_COUNTS,
+  DEFAULT_MAZE_ID,
   NAMED_MAZES,
   PERFECT_MAZE_WALLS,
   PLAYABLE_MAZE_COUNT,
@@ -29,11 +32,14 @@ import {
   describeScenario,
   drawScenario,
   encodeScenario,
+  isCompetitionMaze,
+  isCompetitionWallCount,
   isValidScenario,
   namedMaze,
   openField,
   perfectMazeWalls,
   randomScenario,
+  randomScenarioWithWalls,
   scenarioOfCode,
   scenarioProblems,
   shortestWay,
@@ -165,13 +171,49 @@ test('named mazes: five, from the open field to a perfect maze, every one playab
   assert.deepEqual(new Set(NAMED_MAZES.map((m) => m.scenario.fireSpot)), new Set(FIRE_SPOTS));
 });
 
-test('named mazes: the default is "Crossroads" - medium, fire in the corner of the living room', () => {
+test('named mazes: the default is "Detour" - a competition maze with 13 inner walls - with the fire in the corner of the living room', () => {
   const s = defaultScenario();
-  assert.deepEqual(s, namedMaze('crossroads'));
+  const detour = namedMaze('detour');
+  assert.ok(detour);
+  assert.equal(DEFAULT_MAZE_ID, 'detour');
+  // the walls of the ready-made maze; the fire where a first visitor's examples find it (the ready-made one has it in the bedroom)
+  assert.deepEqual(s.walls, detour.walls);
+  assert.deepEqual(s, withFire(detour, 'living', 'corner'));
   assert.equal(s.fireRoom, 'living');
   assert.equal(s.fireSpot, 'corner');
+  assert.equal(wallCount(s), 13);
+  assert.equal(isCompetitionMaze(s), true, 'the maze a visitor sees first is a competition maze');
+  assert.equal(encodeScenario(s), 'LC-H8G6-69T0');
+  assert.deepEqual(drawScenario(s), [
+    '+---+---+---+---+---+',
+    '| * |             B |',
+    '+   +   +---+---+   +',
+    '|   |       |       |',
+    '+   +---+   +   +---+',
+    '|           |       |',
+    '+---+---+   +---+   +',
+    '|                   |',
+    '+   +   +   +   +   +',
+    '|       | S |       |',
+    '+---+---+---+---+---+',
+  ]);
+  // every cell of it can be reached
+  assert.ok(stepsFrom(s.walls, START_CELL).every((n) => n >= 0));
+  // every call hands out a fresh copy: changing one does not change the next
+  s.walls[0] = false;
+  s.fireRoom = 'bedroom';
+  assert.equal(defaultScenario().walls[0], true);
+  assert.equal(defaultScenario().fireRoom, 'living');
+  assert.equal(namedMaze('nothing'), null);
+});
+
+test('named mazes: the code of the old default maze still names "Crossroads", fire in the corner of the living room', () => {
+  // (until the organiser decided on 13 or 16 inner walls, this was the maze a visitor saw first;
+  // a browser that saved its code, or a student who wrote it down, gets the same maze back)
+  const s = decodeScenario('LC-4406-N0E0');
+  assert.ok(s);
+  assert.deepEqual(s, namedMaze('crossroads'));
   assert.equal(wallCount(s), 10);
-  assert.equal(encodeScenario(s), 'LC-4406-N0E0');
   assert.deepEqual(drawScenario(s), [
     '+---+---+---+---+---+',
     '| *         |     B |',
@@ -185,12 +227,11 @@ test('named mazes: the default is "Crossroads" - medium, fire in the corner of t
     '|       | S |       |',
     '+---+---+---+---+---+',
   ]);
-  // every call hands out a fresh copy: changing one does not change the next
-  s.walls[0] = true;
-  s.fireRoom = 'bedroom';
-  assert.equal(defaultScenario().walls[0], false);
-  assert.equal(defaultScenario().fireRoom, 'living');
-  assert.equal(namedMaze('nothing'), null);
+  // and every named maze has the code it had before (read from the website as it was before this change)
+  assert.deepEqual(
+    NAMED_MAZES.map((m) => encodeScenario(m.scenario)),
+    ['LB-0000-0000', 'BB-J006-0000', 'LC-4406-N0E0', 'BS-H8G6-69T0', 'BC-8X86-AHCA'],
+  );
 });
 
 test('named mazes: the open field has no wall; "One way only" is a perfect maze', () => {
@@ -293,6 +334,275 @@ test('random: it copes with any random function - all zeros, all (nearly) ones, 
   assert.equal(wallCount(randomScenario(() => 0.999999999)), PERFECT_MAZE_WALLS);
 });
 
+test('random: the mixed generator draws what it always drew - the same seed gives the same maze as before the competition mazes', () => {
+  // (written down from the generator before randomScenarioWithWalls() was added beside it)
+  const before: Array<[number, string, number]> = [
+    [1, 'BB-4M70-8T1P', 14],
+    [2, 'LB-4N70-8Q2B', 16],
+    [3, 'LB-0AGG-1812', 8],
+    [4, 'LB-9D8K-848G', 13],
+    [5, 'BS-1000-2940', 5],
+    [6, 'BS-88S0-ADTE', 16],
+    [7, 'BS-84J8-0880', 7],
+    [8, 'BS-580G-029J', 9],
+    [2027, 'BS-0880-1025', 6],
+    [99999, 'BB-01T8-1800', 7],
+  ];
+  for (const [seed, code, walls] of before) {
+    const s = randomScenario(makeRng(seed));
+    assert.equal(encodeScenario(s), code, `seed ${seed}`);
+    assert.equal(wallCount(s), walls, `seed ${seed}`);
+  }
+  // and one number made from the codes of seeds 1 to 2000
+  let digest = 0;
+  for (let seed = 1; seed <= 2000; seed++) {
+    for (const ch of encodeScenario(randomScenario(makeRng(seed)))) digest = (digest * 31 + ch.charCodeAt(0)) >>> 0;
+  }
+  assert.equal(digest, 3297308172);
+});
+
+// =============================================================================================
+// Competition mazes: 13 or 16 inner walls
+// =============================================================================================
+
+/** Is there an open square: four cells in a square with none of the four walls between them? */
+function hasOpenSquare(walls: readonly boolean[]): boolean {
+  for (let row = 0; row < 4; row++) {
+    for (let col = 0; col < 4; col++) {
+      const a = { col, row };
+      const b = { col: col + 1, row };
+      const c = { col, row: row + 1 };
+      const d = { col: col + 1, row: row + 1 };
+      if (!wallBetweenCells(walls, a, b) && !wallBetweenCells(walls, c, d) && !wallBetweenCells(walls, a, c) && !wallBetweenCells(walls, b, d)) return true;
+    }
+  }
+  return false;
+}
+
+/** In how many ways can the robot go from one cell to another without driving through a cell twice? (Counted up to `stopAt`.) */
+function waysBetween(walls: readonly boolean[], from: Cell, to: Cell, stopAt = 2): number {
+  const visited = new Set<number>([cellNumber(from)]);
+  let ways = 0;
+  const walk = (here: Cell): void => {
+    if (ways >= stopAt) return;
+    if (cellNumber(here) === cellNumber(to)) {
+      ways++;
+      return;
+    }
+    for (const next of neighbours(here)) {
+      if (visited.has(cellNumber(next)) || wallBetweenCells(walls, here, next)) continue;
+      visited.add(cellNumber(next));
+      walk(next);
+      visited.delete(cellNumber(next));
+    }
+  };
+  walk(from);
+  return ways;
+}
+
+/**
+ * A robot that keeps one hand on the wall, on squared paper: how many cells it drives from START
+ * until it has been in both rooms, or -1 when it comes back to where it began (in START, facing
+ * up) without having seen both - then it would go round the same ring for ever.
+ */
+function cellsUntilBothRooms(walls: readonly boolean[], hand: 'left' | 'right'): number {
+  const step = [
+    { col: 0, row: -1 },
+    { col: 1, row: 0 },
+    { col: 0, row: 1 },
+    { col: -1, row: 0 },
+  ];
+  const towards = hand === 'left' ? 3 : 1;
+  const away = hand === 'left' ? 1 : 3;
+  const open = (cell: Cell, dir: number): boolean => {
+    const next = { col: cell.col + step[dir].col, row: cell.row + step[dir].row };
+    return next.col >= 0 && next.col < 5 && next.row >= 0 && next.row < 5 && !wallBetweenCells(walls, cell, next);
+  };
+  let cell: Cell = { ...START_CELL };
+  let dir = 0;
+  const seen = new Set<number>();
+  const states = new Set<number>();
+  for (let cells = 1; cells <= 500; cells++) {
+    dir = (dir + towards) % 4;
+    for (let look = 0; look < 3 && !open(cell, dir); look++) dir = (dir + away) % 4;
+    if (!open(cell, dir)) return -1; // (a cell closed on all four sides: START of a maze that cannot be played)
+    cell = { col: cell.col + step[dir].col, row: cell.row + step[dir].row };
+    for (const room of [LIVING_ROOM_CELL, BEDROOM_CELL]) if (cellNumber(cell) === cellNumber(room)) seen.add(cellNumber(room));
+    if (seen.size === 2) return cells;
+    // the same cell, facing the same way, a second time: from here on everything repeats
+    const state = cellNumber(cell) * 4 + dir;
+    if (states.has(state)) return -1;
+    states.add(state);
+  }
+  return -1;
+}
+
+test('competition: the organiser\'s two numbers are one constant - 13 and 16 - and 16 is the number of a maze with corridors only', () => {
+  assert.deepEqual([...COMPETITION_WALL_COUNTS], [13, 16]);
+  assert.equal(COMPETITION_WALLS_TEXT, '13 or 16');
+  // the sentences of the screen that say "corridors only" count on this:
+  assert.equal(Math.max(...COMPETITION_WALL_COUNTS), PERFECT_MAZE_WALLS);
+  for (const count of COMPETITION_WALL_COUNTS) assert.ok(count <= PERFECT_MAZE_WALLS, 'a maze with every cell in reach can have it');
+  for (let count = 0; count <= 40; count++) assert.equal(isCompetitionWallCount(count), count === 13 || count === 16, `${count} walls`);
+  assert.equal(isCompetitionWallCount(13.5), false);
+  assert.equal(isCompetitionWallCount(Number.NaN), false);
+});
+
+test('competition: a random maze with exactly 13 or exactly 16 inner walls - 3000 seeds each, every one can be played, every cell can be reached', () => {
+  for (const count of COMPETITION_WALL_COUNTS) {
+    const byFire = new Map<string, number>();
+    const codes = new Set<string>();
+    for (let seed = 0; seed < 3000; seed++) {
+      const s = randomScenarioWithWalls(makeRng(seed), count);
+      assert.equal(s.walls.length, 40);
+      assert.equal(wallCount(s), count, `seed ${seed}: exactly ${count} walls`);
+      assert.deepEqual(scenarioProblems(s), [], `seed ${seed}, ${count} walls`);
+      assert.equal(isCompetitionMaze(s), true, `seed ${seed}, ${count} walls`);
+      // made from a maze with corridors only by taking walls away: no cell is closed off
+      assert.ok(stepsFrom(s.walls, START_CELL).every((n) => n >= 0), `seed ${seed}, ${count} walls`);
+      assert.match(encodeScenario(s), CODE);
+      assert.deepEqual(decodeScenario(encodeScenario(s)), s);
+      byFire.set(`${s.fireRoom} ${s.fireSpot}`, (byFire.get(`${s.fireRoom} ${s.fireSpot}`) ?? 0) + 1);
+      codes.add(encodeScenario(s).slice(3));
+      if (seed % 100 === 0) assert.deepEqual(randomScenarioWithWalls(makeRng(seed), count), s, 'same seed, same maze');
+    }
+    // the fire stands at each of its six places about equally often (500 each)
+    assert.equal(byFire.size, 6);
+    for (const [place, times] of byFire) assert.ok(times > 420 && times < 580, `${count} walls, ${place}: ${times} times`);
+    // and hardly ever the same walls twice
+    assert.ok(codes.size > 2950, `${count} walls: ${codes.size} different mazes`);
+  }
+});
+
+test('competition: 16 inner walls mean corridors only - no open square, and exactly one way between START and each room', () => {
+  for (let seed = 0; seed < 1000; seed++) {
+    const { walls } = randomScenarioWithWalls(makeRng(seed), 16);
+    assert.equal(hasOpenSquare(walls), false, `seed ${seed}: no open square`);
+    // 25 cells, all reached, joined by 40 - 16 = 24 openings: no ring anywhere
+    assert.ok(stepsFrom(walls, START_CELL).every((n) => n >= 0), `seed ${seed}`);
+    for (const room of [LIVING_ROOM_CELL, BEDROOM_CELL]) assert.equal(waysBetween(walls, START_CELL, room), 1, `seed ${seed}: one way only`);
+    if (seed < 100) {
+      // ... and between any two cells
+      for (let n = 1; n < 25; n++) assert.equal(waysBetween(walls, cellFromNumber(0), cellFromNumber(n)), 1, `seed ${seed}, cell ${n}`);
+    }
+  }
+  // with 13, three walls of such a maze are gone: there are rings to drive round, and often more than one way to a room
+  let moreWays = 0;
+  let openSquares = 0;
+  for (let seed = 0; seed < 1000; seed++) {
+    const { walls } = randomScenarioWithWalls(makeRng(seed), 13);
+    assert.equal(waysBetween(walls, cellFromNumber(0), cellFromNumber(24), 1), 1, `seed ${seed}`);
+    if ([LIVING_ROOM_CELL, BEDROOM_CELL].some((room) => waysBetween(walls, START_CELL, room) > 1)) moreWays++;
+    if (hasOpenSquare(walls)) openSquares++;
+  }
+  assert.ok(moreWays > 600, `${moreWays} of 1000 mazes with 13 walls have more than one way to a room`);
+  assert.ok(openSquares > 300 && openSquares < 1000, `${openSquares} of 1000 mazes with 13 walls have an open square`);
+});
+
+test('competition: any number of walls from 0 to 16 can be asked for, and nothing else', () => {
+  for (let count = 0; count <= PERFECT_MAZE_WALLS; count++) {
+    for (const seed of [1, 2, 3]) {
+      const s = randomScenarioWithWalls(makeRng(seed), count);
+      assert.equal(wallCount(s), count);
+      assert.deepEqual(scenarioProblems(s), [], `${count} walls`);
+      assert.equal(isCompetitionMaze(s), count === 13 || count === 16, `${count} walls`);
+    }
+  }
+  assert.deepEqual(randomScenarioWithWalls(makeRng(1), 0).walls, openField().walls);
+  // it copes with any random function, as the mixed generator does
+  for (const rng of [() => 0, () => 0.999999999, () => 1, () => 0.5]) {
+    for (const count of COMPETITION_WALL_COUNTS) {
+      const s = randomScenarioWithWalls(rng, count);
+      assert.equal(wallCount(s), count);
+      assert.deepEqual(scenarioProblems(s), []);
+    }
+  }
+  // more than 16 walls always close a cell off: such a maze is not made
+  for (const wrong of [17, 40, -1, 12.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+    assert.throws(() => randomScenarioWithWalls(makeRng(1), wrong), RangeError, `${wrong} walls`);
+  }
+});
+
+test('competition: a maze is one only with 13 or 16 inner walls AND a way from START to both rooms', () => {
+  // the five ready-made mazes: "Detour" (13) and "One way only" (16) are competition mazes
+  assert.deepEqual(NAMED_MAZES.map((m) => [m.id, isCompetitionMaze(m.scenario)]), [
+    ['open', false],
+    ['two-doors', false],
+    ['crossroads', false],
+    ['detour', true],
+    ['one-way', true],
+  ]);
+  // the fire does not matter
+  for (const room of ROOM_IDS) for (const spot of FIRE_SPOTS) assert.equal(isCompetitionMaze(withFire(defaultScenario(), room, spot)), true);
+  // one wall more or less: a practice maze
+  const thirteen = defaultScenario();
+  const standing = thirteen.walls.indexOf(true);
+  assert.equal(isCompetitionMaze(withWall(thirteen, standing, false)), false, '12 walls');
+  // (the wall between A5 and B5 closes nothing off in this maze)
+  const fourteen = withWall(thirteen, between([0, 4], [1, 4]), true);
+  assert.deepEqual([wallCount(fourteen), isValidScenario(fourteen)], [14, true]);
+  assert.equal(isCompetitionMaze(fourteen), false, '14 walls');
+  // 13 walls, but the bedroom is closed off: a practice maze
+  let closed = withWall(withWall(thirteen, between([3, 0], [4, 0]), true), between([4, 0], [4, 1]), true);
+  closed = withWall(withWall(closed, between([1, 4], [2, 4]), false), between([2, 4], [3, 4]), false);
+  assert.equal(wallCount(closed), 13);
+  assert.deepEqual(scenarioProblems(closed), ['There is no way from START to the bedroom: take a wall away.']);
+  assert.equal(isCompetitionMaze(closed), false, '13 walls and a closed room');
+  // 16 walls with a cell closed off that is no room: still a way to both rooms - a competition maze by the two conditions
+  let boxed = openField();
+  for (const [a, b] of [
+    [[2, 2], [1, 2]], [[2, 2], [3, 2]], [[2, 2], [2, 1]], [[2, 2], [2, 3]], // a box around C3
+    [[0, 0], [1, 0]], [[1, 0], [2, 0]], [[2, 0], [3, 0]], [[3, 0], [4, 0]], // four walls in the top row
+    [[0, 4], [1, 4]], [[1, 4], [2, 4]], [[2, 4], [3, 4]], [[3, 4], [4, 4]], // four in the bottom row
+    [[0, 1], [1, 1]], [[3, 1], [4, 1]], [[0, 3], [1, 3]], [[3, 3], [4, 3]], // four more
+  ] as Array<[[number, number], [number, number]]>) {
+    boxed = withWall(boxed, between(a, b), true);
+  }
+  assert.equal(wallCount(boxed), 16);
+  assert.deepEqual(scenarioProblems(boxed), []);
+  assert.equal(stepsFrom(boxed.walls, START_CELL)[cellNumber({ col: 2, row: 2 })], -1, 'C3 is closed off');
+  assert.equal(isCompetitionMaze(boxed), true);
+  // a combination that is broken is none
+  assert.equal(isCompetitionMaze({ walls: [], fireRoom: 'living', fireSpot: 'corner' }), false);
+});
+
+test('competition: a robot that keeps one hand on the wall comes through both rooms - it never circles for ever', (t) => {
+  // START and both rooms lie against the outer wall of the field, and the hand follows that wall.
+  // Walked on squared paper with each hand: 3000 mazes with 13 walls, 3000 with 16, 3000 of the
+  // mixed generator, and 1500 mazes no generator draws (every wall by the throw of a coin, kept
+  // when there is a way from START to both rooms: closed-off cells, loose walls in the field).
+  const mazes: boolean[][] = [];
+  for (let seed = 0; seed < 3000; seed++) {
+    for (const count of COMPETITION_WALL_COUNTS) mazes.push(randomScenarioWithWalls(makeRng(seed), count).walls);
+    mazes.push(randomScenario(makeRng(seed)).walls);
+  }
+  const coin = makeRng(13_16);
+  while (mazes.length < 10_500) {
+    const share = 0.15 + 0.5 * coin();
+    const walls = Array.from({ length: 40 }, () => coin() < share);
+    if (isValidScenario({ walls, fireRoom: 'living', fireSpot: 'corner' })) mazes.push(walls);
+  }
+  let longest = 0;
+  let walks = 0;
+  for (const walls of mazes) {
+    for (const hand of ['left', 'right'] as const) {
+      const cells = cellsUntilBothRooms(walls, hand);
+      assert.ok(cells > 0, `the ${hand} hand reaches both rooms`);
+      longest = Math.max(longest, cells);
+      walks++;
+    }
+  }
+  t.diagnostic(`${mazes.length} mazes, each with the left and with the right hand: both rooms reached in ${walks} of ${walks} walks, after ${longest} cells at most`);
+  // (a hand on the wall drives through 48 openings at most before it is back where it began, and
+  // from the second room back to START it needs at least 6 of them)
+  assert.ok(longest >= 30 && longest <= 42, `the longest way to the second room: ${longest} cells`);
+  // the helper does say "circles" when a maze makes it: with a loose box of walls around the
+  // middle cell and nothing else, a robot that starts beside it with its hand on the box goes
+  // round it for ever - but from START the hand is on the outer wall, and it does not
+  const island = fieldWith(between([2, 2], [1, 2]), between([2, 2], [3, 2]), between([2, 2], [2, 1]), between([2, 2], [2, 3]));
+  assert.ok(cellsUntilBothRooms(island.walls, 'left') > 0);
+});
+
 test('count: about one in ten of all wall arrangements can be played', () => {
   assert.equal(SCENARIO_COUNT, PLAYABLE_MAZE_COUNT * 6);
   assert.ok(Number.isSafeInteger(SCENARIO_COUNT));
@@ -365,7 +675,8 @@ test('code: every wall place and every fire place has its own spot in the code',
 });
 
 test('code: typed in any letter case, with or without separators, with look-alike letters', () => {
-  const s = defaultScenario();
+  const s = namedMaze('crossroads');
+  assert.ok(s);
   for (const typed of [
     'LC-4406-N0E0',
     'lc-4406-n0e0',
@@ -490,7 +801,7 @@ test('code: 20 000 random texts never throw, and whatever is accepted is a playa
 test('describe: says where the fire is, how many walls there are and how far it is', () => {
   assert.equal(
     describeScenario(defaultScenario()),
-    'Fire in the living room (corner). 10 inner walls. Shortest way from START to the fire: 8 cells.',
+    'Fire in the living room (corner). 13 inner walls. Shortest way from START to the fire: 6 cells.',
   );
   assert.equal(
     describeScenario(openField('bedroom', 'side')),

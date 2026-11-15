@@ -88,15 +88,28 @@ import { TARGET_BODY_ID, fireChiefGame, roomAround, targetOf } from './game';
 import { COLOR_SENSOR_RANGE_MM, FIRE_CHIEF_ROBOT, START_POSE } from './robot';
 import {
   NAMED_MAZES,
-  defaultScenario,
   encodeScenario,
+  namedMaze,
   openField,
   randomScenario,
   wallBetweenCells,
+  withFire,
   type FireChiefScenario,
 } from './scenario';
 
 type Sim = Simulation<FireChiefScenario>;
+
+/**
+ * The maze the routes of this file were written for: "Crossroads" (ten walls) with the fire in
+ * the corner of the living room - code LC-4406-N0E0. (It was the default maze until the
+ * organiser decided that a competition maze has 13 or 16 inner walls; the default maze is
+ * "Detour" now, and the examples are played on it in samples.test.ts.)
+ */
+function crossroads(): FireChiefScenario {
+  const maze = namedMaze('crossroads');
+  assert.ok(maze, 'the named maze "Crossroads" exists');
+  return withFire(maze, 'living', 'corner');
+}
 
 // =============================================================================================
 // Helpers
@@ -148,7 +161,7 @@ function aimErrorDeg(sim: Sim): number {
 
 // ---- block programs
 
-/** The way through the default maze ("Crossroads") from START to the living room, cell by cell. */
+/** The way through the maze "Crossroads" from START to the living room, cell by cell. */
 const ROUTE_CELLS = ['C5', 'C4', 'B4', 'A4', 'A3', 'A2', 'B2', 'B1', 'A1'];
 
 /** The same way as a block program that knows it by heart (no sensor). It ends in the middle of the living room. */
@@ -402,8 +415,9 @@ function assertStandsAtTheFire(sim: Sim, events: SimEvent[], touched: boolean, w
 // Blocks only: driving through the maze
 // =============================================================================================
 
-test('real run, blocks only: a route learned by heart through the default maze earns 10 + 20 points', () => {
-  const scenario = defaultScenario();
+test('real run, blocks only: a route learned by heart through the maze "Crossroads" earns 10 + 20 points', () => {
+  const scenario = crossroads();
+  assert.equal(encodeScenario(scenario), 'LC-4406-N0E0');
   // the route really is a way through this maze: no wall between two cells that follow each other
   const cells: Cell[] = ROUTE_CELLS.map((name) => ({ col: 'ABCDE'.indexOf(name[0]), row: Number(name[1]) - 1 }));
   assert.deepEqual(cells.map(cellName), ROUTE_CELLS);
@@ -530,7 +544,7 @@ test('real run: blocks drive to the living room, the ultrasonic sensor finds the
     programSwitchedFanOff = true;
     io.stopDcMotor('M1');
   });
-  const sim: Sim = createEngineSimulation({ game: fireChiefGame, scenario: defaultScenario(), program: {} }, harness.factory);
+  const sim: Sim = createEngineSimulation({ game: fireChiefGame, scenario: crossroads(), program: {} }, harness.factory);
   let fanTicks = 0;
   let touchTicks = 0;
   let sawRedBeforeTheCorner = false;
@@ -548,7 +562,7 @@ test('real run: blocks drive to the living room, the ultrasonic sensor finds the
   assert.deepEqual(problems(events), []);
 
   // the ultrasonic sensor found the place: a bare wall straight ahead (4.5 cm), then the target in the corner (5.7 cm)
-  assert.equal(defaultScenario().fireSpot, 'corner');
+  assert.equal(crossroads().fireSpot, 'corner');
   assert.equal(found, true);
   assert.deepEqual(looks, [4.5, 5.7]);
   // the colour sensor read red when the robot had gone close, and the robot faces the target
@@ -558,7 +572,7 @@ test('real run: blocks drive to the living room, the ultrasonic sensor finds the
   // only there is the colour sensor close enough. It pressed on them for 3 hundredths of a second.
   assert.equal(sawRedBeforeTheCorner, false, 'no red before the walls of the corner stopped the robot');
   assert.equal(touchTicks, 3);
-  assertStandsAtTheFire(sim, events, touchTicks > 0, 'default maze');
+  assertStandsAtTheFire(sim, events, touchTicks > 0, 'Crossroads');
 
   // the referee: mission complete, 3 seconds after the fan came on
   assert.equal(sim.finishReason, 'mission-complete');
@@ -748,7 +762,7 @@ test('real run on the open field, the fire at each of its six places: the looks 
 // =============================================================================================
 
 test('real run: a restart on the way - back to START, the points are gone, the program starts again and completes', () => {
-  const { sim, visits, harness } = explore(defaultScenario());
+  const { sim, visits, harness } = explore(crossroads());
   sim.start();
   const events: SimEvent[] = [];
   while (sim.status === 'running' && sim.score().total < 30) {
@@ -978,8 +992,8 @@ describe('on the real mat picture', () => {
     const mat = await picture;
     if (!mat) return t.skip('the mat picture could not be decoded (sharp is not installed)');
     for (const blocks of [ROUTE_TO_LIVING_ROOM, wallFollower(AT_START, [LIVING_ROOM_CELL.col, BEDROOM_CELL.col])]) {
-      const onDrawing: BatchResult = runMatch({ game: fireChiefGame, scenario: defaultScenario(), program: blocks });
-      const onPicture: BatchResult = runMatch({ game: fireChiefGame, scenario: defaultScenario(), program: blocks, sampler: mat });
+      const onDrawing: BatchResult = runMatch({ game: fireChiefGame, scenario: crossroads(), program: blocks });
+      const onPicture: BatchResult = runMatch({ game: fireChiefGame, scenario: crossroads(), program: blocks, sampler: mat });
       assert.deepEqual(onPicture, onDrawing);
       assert.equal(onPicture.total, 30);
     }

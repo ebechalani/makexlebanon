@@ -34,6 +34,11 @@
  * named mazes with the fire at each of its six places, and on several hundred random mazes.
  * What a description promises is what those tests measure.
  *
+ * The default maze is a competition maze: the walls of "Detour" (13 inner walls) with the fire
+ * in the corner of the living room (./scenario.ts: defaultScenario). Four descriptions speak of
+ * it - what the line counter counts there, which room the right hand reaches, and the seconds
+ * of the two examples that find the fire - and a test holds each of them to it.
+ *
  * The blocks that are not obvious carry a note (`note(block, text)`): in the editor such a block
  * shows a small round "?" icon, and a click on it opens the explanation.
  *
@@ -618,7 +623,7 @@ const findFire: SampleProgram = {
     'Something: it drives at it slowly until the colour sensor reads red, stops, and only then starts the fan: 100 points. ' +
     'At a wall it touches nothing. In the corner the sensor is close enough (1.5 cm in this simulator) only when the two walls stop the robot: it touches them for a moment. ' +
     `${ASK_THE_REFEREE} ` +
-    'In the default maze the left hand leads to the fire: 100 points after 34 seconds. ' +
+    'In the default maze the left hand leads to the fire: 100 points after 41 seconds. ' +
     'It needs the robot at its default start position. ' +
     'Try the default maze with the fire in the bedroom: what does the robot show?',
   program: program([
@@ -662,6 +667,12 @@ const findFire: SampleProgram = {
 //   - 10 000 mazes with one way only: 100 points in every one, slowest 133.6 s;
 //   - 5 000 mazes no generator draws (every wall by the throw of a coin): 100 points in every
 //     one, slowest 121.5 s;
+//   - competition mazes as the page draws them (randomScenarioWithWalls; the first 2 000
+//     different mazes of each kind from seed 1 on, every one with the fire at all six places:
+//     12 000 attempts of each kind): 100 points in every one. With 13 inner walls 50.8 s on
+//     average, slowest 116.0 s; with 16 inner walls 68.6 s on average, slowest 133.6 s. (On
+//     paper the left hand drives 15.0 cells to the fire room on average with 13 walls, 36 at
+//     most, and 20.9 with 16 walls, 42 at most.)
 //   - in every run the colour sensor read red before the fan started, and the target never
 //     moved and was never touched;
 //   - with the fire at a wall (two runs of three) the robot touched nothing; with the fire in a
@@ -677,10 +688,10 @@ const fullMission: SampleProgram = {
     'In a room it looks at the three places where the fire can stand, with the ultrasonic sensor. ' +
     'Nothing there: it follows the wall on to the other room. ' +
     'Something there: it drives at it slowly until the colour sensor reads red, stops and lets the fan blow for 3 seconds: mission complete. ' +
-    'It scored 100 points in all 570 mazes it was tested on, with the fire at each of its six places, and never moved the target. ' +
+    'It scored 100 points in all 630 mazes it was tested on, with the fire at each of its six places, and never moved the target. ' +
     'With the target in a corner it touches the two walls of that corner for a moment; otherwise it touched nothing. ' +
     'On a real field, ask the referee about that first. ' +
-    'The default maze takes 34 seconds, the slowest maze found 134 of the 180 seconds. ' +
+    'The default maze takes 41 seconds, the slowest maze found 134 of the 180 seconds. ' +
     'It needs the robot at its default start position. ' +
     'Try the right hand (swap "turn left" and "turn right" in the loop): in which mazes is it faster?',
   program: program([

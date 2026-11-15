@@ -670,7 +670,10 @@ Challenge" for ages 14–17. The robot — an mBot2 without the gripper, with a 
 that looks forward and a **fan** at its front — starts in the START cell of a 5 × 5 field,
 finds its way round the walls to the room with the fire, goes up to the red fire target,
 reads "red", faces the target and blows at it for 3 seconds. The walls are different in every
-round, so the student sets up the maze, draws a random one or types in a code. It lives at:
+round, so the student sets up the maze, draws a random one or types in a code. **Competition
+mazes have 13 or 16 inner walls** (decided by the organiser): the page opens with one, and
+every random maze it draws is one — see "Competition mazes: 13 or 16 inner walls" below. It
+lives at:
 
 ```
 https://www.makexlebanon.com/training/simulator/fire-chief
@@ -724,7 +727,7 @@ them on to Fire Rescue) and what search engines find.
 | --- | --- |
 | `src/simulator/fire-chief/field.ts` | Every measure of the field, the walls and the fire target; the 25 cells and the 40 places where an inner wall can stand |
 | `src/simulator/fire-chief/robot.ts` | The robot of this game: where the colour sensor and the fan sit and what they reach; where the robot starts |
-| `src/simulator/fire-chief/scenario.ts` | A maze: which of the 40 walls stand, the room of the fire and its place in the room. Which mazes can be played, the named mazes, the random mazes, the short code |
+| `src/simulator/fire-chief/scenario.ts` | A maze: which of the 40 walls stand, the room of the fire and its place in the room. Which mazes can be played, the named mazes, the default maze, the random mazes, how many inner walls a competition maze has, the short code |
 | `src/simulator/fire-chief/game.ts` | The game and its referee: the four achievements with their points, the 3 minutes, the 3 seconds of the fan, the one restart, the end of an attempt. At its top: the two lists described below |
 | `src/simulator/fire-chief/sample-catalog.ts`, `samples.ts` | The examples: titles and levels, and the programs with their descriptions. They stay on the server (see "Member codes" above) |
 | `src/simulator/ui/fire-chief/` | What only this game shows: `FireChiefSimulator.tsx` (what the general screen is given), `MazeEditor.tsx` (the Maze panel) with its plain helpers `maze-plan.ts`, `maze-level.ts`, `maze-code.ts`, `maze-words.ts`, `maze-choices.ts`, `maze-batch.ts`, the `rules.ts` of the Rules window and the `words.ts` of the screen |
@@ -759,6 +762,7 @@ Every number is written once:
 | The mat (1500 mm, 5 × 5 cells of 300 mm), the walls (150 mm high, 3 mm thick, the wall around the field; what a colour sensor reads on them), the fire target (60 mm wide, 120 mm high, 20 mm deep; red; its three places per room), the size limits of the robot | `src/simulator/fire-chief/field.ts` |
 | The colour sensor (in the middle of the front, 60 mm above the mat, reads from 15 mm or closer) and the fan (port M1, from 20 % power, 20° to each side, 300 mm) | `src/simulator/fire-chief/robot.ts` |
 | The points (10, 20, 30, 40), the 180 seconds, the 3 seconds of the fan action, the one restart, how far the target may move before it counts as moved (5 mm) | `src/simulator/fire-chief/game.ts` |
+| How many inner walls a competition maze has (13 or 16) | `src/simulator/fire-chief/scenario.ts` (`COMPETITION_WALL_COUNTS`) |
 
 The top of `src/simulator/fire-chief/game.ts` holds two lists, each line with the name of the
 constant behind it:
@@ -769,6 +773,10 @@ constant behind it:
   position — what the colour sensor reads does not matter to the referee; the target is 6 cm
   wide and 12 cm high; the outer edge of the field is walled; the walls are 3 mm thick; the
   robot finds the fire with a colour sensor that looks forward, and the fire target is red.
+  One decision is not in that list, because it is about the maze and not about the referee:
+  **a competition maze has 13 or 16 inner walls.** It is written at its constant,
+  `COMPETITION_WALL_COUNTS` in `src/simulator/fire-chief/scenario.ts`, and described in
+  "Competition mazes: 13 or 16 inner walls" below.
 - **Assumptions** — everything neither the draft nor the organiser says, which the simulator
   had to choose. They are numbered 1 to 20 there; in short:
   - *The field:* how long a wall panel is; that the target is 20 mm deep and light enough to
@@ -853,13 +861,18 @@ Each answer turns an assumption into a decision (see the next section for the st
    from the draft, which names no robot at all: it is what is left of "mBot2 + vision", and
    the robot the simulator plays this category with. Are these words right, and is the mBot2
    the platform — or what should stand there?
+10. **Which number of inner walls is used in which round?** The organiser has decided that a
+    competition maze has 13 or 16 inner walls, and has not said which of the two belongs to
+    which round. The simulator offers both side by side and says nothing about rounds.
 
 #### When the organiser decides something
 
 1. Change the constant (if the number changes).
 2. In the comment of the constant, change the word `ASSUMPTION` to `DECISION`.
 3. In the header of `game.ts`, move the line from the list of assumptions to the list of
-   decisions.
+   decisions. (A decision about the maze and not about the referee — the 13 or 16 inner walls
+   of a competition maze — is written at its constant in `scenario.ts` instead of in that
+   header.)
 4. In `src/simulator/ui/fire-chief/rules.ts`, move the sentence from `FIRE_CHIEF_ASSUMPTIONS`
    into `FIRE_CHIEF_RULES` and word it as a rule.
 5. `npm run test:sim`. Two tests tell you what you forgot: "decisions and assumptions" in
@@ -867,6 +880,65 @@ Each answer turns an assumption into a decision (see the next section for the st
    `src/simulator/ui/fire-chief/rules.test.ts` compares **every number in the Rules window**
    with the constant that holds it. A number in the window that is on no list of that test
    fails it, so a new sentence with a number needs a line in its `CHECKS`.
+
+### Competition mazes: 13 or 16 inner walls
+
+**Decided by the organiser:** a competition maze has **13 or 16 inner walls** (the wall around
+the field is not counted). With fewer walls a maze is a practice maze. The organiser has not
+said which of the two numbers is used in which round, so no text of the simulator says it.
+
+- **Why.** Where walls are missing, open squares make the ways short and the maze easy. 16 is
+  the most a maze can have while every cell can still be reached: such a maze has corridors
+  only, and exactly one way to each room. With 13, three walls of such a maze are gone and
+  there are rings to drive round.
+- **Can a robot circle for ever in a maze with rings?** One that keeps a hand on the wall
+  cannot, on this field: START and both rooms lie against the outer wall, so the wall the hand
+  follows from START leads through both rooms. A test walks it on squared paper
+  (`scenario.test.ts`: 10 500 mazes — 3000 with 13 walls, 3000 with 16, 3000 of the mixed
+  generator and 1500 that no generator draws — each with the left and with the right hand:
+  both rooms reached in 21 000 of 21 000 walks, after 42 cells at most). A program that chooses
+  its turns another way and does not remember where it has been can still circle — that is part
+  of the challenge.
+- **The one constant.** `COMPETITION_WALL_COUNTS = [13, 16]` in
+  `src/simulator/fire-chief/scenario.ts`. Every text that names the numbers is built from it:
+  the Rules window, the two random buttons of the Maze panel, the box "How hard is this
+  maze?", the test window. A test (`maze.test.ts`: "every text of the screen that names the
+  numbers …") fails for a line of the screen's code that writes 13 or 16 itself. The sentences
+  that say "corridors only" count on the larger number being 16 (`PERFECT_MAZE_WALLS`, the
+  number of a maze with one way only); the tests say so if the numbers ever change.
+- **What a competition maze is, on the whole page:** it has 13 or 16 inner walls **and** a way
+  from START to both rooms (`isCompetitionMaze()` in `scenario.ts`; the editor's `mazeKind()`
+  in `maze-level.ts` gives the same answer). Every other maze is a **practice maze** — one with
+  10 walls as much as one with a closed room. The two words mean this wherever the page says
+  them. (A maze with 16 walls that was built by hand can have a closed-off cell that is no
+  room: by the two conditions it is a competition maze, and the page calls it one, but it does
+  not say "corridors only" about it.)
+- **The generator.** `randomScenarioWithWalls(rng, count)` makes a random maze with exactly
+  `count` inner walls the way the older `randomScenario()` makes its mixed mazes: a maze with
+  corridors only, from which walls are taken away by chance. So every cell of it can be
+  reached and it can always be played. `randomScenario()` itself is unchanged — the same seed
+  gives the same maze of 4 to 16 walls as before (a test holds it to ten codes that were
+  written down before the change) — but the page does not draw from it any more.
+- **What the page does with it.** It opens with a competition maze (see "The default maze"
+  below); the Maze panel has one button for a random competition maze with 13 inner walls and
+  one for 16; the box "How hard is this maze?" names the kind of the maze on the stage; each
+  ready-made maze says on its button what it is; "Test on many mazes" draws random competition
+  mazes of either kind; the Rules window has the decision among the rules of the field.
+- **A code names the maze it always named.** Nothing about the code changed. `LC-4406-N0E0`,
+  the code of the old default maze, is still "Crossroads" with the fire in the corner of the
+  living room, and a visitor whose browser has saved a maze gets that maze back.
+
+**Measured** with the advanced example ("The whole mission on any maze"), on the first 2000
+different mazes of each kind that `randomScenarioWithWalls()` draws from seed 1 on, each maze
+with the fire at all six places (12 000 attempts of each kind, on the simulator's perfect
+robot):
+
+| Inner walls | 100 points | Average time | Slowest | Cells the left hand drives to the fire room |
+| --- | --- | --- | --- | --- |
+| 13 | 12 000 of 12 000 | 50.8 s | 116.0 s | 15.0 on average, 36 at most |
+| 16 | 12 000 of 12 000 | 68.6 s | 133.6 s | 20.9 on average, 42 at most |
+
+(The suite repeats this on a small scale: 30 mazes of each kind in `samples.test.ts`.)
 
 ### The Maze panel
 
@@ -878,33 +950,58 @@ The panel "Maze" under the stage (it takes the place of Fire Rescue's "Combinati
   from wall to wall and the space bar switches the wall. A screen reader hears "Wall between
   A1 and B1, pressed". A change puts the field back to the start, as in Fire Rescue — also
   during an attempt.
-- **Ready-made mazes** (the named mazes of the game), **Random maze** and **Default maze**.
+- **Random competition maze:** two buttons, **13 inner walls** and **16 inner walls**. A press
+  draws a new competition maze of that kind and a random place for the fire. They take the
+  place of the old button "Random maze", which drew a maze with 4 to 16 walls: three random
+  buttons and "Default maze" do not fit a 360 px phone in a way that stays clear, and a draw
+  that mixes practice mazes and competition mazes would blur the two words. For an easier
+  maze there are the three ready-made practice mazes, and any maze gets easier with a tap on
+  one of its walls. (The buttons are a list the game hands to the general panel:
+  `RANDOM_MAZE_DRAWS` in `maze-choices.ts`, shown by `CombinationPanel.tsx`. Fire Rescue
+  hands over none and keeps its one "Random" button.)
+- **Default maze:** back to the maze a new visitor sees first (see "The default maze" below).
+- **Ready-made mazes** (the named mazes of the game). Each button has a small second line:
+  "competition maze" (Detour, 13 walls; One way only, 16 walls) or "practice maze" (Open
+  field, Two doors, Crossroads). The sentence under the buttons begins with the same words. A
+  ready-made maze changes the walls only: the fire stays where the student put it.
 - **The fire:** its room and its place in the room (corner, back wall, side wall).
-- **How hard is this maze?** A level from 1 to 5 and what was counted for it: the walls, the
-  shortest way from START into the room of the fire, its turns, the dead ends. The level comes
-  from the number of walls (none: 1, up to 6: 2, up to 11: 3, up to 15: 4, more: 5) and is one
-  higher when the shortest way is 10 cells or longer. It is counted, not measured with a
-  program, and the panel says so. The rule is in `src/simulator/ui/fire-chief/maze-level.ts`.
-- **The code**, for example `LC-4406-N0E0`: the room of the fire (L or B), its place (C, B or
-  S), then eight characters for the 40 walls. **Copy** copies it; typed or pasted into the
-  field it brings the maze back. A text that is no code gets one plain sentence that says what
-  a code looks like (`maze-code.ts`).
+- **How hard is this maze?** A level from 1 to 5, then **the kind of the maze with its
+  walls** — "Competition maze: 13 inner walls.", "Competition maze: 16 inner walls, corridors
+  only." or "Practice maze: 10 inner walls. A competition maze has 13 or 16 inner walls." (a
+  practice maze is told what a competition maze has that it has not: the walls, the way to
+  both rooms, or both) — and what was counted about the ways: the shortest way from START into
+  the room of the fire, its turns, the dead ends. The level comes from the number of walls
+  (none: 1, up to 6: 2, up to 11: 3, up to 15: 4, more: 5) and is one higher when the shortest
+  way is 10 cells or longer. It is counted, not measured with a program, and the panel says
+  so. The rules are in `src/simulator/ui/fire-chief/maze-level.ts`.
+- **The code**, for example `LC-H8G6-69T0` (the default maze): the room of the fire (L or B),
+  its place (C, B or S), then eight characters for the 40 walls. **Copy** copies it; typed or
+  pasted into the field it brings the maze back. A text that is no code gets one plain
+  sentence that says what a code looks like (`maze-code.ts`).
 
 **A maze in which a room cannot be reached** is no competition maze — the draft asks for a way
 from START to both rooms. The simulator still lets the student **start an attempt in it, for
 practice**: a maze built by hand passes through such states, a closed room or a box around
 START is a useful exercise, and nothing in the engine or the referee needs the ways. As long
 as the maze is like this, the panel says what is wrong in the game's own words ("There is no
-way from START to the bedroom: take a wall away."), that it is a practice maze, and it shows
-the closed cells in grey. Its code can be copied and typed in like any other, and it is still
-there after a reload. (The reasons are written down in `maze-words.ts`.)
+way from START to the bedroom: take a wall away.") in a note of its own, that it is a
+practice maze and what a competition maze has, and it shows the closed cells in grey. Its
+code can be copied and typed in like any other, and it is still there after a reload. (The
+reasons are written down in `maze-words.ts`.)
 
 **Test on many mazes** (the button in the title row) plays the program on a list of mazes:
-10, 50 or 200 random mazes, in which the fire stands at each of its six places in turn; the
-named mazes, each with the fire at its six places; or the maze on the stage with the fire at
-its six places. For every run the table shows the points, the time at which they were reached
-(the ranking uses it) and how the attempt ended in the referee's own words. The lists are in
-`src/simulator/ui/fire-chief/maze-batch.ts`.
+10, 50 or 200 **random competition mazes**, in which the fire stands at each of its six places
+in turn; the named mazes, each with the fire at its six places; or the maze on the stage with
+the fire at its six places. While a random list is chosen, one small choice beside the seed
+says which kind: **"Competition mazes with: 13 inner walls / 16 inner walls (corridors
+only)"** — 13 when the window opens. That is one choice of two for all three lists; six lists
+would have been more to read, and a list that mixed the two kinds could not be asked for 16
+walls alone. The mixed list of before (4 to 16 walls) is gone with the old "Random maze"
+button, for the same reason. With "This maze" chosen and a practice maze on the stage, a line
+says so and what a competition maze has. For every run the table shows the points, the time
+at which they were reached (the ranking uses it) and how the attempt ended in the referee's
+own words. The lists are in `src/simulator/ui/fire-chief/maze-batch.ts`; a game hands the
+general window its kinds of random lists as `BatchRandom.kinds` (`BatchDialog.tsx`).
 
 ### What to change, and where
 
@@ -915,8 +1012,10 @@ its six places. For every run the table shows the points, the time at which they
 | The points, the time of an attempt, the seconds of the fan action, the restart, when the target counts as moved | `src/simulator/fire-chief/game.ts` |
 | The sentences of the **Rules** window | `src/simulator/ui/fire-chief/rules.ts` (and the list `CHECKS` in `rules.test.ts` when a number is new) |
 | The named mazes, the default maze, how random mazes are made | `src/simulator/fire-chief/scenario.ts` |
-| How the level of a maze is counted, and its words | `src/simulator/ui/fire-chief/maze-level.ts` |
-| The lists of "Test on many mazes" | `src/simulator/ui/fire-chief/maze-batch.ts` |
+| How many inner walls a competition maze has | `COMPETITION_WALL_COUNTS` in `src/simulator/fire-chief/scenario.ts` — one line; then `npm run test:sim` (see "Competition mazes" above) |
+| How the level of a maze is counted, the words "competition maze" and "practice maze" and the sentence about the kind | `src/simulator/ui/fire-chief/maze-level.ts` |
+| The two random buttons of the Maze panel, the words on the ready-made mazes | `src/simulator/ui/fire-chief/maze-choices.ts` |
+| The lists of "Test on many mazes" and its two kinds of random lists | `src/simulator/ui/fire-chief/maze-batch.ts` |
 | The examples | `src/simulator/fire-chief/samples.ts` and `sample-catalog.ts`; who may see them: `content/simulator-codes.ts` |
 | The words "attempt", "achievement", "maze" and the hints of the buttons | `src/simulator/ui/fire-chief/words.ts` |
 | The texts on the Colour Sensor and DC motor blocks | `src/simulator/blocks/mblock-wording.ts` |
@@ -952,9 +1051,34 @@ That is all: the maze gets its button in the Maze panel and is part of "Test on 
 - A few tests say "five named mazes" and "30 runs" in so many words (`scenario.test.ts`,
   `maze.test.ts`, `ui-games.test.ts`): change the numbers there.
 
-The **default maze** is the one `defaultScenario()` returns in the same file ("Crossroads").
-Two example descriptions and the tests of the examples count on it; think twice before
-changing it.
+A new named maze says by itself whether it is a competition maze (13 or 16 inner walls) or a
+practice maze: on its button, in its sentence and in the list of the test window.
+
+#### The default maze
+
+The maze a new visitor sees first is the one `defaultScenario()` returns in the same file: the
+walls of **"Detour"** — a competition maze with 13 inner walls — with the fire in the **corner
+of the living room**, code `LC-H8G6-69T0`. (Until the organiser decided on 13 or 16 inner
+walls it was "Crossroads", with ten walls. A visitor whose browser has saved a maze keeps that
+maze.) The fire is not where the ready-made "Detour" has it, at the side wall of the bedroom:
+the two examples that keep the left hand on the wall come to the living room first, so a
+first visitor sees them find the fire; and a ready-made maze changes the walls only.
+
+What the six examples do on it (each is a test in `samples.test.ts`):
+
+| Example | On the default maze |
+| --- | --- |
+| Stop in front of the first wall | drives three cells up the middle and stops 7.5 cm in front of the wall above C2: 10 points after 5.7 s |
+| Count grid lines to drive two cells | one cell up, a quarter turn to the left, two cells by counting lines: "Cells counted: 2", 10 points |
+| Read red, then start the fan | sees a wall on the way up, shows "Choose: Open field" and stays in START (it knows the open field only) |
+| Follow the right-hand wall to a room | ten cells round the right side into the bedroom: 30 points after 30 s |
+| Find the fire in a room and check its colour | twelve cells with the left hand into the living room, finds the fire in its corner, reads red, blows: 100 points after 41 s |
+| The whole mission on any maze | the same way: 100 points after 41 s |
+
+Four example descriptions name the default maze (what the line counter counts there, the room
+the right hand reaches, and the 41 seconds of the last two), and a test holds each of them to
+it; so do the hint of the "Default maze" button and the example code under the code field.
+Think twice before changing it, and run `npm run test:sim` when you do.
 
 #### Adding an example
 
@@ -1044,6 +1168,10 @@ Described in full in "Member codes for the simulator examples" above. In short:
   was never published, so it can go once nobody can hold such a program any more.
 - **The level of a maze** is counted from its walls and its shortest way. It says nothing
   about how hard the maze is for one particular program.
+- **Which number of walls is used in which round is not decided**, so the page offers both
+  kinds side by side and says nothing about rounds.
+- **Random mazes are competition mazes only.** The page no longer draws a random practice maze
+  (4 to 16 walls); `randomScenario()` still makes them, for the tests.
 
 ---
 

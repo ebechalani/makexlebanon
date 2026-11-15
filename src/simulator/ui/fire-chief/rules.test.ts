@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { makeRng } from '../../core/geometry';
 import { createSimulation } from '../../core/simulation';
 import {
   CELL_SIZE,
@@ -24,6 +25,7 @@ import {
   ROBOT_MAX_WIDTH,
   ROOM_IDS,
   SENSOR_MAX_HEIGHT,
+  START_CELL,
   TARGET_COLOR,
   TARGET_DEPTH,
   TARGET_HEIGHT,
@@ -49,10 +51,21 @@ import {
   fireChiefGame,
 } from '../../fire-chief/game';
 import { COLOR_SENSOR, COLOR_SENSOR_RANGE_MM, FAN, FIRE_CHIEF_ROBOT, START_POSE } from '../../fire-chief/robot';
-import { defaultScenario, openField } from '../../fire-chief/scenario';
+import {
+  COMPETITION_WALL_COUNTS,
+  NAMED_MAZES,
+  PERFECT_MAZE_WALLS,
+  defaultScenario,
+  isCompetitionMaze,
+  openField,
+  randomScenarioWithWalls,
+  stepsFrom,
+  wallCount,
+} from '../../fire-chief/scenario';
 import { blankProgram } from '../program-file';
 import { dcMotor, move, moveCm, program, script, wait, whenStart } from '../../vm/builder';
 import type { RulesSection } from '../SimulatorApp';
+import { corridorsOnly, kindSentence, mazeFacts } from './maze-level';
 import { FIRE_CHIEF_ASSUMPTIONS, FIRE_CHIEF_RULES, FIRE_CHIEF_RULES_NOTE } from './rules';
 
 const sentences = (sections: readonly RulesSection[]): string[] => sections.flatMap((section) => [section.title, ...section.items]);
@@ -81,6 +94,9 @@ const CHECKS: NumberCheck[] = [
   { find: /whole mat is (\d+) x (\d+) cm/, values: [cm(FIELD_SIZE), cm(FIELD_SIZE)], part: 'rules' },
   { find: /They are (\d+) cm high and (\d+) mm thick/, values: [cm(WALL_HEIGHT), WALL_THICKNESS], part: 'rules' },
   { find: /a red wooden flame, (\d+) cm wide and (\d+) cm high/, values: [cm(TARGET_WIDTH), cm(TARGET_HEIGHT)], part: 'rules' },
+  // (the organiser's decision: the two numbers of inner walls of a competition maze - the game's one constant)
+  { find: /A competition maze has (\d+) or (\d+) inner walls/, values: [...COMPETITION_WALL_COUNTS], part: 'rules' },
+  { find: /^(\d+) inner walls are the most a maze can have while every cell can still be reached/, values: [PERFECT_MAZE_WALLS], part: 'rules' },
   // ---- the robot
   { find: /at most (\d+) cm long, (\d+) cm wide and (\d+) cm high/, values: [cm(ROBOT_MAX_LENGTH), cm(ROBOT_MAX_WIDTH), cm(ROBOT_MAX_HEIGHT)], part: 'rules' },
   { find: /higher than (\d+) cm above the mat/, values: [cm(SENSOR_MAX_HEIGHT)], part: 'rules' },
@@ -337,6 +353,8 @@ test('rules: marked as a draft; the organiser\'s decisions are rules; what is as
     /It has a colour sensor that looks forward, and a fan\./,
     /The fire is a red wooden flame/,
     /the game is played with a colour sensor, not with a flame sensor\./,
+    // decided after the draft: how many inner walls a competition maze has
+    /A competition maze has 13 or 16 inner walls \(the wall around the field is not counted\)\. With fewer inner walls a maze is a practice maze\./,
   ];
   for (const said of decided) {
     assert.match(RULES_TEXT, said);
@@ -430,6 +448,48 @@ test('rules: marked as a draft; the organiser\'s decisions are rules; what is as
   ]) {
     assert.match(ASSUMED_TEXT, said);
     assert.ok(!said.test(RULES_TEXT), `${said} is about the simulator, not a rule`);
+  }
+});
+
+test('rules: a competition maze has 13 or 16 inner walls - the numbers are the game\'s, 16 means corridors only, and nothing is said about rounds', () => {
+  const [decision, meaning] = [
+    `A competition maze has ${COMPETITION_WALL_COUNTS.join(' or ')} inner walls (the wall around the field is not counted). With fewer inner walls a maze is a practice maze.`,
+    `${PERFECT_MAZE_WALLS} inner walls are the most a maze can have while every cell can still be reached: then it has corridors only, and exactly one way to each room.`,
+  ];
+  // both sentences stand with the field, after "there is always a way from START to both rooms"
+  const field = FIRE_CHIEF_RULES[0];
+  assert.equal(field.title, 'The field');
+  const at = field.items.indexOf('The maze can be different in every round. There is always a way from START to both rooms.');
+  assert.ok(at >= 0);
+  assert.deepEqual(field.items.slice(at + 1, at + 3), [decision, meaning]);
+  assert.ok(!ASSUMED.some((sentence) => /competition maze|practice maze|inner walls/.test(sentence)), 'a decision, not an assumption');
+  // the organiser has not said which number is used in which round: the window does not either
+  for (const sentence of [decision, meaning]) assert.ok(!/\brounds?\b|qualif|final|\bstage|\bday/i.test(sentence), sentence);
+  assert.equal([...RULES, ...ASSUMED].filter((sentence) => /qualif|final\b|finals/i.test(sentence)).length, 0);
+  // no sentence of the window says "perfect maze"
+  assert.ok(![...RULES, ...ASSUMED].some((sentence) => /perfect maze/i.test(sentence)));
+
+  // the sentences are true of the game:
+  // the larger number is the number of a maze with corridors only, and the default maze and two of the named mazes are competition mazes
+  assert.equal(Math.max(...COMPETITION_WALL_COUNTS), PERFECT_MAZE_WALLS);
+  assert.equal(isCompetitionMaze(defaultScenario()), true);
+  assert.deepEqual(NAMED_MAZES.filter((maze) => isCompetitionMaze(maze.scenario)).map((maze) => wallCount(maze.scenario)), [...COMPETITION_WALL_COUNTS]);
+  // "16 inner walls are the most a maze can have while every cell can still be reached": in a
+  // maze with 16 walls and every cell in reach, any 17th wall closes a cell off ...
+  for (let seed = 1; seed <= 40; seed++) {
+    const maze = randomScenarioWithWalls(makeRng(seed), PERFECT_MAZE_WALLS);
+    assert.ok(stepsFrom(maze.walls, START_CELL).every((steps) => steps >= 0));
+    for (let index = 0; index < maze.walls.length; index++) {
+      if (maze.walls[index]) continue;
+      const more = [...maze.walls];
+      more[index] = true;
+      assert.ok(stepsFrom(more, START_CELL).some((steps) => steps < 0), `seed ${seed}: a 17th wall at place ${index}`);
+    }
+    // ... "then it has corridors only, and exactly one way to each room"
+    const facts = mazeFacts(maze);
+    assert.equal(facts.oneWayOnly, true);
+    assert.equal(corridorsOnly(facts), true);
+    assert.equal(kindSentence(facts), 'Competition maze: 16 inner walls, corridors only.');
   }
 });
 

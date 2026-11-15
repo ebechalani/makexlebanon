@@ -290,7 +290,7 @@ export const NAMED_MAZES: NamedMaze[] = [
     id: 'one-way',
     name: 'One way only',
     level: 5,
-    about: 'Sixteen walls: a perfect maze. There is exactly one way to each room.',
+    about: 'Sixteen walls: corridors only. There is exactly one way to each room.',
     scenario: maze('bedroom', 'corner', [
       '+---+---+---+---+---+',
       '| L     |         B |',
@@ -319,16 +319,34 @@ export function namedMaze(id: string): FireChiefScenario | null {
   return found ? copyOf(found.scenario) : null;
 }
 
-/** The maze a new visitor sees first: "Crossroads" (medium), fire in the corner of the living room. */
+/** The ready-made maze whose walls a new visitor sees first: "Detour", a competition maze with 13 inner walls. */
+export const DEFAULT_MAZE_ID = 'detour';
+
+/**
+ * The maze a new visitor sees first: the walls of "Detour" - a competition maze with 13 inner
+ * walls (see COMPETITION_WALL_COUNTS below) - with the fire in the corner of the living room.
+ *
+ * (Until the organiser decided how many walls a competition maze has, the first maze was
+ * "Crossroads", with ten walls. Its code, LC-4406-N0E0, still names it, and a visitor whose
+ * browser has saved a maze keeps that maze.)
+ * The fire is not where the ready-made "Detour" has it (side wall of the bedroom): the examples
+ * with a hand on the left wall come to the living room first, so a first visitor sees them find
+ * the fire - and a ready-made maze changes only the walls on the page, never the fire.
+ */
 export function defaultScenario(): FireChiefScenario {
-  return namedMaze('crossroads') ?? openField('living', 'corner');
+  const first = namedMaze(DEFAULT_MAZE_ID);
+  return first ? withFire(first, 'living', 'corner') : openField('living', 'corner');
 }
 
 // =============================================================================================
 // Random mazes
 // =============================================================================================
 
-/** A "perfect" maze of 25 cells has exactly this many walls: every cell can be reached, in one way only. */
+/**
+ * A "perfect" maze of 25 cells has exactly this many walls: every cell can be reached, in one
+ * way only. It has corridors only - no open square of four cells - and that is what the screen
+ * calls it ("corridors only"). No maze in which every cell can be reached has more walls.
+ */
 export const PERFECT_MAZE_WALLS = INNER_WALL_COUNT - (CELL_COUNT - 1);
 /** The random generator never leaves fewer walls than this: below that it is hardly a maze. */
 export const RANDOM_MIN_WALLS = 4;
@@ -359,16 +377,8 @@ export function perfectMazeWalls(rng: () => number): boolean[] {
   return walls;
 }
 
-/**
- * A random combination that can always be played, of mixed difficulty: a perfect maze (16
- * walls, one way only) from which a random number of walls is taken away again - down to
- * RANDOM_MIN_WALLS. Every number of walls from 4 to 16 is equally likely. The same `rng`
- * sequence always gives the same combination.
- */
-export function randomScenario(rng: () => number): FireChiefScenario {
-  const walls = perfectMazeWalls(rng);
-  const span = PERFECT_MAZE_WALLS - RANDOM_MIN_WALLS + 1;
-  const keep = RANDOM_MIN_WALLS + (Math.floor(rng() * span) % span);
+/** Take standing walls away, one at a time and each by chance, until `keep` of them are left. */
+function takeWallsAway(walls: boolean[], keep: number, rng: () => number): void {
   const standing: number[] = [];
   walls.forEach((w, i) => {
     if (w) standing.push(i);
@@ -379,9 +389,90 @@ export function randomScenario(rng: () => number): FireChiefScenario {
     walls[standing[pick]] = false;
     standing.splice(pick, 1);
   }
+}
+
+/** A room and a spot for the fire, by chance: each of the six places is equally likely. */
+function randomFire(rng: () => number): Pick<FireChiefScenario, 'fireRoom' | 'fireSpot'> {
   const fireRoom = ROOM_IDS[Math.floor(rng() * ROOM_IDS.length) % ROOM_IDS.length];
   const fireSpot = FIRE_SPOTS[Math.floor(rng() * FIRE_SPOTS.length) % FIRE_SPOTS.length];
-  return { walls, fireRoom, fireSpot };
+  return { fireRoom, fireSpot };
+}
+
+/**
+ * A random combination that can always be played, of mixed difficulty: a maze with corridors
+ * only (16 walls, one way only) from which a random number of walls is taken away again - down
+ * to RANDOM_MIN_WALLS. Every number of walls from 4 to 16 is equally likely. The same `rng`
+ * sequence always gives the same combination.
+ * (Most of these are practice mazes. The page draws competition mazes: randomScenarioWithWalls.)
+ */
+export function randomScenario(rng: () => number): FireChiefScenario {
+  const walls = perfectMazeWalls(rng);
+  const span = PERFECT_MAZE_WALLS - RANDOM_MIN_WALLS + 1;
+  const keep = RANDOM_MIN_WALLS + (Math.floor(rng() * span) % span);
+  takeWallsAway(walls, keep, rng);
+  return { walls, ...randomFire(rng) };
+}
+
+/**
+ * A random combination with exactly `count` inner walls, made the way randomScenario() makes
+ * its mazes: a maze with corridors only (16 walls) from which walls are taken away by chance
+ * until `count` are left. So every cell of it can be reached and it can always be played; with
+ * 16 walls it has corridors only and one way to each room, with fewer it has `16 - count` rings
+ * to drive round. The fire stands at one of its six places by chance. The same `rng` sequence
+ * and the same `count` always give the same combination.
+ *
+ * `count` is a whole number from 0 to 16. (More than 16 walls always close a cell off: such a
+ * maze is not made here, and the function throws for it.)
+ */
+export function randomScenarioWithWalls(rng: () => number, count: number): FireChiefScenario {
+  if (!Number.isInteger(count) || count < 0 || count > PERFECT_MAZE_WALLS) {
+    throw new RangeError(`a random maze has 0 to ${PERFECT_MAZE_WALLS} inner walls, not ${count}`);
+  }
+  const walls = perfectMazeWalls(rng);
+  takeWallsAway(walls, count, rng);
+  return { walls, ...randomFire(rng) };
+}
+
+// =============================================================================================
+// Competition mazes and practice mazes
+// =============================================================================================
+
+/**
+ * DECISION of the organiser: a competition maze has 13 or 16 inner walls. Every other maze is a
+ * practice maze. (Which of the two numbers is used in which round has not been said.)
+ *
+ * Why these two: where walls are missing, open squares make the ways short and the maze easy.
+ * 16 is the most a maze can have while every cell can still be reached (PERFECT_MAZE_WALLS):
+ * then it has corridors only and exactly one way to each room. With 13, three walls of such a
+ * maze are gone and there are rings to drive round.
+ * Can a robot circle for ever in a maze with rings? One that keeps a hand on the wall cannot:
+ * START and both rooms lie against the outer wall of the field, so the wall the hand follows
+ * from START leads through both rooms (scenario.test.ts walks it, with each hand, through
+ * thousands of mazes of both kinds). A program that chooses its turns another way and does not
+ * remember where it has been can still circle - that is part of the challenge.
+ *
+ * EVERY TEXT THAT NAMES THESE NUMBERS TAKES THEM FROM HERE (the Rules window, the Maze panel,
+ * "Test on many mazes"): to change them, change this line and run the tests - they say which
+ * sentences speak of "corridors only" and count on the larger number being 16.
+ */
+export const COMPETITION_WALL_COUNTS = [13, 16] as const;
+export type CompetitionWallCount = (typeof COMPETITION_WALL_COUNTS)[number];
+
+/** The numbers as they are said in a sentence: "13 or 16". */
+export const COMPETITION_WALLS_TEXT = COMPETITION_WALL_COUNTS.join(' or ');
+
+/** Is this one of the numbers of inner walls a competition maze has? */
+export function isCompetitionWallCount(count: number): count is CompetitionWallCount {
+  return (COMPETITION_WALL_COUNTS as readonly number[]).includes(count);
+}
+
+/**
+ * Is this a competition maze? It is when it has 13 or 16 inner walls AND there is a way from
+ * START to both rooms (rules §3). Every other maze is a practice maze - the screen uses the two
+ * words in this meaning only.
+ */
+export function isCompetitionMaze(s: FireChiefScenario): boolean {
+  return isValidScenario(s) && isCompetitionWallCount(wallCount(s));
 }
 
 /**
@@ -410,7 +501,7 @@ const WALL_CHARACTERS = INNER_WALL_COUNT / WALLS_PER_CHARACTER;
 const ROOM_LETTER: Record<RoomId, string> = { living: 'L', bedroom: 'B' };
 const SPOT_LETTER: Record<FireSpot, string> = { corner: 'C', back: 'B', side: 'S' };
 
-/** Short code of a combination, e.g. "LC-4406-N0E0" (the default maze). */
+/** Short code of a combination, e.g. "LC-4406-N0E0" (the ready-made maze "Crossroads", fire in the corner of the living room). */
 export function encodeScenario(s: FireChiefScenario): string {
   let code = '';
   for (let k = 0; k < WALL_CHARACTERS; k++) {

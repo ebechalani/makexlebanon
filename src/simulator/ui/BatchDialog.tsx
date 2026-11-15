@@ -11,7 +11,8 @@
  * The window is the same for every game. What differs comes from the game:
  *   - its words (./screen-words.ts): Fire Chief tests "mazes", not "combinations";
  *   - its ready-made lists (`presets`) and, if it wants, its own way to draw the random lists
- *     (`random`);
+ *     (`random`) - also several kinds of them, chosen beside the seed (Fire Chief: competition
+ *     mazes with 13 or with 16 inner walls);
  *   - a game whose referee writes times down (Game.createReferee) gets, for every run, the time
  *     at which its points were reached - a ranking by time uses it - and the referee's own
  *     sentence about the end (./batch-words.ts). Fire Rescue has no such referee: its table
@@ -43,12 +44,30 @@ export interface BatchPreset<S> {
   note?: (current: S) => string | null;
 }
 
+/** One kind of random list, where a game has several (Fire Chief: "13 inner walls", "16 inner walls (corridors only)"). */
+export interface BatchRandomKind<S> {
+  id: string;
+  /** the words beside its radio button */
+  label: string;
+  /** `count` different combinations of this kind - the same list every time for the same seed */
+  draw: (count: number, seed: number) => S[];
+}
+
 /** How a game draws its random lists, when it does not leave everything to chance. */
 export interface BatchRandom<S> {
-  /** `count` different combinations - the same list every time for the same seed */
+  /** `count` different combinations - the same list every time for the same seed (with `kinds`: the first kind) */
   draw: (count: number, seed: number) => S[];
   /** one sentence about these lists, shown while one of them is chosen */
   note?: string;
+  /** what the random lists hold, where the game's word for a combination says too little: "10 random competition mazes" */
+  name?: string;
+  /**
+   * Several kinds of random lists to choose from. The choice stands beside the seed while a
+   * random list is chosen, and the first kind is chosen at the beginning. Left out: one kind.
+   */
+  kinds?: BatchRandomKind<S>[];
+  /** the few words in front of that choice: "Competition mazes with" */
+  kindsLegend?: string;
 }
 
 export interface BatchDialogProps<S> {
@@ -114,6 +133,10 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
 
   const [choice, setChoice] = useState<string>('random-50');
   const [seed, setSeed] = useState(1);
+  /** which kind of random list, where the game has several (the first one at the beginning) */
+  const kinds = random?.kinds ?? [];
+  const [kindId, setKindId] = useState<string | null>(null);
+  const kind = kinds.find((k) => k.id === kindId) ?? kinds[0];
   const [phase, setPhase] = useState<'idle' | 'running' | 'done' | 'cancelled'>('idle');
   const [total, setTotal] = useState(0);
   const [rows, setRows] = useState<Row<S>[]>([]);
@@ -143,7 +166,7 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
     if (preset) scenarios = preset.scenarios(currentScenario);
     else {
       const count = Number(choice.replace('random-', '')) || 10;
-      scenarios = random ? random.draw(count, seed) : drawCombinations(game, count, seed);
+      scenarios = kind ? kind.draw(count, seed) : random ? random.draw(count, seed) : drawCombinations(game, count, seed);
     }
     if (scenarios.length === 0) {
       setProblem(`There is no ${words.scenario} to test.`);
@@ -183,7 +206,7 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
       else timerRef.current = setTimeout(slice, 0);
     };
     timerRef.current = setTimeout(slice, 0);
-  }, [choice, currentScenario, game, getProgram, getSampler, presets, random, robotConfig, seed, startPose, words]);
+  }, [choice, currentScenario, game, getProgram, getSampler, kind, presets, random, robotConfig, seed, startPose, words]);
 
   const cancel = () => {
     cancelRef.current = true;
@@ -244,7 +267,7 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
                 <span>
                   <span className="font-semibold text-ink-800">
                     {count}
-                    {` random ${words.scenarios}`}
+                    {` random ${random?.name ?? words.scenarios}`}
                   </span>
                   <span className="block text-xs text-ink-500">
                     {count === 10 ? 'A quick check.' : count === 50 ? 'A good picture of how reliable the program is.' : 'A thorough test. Takes a little longer.'}
@@ -272,7 +295,20 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
             ))}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          {/* (a game with kinds of random lists has three things in this row: a little more room between them) */}
+          <div className={`flex flex-wrap items-center ${kinds.length > 1 ? 'gap-x-4 gap-y-2' : 'gap-2'}`}>
+            {choice.startsWith('random-') && kinds.length > 1 && (
+              // which kind of random list: a small choice that belongs to the three random lists above
+              <div role="radiogroup" aria-label={random?.kindsLegend ?? `Kind of random ${words.scenarios}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-700" data-batch-kinds>
+                {random?.kindsLegend && <span className="font-semibold text-ink-800">{random.kindsLegend}</span>}
+                {kinds.map((k) => (
+                  <label key={k.id} className="flex cursor-pointer items-center gap-1.5">
+                    <input type="radio" name="batch-random-kind" className="accent-brand-600" checked={kind?.id === k.id} onChange={() => setKindId(k.id)} />
+                    {k.label}
+                  </label>
+                ))}
+              </div>
+            )}
             {choice.startsWith('random-') && (
               <label className="flex items-center gap-2 text-sm text-ink-600" title={`The same seed always draws the same ${words.scenarios}, so you can repeat a test after changing your program.`}>
                 Seed
