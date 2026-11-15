@@ -308,15 +308,44 @@ export function isSavedCode(value: unknown): value is { code: string } {
 }
 
 /**
- * What another tab of the same browser did to the saved code:
+ * The code that stands in the browser's memory, read from the text that is kept there: in its
+ * handed-out form (FIRE-7K2M-9QXD), or null when there is none - no text, or a text that is no
+ * code (the next visit would find none either).
+ */
+export function savedCodeIn(text: string | null): string | null {
+  if (text === null) return null;
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  return isSavedCode(value) ? tidyCode(value.code) : null;
+}
+
+/**
+ * What happened to the saved code, seen from one tab:
  *
  *   none        nothing that matters here (another key, or the code this tab already has)
  *   forgotten   the code was taken away ("Forget this code on this device", or the browser's
  *               data was cleared): this tab must lock what the code opened, at once
- *   code        another code was saved (somebody typed one there and the server accepted it):
- *               this tab asks the server what that code opens in its own game
+ *   code        another code was saved (somebody typed one in another tab and the server
+ *               accepted it): this tab takes it for its saved code, locks what an earlier code
+ *               opened, and asks the server what the new one opens in its own game - exactly
+ *               as it would at the start of a visit
  */
 export type SavedCodeChange = { kind: 'none' } | { kind: 'forgotten' } | { kind: 'code'; code: string };
+
+/**
+ * Compare the code the browser's memory holds with the one a tab has.
+ *
+ * @param inMemory  the code in the browser's memory (see savedCodeIn), or null
+ * @param mine      the code this tab takes for the saved one (FIRE-7K2M-9QXD), or null
+ */
+export function savedCodeNow(inMemory: string | null, mine: string | null): SavedCodeChange {
+  if (inMemory === mine) return { kind: 'none' };
+  return inMemory === null ? { kind: 'forgotten' } : { kind: 'code', code: inMemory };
+}
 
 /**
  * Read a "storage" event of the browser: it tells every OTHER open tab of this website that
@@ -329,22 +358,68 @@ export type SavedCodeChange = { kind: 'none' } | { kind: 'forgotten' } | { kind:
  *
  * @param key       the key of the event; null when the whole memory was cleared
  * @param newValue  what stands under the key now, as text; null when it was taken out
- * @param mine      the code this tab has saved (FIRE-7K2M-9QXD), or null
+ * @param mine      the code this tab takes for the saved one (FIRE-7K2M-9QXD), or null
  */
 export function savedCodeChange(key: string | null, newValue: string | null, mine: string | null): SavedCodeChange {
-  const forgotten: SavedCodeChange = mine === null ? { kind: 'none' } : { kind: 'forgotten' };
   // (key null: everything was cleared, the code with it)
-  if (key === null) return forgotten;
+  if (key === null) return savedCodeNow(null, mine);
   if (key !== SAVED_CODE_KEY) return { kind: 'none' };
-  if (newValue === null) return forgotten;
-  let value: unknown;
-  try {
-    value = JSON.parse(newValue);
-  } catch {
-    // what stands there now is no code: the next visit would find none
-    return forgotten;
-  }
-  const code = isSavedCode(value) ? tidyCode(value.code) : null;
-  if (code === null) return forgotten;
-  return code === mine ? { kind: 'none' } : { kind: 'code', code };
+  return savedCodeNow(savedCodeIn(newValue), mine);
+}
+
+/**
+ * What a tab does about a change of the saved code: nothing (null), or it locks what its own
+ * code had opened and from that moment takes `savedCode` for the saved code - the code in the
+ * browser's memory, which it then asks the server about; null when there is none.
+ *
+ * A tab that follows a code another tab saved stands exactly as a tab that was just loaded
+ * with that code in the browser's memory: the code is its saved code BEFORE the server has
+ * answered, not only after a "yes". So the window shows "Saved on this device", offers "Try
+ * again" when the server could not be reached, and asks again when it is opened again - and
+ * the tab knows which code it is asking about when that code is forgotten meanwhile.
+ */
+export function followSavedCode(change: SavedCodeChange): { savedCode: string | null } | null {
+  if (change.kind === 'none') return null;
+  return { savedCode: change.kind === 'code' ? change.code : null };
+}
+
+/**
+ * Whose code a question to the server is about: one that was `typed` in this tab just now, or
+ * the `saved` one - the code in the browser's memory, which is checked at the start of a visit,
+ * with "Try again", and when another tab has saved it.
+ */
+export type CodeAsked = 'typed' | 'saved';
+
+/**
+ * What a tab does with the server's answer about a code:
+ *
+ *   take   the answer counts. `save`: when it is a "yes", the code is written into the
+ *          browser's memory - which tells every other tab (see savedCodeChange)
+ *   drop   the answer is about a code that is no longer the saved one: the browser's memory
+ *          has moved on while the server was asked. The tab does what `change` says instead
+ */
+export type CodeAnswerUse = { kind: 'take'; save: boolean } | { kind: 'drop'; change: Exclude<SavedCodeChange, { kind: 'none' }> };
+
+/**
+ * The answer to a question about a code has come: what is done with it?
+ *
+ * Two things keep several tabs from working against each other:
+ *
+ *  - Only a code that somebody TYPED IN THIS TAB is written into the browser's memory. A tab
+ *    that asked about the saved code - because another tab saved it, say - never writes it
+ *    back. Otherwise a tab whose answer comes late puts a code back that was forgotten
+ *    meanwhile, or puts an older code over a newer one; the other tabs follow that, and with
+ *    three tabs and two codes they can go on asking each other without end.
+ *  - An answer about the saved code counts only while the browser's memory still holds that
+ *    very code. When it does not, the answer is dropped and the tab follows the memory: it
+ *    locks when the code is gone, and asks about the other code when there is one.
+ *
+ * @param about     whose code was asked about (see CodeAsked)
+ * @param code      the code that was asked about (FIRE-7K2M-9QXD)
+ * @param inMemory  the code the browser's memory holds NOW, when the answer has come
+ */
+export function codeAnswerUse(about: CodeAsked, code: string, inMemory: string | null): CodeAnswerUse {
+  if (about === 'typed') return { kind: 'take', save: true };
+  const change = savedCodeNow(inMemory, code);
+  return change.kind === 'none' ? { kind: 'take', save: false } : { kind: 'drop', change };
 }

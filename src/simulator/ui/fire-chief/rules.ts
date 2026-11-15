@@ -125,7 +125,7 @@ export const FIRE_CHIEF_RULES: RulesSection[] = [
   {
     title: 'Fair play',
     items: [
-      'Students build, program and run their robot themselves.',
+      'Students are responsible for building, programming and running their robot.',
       'Coaches and spectators give no directions and send no commands during an attempt.',
       'All teams respect the field, the equipment, the other teams and what the referee says.',
     ],
@@ -178,7 +178,7 @@ export const FIRE_CHIEF_ASSUMPTIONS: RulesPart = {
         'The time written on the 30 points is the moment the fan action begins.',
         'What the robot earns in the very last moment of the time still counts.',
         'One more end that the draft rules do not name: the attempt also ends when the program has ended, the robot stands still and no DC motor runs. A program that ends with the fan still on runs until the time is up.',
-        'When the mission is complete, the simulator stops the robot and its fan by itself. On a real field your program has to stop them.',
+        'When the mission is complete, the simulator stops the robot and its fan by itself. On a real field your program has to stop the robot.',
         'The only broken rule that ends an attempt here is a moved target.',
         'A restart puts the robot back exactly where and how it started. A target that was pushed a little goes back to its place.',
         'Before the start the robot can only be put completely inside the START cell.',

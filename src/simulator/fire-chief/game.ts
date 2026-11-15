@@ -86,7 +86,7 @@
  *      straight at a target in a corner is stopped by the two walls of that corner when its
  *      nose is exactly 15 mm from the target. So that target is read only by a robot that
  *      touches both walls or nearly does: in every pose that reads "red" there, both walls
- *      are 2.5 mm away or nearer.)
+ *      are 3 mm away or nearer, and the robot is never clear of both by more than 1.4 mm.)
  *   8. The fan: on port M1, blowing from 20 % power, 20 degrees to each side. (How far it
  *      reaches, 300 mm, is decision D2.)                                                FAN
  *
@@ -99,7 +99,10 @@
  *  11. "Touching" (§7) = closer than half a millimetre. (Measured with the target made that
  *      much larger on every side: at a corner of the target it is up to 0.7 mm.)       TOUCH_MM
  *  12. "Stationary" (§7) = both wheel speeds are 0 and the robot is exactly where it was one
- *      tick (1/100 s) before. Wheels that spin against a wall are not stationary.   observe()
+ *      tick (1/100 s) before. Wheels that spin against a wall are not stationary. On the first
+ *      tick after the start signal or a restart there is no tick before to compare with: that
+ *      tick never counts, and the referee says of it that it has not yet seen the robot stand
+ *      still - not that the robot was moving.                                       observe()
  *  13. "Directed towards the wooden flame" (§7) = the straight-ahead line of the fan hits the
  *      target, or the middle of the target is at most 20 degrees away from that line. The
  *      30 cm of D2 are measured from the fan to the middle of the target. "No wall between" =
@@ -399,8 +402,12 @@ export function lookAtFan(ctx: ScoreContext<FireChiefScenario>): FanView | null 
   };
 }
 
-/** The reasons why a fan action does not count. */
-type FanIssueKind = 'no-fan' | 'off' | 'moving' | 'no-target' | 'touching' | 'wall' | 'far' | 'aim';
+/**
+ * The reasons why a fan action does not count. ('unseen' is the referee's own: on the first
+ * tick after the start signal or a restart it has nothing to compare the robot's place with -
+ * see createReferee.)
+ */
+type FanIssueKind = 'no-fan' | 'off' | 'moving' | 'unseen' | 'no-target' | 'touching' | 'wall' | 'far' | 'aim';
 
 /** One reason, with the measure that is over its limit ('far': mm, 'aim': degrees). */
 interface FanIssue {
@@ -431,6 +438,8 @@ function issueText(issue: FanIssue, past = false): string {
       return past ? 'the fan was off' : 'the fan is off';
     case 'moving':
       return past ? 'the robot was moving - it must stand still' : 'the robot is moving - it must stand still';
+    case 'unseen':
+      return `the referee ${past ? 'had' : 'has'} not yet seen the robot stand still - that takes a moment after the start or a restart`;
     case 'no-target':
       return past ? 'there was no fire target on the field' : 'there is no fire target on the field';
     case 'touching':
@@ -577,6 +586,17 @@ export function clock(seconds: number): string {
   return `${minutes}:${rest < 100 ? '0' : ''}${(rest / 10).toFixed(1)}`;
 }
 
+/**
+ * The same with hundredths, for a moment that has to be told apart from another one in the
+ * same tenth of a second: 61.02 -> "1:01.02".
+ */
+function clockToTheHundredth(seconds: number): string {
+  const hundredths = Math.max(0, Math.floor(seconds * 100 + 1e-6));
+  const minutes = Math.floor(hundredths / 6000);
+  const rest = hundredths - minutes * 6000;
+  return `${minutes}:${rest < 1000 ? '0' : ''}${(rest / 100).toFixed(2)}`;
+}
+
 /** Seconds with one decimal, cut off: 1.49 -> "1.4". */
 const oneDecimal = (seconds: number): string => (Math.floor(seconds * 10 + 1e-6) / 10).toFixed(1);
 
@@ -602,6 +622,15 @@ function createReferee(_scenario: FireChiefScenario): Referee<FireChiefScenario>
   /** where the robot was at the last tick (and when that was), to see whether it stands still */
   const last = { known: false, x: 0, y: 0, heading: 0, time: 0 };
   let still = false;
+  /**
+   * True on the first tick after the start signal or a restart (and before it): the referee has
+   * no earlier place of the robot to compare with, so it cannot call the robot still yet - also
+   * a robot that has not moved at all. (That tick never counts for a fan action; the sentences
+   * say why in the referee's own words instead of "the robot was moving": see firstLookIssue.)
+   */
+  let firstLook = true;
+  /** match time at which the fan that is blowing right now began to blow; null while it does not blow */
+  let fanSince: number | null = null;
   /** match time of the restart, if the team used it */
   let restartAt: number | null = null;
   /** rules §6.1: the whole robot was inside START at the start signal (`begun`: the signal was given) */
@@ -618,12 +647,12 @@ function createReferee(_scenario: FireChiefScenario): Referee<FireChiefScenario>
    * fan was already blowing, but it did not count (`issue`: why not - mostly the robot was still
    * rolling). A team that reads "2.98 of 3 seconds" after "wait 3 seconds" needs to be told.
    */
-  const late = { seen: false, issue: newIssue() };
+  const late = { seen: false, issue: newIssue(), fanSince: 0 };
   /**
    * The last fan action that broke before its 3 seconds were over: how long it had lasted, why
    * it broke, when its count began - and, when that was later than the fan, why (see `late`).
    */
-  const broke = { seen: false, seconds: 0, issue: newIssue(), since: 0, late: false, lateIssue: newIssue() };
+  const broke = { seen: false, seconds: 0, issue: newIssue(), since: 0, late: false, lateIssue: newIssue(), lateFanSince: 0 };
   /** match time of the last tick in which the robot touched the target */
   let lastTouch = -Infinity;
   /** set when the attempt is over: how long the fan action that was going on had lasted (null = none was) */
@@ -638,11 +667,25 @@ function createReferee(_scenario: FireChiefScenario): Referee<FireChiefScenario>
   };
 
   /**
-   * The sentence for an action whose count began later than the fan: when it began, and what
-   * was not right before. Empty when the count began with the fan.
+   * "The robot is moving" on the first tick after the start signal or a restart, with wheels
+   * that do not turn: the robot is not moving - the referee has not seen it stand still yet.
+   * (Which ticks count is not touched here, only what is said about that one.)
+   */
+  const firstLookIssue = (found: FanIssue, robot: { left: { rpm: number }; right: { rpm: number } }): void => {
+    if (found.kind === 'moving' && firstLook && robot.left.rpm === 0 && robot.right.rpm === 0) found.kind = 'unseen';
+  };
+
+  /**
+   * The sentence for an action whose count began later than the fan: when it began, how much
+   * later than the fan that was, and what was not right before. Empty when the count began with
+   * the fan. (The moment is written to the hundredth: the count mostly begins a few hundredths
+   * after the fan, and in tenths the two moments would read the same.)
    */
   const lateStart = (): string =>
-    broke.late ? ` The count began at ${clock(broke.since)}, not when the fan started: before that, ${issueText(broke.lateIssue, true)}.` : '';
+    broke.late
+      ? ` Its count began at ${clockToTheHundredth(broke.since)}, ${(broke.since - broke.lateFanSince).toFixed(2)} s after the fan started: ` +
+        `before that, ${issueText(broke.lateIssue, true)}.`
+      : '';
 
   /** what the referee says on this tick (almost always nothing) */
   let say: string[] | null = null;
@@ -676,6 +719,7 @@ function createReferee(_scenario: FireChiefScenario): Referee<FireChiefScenario>
 
     // "stands still": the wheels do not turn and the robot is exactly where it was a tick ago
     const pose = robot.pose;
+    firstLook = !last.known;
     still =
       last.known &&
       robot.left.rpm === 0 &&
@@ -747,6 +791,9 @@ function createReferee(_scenario: FireChiefScenario): Referee<FireChiefScenario>
     // fan on at the beginning of a tick. So an action begins at the BEGINNING of the first tick
     // that was right - the moment the program switched the fan on (or the robot came to rest) -
     // and a fan that blows for 300 ticks ("fan on, wait 3 seconds, fan off") has blown for 3 s.
+    // (since when the fan blows: a program switches it on at the beginning of a tick)
+    if (robot.fanOn !== true) fanSince = null;
+    else if (fanSince === null) fanSince = tickBegan;
     if (robot.fanOn !== true && actionSince === null) {
       // (almost every tick of an attempt: the fan is off and no action is going on - nothing to look at)
     } else if (checkFan(ctx, still, issue)) {
@@ -754,7 +801,10 @@ function createReferee(_scenario: FireChiefScenario): Referee<FireChiefScenario>
         actionSince = tickBegan;
         // (was the fan already blowing on the tick before, without counting? Then the count begins later than the fan)
         late.seen = miss.seen && Math.abs(miss.time - tickBegan) < 1e-9;
-        if (late.seen) copyIssue(late.issue, miss.issue);
+        if (late.seen) {
+          copyIssue(late.issue, miss.issue);
+          late.fanSince = fanSince ?? tickBegan;
+        }
       }
       if (!earned.has('fan-start')) {
         award('fan-start', actionSince, 'the robot stands still, faces the fire and the fan is on.');
@@ -774,6 +824,7 @@ function createReferee(_scenario: FireChiefScenario): Referee<FireChiefScenario>
         return { say: say ?? undefined, end: { reason: 'mission-complete', detail } };
       }
     } else {
+      firstLookIssue(issue, robot);
       if (issue.kind !== 'off' && issue.kind !== 'no-fan') {
         // the fan blows, but not so that it counts: the final sheet says when and why
         miss.seen = true;
@@ -788,11 +839,12 @@ function createReferee(_scenario: FireChiefScenario): Referee<FireChiefScenario>
         copyIssue(broke.issue);
         broke.since = actionSince;
         broke.late = late.seen;
-        if (late.seen) copyIssue(broke.lateIssue, late.issue);
-        speak(
-          `The fan action stopped after ${actionLength(broke.seconds)} s: ${issueText(issue)}. ` +
-            `The ${FAN_ACTION_SECONDS} seconds start again.${lateStart()}`,
-        );
+        if (late.seen) {
+          copyIssue(broke.lateIssue, late.issue);
+          broke.lateFanSince = late.fanSince;
+        }
+        // (the late count is the count of the action that stopped: said before "start again", which is about the next one)
+        speak(`The fan action stopped after ${actionLength(broke.seconds)} s: ${issueText(issue)}.${lateStart()} The ${FAN_ACTION_SECONDS} seconds start again.`);
         actionSince = null;
       }
     }
@@ -808,6 +860,8 @@ function createReferee(_scenario: FireChiefScenario): Referee<FireChiefScenario>
     last.known = false;
     last.time = ctx.world.time;
     still = false;
+    firstLook = true;
+    fanSince = null;
     restartAt = ctx.world.time;
     miss.seen = false;
     broke.seen = false;
@@ -828,7 +882,12 @@ function createReferee(_scenario: FireChiefScenario): Referee<FireChiefScenario>
   function notYet(id: AchievementId, ctx: ScoreContext<FireChiefScenario>): string {
     if (id === 'leave-start') return 'not yet - the whole robot must be outside the START cell';
     if (id === 'enter-room') return 'not yet - the whole robot must be inside the living room or the bedroom';
-    if (id === 'fan-start') return `not yet - ${fanProblem(ctx, still) ?? 'stand still in front of the fire and switch the fan on'}`;
+    if (id === 'fan-start') {
+      const now = newIssue();
+      if (checkFan(ctx, still, now)) return 'not yet - stand still in front of the fire and switch the fan on';
+      firstLookIssue(now, ctx.world.robot);
+      return `not yet - ${issueText(now)}`;
+    }
     // fan-complete
     if (actionSince !== null) {
       return `the fan is on the fire: ${oneDecimal(ctx.world.time - actionSince)} of ${FAN_ACTION_SECONDS} seconds - keep still`;

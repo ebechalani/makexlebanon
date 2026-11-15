@@ -124,9 +124,11 @@ export const seasons: Season[] = [
         // finds the fire and blows at it with a fan. The maze "may change between rounds", and
         // the draft names no camera. The simulator plays exactly that, and it is offered right
         // under this teaser, so the old words told a teacher two different things on one page.
-        // The new words say only what the draft rules say, and nothing more certain than they
-        // do. To go back to the old teaser, put the two old strings back here and the old
-        // half-sentence back into `intro` above.
+        // The new `summary` says only what the draft rules say, and nothing more certain than
+        // they do. The `platform` is NOT from the draft, which names no robot at all: 'mBot2' is
+        // what is left of the old 'mBot2 + vision', and the robot the simulator plays this
+        // category with - to be confirmed like the summary. To go back to the old teaser, put
+        // the two old strings back here and the old half-sentence back into `intro` above.
         platform: 'mBot2',
         summary: 'One robot, on its own. A maze that can change between rounds. Find the fire.',
         simulator: {

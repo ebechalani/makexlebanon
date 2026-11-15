@@ -632,6 +632,27 @@ describe('the window as each kind of visitor sees it', () => {
     }
   });
 
+  test('the window sends nobody to a button that is not there: wherever it says "press Try again", "Try again" can be pressed', () => {
+    const says = `press “${EXAMPLES_WORDS.tryAgain}”`;
+    const buttons = (html: string): number => html.split(`>${EXAMPLES_WORDS.tryAgain}<`).length - 1;
+    let said = 0;
+    for (const state of NOT_UNLOCKED) {
+      const html = draw(windowWith(visitor, state));
+      if (!wordsOf(html).includes(says)) continue;
+      said++;
+      assert.equal(buttons(html), 1, JSON.stringify(state.status));
+      assert.ok(wordsOf(html).includes(`${EXAMPLES_WORDS.savedOnThisDevice} ${hiddenCode(MEMBER_CODE)}`), 'and the code it is about is shown, half hidden');
+    }
+    assert.ok(said > 0, 'the sentence is said in some state');
+    // This is how a tab stands that follows a code another tab saved, when the website cannot be
+    // reached: the code is its saved code (useMemberExamples.ts takes it before it asks). Without
+    // a saved code the same sentence would stand over no button at all - a state the screen must
+    // never be in:
+    const lost = draw(windowWith(visitor, { savedCode: null, status: { phase: 'unreachable', about: 'saved' } }));
+    assert.ok(wordsOf(lost).includes(says));
+    assert.equal(buttons(lost), 0, 'which is why the saved code must be known to the tab');
+  });
+
   test('the same window in Fire Chief: it draws the answer about that game for each kind of visitor - and not a word of Fire Rescue', async () => {
     const STARTERS = ['chief-first-wall', 'chief-count-lines', 'chief-flame-fan'];
     const FOR_MEMBERS = [...STARTERS, 'chief-wall-follow', 'chief-face-flame'];

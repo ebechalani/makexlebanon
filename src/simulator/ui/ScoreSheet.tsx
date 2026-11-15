@@ -233,6 +233,8 @@ export function StatusLine({
 
   let tone = 'border-slate-200 bg-white text-ink-600';
   let content: ReactNode;
+  /** the words of a brief ending as one text, for the hint of a line that is cut after two lines (see `twoLines` below) */
+  let wholeEnding: string | undefined;
   let showSheet = false;
   if (runState === 'ready') {
     if (placingProblem) {
@@ -288,15 +290,28 @@ export function StatusLine({
         {penaltyNote && ` (${penaltyNote})`}
       </>
     );
+    if (briefEnding) {
+      // (the very words of `content` above, piece by piece: a test holds the two together)
+      wholeEnding =
+        `${Match} over. ` +
+        (finishDetail ? `${finishHeadline(finishDetail)} Final score: ` : `${finishText(finishReason)} at ${timeText(time)}. Final score: `) +
+        `${score.total} / ${score.max}` +
+        (perfect ? ' - a perfect run!' : score.complete ? ` - every ${words.goal} complete.` : '') +
+        (penaltyNote ? ` (${penaltyNote})` : '');
+    }
   }
 
   // A brief ending keeps to two lines where the stage stands beside the blocks ("lg:"): there the
   // window does not scroll, and a third line would push the buttons under the mat out of it.
   // (On a narrow screen the page scrolls anyway, and the whole text is shown.)
+  // In a window that is just wide enough for that layout the two lines can be too short for the
+  // text, and its end is cut off ("…"). Nothing is lost for good: the line then carries its whole
+  // text as a hint (`title`: the pointer shows it), and the score sheet - one press away - says
+  // the referee's whole sentence and what a restart did.
   const twoLines = briefEnding && runState === 'finished' ? ' lg:line-clamp-2' : '';
   return (
     <div className={`flex min-h-12 shrink-0 items-center gap-2 rounded-card border px-3 py-1.5 text-[13px] leading-snug ${tone}`}>
-      <p role="status" aria-live="polite" className={`min-w-0 flex-1${twoLines}`}>
+      <p role="status" aria-live="polite" className={`min-w-0 flex-1${twoLines}`} title={twoLines ? wholeEnding : undefined}>
         {content}
       </p>
       {showSheet && (

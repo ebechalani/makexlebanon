@@ -386,7 +386,12 @@ The code is remembered once for both games. Somebody who typed a code in Fire Re
 long ago, before Fire Chief existed — finds the examples of Fire Chief open in the same
 browser without typing anything, and the other way round. Other tabs of the same browser that
 have a simulator open follow at once: a code that is accepted in one tab opens the examples in
-the others too (each asks the server what the code opens in its own game).
+the others too (each asks the server what the code opens in its own game). A tab that follows
+stands as it does after a fresh load with that code: what an earlier code had opened there is
+closed until the server has answered, and if the server cannot be reached the tab says so and
+offers "Try again". Only the tab in which a code was typed saves it; a tab that follows never
+writes it back, and an answer that comes after the code was forgotten or replaced is dropped —
+so "Forget" stays forgotten, and tabs never go on asking each other.
 
 - **A member who gets an advanced code later** presses **Use a different code** in the same
   window and types the new one. Nothing has to be forgotten first. If the new code is
@@ -820,10 +825,12 @@ Each answer turns an assumption into a decision (see the next section for the st
 5. **Can the target really stand in a corner?** With the three assumptions above, a 130 mm
    wide robot that drives at a corner target is stopped by the two walls of the corner when
    its nose is exactly 15 mm from the target. So it reads "red" there only while it touches
-   both walls (or is 2.5 mm from them at most), and with no margin at all: with a sensor that
+   both walls or almost does (no pose that reads "red" is clear of both walls by more than
+   1.4 mm, or further than 3 mm from either), and with no margin at all: with a sensor that
    reads from 14.999 mm the advanced example scores 30 points on the default maze, with 15 mm
    100. A sensor that sees a few millimetres further, or no corner place, would remove this
-   (measured: a range of 20 mm leaves 4.9 mm to the walls, 25 mm leaves 8.4 mm, 30 mm 11.6 mm).
+   (measured, as the most a robot that reads "red" can be clear of both walls at once: about
+   5.3 mm with a range of 20 mm, 8.7 mm with 25 mm, 11.9 mm with 30 mm).
    Three questions in one:
    - **May a robot rest against the two walls of a corner?** The draft allows only "minor
      accidental contact with a wall" (§11). The simulator does not judge it; the two examples
@@ -840,10 +847,12 @@ Each answer turns an assumption into a decision (see the next section for the st
    the referee says "in this simulator" with that number, because it is no rule.
 9. **The words that introduce the category on the website.** `content/seasons.ts` said "Two
    robots. One operation. Command the whole response." on the platform "mBot2 + vision" — the
-   teaser from before the draft rules. It now says what the draft rules say (one robot, a maze
-   that can change between rounds, find the fire; platform "mBot2"), in words that are not
-   the organiser's: see "Things left to fill in". Are these words right, or what should stand
-   there?
+   teaser from before the draft rules. The summary now says what the draft rules say (one
+   robot, a maze that can change between rounds, find the fire), in words that are not the
+   organiser's: see "Things left to fill in". The platform now reads "mBot2". That is **not**
+   from the draft, which names no robot at all: it is what is left of "mBot2 + vision", and
+   the robot the simulator plays this category with. Are these words right, and is the mBot2
+   the platform — or what should stand there?
 
 #### When the organiser decides something
 
@@ -975,7 +984,11 @@ Described in full in "Member codes for the simulator examples" above. In short:
   stay open while the website is put back to a state from before Fire Chief, that older server
   answers every question with the examples of Fire Rescue — the Fire Chief page then shows
   "could not be reached" instead of the cards of the other game. (An answer without a name
-  counts as Fire Rescue's, so the Fire Rescue page goes on working with such a server.)
+  counts as Fire Rescue's, so the Fire Rescue page goes on working with such a server.) The
+  same happens after a rollback to the first release of Fire Chief, whose server answered
+  rightly but did not say the name back: a Fire Chief tab that is still open then shows no
+  examples and says "the website could not be reached", although it was. Loading the page
+  again cures it, and so does putting the newer server back.
 - **One set of codes.** A member code opens the member examples of both games, an advanced
   code shows every example of both. There is nothing to make or to hand out for Fire Chief.
 - **Typed once.** The browser keeps the code in one place for both games.
@@ -1002,9 +1015,11 @@ Described in full in "Member codes for the simulator examples" above. In short:
 - **The colour sensor reads only from 1.5 cm**, and on the screen that is a few dots: a robot
   that looks as if it stood at the target can read "none". The screen says so in four places:
   under the "Colour sensor" row of the Sensors panel (always to be read), on the closed
-  Sensors panel when the robot is close to something and reads "none" ("colour none (needs
-  1.5 cm)"), as a short line in front of the robot in the **Sensors** view (exactly as
-  long as the range; it takes the colour that is read), and in the Rules window.
+  Sensors panel when the robot is close to something and reads "none" ("colour none (too
+  far)" — without the number: wherever the 1.5 cm are written, "in this simulator" stands
+  with them, and the closed panel has no room for that on a phone), as a short line in front
+  of the robot in the **Sensors** view (it ends exactly where the range ends — flat ends,
+  nothing is painted beyond — and takes the colour that is read), and in the Rules window.
 - **Walls are drawn thicker than they are** (6 dots at least, the real wall is 3 mm), around
   their true middle line. The robot stops at the real wall, and the ruler measures the real
   field: measured to the edge of a drawn wall it reads up to 1.5 cm short. The Rules window
@@ -1017,6 +1032,8 @@ Described in full in "Member codes for the simulator examples" above. In short:
 - **The line above the mat says the end of an attempt in the referee's first words** ("Mission
   complete at 0:14.4 with 80 of 100 points."), on two lines at most where the stage stands
   beside the blocks. The whole sentence is at the top of the Score sheet and in the Console.
+  In a window that is only just wide enough for that layout (1024 dots) two lines can be too
+  short for the text: its end is then cut off ("…"), and the pointer shows the whole line.
 - **A program that still holds flame sensor blocks** (saved in a browser or in a file while
   the page was being built) opens without them: the blocks are taken out, the rest of the
   program stays, and two sentences at the bottom of the screen say so ("2 flame sensor blocks
@@ -1115,10 +1132,12 @@ These are marked with `TODO` or `NOTE` comments in `content/seasons.ts`:
   teaser now reads "One robot, on its own. A maze that can change between rounds. Find the
   fire." on the platform "mBot2", and the introduction of the 2027 season ends "… to a robot
   that finds the fire on its own, in a maze that can change between rounds" instead of "… to a
-  coordinated two-robot rescue operation". These three wordings are not the organiser's own:
-  they say only what the draft rules say. Ask the organiser, then replace them (`summary`,
-  `platform`, and `intro` of the 2027 season) with the organiser's words — or put the old
-  ones back.
+  coordinated two-robot rescue operation". These three wordings are not the organiser's own.
+  The summary and the introduction say only what the draft rules say. The platform does not
+  come from the draft, which names no robot: "mBot2" is what is left of "mBot2 + vision" and
+  the robot the simulator plays this category with — it is to be confirmed like the rest. Ask
+  the organiser, then replace them (`summary`, `platform`, and `intro` of the 2027 season)
+  with the organiser's words — or put the old ones back.
 - **Training tracks** — four of the seven are marked `coming-soon`. Write the content, then
   change `status` to `available` and add an `href` in `content/seasons.ts`. (A track can also
   set `cta` to change the wording of its link — the simulator's card says "Open the simulator"

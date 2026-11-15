@@ -92,7 +92,7 @@ export function colourRangeNote(part: FrontColourPart): string {
 export const NEAR_FOR_COLOUR_CM = 5;
 
 /**
- * True when the closed Sensors panel should say how close the colour sensor must be: the robot
+ * True when the closed Sensors panel should say why the colour sensor reads nothing: the robot
  * has such a sensor, it reads "none", and something is right in front of the robot.
  */
 export function colourNeedsCloser(parts: RobotParts, sensors: Pick<SensorSnapshot, 'ultrasonicCm' | 'frontColor'>): boolean {
@@ -104,9 +104,14 @@ export function colourNeedsCloser(parts: RobotParts, sensors: Pick<SensorSnapsho
  * readings of the sensors this robot has besides them ("claw empty", "colour red", "fan off").
  *
  * One case is different: the colour sensor at the front reads "none" although something stands
- * right in front of the robot (see colourNeedsCloser). Then the words say how close it must be.
- * The line status makes room for that - the panel is narrow on a phone, and what the robot
- * reads on the floor is not the question in that moment.
+ * right in front of the robot (see colourNeedsCloser). Then the words say why: the thing is
+ * too far away for this sensor. The line status makes room for that - the panel is narrow on a
+ * phone, and what the robot reads on the floor is not the question in that moment.
+ *
+ * How close it must be is not said here but in the open panel, in a whole sentence
+ * (colourRangeNote): the 1.5 cm are a choice of this simulator, and there is no room on the
+ * closed panel to say so. A number without "in this simulator" would read like a fact about the
+ * real sensor.
  */
 export function sensorSummary(parts: RobotParts, sensors: Pick<SensorSnapshot, 'lineStatus' | 'ultrasonicCm' | 'frontColor' | 'fanOn'>): string {
   const closer = parts.frontColour !== null && colourNeedsCloser(parts, sensors);
@@ -114,10 +119,10 @@ export function sensorSummary(parts: RobotParts, sensors: Pick<SensorSnapshot, '
   words.push(`${formatNumber(sensors.ultrasonicCm)} cm`);
   if (parts.clawColour) words.push(`claw ${sensors.frontColor === 'none' ? 'empty' : sensors.frontColor}`);
   // (the word the "colour sensor (1) colour" block gives: a colour name, or "none")
-  // ("needs 1.5 cm": the shortest words that say it. Measured in the browser, the whole text is
-  // then 241 dots wide, and the closed panel of a phone that is 390 wide has room for 253. On a
-  // phone that is 360 wide there is room for 223: there the end of the text, the fan, is cut off.)
-  if (parts.frontColour) words.push(closer ? `colour none (needs ${colourRangeText(parts.frontColour)})` : `colour ${sensors.frontColor}`);
+  // ("too far": measured in the browser, the whole text - "5 cm · colour none (too far) · fan off" -
+  // is then 203 dots wide. The closed panel of a phone that is 360 wide has room for 223, one
+  // that is 390 wide for 253: nothing is cut off, the fan at the end least of all.)
+  if (parts.frontColour) words.push(closer ? 'colour none (too far)' : `colour ${sensors.frontColor}`);
   if (parts.fan) words.push(`fan ${sensors.fanOn ? 'on' : 'off'}`);
   return words.join(' · ');
 }
@@ -129,6 +134,6 @@ export function sensorSummary(parts: RobotParts, sensors: Pick<SensorSnapshot, '
  */
 export function sensorsViewHint(parts: RobotParts): string {
   return parts.frontColour
-    ? `Show what the line sensor and the ultrasonic sensor see, and how far the colour sensor reads (${colourRangeText(parts.frontColour)})`
+    ? `Show what the line sensor and the ultrasonic sensor see, and how far the colour sensor reads (in this simulator: ${colourRangeText(parts.frontColour)})`
     : 'Show what the line sensor and the ultrasonic sensor see';
 }

@@ -870,15 +870,34 @@ function drawFanAir(ctx: CanvasRenderingContext2D, sim: StageSim, view: StageVie
  * The range is short (15 mm in Fire Chief: a few dots on the screen), and a robot that looks
  * as if it stood at the target can still be too far away. The line shows where "close enough"
  * ends: the sensor names a colour when the thing in front of it reaches into the line.
+ *
+ * So nothing of it may be painted beyond the end of the range - on a small stage one dot is
+ * 5 mm, and a target a few millimetres out of range would lie under the paint while the sensor
+ * reads "none". The strokes have flat ends, and the bar is not laid ACROSS the end (half of its
+ * thickness would lie beyond it) but up to it: the far side of its dark edge is the end of the
+ * range, and the line from the sensor ends inside the bar (see `strokes`).
  */
 export interface ColourSight {
   /** the face of the sensor, and the point straight ahead of it where its range ends (mm on the mat) */
   from: Vec2;
   to: Vec2;
-  /** the two ends of the bar across that point */
+  /** the two ends of the bar, on the line across that point */
   left: Vec2;
   right: Vec2;
+  /** what is painted, in this order: the dark edge, then the colour on top of it */
+  strokes: [edge: SightStroke, colour: SightStroke];
 }
+
+/** One stroke of that drawing, painted with flat ends: the line from the sensor and the bar at its end, with one width (mm on the mat). */
+export interface SightStroke {
+  width: number;
+  stem: [Vec2, Vec2];
+  bar: [Vec2, Vec2];
+}
+
+/** How thick the two strokes are, in screen dots: a dark edge, and the colour that is painted on top of it. */
+const SIGHT_EDGE_DOTS = 4.5;
+const SIGHT_COLOUR_DOTS = 2.2;
 
 /**
  * Where that line is drawn for a robot that stands at `pose`: null for a robot without a colour
@@ -889,34 +908,56 @@ export function colourSight(config: RobotConfig, pose: Pose, scale: number): Col
   const sensor = config.frontColorSensor;
   if (!sensor.enabled || !sensor.mount || !(sensor.rangeMm > 0)) return null;
   const face = sensor.mount.forward;
+  const end = face + sensor.rangeMm;
   const half = Math.max(6, 4.5 / scale);
+  const edge = SIGHT_EDGE_DOTS / scale;
+  const colour = SIGHT_COLOUR_DOTS / scale;
+  // the middle line of the bar: half the dark edge before the end, so that the far side of the bar IS the end
+  const bar = end - edge / 2;
+  // (on a small stage the bar is thicker than the range is long: then there is no line left to draw before it)
+  const stemEnd = Math.max(face, bar);
+  // the colour is shorter than its dark edge by the same margin all around
+  const inset = (edge - colour) / 2;
+  const stroke = (width: number, halfLength: number): SightStroke => ({
+    width,
+    stem: [localToWorld(pose, face, 0), localToWorld(pose, stemEnd, 0)],
+    bar: [localToWorld(pose, bar, -halfLength), localToWorld(pose, bar, halfLength)],
+  });
   return {
     from: localToWorld(pose, face, 0),
-    to: localToWorld(pose, face + sensor.rangeMm, 0),
-    left: localToWorld(pose, face + sensor.rangeMm, -half),
-    right: localToWorld(pose, face + sensor.rangeMm, half),
+    to: localToWorld(pose, end, 0),
+    left: localToWorld(pose, end, -half),
+    right: localToWorld(pose, end, half),
+    strokes: [stroke(edge, half), stroke(colour, half - inset)],
   };
 }
 
-function drawColourSight(ctx: CanvasRenderingContext2D, sim: StageSim, sensors: SensorSnapshot, view: StageView): void {
+/** (exported for the tests) */
+export function drawColourSight(
+  ctx: CanvasRenderingContext2D,
+  sim: Pick<StageSim, 'robotConfig'> & { world: { robot: { pose: Pose } } },
+  sensors: Pick<SensorSnapshot, 'frontColor'>,
+  view: Pick<StageView, 'scale'>,
+): void {
   const sight = colourSight(sim.robotConfig, sim.world.robot.pose, view.scale);
   if (!sight) return;
-  const { from, to, left, right } = sight;
   const reads = sensors.frontColor;
+  const [edge, colour] = sight.strokes;
   ctx.save();
-  ctx.lineCap = 'round';
+  // flat ends: a round end would paint half the width of the stroke beyond the end of the range
+  ctx.lineCap = 'butt';
   // drawn twice: a dark edge first, then the colour on top of it, so that it shows on every background
-  for (const [width, colour] of [
-    [4.5 / view.scale, '#0f172a'],
-    [2.2 / view.scale, reads === 'none' ? '#ffffff' : SENSOR_COLOR_CSS[reads]],
+  for (const [stroke, css] of [
+    [edge, '#0f172a'],
+    [colour, reads === 'none' ? '#ffffff' : SENSOR_COLOR_CSS[reads]],
   ] as const) {
     ctx.beginPath();
-    ctx.moveTo(from.x, from.y);
-    ctx.lineTo(to.x, to.y);
-    ctx.moveTo(left.x, left.y);
-    ctx.lineTo(right.x, right.y);
-    ctx.lineWidth = width;
-    ctx.strokeStyle = colour;
+    ctx.moveTo(stroke.stem[0].x, stroke.stem[0].y);
+    ctx.lineTo(stroke.stem[1].x, stroke.stem[1].y);
+    ctx.moveTo(stroke.bar[0].x, stroke.bar[0].y);
+    ctx.lineTo(stroke.bar[1].x, stroke.bar[1].y);
+    ctx.lineWidth = stroke.width;
+    ctx.strokeStyle = css;
     ctx.stroke();
   }
   ctx.restore();

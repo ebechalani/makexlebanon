@@ -72,9 +72,9 @@
  * it has read red and stops, resting against them. In the simulator that costs nothing (walls
  * are smooth and cannot move). The draft rules allow "minor accidental contact with a wall" and
  * forbid pushing walls on purpose: the descriptions say that the robot touches the walls and
- * send the student to the referee, and it is a question for the organiser. (Looked for on a
- * grid of 0.25 mm and 0.25 degrees: no place from which the sensor reads the corner target
- * while the robot is clear of both walls by 1.25 mm or more and does not touch the target.)
+ * send the student to the referee, and it is a question for the organiser. (Looked for down
+ * to 0.01 mm and 0.01 degrees: no place from which the sensor reads the corner target while
+ * the robot is clear of both walls by more than 1.4 mm and does not touch the target.)
  *
  * The referee does not ask what the colour sensor reads: the fan points count by position
  * alone (game.ts, decision D3). "Read red, then blow" is what the programs do to be sure
