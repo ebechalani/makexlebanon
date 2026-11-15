@@ -740,6 +740,52 @@ test('reasons: a robot turned by exactly 20 degrees stands ON the limit and coun
   }
 });
 
+test('reasons: exactly 20 degrees and exactly 300 mm count at every one of the six fire places - also where the arithmetic comes out a hair over the limit', () => {
+  // Which way the last digit falls depends on where the target stands and which way it faces:
+  // at the back wall of the living room "exactly 20 degrees" comes out a hair under 20, at the
+  // side wall and in the corner of the bedroom a hair over. Without the slack of the referee
+  // (LIMIT_SLACK in game.ts) the second kind would not count - this test fails then.
+  const overAngle: string[] = [];
+  const overReach: string[] = [];
+  for (const room of ROOM_IDS) {
+    for (const spot of FIRE_SPOTS) {
+      for (const [distance, off] of [[300, 0], [100, 20], [100, -20], [200, 20], [200, -20], [299, 20], [299, -20], [300, 20], [300, -20]]) {
+        const where = `${room}, ${spot}: ${distance} mm, ${off} degrees`;
+        const { sim } = play(fanOn(), { scenario: openField(room, spot), startPose: aimedAt(targetPose(room, spot) as Body, distance, off) });
+        const view = lookAtFan({ scenario: sim.scenario, world: sim.world, robotConfig: sim.robotConfig, restarts: 0, robotShapes: sim.robotShapes() });
+        assert.ok(view && view.wall === null && !view.touching, where);
+        // the pose is ON the limit, as closely as numbers can say it
+        near(view.distance, distance, 1e-9);
+        if (off !== 0) {
+          assert.equal(view.pointsAt, false, `${where}: the straight-ahead line misses the target, so the 20 degrees decide`);
+          near(view.offDeg, 20, 1e-9);
+          if (view.offDeg > FAN.coneHalfAngleDeg) overAngle.push(where);
+        }
+        if (view.distance > FAN.reachMm) overReach.push(where);
+        sim.start();
+        sim.step(400);
+        assert.equal(sim.finishReason, 'mission-complete', where);
+        assert.deepEqual([lineOf(sim, 'fan-start').ok, lineOf(sim, 'fan-complete').ok], [true, true], where);
+      }
+    }
+  }
+  // the test holds the slack: some of these poses are over their limit by the last digit, at more than one fire place
+  const places = (list: string[]): number => new Set(list.map((where) => where.split(':')[0])).size;
+  assert.ok(overAngle.length >= 4 && places(overAngle) >= 2, `over 20 degrees by the last digit: ${overAngle.join('; ') || 'none'}`);
+  assert.ok(overReach.length >= 2 && places(overReach) >= 2, `over 300 mm by the last digit: ${overReach.join('; ') || 'none'}`);
+  // ... while what is really over a limit does not count anywhere
+  for (const room of ROOM_IDS) {
+    for (const spot of FIRE_SPOTS) {
+      for (const [distance, off] of [[300.001, 0], [200, 20.001], [200, -20.001]]) {
+        const { sim } = play(fanOn(), { scenario: openField(room, spot), startPose: aimedAt(targetPose(room, spot) as Body, distance, off) });
+        sim.start();
+        sim.step(400);
+        assert.equal(lineOf(sim, 'fan-start').ok, false, `${room}, ${spot}: ${distance} mm, ${off} degrees`);
+      }
+    }
+  }
+});
+
 test('reasons: the 20 degrees are said as what they are - a limit of this simulator, not of the rules; the 300 mm are a rule', () => {
   const aside = play(fanOn(), { startPose: aimedAt(BACK_TARGET, 200, 30) });
   aside.sim.start();
@@ -928,14 +974,21 @@ test('40 points: "stop, fan on, wait 3 seconds, fan off" while the robot still r
   assert.ok(began > 1.5, 'the count began after the fan was switched on (at 1.50 s)');
   const said = logOf(events).find((text) => text.startsWith('The fan action stopped after'));
   assert.ok(said, 'the referee says that the action stopped');
-  const written = /^The fan action stopped after (2\.9\d) s: the fan is off\. The 3 seconds start again\. The count began at (0:01\.\d), not when the fan started: before that, the robot was moving - it must stand still\.$/.exec(said);
+  // (the late count belongs to the action that stopped: it is said before "The 3 seconds start again", which is about the next one)
+  const written = /^The fan action stopped after (2\.9\d) s: the fan is off\. Its count began at (0:01\.5\d), (0\.0\d) s after the fan started: before that, the robot was moving - it must stand still\. The 3 seconds start again\.$/.exec(said);
   assert.ok(written, said);
   // the length is the time from the beginning of the count to the moment the fan was switched off (4.50 s), to the hundredth
   near(Number(written[1]), 4.5 - began, 0.011);
-  assert.equal(written[2], clock(began));
+  // The moment the count began is written to the hundredth, with how much later than the fan it
+  // was (the fan started at 1.50 s): in tenths it reads "0:01.5", the very moment the fan started.
+  assert.equal(clock(began), clock(1.5));
+  assert.equal(written[2], `0:0${began.toFixed(2)}`);
+  assert.notEqual(written[2], '0:01.50');
+  near(Number(written[3]), began - 1.5, 1e-9);
+  assert.ok(Number(written[3]) >= 0.01);
   assert.equal(
     lineOf(sim, 'fan-complete').detail,
-    `not earned - the fan action stopped after ${written[1]} of 3 seconds: the fan was off. The count began at ${clock(began)}, not when the fan started: ` +
+    `not earned - the fan action stopped after ${written[1]} of 3 seconds: the fan was off. Its count began at ${written[2]}, ${written[3]} s after the fan started: ` +
       'before that, the robot was moving - it must stand still',
   );
   // the same program with a robot that already stands still earns everything: nothing is said about a late count
@@ -950,7 +1003,136 @@ test('40 points: "stop, fan on, wait 3 seconds, fan off" while the robot still r
   );
   const quiet = runUntil(atRest.sim, () => atRest.sim.status !== 'running');
   assert.equal(atRest.sim.finishReason, 'mission-complete');
-  assert.ok(!logOf(quiet).some((text) => text.includes('The count began')));
+  assert.ok(!logOf(quiet).some((text) => /count began/.test(text)));
+});
+
+test('40 points: the late count is told apart from the moment the fan started at every speed, and says how long the fan had been blowing', () => {
+  // drive at some speed, stop and switch the fan on at 1.00 s, wait 3 seconds, fan off
+  const lateCount = (rpm: number): { began: number; said: string } => {
+    const { sim } = play(
+      function* (io) {
+        io.setWheelRpm('left', rpm);
+        io.setWheelRpm('right', rpm);
+        yield* sleep(100);
+        io.stopWheel('all');
+        io.setDcMotor('M1', 100);
+        yield* sleep(300);
+        io.stopDcMotor('M1');
+        yield* sleep(50);
+      },
+      { startPose: aimedAt(BACK_TARGET, 250) },
+    );
+    const events = runUntil(sim, () => sim.status !== 'running');
+    const said = logOf(events).find((text) => text.startsWith('The fan action stopped after'));
+    assert.ok(said, `${rpm} RPM: the action stopped`);
+    return { began: lineOf(sim, 'fan-start').time ?? 0, said };
+  };
+  for (const rpm of [10, 20, 30, 45]) {
+    const { began, said } = lateCount(rpm);
+    assert.ok(began > 1 && began < 1.1, `${rpm} RPM: the count began at ${began}`);
+    // in tenths both moments read "0:01.0" - the sentence does not print that
+    assert.equal(clock(began), '0:01.0');
+    const later = (began - 1).toFixed(2);
+    assert.ok(said.includes(` Its count began at 0:0${began.toFixed(2)}, ${later} s after the fan started: before that, the robot was moving - it must stand still.`), said);
+    assert.doesNotMatch(said, /began at 0:01\.0[,:. ]/, said);
+    assert.notEqual(later, '0.00');
+  }
+  // a fan that was switched on long before the robot arrived: the sentence says for how long it had blown without counting
+  const { sim } = play(
+    function* (io) {
+      io.setDcMotor('M1', 100);
+      yield* sleep(20);
+      io.setWheelRpm('left', 20);
+      io.setWheelRpm('right', 20);
+      yield* sleep(100);
+      io.stopWheel('all');
+      yield* sleep(200);
+      io.stopDcMotor('M1');
+      yield* sleep(50);
+    },
+    // (300.5 mm: the fan is switched on a little too far away, and the robot then rolls into reach)
+    { startPose: aimedAt(BACK_TARGET, 300.5) },
+  );
+  const events = runUntil(sim, () => sim.status !== 'running');
+  const said = logOf(events).find((text) => text.startsWith('The fan action stopped after'));
+  assert.ok(said);
+  const began = lineOf(sim, 'fan-start').time ?? 0;
+  const written = /Its count began at 0:0(\d\.\d\d), (\d\.\d\d) s after the fan started: before that, (.*)\. The 3 seconds start again\.$/.exec(said);
+  assert.ok(written, said);
+  near(Number(written[1]), began, 1e-9);
+  // (the fan was on from the very first tick, which began at 0.00 s)
+  near(Number(written[2]), began, 1e-9);
+  assert.ok(began > 0.2, `the count began at ${began}`);
+});
+
+test('40 points: a fan that is on from the first tick - the referee does not say that a robot moved which never moved', () => {
+  // The referee calls a robot "still" when it is where it was a tick ago: on the first tick
+  // after the start signal (or a restart) there is nothing to compare with, so that tick never
+  // counts. The robot here does not move at all - no sentence may say that it did.
+  const program: Script = function* (io) {
+    io.setDcMotor('M1', 100);
+    yield* sleep(200);
+    io.stopDcMotor('M1');
+    yield* sleep(100);
+    io.setDcMotor('M1', 100);
+    yield* sleep(200);
+    io.stopDcMotor('M1');
+    yield* sleep(30);
+  };
+  const { sim } = play(program, { startPose: IN_ROOM });
+  const start = { ...sim.world.robot.pose };
+  const UNSEEN = 'the referee had not yet seen the robot stand still - right after the start or a restart that takes a moment';
+  sim.start();
+  // the first tick: the fan blows, the robot stands - and the sheet does not say "the robot is moving"
+  sim.step(1);
+  assert.equal(lineOf(sim, 'fan-start').detail, `not yet - ${UNSEEN.replace('had', 'has')}`);
+  const events = [...sim.drainEvents()];
+  events.push(...runUntil(sim, () => sim.world.tick >= 250));
+  // (points and times are what they always were: the count begins with the second tick, at 0.01 s)
+  assert.equal(lineOf(sim, 'fan-start').time, 0.01);
+  const first = logOf(events).find((text) => text.startsWith('The fan action stopped after'));
+  assert.equal(first, `The fan action stopped after 1.9 s: the fan is off. Its count began at 0:00.01, 0.01 s after the fan started: before that, ${UNSEEN}. The 3 seconds start again.`);
+  // the same after a restart, which puts the robot back and makes the referee look anew
+  sim.restart();
+  const restartedAt = sim.world.time;
+  const after = runUntil(sim, () => sim.status !== 'running');
+  const stops = logOf(after).filter((text) => text.startsWith('The fan action stopped after'));
+  assert.equal(stops.length, 2, stops.join(' | '));
+  const at = restartedAt + 0.01;
+  assert.equal(stops[0], `The fan action stopped after 1.9 s: the fan is off. Its count began at 0:0${at.toFixed(2)}, 0.01 s after the fan started: before that, ${UNSEEN}. The 3 seconds start again.`);
+  // (the second action of the program begins with the fan, a second later: nothing about a late count)
+  assert.equal(stops[1], 'The fan action stopped after 2.0 s: the fan is off. The 3 seconds start again.');
+  for (const text of [...logOf(events), ...logOf(after), ...sim.score().lines.map((line) => line.detail)]) assert.doesNotMatch(text, /was moving|is moving/, text);
+  // the robot never moved
+  assert.deepEqual(sim.world.robot.pose, start);
+  // a robot whose wheels do turn on the first tick IS moving, and is said to be
+  const rolling = play(
+    function* (io) {
+      io.setWheelRpm('left', 5);
+      io.setWheelRpm('right', 5);
+      io.setDcMotor('M1', 100);
+      yield;
+      io.stopDcMotor('M1');
+      yield* sleep(20);
+    },
+    { startPose: aimedAt(BACK_TARGET, 250) },
+  );
+  runUntil(rolling.sim, () => rolling.sim.world.tick >= 10);
+  rolling.sim.declareFinished();
+  assert.match(lineOf(rolling.sim, 'fan-start').detail, /^not earned - the fan blew, but it did not count\. The last time, at 0:00\.0: the robot was moving - it must stand still$/);
+  // ... and a fan that blew on the first tick only, on a robot that stood: the final sheet says it in the referee's words
+  const blink = play(
+    function* (io) {
+      io.setDcMotor('M1', 100);
+      yield;
+      io.stopDcMotor('M1');
+      yield* sleep(20);
+    },
+    { startPose: IN_ROOM },
+  );
+  runUntil(blink.sim, () => blink.sim.world.tick >= 10);
+  blink.sim.declareFinished();
+  assert.equal(lineOf(blink.sim, 'fan-start').detail, `not earned - the fan blew, but it did not count. The last time, at 0:00.0: ${UNSEEN}`);
 });
 
 test('40 points: an action that began with the fan and broke says nothing about a late count; a shorter one keeps one decimal', () => {

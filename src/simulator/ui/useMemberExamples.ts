@@ -28,23 +28,33 @@
  * opened, and when a code is accepted in one tab, the others ask the server what it opens in
  * their game.
  *
+ * Only the tab in which a code was typed writes it into the browser's memory. A tab that
+ * follows another tab takes the code for its saved one - exactly as if the page had just been
+ * loaded with that code in the memory - and never writes it back; and an answer about the
+ * saved code counts only while the memory still holds that code. So a tab whose answer comes
+ * late cannot bring back a code that was forgotten meanwhile, and several tabs cannot go on
+ * asking each other (see codeAnswerUse in ./member-unlock.ts).
+ *
  * Somebody whose examples are open can type a different code in the place of the one in use.
  * Nothing changes until the server has accepted the different code: when it is refused, or the
  * server cannot be reached, the saved code and the open examples stay exactly as they were.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  codeAnswerUse,
   isSavedCode,
   requestUnlock,
   requestUnlockPatiently,
   SAVED_CODE_KEY,
   savedCodeChange,
   tidyCode,
+  type CodeAsked,
   type ExampleCard,
   type ExampleLevel,
   type ExampleProgram,
   type ExampleShelf,
   type ExamplesSource,
+  type SavedCodeChange,
 } from './member-unlock';
 import { loadJson, removeKey, saveJson } from './storage';
 
@@ -73,7 +83,7 @@ export type CodePhase = 'none' | 'checking' | 'unlocked' | 'rejected' | 'busy' |
 export interface CodeStatus {
   phase: CodePhase;
   /** which code this is about: one just typed, or the one saved on this device */
-  about: 'typed' | 'saved';
+  about: CodeAsked;
   /** with 'busy': for how many seconds the server asks to wait, when it said so */
   waitSeconds?: number;
   /** with 'unlocked': true when this code took the place of another one that was in use */
@@ -145,6 +155,12 @@ export interface Shelf {
   available: Record<string, ExampleProgram>;
 }
 
+/** The code the browser's memory holds right now, in its handed-out form (FIRE-7K2M-9QXD), or null. */
+function codeInMemory(): string | null {
+  const saved = loadJson(SAVED_CODE_KEY, isSavedCode);
+  return saved ? tidyCode(saved.code) : null;
+}
+
 /** What the window draws from one answer of the server: its headings, its cards, and the examples that can be loaded, by id. */
 export function shelfOf(answer: ExampleShelf): Shelf {
   const available: Record<string, ExampleProgram> = {};
@@ -160,7 +176,7 @@ export function useMemberExamples(config: ExamplesConfig): MemberExamples {
   /** where to ask, and for which game's examples (the same object as long as the two stay the same) */
   const source = useMemo<ExamplesSource>(() => ({ unlockUrl, game }), [unlockUrl, game]);
   // (the code is remembered in one place for every game, so there is no place to choose here: see SAVED_CODE_KEY)
-  const [savedCode, setSavedCode] = useState<string | null>(() => loadJson(SAVED_CODE_KEY, isSavedCode)?.code ?? null);
+  const [savedCode, setSavedCode] = useState<string | null>(codeInMemory);
   const [status, setStatus] = useState<CodeStatus>(() => ({ phase: savedCode ? 'checking' : 'none', about: 'saved' }));
   /** what the accepted code opened; null while no code is accepted */
   const [forCode, setForCode] = useState<Shelf | null>(null);
@@ -177,6 +193,17 @@ export function useMemberExamples(config: ExamplesConfig): MemberExamples {
   const openListKnown = useRef(false);
   /** the code that is in use right now (the one whose examples are open), or null */
   const codeInUse = useRef<string | null>(null);
+  /**
+   * The code this tab takes for the saved one: the same as `savedCode`, but known at once - to
+   * the next "storage" event too, which can come before the screen has been drawn again.
+   */
+  const savedNow = useRef(savedCode);
+  const setSaved = useCallback((code: string | null) => {
+    savedNow.current = code;
+    setSavedCode(code);
+  }, []);
+  /** what to do when the browser's memory turns out to hold another code than this tab, or none (set below: see followMemory) */
+  const follow = useRef<(change: SavedCodeChange) => void>(() => {});
 
   const unlocked = forCode !== null;
   const changing = unlocked && status.phase !== 'unlocked';
@@ -197,7 +224,7 @@ export function useMemberExamples(config: ExamplesConfig): MemberExamples {
   }, [source]);
 
   const askCode = useCallback(
-    (code: string, about: CodeStatus['about']) => {
+    (code: string, about: CodeAsked) => {
       const mine = ++codeQuestion.current;
       // (what an earlier code opened stays open while this one is checked, and when it is refused)
       setStatus({ phase: 'checking', about });
@@ -206,13 +233,22 @@ export function useMemberExamples(config: ExamplesConfig): MemberExamples {
       // (a short "wait" of the server is waited out: see requestUnlockPatiently)
       void requestUnlockPatiently(source, code).then((outcome) => {
         if (codeQuestion.current !== mine) return;
+        // An answer about the saved code counts only while the browser's memory still holds that
+        // code: it may have been forgotten, or replaced, in another tab while the server was asked.
+        const use = codeAnswerUse(about, code, codeInMemory());
+        if (use.kind === 'drop') {
+          follow.current(use.change);
+          return;
+        }
         if (outcome.kind === 'examples') {
           // (said to somebody who typed a different code: it has taken the place of the one that was in use)
           const replaced = codeInUse.current !== null && codeInUse.current !== code;
           codeInUse.current = code;
           setForCode(shelfOf(outcome));
-          setSavedCode(code);
-          setRemembered(saveJson(SAVED_CODE_KEY, { code }));
+          setSaved(code);
+          // Only a code that was typed here is written into the browser's memory (which tells the
+          // other tabs). The saved code is there already: a tab that only follows never writes it.
+          setRemembered(use.save ? saveJson(SAVED_CODE_KEY, { code }) : true);
           setDraft('');
           setStatus(replaced ? { phase: 'unlocked', about, replaced } : { phase: 'unlocked', about });
         } else if (outcome.kind === 'busy') {
@@ -222,7 +258,7 @@ export function useMemberExamples(config: ExamplesConfig): MemberExamples {
         }
       });
     },
-    [askOpenList, source],
+    [askOpenList, setSaved, source],
   );
 
   // at the start of a visit: ask what a visitor gets, and check the saved code again
@@ -258,11 +294,11 @@ export function useMemberExamples(config: ExamplesConfig): MemberExamples {
   const lockAgain = useCallback(() => {
     codeQuestion.current++;
     codeInUse.current = null;
-    setSavedCode(null);
+    setSaved(null);
     setRemembered(true);
     setForCode(null);
     setStatus({ phase: 'none', about: 'saved' });
-  }, []);
+  }, [setSaved]);
 
   const forget = useCallback(() => {
     removeKey(SAVED_CODE_KEY);
@@ -274,16 +310,30 @@ export function useMemberExamples(config: ExamplesConfig): MemberExamples {
   // once for all games, so what happens to it there happens here too (see savedCodeChange).
   // Forgetting must not wait for this tab to be loaded again: on a shared computer the examples
   // the code opened - advanced ones included - would stay open for the next person.
+  const followMemory = useCallback(
+    (change: SavedCodeChange) => {
+      if (change.kind === 'none') return;
+      // what a code opened here is locked in both cases: the code that opened it is no longer the saved one
+      lockAgain();
+      if (change.kind === 'code') {
+        // From here on this tab stands as it does at the start of a visit with that code in the
+        // browser's memory: the code is its saved code ("Saved on this device", "Try again" and
+        // asking again when the window is opened all work), and it opens nothing until the
+        // server has said so for this game. This tab does not write the code: it is saved already.
+        setSaved(change.code);
+        askCode(change.code, 'saved');
+      }
+    },
+    [askCode, lockAgain, setSaved],
+  );
   useEffect(() => {
-    const onStorage = (event: StorageEvent): void => {
-      const change = savedCodeChange(event.key, event.newValue, savedCode);
-      if (change.kind === 'forgotten') lockAgain();
-      // (the code opens nothing here until the server has said so for this game)
-      else if (change.kind === 'code') askCode(change.code, 'saved');
-    };
+    follow.current = followMemory;
+  }, [followMemory]);
+  useEffect(() => {
+    const onStorage = (event: StorageEvent): void => followMemory(savedCodeChange(event.key, event.newValue, savedNow.current));
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
-  }, [askCode, lockAgain, savedCode]);
+  }, [followMemory]);
 
   const startChange = useCallback(() => {
     if (!unlocked) return;

@@ -34,7 +34,7 @@ import { FIRE_CHIEF_START_ZONE, FIRE_CHIEF_WORDS } from './fire-chief/words';
 import { bodyName, CYBERPI_PANEL_HOLDS, cyberPiSummary, describeEvent, finishText, formatRefereeTime, formatStamp, restartFacts, restartLine, restartsLeftText, timeTextOf, type LogLine } from './format';
 import { finishHeadline, finishSentence, restartButton, restartSummary } from './match-words';
 import { foreignBlocks, gameNameFromId, otherGameNote, parseProgramFile, serializeProgramFile } from './program-file';
-import { colourSight, FIRE_KIND, fitView, placeZoneLabels, sightPolygon, viewToMat, wallDrawBox, WALL_MIN_PIXELS } from './render';
+import { colourSight, drawColourSight, FIRE_KIND, fitView, placeZoneLabels, sightPolygon, viewToMat, wallDrawBox, WALL_MIN_PIXELS } from './render';
 import { colourNeedsCloser, colourRangeNote, colourRangeText, dcMotorUse, NEAR_FOR_COLOUR_CM, robotParts, sensorSummary, sensorsViewHint } from './robot-parts';
 import { addRulerPoint, EMPTY_RULER, rulerText } from './ruler';
 import { lineMark, linePoints, lineTime, ScoreSheet, StatusLine, type StatusLineProps } from './ScoreSheet';
@@ -513,8 +513,24 @@ test('end: the longest end of an attempt - 80 points after a restart - stays sho
   const brief = text(html).replace(/Score sheet$/, '');
   assert.match(brief, /^Attempt over\. Mission complete at 0:\d\d\.\d with 80 of 100 points\. Final score: 80 \/ 100 \(1 restart: points cleared\)$/);
   assert.ok(brief.length <= 115, `${brief.length} characters`);
-  // beside the blocks the line never shows more than two lines of text
-  assert.match(html, /<p role="status" aria-live="polite" class="min-w-0 flex-1 lg:line-clamp-2">/);
+  // beside the blocks the line never shows more than two lines of text - and where two lines
+  // are too short for it (a window 1024 wide), the cut line carries its whole text as a hint
+  const cut = /<p role="status" aria-live="polite" class="min-w-0 flex-1 lg:line-clamp-2" title="([^"]*)">/.exec(html);
+  assert.ok(cut, html.slice(0, 300));
+  assert.equal(cut[1], brief, 'the hint is the text of the line, word for word');
+  // (the same for the other brief endings: every one of them is the line's own text)
+  for (const [reason, detail, score] of [
+    ['mission-complete', 'Mission complete at 0:15.6: the fan blew at the fire for 3 seconds.', { ...sim.score(), total: 100, complete: true }],
+    ['time', null, sim.score()],
+    ['target-displaced', 'The robot pushed the fire target out of its place (by 12.5 mm). The attempt ends here; the points earned before stay.', sim.score()],
+  ] as const) {
+    const line = statusLine('finished', score, { ...props, finishReason: reason, finishDetail: detail, briefEnding: true });
+    const hint = / title="([^"]*)"/.exec(line);
+    assert.ok(hint, reason);
+    assert.equal(hint[1].replace(/&#x27;/g, "'").replace(/&amp;/g, '&'), text(line).replace(/Score sheet$/, ''), reason);
+  }
+  // without the brief ending (every sheet of Fire Rescue) the line has no hint: it is what it always was
+  assert.doesNotMatch(statusLine('finished', sim.score(), props), / title=/);
   // while the attempt runs the line is what it was: nothing is cut, and "no restart left" is still news
   const running = statusLine('running', sim.score(), { ...props, briefEnding: true });
   assert.match(running, /<p role="status" aria-live="polite" class="min-w-0 flex-1">/);
@@ -755,7 +771,7 @@ test('robot parts: the few words on the closed Sensors panel', () => {
   );
 });
 
-test('robot parts: close to something and still "none" - the closed Sensors panel says how close the colour sensor must be', () => {
+test('robot parts: close to something and still "none" - the closed Sensors panel says why, and the 1.5 cm are only ever said as the simulator\'s', () => {
   const chief = robotParts(FIRE_CHIEF_ROBOT);
   const rescue = robotParts(DEFAULT_ROBOT_CONFIG);
   assert.equal(colourRangeText(chief.frontColour!), '1.5 cm');
@@ -763,28 +779,42 @@ test('robot parts: close to something and still "none" - the closed Sensors pane
   // 2.5 cm in front of the fire target: the ultrasonic sensor says 3 cm (it cannot say less), the colour sensor "none"
   const near = { lineStatus: 0, ultrasonicCm: 3, frontColor: 'none' as const, fanOn: false };
   assert.equal(colourNeedsCloser(chief, near), true);
-  assert.equal(sensorSummary(chief, near), '3 cm · colour none (needs 1.5 cm) · fan off');
-  assert.equal(sensorSummary(chief, { ...near, ultrasonicCm: 5 }), '5 cm · colour none (needs 1.5 cm) · fan off');
+  assert.equal(sensorSummary(chief, near), '3 cm · colour none (too far) · fan off');
+  assert.equal(sensorSummary(chief, { ...near, ultrasonicCm: 5 }), '5 cm · colour none (too far) · fan off');
+  assert.equal(sensorSummary(chief, { ...near, ultrasonicCm: 5, fanOn: true }), '5 cm · colour none (too far) · fan on');
+  // (the longest of these words must fit the closed panel of a phone that is 360 wide: they are shorter than the
+  // ones that were cut off there - "5 cm · colour none (needs 1.5 cm) · fan off" - by five letters)
+  assert.ok(sensorSummary(chief, { ...near, ultrasonicCm: 5 }).length <= 38);
   // close enough, and it reads: nothing to explain
   assert.equal(sensorSummary(chief, { ...near, frontColor: 'red' }), 'line 0 · 3 cm · colour red · fan off');
   assert.equal(sensorSummary(chief, { ...near, frontColor: 'yellow' }), 'line 0 · 3 cm · colour yellow · fan off');
   // far from everything: "none" needs no explanation
   assert.equal(sensorSummary(chief, { ...near, ultrasonicCm: 5.1 }), 'line 0 · 5 cm · colour none · fan off');
   assert.equal(sensorSummary(chief, { ...near, ultrasonicCm: 34.4 }), 'line 0 · 34 cm · colour none · fan off');
-  // the number is the robot's own: another range, other words
+  // How close it must be is a choice of this simulator. The closed panel has no room to say so,
+  // so it gives no number at all: the number stands in the open panel and in the hint of the
+  // Sensors button, each time with "in this simulator" - and it is the robot's own number
   const far = robotParts({ ...FIRE_CHIEF_ROBOT, frontColorSensor: { ...FIRE_CHIEF_ROBOT.frontColorSensor, rangeMm: 22 } });
-  assert.equal(sensorSummary(far, near), '3 cm · colour none (needs 2.2 cm) · fan off');
+  assert.equal(sensorSummary(far, near), '3 cm · colour none (too far) · fan off');
+  for (const parts of [chief, far]) {
+    const range = colourRangeText(parts.frontColour!);
+    assert.ok(!sensorSummary(parts, near).includes(range), 'no bare number on the closed panel');
+    for (const sentence of [colourRangeNote(parts.frontColour!), sensorsViewHint(parts)]) {
+      assert.ok(sentence.includes(range) && /in this simulator/i.test(sentence), sentence);
+    }
+  }
+  assert.equal(colourRangeText(far.frontColour!), '2.2 cm');
   // Fire Rescue has no such sensor: its words never change, however close the robot is
   assert.equal(colourNeedsCloser(rescue, near), false);
   assert.equal(sensorSummary(rescue, near), 'line 0 · 3 cm · claw empty');
   // the hint of the "Sensors" button under the mat: Fire Rescue's is the sentence it always was
   assert.equal(sensorsViewHint(rescue), 'Show what the line sensor and the ultrasonic sensor see');
-  assert.equal(sensorsViewHint(chief), 'Show what the line sensor and the ultrasonic sensor see, and how far the colour sensor reads (1.5 cm)');
+  assert.equal(sensorsViewHint(chief), 'Show what the line sensor and the ultrasonic sensor see, and how far the colour sensor reads (in this simulator: 1.5 cm)');
   // in a real run: the robot stands 2.5 cm in front of the red target and reads "none"
   const sim = createSimulation({ game: fireChiefGame, scenario: openField('living', 'back'), program: {}, startPose: { x: 150, y: 20 + 25 + FIRE_CHIEF_ROBOT.chassisFront, heading: 0 } });
   const read = sim.readSensors();
   assert.deepEqual([read.frontColor, read.ultrasonicCm], ['none', 3]);
-  assert.equal(sensorSummary(chief, read), '3 cm · colour none (needs 1.5 cm) · fan off');
+  assert.equal(sensorSummary(chief, read), '3 cm · colour none (too far) · fan off');
 });
 
 test('the stage: the short line of the colour sensor is exactly as long as its range - and only a robot with such a sensor has one', () => {
@@ -813,6 +843,92 @@ test('the stage: the short line of the colour sensor is exactly as long as its r
   // Fire Rescue's sensor looks at the claw: no line; and a robot whose sensor is switched off has none
   assert.equal(colourSight(DEFAULT_ROBOT_CONFIG, pose, 0.3), null);
   assert.equal(colourSight({ ...FIRE_CHIEF_ROBOT, frontColorSensor: { ...FIRE_CHIEF_ROBOT.frontColorSensor, enabled: false } }, pose, 0.3), null);
+});
+
+test('the stage: nothing of the colour sensor\'s line is painted beyond the end of its range - flat ends, on a small stage and on a large one', () => {
+  const range = FIRE_CHIEF_ROBOT.frontColorSensor.rangeMm;
+  assert.equal(range, 15);
+  const near = (value: number, wanted: number, slack: number): void => assert.ok(Math.abs(value - wanted) <= slack, `${value} is ${wanted}`);
+  // (dots per millimetre: a phone that is 360 wide, a desktop window, an enlarged stage)
+  for (const scale of [0.12, 0.19, 0.3085, 0.6, 1, 2.5]) {
+    for (const heading of [0, 37 * DEG, 90 * DEG, -135 * DEG, 180 * DEG]) {
+      const pose: Pose = { x: 400, y: 900, heading };
+      const sight = colourSight(FIRE_CHIEF_ROBOT, pose, scale);
+      assert.ok(sight);
+      const where = `${scale} dots per mm, heading ${Math.round(heading / DEG)}`;
+      // how far a point lies ahead of the face of the sensor, and how far beside the line
+      const ahead = (p: { x: number; y: number }): number => (p.x - sight.from.x) * Math.sin(heading) - (p.y - sight.from.y) * Math.cos(heading);
+      const beside = (p: { x: number; y: number }): number => (p.x - sight.from.x) * Math.cos(heading) + (p.y - sight.from.y) * Math.sin(heading);
+      const [edge, colour] = sight.strokes;
+      near(edge.width * scale, 4.5, 1e-9);
+      near(colour.width * scale, 2.2, 1e-9);
+      for (const stroke of sight.strokes) {
+        // With flat ends a stroke covers its line and half its width to each SIDE of the line -
+        // nothing before its beginning and nothing after its end.
+        // the line from the sensor: from the face straight ahead, never past the end of the range
+        near(ahead(stroke.stem[0]), 0, 1e-9);
+        near(beside(stroke.stem[0]), 0, 1e-9);
+        near(beside(stroke.stem[1]), 0, 1e-9);
+        assert.ok(ahead(stroke.stem[1]) >= -1e-9 && ahead(stroke.stem[1]) <= range + 1e-9, where);
+        // the bar: square to that line, and its far side - the middle line plus half the width - is within the range
+        near(ahead(stroke.bar[0]), ahead(stroke.bar[1]), 1e-9);
+        near(beside(stroke.bar[0]), -beside(stroke.bar[1]), 1e-9);
+        assert.ok(ahead(stroke.bar[0]) + stroke.width / 2 <= range + 1e-9, `${where}: the bar ends ${ahead(stroke.bar[0]) + stroke.width / 2} mm ahead`);
+        // the line from the sensor ends in the bar, not beyond it
+        assert.ok(ahead(stroke.stem[1]) <= ahead(stroke.bar[0]) + stroke.width / 2 + 1e-9, where);
+      }
+      // the far side of the dark edge IS the end of the range: the drawing shows exactly where "close enough" ends
+      near(ahead(edge.bar[0]) + edge.width / 2, range, 1e-9);
+      // the colour lies inside its dark edge, with the same margin on every side of the bar
+      const margin = (edge.width - colour.width) / 2;
+      near(ahead(colour.bar[0]), ahead(edge.bar[0]), 1e-9);
+      near(beside(edge.bar[1]) - beside(colour.bar[1]), margin, 1e-9);
+      // the bar is as wide as ever: at least 9 dots, at least 12 mm
+      near(beside(edge.bar[1]) * 2, Math.max(12, 9 / scale), 1e-9);
+    }
+  }
+  // what the canvas is told: flat ends ("butt"), the dark edge first, the colour on top - white while the sensor reads nothing
+  const draw = (frontColor: 'none' | 'red'): string[] => {
+    const calls: string[] = [];
+    const round = (value: number): string => value.toFixed(3);
+    const ctx = {
+      save: () => calls.push('save'),
+      restore: () => calls.push('restore'),
+      beginPath: () => calls.push('begin'),
+      moveTo: (x: number, y: number) => calls.push(`move ${round(x)} ${round(y)}`),
+      lineTo: (x: number, y: number) => calls.push(`line ${round(x)} ${round(y)}`),
+      stroke: () => calls.push(`stroke ${ctx.lineCap} ${round(ctx.lineWidth)} ${ctx.strokeStyle}`),
+      lineCap: 'round',
+      lineWidth: 1,
+      strokeStyle: '',
+    };
+    drawColourSight(ctx as unknown as CanvasRenderingContext2D, { robotConfig: FIRE_CHIEF_ROBOT, world: { robot: { pose: { x: 400, y: 900, heading: 0 } } } }, { frontColor }, { scale: 0.5 });
+    return calls;
+  };
+  const front = 900 - FIRE_CHIEF_ROBOT.chassisFront;
+  // (at 0.5 dots per mm the dark edge is 9 mm thick: the middle line of the bar is 4.5 mm before the end, 10.5 mm ahead of the face)
+  assert.deepEqual(draw('none'), [
+    'save',
+    'begin',
+    `move 400.000 ${front.toFixed(3)}`,
+    `line 400.000 ${(front - 10.5).toFixed(3)}`,
+    `move 391.000 ${(front - 10.5).toFixed(3)}`,
+    `line 409.000 ${(front - 10.5).toFixed(3)}`,
+    'stroke butt 9.000 #0f172a',
+    'begin',
+    `move 400.000 ${front.toFixed(3)}`,
+    `line 400.000 ${(front - 10.5).toFixed(3)}`,
+    `move 393.300 ${(front - 10.5).toFixed(3)}`,
+    `line 406.700 ${(front - 10.5).toFixed(3)}`,
+    'stroke butt 4.400 #ffffff',
+    'restore',
+  ]);
+  const red = draw('red');
+  assert.match(red[12], /^stroke butt 4\.400 #(?!ffffff)[0-9a-f]{6}$/);
+  // a robot without such a sensor: nothing is drawn at all
+  const none: string[] = [];
+  drawColourSight({ save: () => none.push('save') } as unknown as CanvasRenderingContext2D, { robotConfig: DEFAULT_ROBOT_CONFIG, world: { robot: { pose: { x: 400, y: 900, heading: 0 } } } }, { frontColor: 'none' }, { scale: 0.5 });
+  assert.deepEqual(none, []);
 });
 
 test('Sensors panel: Fire Chief shows colour sensor, DC motors and fan - and no claw, arm, servo or flame sensor', () => {

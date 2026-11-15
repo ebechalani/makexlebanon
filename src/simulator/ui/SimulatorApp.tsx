@@ -648,6 +648,10 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
   // the rules window: with a second part under the rules, its titles are real headings (see rulesSection)
   const twoPartRules = props.rulesExtra !== undefined;
   const RulesTitle = twoPartRules ? 'h2' : 'p';
+  // (a heading of this website is set a little tighter and its lines are balanced: these two titles
+  // keep the look they had as plain paragraphs. The title of a window without a second part IS a
+  // paragraph, and its classes are what they always were.)
+  const rulesTitleLook = `text-base font-bold text-ink-900${twoPartRules ? ' tracking-normal text-wrap' : ''}`;
 
   /** The small message of the simulator (see `say`). */
   const message = notice && (
@@ -689,13 +693,13 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
               className="mbot2-rules-panel absolute right-0 top-full z-40 mt-2 w-[min(30rem,calc(100vw-1.5rem))] overflow-y-auto rounded-card border border-slate-200 bg-white p-4 text-ink-800 shadow-2xl"
             >
               {/* (a window with two parts has real headings: see rulesSection) */}
-              <RulesTitle className="text-base font-bold text-ink-900">{props.title}: the rules in short</RulesTitle>
+              <RulesTitle className={rulesTitleLook}>{props.title}: the rules in short</RulesTitle>
               {props.rulesNote && <p className="mt-1 rounded-md bg-amber-100 px-2 py-1 text-xs font-semibold leading-snug text-amber-900">{props.rulesNote}</p>}
               {props.rules.map((section) => rulesSection(section, twoPartRules))}
               {/* what is not a rule gets its own heading, clearly apart from the rules above it */}
               {props.rulesExtra && (
                 <div className="mt-4 border-t-2 border-slate-200 pt-3" data-rules-extra>
-                  <h2 className="text-base font-bold text-ink-900">{props.rulesExtra.title}</h2>
+                  <h2 className={rulesTitleLook}>{props.rulesExtra.title}</h2>
                   {props.rulesExtra.note && <p className="mt-1 rounded-md bg-sky-100 px-2 py-1 text-xs font-semibold leading-snug text-sky-900">{props.rulesExtra.note}</p>}
                   {props.rulesExtra.sections.map((section) => rulesSection(section, true))}
                 </div>

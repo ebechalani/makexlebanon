@@ -16,19 +16,25 @@ import { GAME_WHEN_NONE_IS_NAMED, handleUnlockRequest, type UnlockSetup } from '
 import { blankProgram } from './program-file';
 import {
   answerIsAbout,
+  codeAnswerUse,
   hiddenCode,
   isSavedCode,
   readUnlockAnswer,
   requestUnlock,
   requestUnlockPatiently,
   savedCodeChange,
+  savedCodeIn,
+  savedCodeNow,
   tidyCode,
   CODE_LOOKS_LIKE,
   CODE_PLACEHOLDER,
   EXAMPLES_GAMES,
   GAME_OF_AN_UNNAMED_ANSWER,
   SAVED_CODE_KEY,
+  type CodeAnswerUse,
+  type CodeAsked,
   type ExamplesSource,
+  type SavedCodeChange,
 } from './member-unlock';
 import { storageKey } from './storage';
 
@@ -563,8 +569,344 @@ describe('the code as it is typed, shown and remembered', () => {
     }
   });
 
+  test('the code in the browser\'s memory is read in its handed-out form, and what is no code is no code', () => {
+    assert.equal(savedCodeIn(JSON.stringify({ code: 'FIRE-7K2M-9QXD' })), 'FIRE-7K2M-9QXD');
+    assert.equal(savedCodeIn(JSON.stringify({ code: 'fire 7k2m 9qxd' })), 'FIRE-7K2M-9QXD');
+    for (const nothing of [null, '', 'not json', '{}', '{"code":7}', '{"code":"FIRE-7K2M"}', '[]', 'null', '"FIRE-7K2M-9QXD"']) assert.equal(savedCodeIn(nothing), null, String(nothing));
+    // the memory against a tab: the same code is no news, no code is "forgotten", another code is that code
+    assert.deepEqual(savedCodeNow('FIRE-7K2M-9QXD', 'FIRE-7K2M-9QXD'), { kind: 'none' });
+    assert.deepEqual(savedCodeNow(null, null), { kind: 'none' });
+    assert.deepEqual(savedCodeNow(null, 'FIRE-7K2M-9QXD'), { kind: 'forgotten' });
+    assert.deepEqual(savedCodeNow('FIRE-BBBB-3333', 'FIRE-7K2M-9QXD'), { kind: 'code', code: 'FIRE-BBBB-3333' });
+    assert.deepEqual(savedCodeNow('FIRE-BBBB-3333', null), { kind: 'code', code: 'FIRE-BBBB-3333' });
+  });
+
   test('the texts that show what a code looks like have the shape of a code', () => {
     assert.equal(CODE_PLACEHOLDER, 'FIRE-XXXX-XXXX');
     assert.equal(tidyCode(CODE_LOOKS_LIKE), CODE_LOOKS_LIKE);
+  });
+});
+
+describe('several tabs of one browser and the one saved code', () => {
+  const MEMBER = 'FIRE-AAAA-2222';
+  const ADVANCED = 'FIRE-DDDD-5555';
+
+  test('an answer about a code: only a typed code is written into the browser\'s memory, and an answer about the saved code counts only while the memory holds it', () => {
+    // typed in this tab: the answer counts, and a "yes" is saved - whatever the memory holds meanwhile
+    for (const inMemory of [null, MEMBER, ADVANCED]) assert.deepEqual(codeAnswerUse('typed', MEMBER, inMemory), { kind: 'take', save: true }, String(inMemory));
+    // the saved code (start of a visit, "Try again", another tab saved it): it is in the memory already, so it is never written again
+    assert.deepEqual(codeAnswerUse('saved', MEMBER, MEMBER), { kind: 'take', save: false });
+    // ... it was forgotten while the server was asked: the answer is dropped, and the tab locks
+    assert.deepEqual(codeAnswerUse('saved', MEMBER, null), { kind: 'drop', change: { kind: 'forgotten' } });
+    // ... another code took its place meanwhile: the answer is dropped, and the tab follows that code
+    assert.deepEqual(codeAnswerUse('saved', MEMBER, ADVANCED), { kind: 'drop', change: { kind: 'code', code: ADVANCED } });
+  });
+
+  // ---------------------------------------------------------------------------------------------
+  // A pretend browser: one memory, some tabs, and a server whose answers the test lets through
+  // one by one (so that an answer can be held back while something else happens).
+  //
+  // A tab here does what the simulator screen does with a code (useMemberExamples.ts), step for
+  // step, and takes every decision from the functions under test. `Rules` says which ones:
+  // TODAY's, or the ones the screen had BEFORE - written out below - with which the three faults
+  // of the first version can be played again.
+  // ---------------------------------------------------------------------------------------------
+  interface Rules {
+    /** a tab that follows another tab takes the code for its saved one and locks, as at the start of a visit - before it asks */
+    followsAsAfterALoad: boolean;
+    answerUse: (about: CodeAsked, code: string, inMemory: string | null) => CodeAnswerUse;
+  }
+  const TODAY: Rules = { followsAsAfterALoad: true, answerUse: codeAnswerUse };
+  /** Before: every tab wrote every accepted code back, no tab looked into the memory again, and a code that was only followed was nobody's saved code. */
+  const BEFORE: Rules = { followsAsAfterALoad: false, answerUse: () => ({ kind: 'take', save: true }) };
+
+  type Reply = 'yes' | 'no' | 'not reached';
+  interface Question {
+    tab: Tab;
+    number: number;
+    code: string;
+    about: CodeAsked;
+  }
+
+  class Browser {
+    /** the text under SAVED_CODE_KEY, or null */
+    memory: string | null = null;
+    readonly tabs: Tab[] = [];
+    /** the questions that are on their way to the server, oldest first */
+    readonly onTheWay: Question[] = [];
+    /** how many questions were sent in all */
+    sent = 0;
+    constructor(readonly rules: Rules) {}
+
+    open(): Tab {
+      const tab = new Tab(this);
+      this.tabs.push(tab);
+      return tab;
+    }
+    /** (the browser tells every OTHER tab, and only when something changed) */
+    write(by: Tab, code: string): void {
+      const text = JSON.stringify({ code });
+      if (text === this.memory) return;
+      this.memory = text;
+      for (const tab of this.tabs) if (tab !== by) tab.onStorage(SAVED_CODE_KEY, text);
+    }
+    remove(by: Tab): void {
+      if (this.memory === null) return;
+      this.memory = null;
+      for (const tab of this.tabs) if (tab !== by) tab.onStorage(SAVED_CODE_KEY, null);
+    }
+    get saved(): string | null {
+      return savedCodeIn(this.memory);
+    }
+    /** The answer to the oldest question of this tab arrives. */
+    answer(tab: Tab, reply: Reply = 'yes'): void {
+      const at = this.onTheWay.findIndex((question) => question.tab === tab);
+      assert.ok(at >= 0, 'a question of this tab is on its way');
+      const [question] = this.onTheWay.splice(at, 1);
+      tab.onAnswer(question, reply);
+    }
+    /** Every answer arrives, oldest first, until no question is on its way. Gives up after `most` answers: says how many arrived. */
+    settle(most = 300): number {
+      let arrived = 0;
+      while (this.onTheWay.length > 0 && arrived < most) {
+        const question = this.onTheWay.shift() as Question;
+        question.tab.onAnswer(question, 'yes');
+        arrived++;
+      }
+      return arrived;
+    }
+  }
+
+  class Tab {
+    /** the code this tab takes for the saved one ("Saved on this device", "Try again") */
+    saved: string | null;
+    /** the code whose examples are open here */
+    open: string | null = null;
+    phase: 'none' | 'checking' | 'unlocked' | 'rejected' | 'unreachable' = 'none';
+    about: CodeAsked = 'saved';
+    private latest = 0;
+
+    constructor(private readonly browser: Browser) {
+      // the start of a visit: the saved code is checked again
+      this.saved = browser.saved;
+      if (this.saved !== null) this.ask(this.saved, 'saved');
+    }
+    /** a code is typed and sent ("Unlock", or "Use this code") */
+    type(code: string): void {
+      this.ask(code, 'typed');
+    }
+    /** "Forget this code on this device" */
+    forget(): void {
+      this.browser.remove(this);
+      this.lock();
+    }
+    /** "Try again" is on the screen (see ExamplesDialog.tsx) ... */
+    get offersTryAgain(): boolean {
+      return this.saved !== null && this.open === null && this.about === 'saved' && this.phase === 'unreachable';
+    }
+    /** ... and is pressed */
+    tryAgain(): void {
+      assert.ok(this.offersTryAgain, '"Try again" is on the screen');
+      this.ask(this.saved as string, 'saved');
+    }
+    onStorage(key: string | null, newValue: string | null): void {
+      this.follow(savedCodeChange(key, newValue, this.saved));
+    }
+    onAnswer(question: Question, reply: Reply): void {
+      // (only the answer to the latest question counts)
+      if (question.number !== this.latest) return;
+      const use = this.browser.rules.answerUse(question.about, question.code, this.browser.saved);
+      if (use.kind === 'drop') {
+        this.follow(use.change);
+        return;
+      }
+      this.about = question.about;
+      if (reply === 'yes') {
+        this.open = question.code;
+        this.saved = question.code;
+        if (use.save) this.browser.write(this, question.code);
+        this.phase = 'unlocked';
+      } else {
+        this.phase = reply === 'no' ? 'rejected' : 'unreachable';
+      }
+    }
+    private ask(code: string, about: CodeAsked): void {
+      this.phase = 'checking';
+      this.about = about;
+      this.browser.sent++;
+      this.browser.onTheWay.push({ tab: this, number: ++this.latest, code, about });
+    }
+    private lock(): void {
+      this.latest++;
+      this.open = null;
+      this.saved = null;
+      this.phase = 'none';
+      this.about = 'saved';
+    }
+    private follow(change: SavedCodeChange): void {
+      if (change.kind === 'none') return;
+      if (change.kind === 'forgotten') {
+        this.lock();
+        return;
+      }
+      if (this.browser.rules.followsAsAfterALoad) {
+        this.lock();
+        this.saved = change.code;
+      }
+      this.ask(change.code, 'saved');
+    }
+  }
+
+  /** What the tabs show, and what the memory holds: "open ADVANCED | locked | memory: ADVANCED". */
+  const picture = (browser: Browser): string =>
+    [...browser.tabs.map((tab) => (tab.open === null ? 'locked' : `open ${tab.open}`)), `memory: ${browser.saved ?? 'nothing'}`].join(' | ');
+
+  /** One code accepted in the first of `count` tabs, and every other tab has followed. */
+  function allOpenWith(code: string, count: number, rules: Rules): Browser {
+    const browser = new Browser(rules);
+    const tabs = Array.from({ length: count }, () => browser.open());
+    tabs[0].type(code);
+    browser.settle();
+    assert.equal(picture(browser), [...tabs.map(() => `open ${code}`), `memory: ${code}`].join(' | '));
+    return browser;
+  }
+
+  test('"Forget" stays forgotten: a tab that was still asking about the code does not bring it back', () => {
+    const play = (rules: Rules): string => {
+      const browser = new Browser(rules);
+      const [first, second] = [browser.open(), browser.open()];
+      // the code is accepted in the first tab; the second tab starts asking about it - and its answer is held back
+      first.type(ADVANCED);
+      browser.answer(first);
+      assert.equal(browser.onTheWay.length, 1, 'the second tab is asking');
+      // "Forget this code on this device" in the first tab, right away
+      first.forget();
+      assert.equal(picture(browser), 'locked | locked | memory: nothing');
+      // now the held answer arrives, and whatever follows from it
+      browser.settle();
+      return picture(browser);
+    };
+    assert.equal(play(TODAY), 'locked | locked | memory: nothing');
+    // (the fault this test is for, played with the rules of before: the code is back in the memory and both tabs are open again)
+    assert.equal(play(BEFORE), `open ${ADVANCED} | open ${ADVANCED} | memory: ${ADVANCED}`);
+  });
+
+  test('a tab that follows never writes: forgetting in a tab that only followed locks every tab, and nothing comes back', () => {
+    const browser = allOpenWith(ADVANCED, 3, TODAY);
+    const sent = browser.sent;
+    browser.tabs[2].forget();
+    assert.equal(picture(browser), 'locked | locked | locked | memory: nothing');
+    assert.equal(browser.settle(), 0);
+    assert.equal(browser.sent, sent, 'forgetting asks the server nothing');
+  });
+
+  test('three tabs and two right codes come to rest: no tab puts an older code over a newer one', () => {
+    const play = (rules: Rules): { arrived: number; picture: string } => {
+      const browser = allOpenWith(ADVANCED, 3, rules);
+      const [first, second, third] = browser.tabs;
+      // 1. "Use a different code" in the first tab: the member code. The other two start asking about it
+      first.type(MEMBER);
+      browser.answer(first);
+      // 2. the second tab has followed, and goes back to the advanced code - while the answer to the third tab hangs
+      browser.answer(second);
+      second.type(ADVANCED);
+      browser.answer(second);
+      // 3. now the answer to the third tab arrives after all, and every answer after it
+      browser.answer(third);
+      return { arrived: browser.settle(300), picture: picture(browser) };
+    };
+    const today = play(TODAY);
+    assert.ok(today.arrived <= 3, `${today.arrived} more answers, then nothing is on its way`);
+    assert.equal(today.picture, `open ${ADVANCED} | open ${ADVANCED} | open ${ADVANCED} | memory: ${ADVANCED}`);
+    // (with the rules of before the tabs never stop asking each other: 300 answers later questions are still on their way)
+    assert.equal(play(BEFORE).arrived, 300);
+  });
+
+  test('one action, at most one question per other tab - with two, three and four tabs', () => {
+    for (const count of [2, 3, 4]) {
+      const browser = allOpenWith(MEMBER, count, TODAY);
+      // (the first code: one question of the tab it was typed in, one of every other tab)
+      assert.equal(browser.sent, count, `${count} tabs: the first code`);
+      // "Use a different code" in the last tab
+      browser.tabs[count - 1].type(ADVANCED);
+      browser.settle();
+      assert.equal(browser.sent, 2 * count, `${count} tabs: a different code`);
+      assert.equal(picture(browser), [...browser.tabs.map(() => `open ${ADVANCED}`), `memory: ${ADVANCED}`].join(' | '));
+      // a wrong code typed in one tab is asked about by that tab alone, and changes nothing anywhere
+      browser.tabs[0].type('FIRE-CCCC-4444');
+      browser.answer(browser.tabs[0], 'no');
+      assert.equal(browser.settle(), 0);
+      assert.equal(browser.sent, 2 * count + 1, `${count} tabs: a wrong code`);
+      assert.equal(browser.saved, ADVANCED);
+      // forgetting: no question at all
+      browser.tabs[0].forget();
+      assert.equal(browser.settle(), 0);
+      assert.equal(browser.sent, 2 * count + 1, `${count} tabs: forgetting`);
+      assert.equal(picture(browser), [...browser.tabs.map(() => 'locked'), 'memory: nothing'].join(' | '));
+    }
+  });
+
+  test('a tab that could not reach the website when another tab\'s code arrived has that code as its saved code: "Try again" is there and works', () => {
+    const play = (rules: Rules): { saved: string | null; offersTryAgain: boolean; browser: Browser; second: Tab } => {
+      const browser = new Browser(rules);
+      const [first, second] = [browser.open(), browser.open()];
+      first.type(MEMBER);
+      browser.answer(first);
+      // the second tab asks about the code, and the website cannot be reached
+      browser.answer(second, 'not reached');
+      assert.deepEqual([second.phase, second.about, second.open], ['unreachable', 'saved', null]);
+      return { saved: second.saved, offersTryAgain: second.offersTryAgain, browser, second };
+    };
+    const { saved, offersTryAgain, browser, second } = play(TODAY);
+    // the state of a tab that was loaded with the code in the memory: the window says "press Try again" and has the button (see examples-words.test.ts)
+    assert.equal(saved, MEMBER);
+    assert.ok(offersTryAgain);
+    second.tryAgain();
+    browser.answer(second);
+    assert.equal(picture(browser), `open ${MEMBER} | open ${MEMBER} | memory: ${MEMBER}`);
+    // (the second tab only followed: it asked twice and wrote nothing, so the first tab was not asked to follow anything)
+    assert.equal(browser.sent, 3);
+    assert.equal(browser.settle(), 0);
+    // while it waits for "Try again", forgetting in the first tab still locks it for good
+    const again = play(TODAY);
+    again.browser.tabs[0].forget();
+    assert.deepEqual([again.second.saved, again.second.offersTryAgain, picture(again.browser)], [null, false, 'locked | locked | memory: nothing']);
+    // (the fault, with the rules of before: the tab says "could not be checked" about a saved code it does not have - no button, nothing to ask again)
+    const before = play(BEFORE);
+    assert.deepEqual([before.saved, before.offersTryAgain], [null, false]);
+  });
+
+  test('a tab that follows another code closes what its own code had opened until the website has answered - also when it cannot be reached', () => {
+    const browser = allOpenWith(ADVANCED, 2, TODAY);
+    const [first, second] = browser.tabs;
+    // the advanced code gives way to a member code in the first tab ...
+    first.type(MEMBER);
+    browser.answer(first);
+    // ... and the second tab stands as it would after a load with that code: nothing of the advanced code is open while it asks
+    assert.deepEqual([second.open, second.saved, second.phase, second.about], [null, MEMBER, 'checking', 'saved']);
+    browser.answer(second, 'not reached');
+    assert.deepEqual([second.open, second.saved, second.offersTryAgain], [null, MEMBER, true]);
+    second.tryAgain();
+    browser.settle();
+    assert.equal(picture(browser), `open ${MEMBER} | open ${MEMBER} | memory: ${MEMBER}`);
+  });
+
+  test('the saved code was replaced while a tab asked about it at the start of a visit: the tab ends on the code that is saved', () => {
+    const browser = new Browser(TODAY);
+    const first = browser.open();
+    first.type(MEMBER);
+    browser.settle();
+    // a new tab is loaded and asks about the saved code; meanwhile the first tab changes to the advanced code
+    const second = browser.open();
+    assert.deepEqual([second.saved, second.phase], [MEMBER, 'checking']);
+    first.type(ADVANCED);
+    browser.answer(first);
+    browser.settle();
+    assert.equal(picture(browser), `open ${ADVANCED} | open ${ADVANCED} | memory: ${ADVANCED}`);
+    // a tab whose "storage" event got lost finds out when its answer comes: the memory decides
+    const third = browser.open();
+    browser.memory = null;
+    browser.answer(third);
+    assert.deepEqual([third.open, third.saved, third.phase], [null, null, 'none']);
   });
 });

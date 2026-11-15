@@ -228,8 +228,8 @@ test('rules: sentences that can be tried out are true on the real engine and ref
   // reaches the target: 15 mm in front of it when the robot comes straight at it. There the
   // sensor reads red only while the robot touches both walls, or almost touches them": a robot
   // that drives at it along the diagonal of the room. (A search over every pose near the
-  // corner, on a grid of 0.5 mm and 0.5 degrees, found red only with both walls 2.5 mm away or
-  // nearer - too slow for this suite.)
+  // corner, down to 0.05 mm and 0.05 degrees, found red only with both walls 3 mm away or
+  // nearer, and never with the robot clear of both by more than 1.4 mm - too slow for this suite.)
   const corner = targetPose('living', 'corner');
   const diagonal = corner.angle + Math.PI; // looking squarely at the front of the target
   const cornerFace = { x: corner.x + (TARGET_DEPTH / 2) * Math.sin(corner.angle), y: corner.y - (TARGET_DEPTH / 2) * Math.cos(corner.angle) };
@@ -413,7 +413,8 @@ test('rules: marked as a draft; the organiser\'s decisions are rules; what is as
     /The team touches the robot only when the referee allows it\./,
     /It must not damage the field, and it must not use a wall that was moved as a shortcut\./,
     /When equipment of the organiser fails, the referee can give the team a new attempt\./,
-    /Students build, program and run their robot themselves\./,
+    // draft §13: "Students are responsible for their robot's construction, programming, and operation." - and no more than that
+    /Students are responsible for building, programming and running their robot\./,
     /Coaches and spectators give no directions and send no commands during an attempt\./,
   ]) {
     assert.match(RULES_TEXT, said);
@@ -422,7 +423,8 @@ test('rules: marked as a draft; the organiser\'s decisions are rules; what is as
   // the simulator stops the robot itself (a real program has to), walls are drawn thicker than
   // they are, and close to the target the colour sensor can still read "none"
   for (const said of [
-    /the simulator stops the robot and its fan by itself\. On a real field your program has to stop them\./,
+    // (draft §6, step 6 asks the robot to stop; nothing in the draft asks for the fan to be switched off)
+    /the simulator stops the robot and its fan by itself\. On a real field your program has to stop the robot\./,
     /Walls are drawn thicker than they really are, so that you can see them\. The robot stops at the real wall, in the middle of the drawn one\. With the ruler, measure to the middle of a drawn wall\./,
     /a robot that stands close to the fire target can still read "none"/,
   ]) {
