@@ -368,6 +368,22 @@ export function savedCodeChange(key: string | null, newValue: string | null, min
 }
 
 /**
+ * What a tab does about a change of the saved code: nothing (null), or it locks what its own
+ * code had opened and from that moment takes `savedCode` for the saved code - the code in the
+ * browser's memory, which it then asks the server about; null when there is none.
+ *
+ * A tab that follows a code another tab saved stands exactly as a tab that was just loaded
+ * with that code in the browser's memory: the code is its saved code BEFORE the server has
+ * answered, not only after a "yes". So the window shows "Saved on this device", offers "Try
+ * again" when the server could not be reached, and asks again when it is opened again - and
+ * the tab knows which code it is asking about when that code is forgotten meanwhile.
+ */
+export function followSavedCode(change: SavedCodeChange): { savedCode: string | null } | null {
+  if (change.kind === 'none') return null;
+  return { savedCode: change.kind === 'code' ? change.code : null };
+}
+
+/**
  * Whose code a question to the server is about: one that was `typed` in this tab just now, or
  * the `saved` one - the code in the browser's memory, which is checked at the start of a visit,
  * with "Try again", and when another tab has saved it.

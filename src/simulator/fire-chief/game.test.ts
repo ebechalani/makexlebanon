@@ -1081,7 +1081,7 @@ test('40 points: a fan that is on from the first tick - the referee does not say
   };
   const { sim } = play(program, { startPose: IN_ROOM });
   const start = { ...sim.world.robot.pose };
-  const UNSEEN = 'the referee had not yet seen the robot stand still - right after the start or a restart that takes a moment';
+  const UNSEEN = 'the referee had not yet seen the robot stand still - that takes a moment after the start or a restart';
   sim.start();
   // the first tick: the fan blows, the robot stands - and the sheet does not say "the robot is moving"
   sim.step(1);

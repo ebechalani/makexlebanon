@@ -33,7 +33,7 @@
  * loaded with that code in the memory - and never writes it back; and an answer about the
  * saved code counts only while the memory still holds that code. So a tab whose answer comes
  * late cannot bring back a code that was forgotten meanwhile, and several tabs cannot go on
- * asking each other (see codeAnswerUse in ./member-unlock.ts).
+ * asking each other (see followSavedCode and codeAnswerUse in ./member-unlock.ts).
  *
  * Somebody whose examples are open can type a different code in the place of the one in use.
  * Nothing changes until the server has accepted the different code: when it is refused, or the
@@ -42,6 +42,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   codeAnswerUse,
+  followSavedCode,
   isSavedCode,
   requestUnlock,
   requestUnlockPatiently,
@@ -312,16 +313,17 @@ export function useMemberExamples(config: ExamplesConfig): MemberExamples {
   // the code opened - advanced ones included - would stay open for the next person.
   const followMemory = useCallback(
     (change: SavedCodeChange) => {
-      if (change.kind === 'none') return;
+      const follows = followSavedCode(change);
+      if (follows === null) return;
       // what a code opened here is locked in both cases: the code that opened it is no longer the saved one
       lockAgain();
-      if (change.kind === 'code') {
+      if (follows.savedCode !== null) {
         // From here on this tab stands as it does at the start of a visit with that code in the
         // browser's memory: the code is its saved code ("Saved on this device", "Try again" and
         // asking again when the window is opened all work), and it opens nothing until the
         // server has said so for this game. This tab does not write the code: it is saved already.
-        setSaved(change.code);
-        askCode(change.code, 'saved');
+        setSaved(follows.savedCode);
+        askCode(follows.savedCode, 'saved');
       }
     },
     [askCode, lockAgain, setSaved],

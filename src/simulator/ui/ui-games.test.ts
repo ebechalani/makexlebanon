@@ -785,6 +785,14 @@ test('robot parts: close to something and still "none" - the closed Sensors pane
   // (the longest of these words must fit the closed panel of a phone that is 360 wide: they are shorter than the
   // ones that were cut off there - "5 cm · colour none (needs 1.5 cm) · fan off" - by five letters)
   assert.ok(sensorSummary(chief, { ...near, ultrasonicCm: 5 }).length <= 38);
+  // "too far" is true of a wall as well: everything that stands on this field has a colour name,
+  // so the sensor reads "none" only when what it looks at is beyond its range
+  const wallAhead = (mm: number) =>
+    // (the fire is in the other room: the robot looks at the bare back wall of the living room, its nose `mm` from it)
+    createSimulation({ game: fireChiefGame, scenario: openField('bedroom', 'back'), program: {}, startPose: { x: 150, y: mm + FIRE_CHIEF_ROBOT.chassisFront, heading: 0 } }).readSensors();
+  assert.equal(sensorSummary(chief, wallAhead(2)), 'line 0 · 3 cm · colour yellow · fan off');
+  assert.equal(sensorSummary(chief, wallAhead(15)), 'line 0 · 3 cm · colour yellow · fan off');
+  assert.equal(sensorSummary(chief, wallAhead(16)), '3 cm · colour none (too far) · fan off');
   // close enough, and it reads: nothing to explain
   assert.equal(sensorSummary(chief, { ...near, frontColor: 'red' }), 'line 0 · 3 cm · colour red · fan off');
   assert.equal(sensorSummary(chief, { ...near, frontColor: 'yellow' }), 'line 0 · 3 cm · colour yellow · fan off');

@@ -439,7 +439,7 @@ function issueText(issue: FanIssue, past = false): string {
     case 'moving':
       return past ? 'the robot was moving - it must stand still' : 'the robot is moving - it must stand still';
     case 'unseen':
-      return `the referee ${past ? 'had' : 'has'} not yet seen the robot stand still - right after the start or a restart that takes a moment`;
+      return `the referee ${past ? 'had' : 'has'} not yet seen the robot stand still - that takes a moment after the start or a restart`;
     case 'no-target':
       return past ? 'there was no fire target on the field' : 'there is no fire target on the field';
     case 'touching':

@@ -17,6 +17,7 @@ import { blankProgram } from './program-file';
 import {
   answerIsAbout,
   codeAnswerUse,
+  followSavedCode,
   hiddenCode,
   isSavedCode,
   readUnlockAnswer,
@@ -602,6 +603,20 @@ describe('several tabs of one browser and the one saved code', () => {
     assert.deepEqual(codeAnswerUse('saved', MEMBER, ADVANCED), { kind: 'drop', change: { kind: 'code', code: ADVANCED } });
   });
 
+  test('a change of the saved code: the tab locks and takes the code in the memory for its saved code at once - before the server has answered', () => {
+    assert.equal(followSavedCode({ kind: 'none' }), null);
+    // forgotten: locked, and no saved code
+    assert.deepEqual(followSavedCode({ kind: 'forgotten' }), { savedCode: null });
+    // another tab saved a code: locked, and that code is this tab's saved code from now on (which it asks about)
+    assert.deepEqual(followSavedCode({ kind: 'code', code: ADVANCED }), { savedCode: ADVANCED });
+    // read from the "storage" event of a tab that had no code, and of one that had another
+    for (const mine of [null, MEMBER]) {
+      assert.deepEqual(followSavedCode(savedCodeChange(SAVED_CODE_KEY, JSON.stringify({ code: ADVANCED }), mine)), { savedCode: ADVANCED }, String(mine));
+    }
+    assert.equal(followSavedCode(savedCodeChange(SAVED_CODE_KEY, JSON.stringify({ code: MEMBER }), MEMBER)), null);
+    assert.equal(followSavedCode(savedCodeChange('something-else', null, MEMBER)), null);
+  });
+
   // ---------------------------------------------------------------------------------------------
   // A pretend browser: one memory, some tabs, and a server whose answers the test lets through
   // one by one (so that an answer can be held back while something else happens).
@@ -612,13 +627,20 @@ describe('several tabs of one browser and the one saved code', () => {
   // of the first version can be played again.
   // ---------------------------------------------------------------------------------------------
   interface Rules {
-    /** a tab that follows another tab takes the code for its saved one and locks, as at the start of a visit - before it asks */
-    followsAsAfterALoad: boolean;
+    /**
+     * What a tab does about a change of the saved code: nothing (null); or it locks, takes
+     * `savedCode` for its saved code and asks about it (null: no code) - as at the start of a
+     * visit; or, as it was before, it only asks about the code (`onlyAsk`).
+     */
+    follow: (change: SavedCodeChange) => { savedCode: string | null } | { onlyAsk: string } | null;
     answerUse: (about: CodeAsked, code: string, inMemory: string | null) => CodeAnswerUse;
   }
-  const TODAY: Rules = { followsAsAfterALoad: true, answerUse: codeAnswerUse };
+  const TODAY: Rules = { follow: followSavedCode, answerUse: codeAnswerUse };
   /** Before: every tab wrote every accepted code back, no tab looked into the memory again, and a code that was only followed was nobody's saved code. */
-  const BEFORE: Rules = { followsAsAfterALoad: false, answerUse: () => ({ kind: 'take', save: true }) };
+  const BEFORE: Rules = {
+    follow: (change) => (change.kind === 'none' ? null : change.kind === 'forgotten' ? { savedCode: null } : { onlyAsk: change.code }),
+    answerUse: () => ({ kind: 'take', save: true }),
+  };
 
   type Reply = 'yes' | 'no' | 'not reached';
   interface Question {
@@ -744,16 +766,18 @@ describe('several tabs of one browser and the one saved code', () => {
       this.about = 'saved';
     }
     private follow(change: SavedCodeChange): void {
-      if (change.kind === 'none') return;
-      if (change.kind === 'forgotten') {
-        this.lock();
+      const follows = this.browser.rules.follow(change);
+      if (follows === null) return;
+      if ('onlyAsk' in follows) {
+        // (before: what was open stayed open, and the code was nobody's saved code while the server was asked)
+        this.ask(follows.onlyAsk, 'saved');
         return;
       }
-      if (this.browser.rules.followsAsAfterALoad) {
-        this.lock();
-        this.saved = change.code;
+      this.lock();
+      if (follows.savedCode !== null) {
+        this.saved = follows.savedCode;
+        this.ask(follows.savedCode, 'saved');
       }
-      this.ask(change.code, 'saved');
     }
   }
 
