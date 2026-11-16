@@ -6,18 +6,26 @@
  *   2. Which areas should be highlighted on the mat?           -> overlays()
  *   3. What has the robot earned so far, when, and why (not)?  -> createReferee()
  *
- * The referee follows the rules (§5 - §8, "Beginner - Warehouse Sort (MakeX Lebanon, Local)"):
+ * The referee follows the rules (§5 - §8, "Beginner - Warehouse Sort (MakeX Lebanon, Local)"),
+ * with one change the owner of the site decided: one of the four cubes is BLUE, and the robot
+ * must leave it where it is ("Blue shouldn't be touched: the robot checks it; if it is blue, it
+ * leaves it" - ./scenario.ts). The three other cubes are red or green and are sorted as the
+ * rules say:
  *
  *   +5   Leave the start zone: the first moment a part of the robot is outside it (kept)
- *   +5   each cube picked: held by the gripper and lifted at least 1 cm, or carried (once per cube)
- *   +15  each cube in the bay of its own colour at the end: completely inside, standing on the
- *        mat, not held, not touching the robot
- *   -5   each cube in the bay of the other colour at the end (same conditions), "and no points
- *        for that cube": no +15, and no +5 for picking it either (Q10)
+ *   +5   each red or green cube picked: held by the gripper and lifted at least 1 cm, or
+ *        carried (once per cube)
+ *   +15  each red or green cube in the bay of its own colour at the end: completely inside,
+ *        standing on the mat, not held, not touching the robot
+ *   -5   each red or green cube in the bay of the other colour at the end (same conditions), "and
+ *        no points for that cube": no +15, and no +5 for picking it either (Q10)
+ *   -5   the blue cube is not where it was put (ASSUMPTION, Q15): it was picked up or lifted at
+ *        any time, the robot holds it at the end, or at the end it is more than 5 mm from its
+ *        place. Once, whatever happened to it. It never scores anything.
  *   +10  Finish park: at the end the robot touches one of the two round finish pads
  *   +5   Clean run: no restart
  *   -10  each restart: the robot goes back to the start zone, the clock runs on
- *   The total is never below 0. Highest score: 5 + 4 x 5 + 4 x 15 + 10 + 5 = 100.
+ *   The total is never below 0. Highest score: 5 + 3 x 5 + 3 x 15 + 10 + 5 = 80.
  *
  * A match lasts 90 s. It ends then, when the program has ended and the robot stands still, or
  * when the team says "Finished"; then the field is judged as it lies (like Fire Rescue).
@@ -34,17 +42,21 @@
  * the organiser. The README's list "Questions for the organiser" (section "The Warehouse Sort
  * simulator") has the same questions with the same numbers: change both together.
  *
+ *   (The field is turned 90 degrees to the right - the owner's decision, ./field.ts: what the
+ *   rules call "on the right", "upper middle", "top" is at the bottom, right of the middle and on
+ *   the right here.)
  *   Q1. §2 calls the start zone "a large green area on the right". The mat has a yellow-framed
  *       area with a blue picture there. The simulator uses that area, and counts the yellow
  *       frame in (as Fire Rescue counts its outlines).                    START_ZONE (./field.ts)
  *   Q2. §2 calls the finish pads "yellow circles with checkerboards". The mat has two round
- *       pictures without a checkerboard at the top and the bottom. The simulator uses those.
- *                                                                        FINISH_PADS (./field.ts)
+ *       pictures without a checkerboard at the top and the bottom of the print file (left and
+ *       right on the turned field). The simulator uses those.            FINISH_PADS (./field.ts)
  *   Q3. The finish park: §5 "park touching the circle", §8 "projection entirely inside one
  *       circle". The pads are 160 x 157 mm; the mBot2 with its gripper is 237 x 130 mm, so it
  *       can never be entirely inside one. The simulator scores "touching".           parkedOn()
- *   Q4. §6 "Example max = 85", but its own line items add up to 5 + 20 + 60 + 10 + 5 = 100.
- *       The simulator uses the line items.                                         MAX_SCORE
+ *   Q4. §6 "Example max = 85", but its own line items add up to 5 + 20 + 60 + 10 + 5 = 100 for
+ *       four cubes. With the blue cube (Q15) three cubes are sorted, and the line items give
+ *       5 + 15 + 45 + 10 + 5 = 80. The simulator uses the line items.             MAX_SCORE
  *   Q5. The clean run bonus (+5, "no human touch after GO"): taken as written, a robot that
  *       never moves earns it. The simulator gives it whenever no restart was used.  POINTS_CLEAN
  *   Q6. The rules give no size or weight for the cubes: 40 mm, light.
@@ -65,15 +77,28 @@
  *       the robot (the conditions of a delivery); a cube only partly inside costs nothing. And
  *       "no points for that cube" as written: that cube also loses its 5 for picking it up -
  *       read the same way as "no score" in Q9.                          judgeCube(), score()
- *   Q11. Leaving the start zone: the zone runs to the right edge of the mat, so a robot that
- *       backs over that edge onto the table has also left it, and gets the 5 points without
- *       driving into the field.                                          isOutsideStartZone()
+ *   Q11. Leaving the start zone: the zone runs to the edge of the mat (the bottom edge on the
+ *       turned field), so a robot that backs over that edge onto the table has also left it, and
+ *       gets the 5 points without driving into the field.                isOutsideStartZone()
  *   Q12. The rules have no walls ("teams may navigate freely as long as they stay on the mat").
  *       Leaving the mat costs nothing here; a table 100 mm wide around the mat stops the robot
  *       and the cubes.                                                  TABLE_STRIP (./field.ts)
  *   Q13. The total is never below 0 (as in Fire Rescue; the rules do not say).        score()
  *   Q14. Tie-breaker 3, "faster time of last correct delivery": the simulator shows the latest
  *       moment at which a cube that counts at the end was put down in its bay. LINE_LAST_DELIVERY
+ *   Q15. The blue cube is the owner's addition: the rules have no blue cube, so they do not say
+ *       what touching or moving it costs. The simulator: -5, once, when at the end the blue cube
+ *       is not where it was put - it was picked up or lifted at any time (also when a restart
+ *       put it back), the robot holds it, or it is more than 5 mm from its place (the largest
+ *       distance of one of its corners, as Fire Chief measures its target). A touch that does
+ *       not move it costs nothing. It counts once, wherever the cube ends (a bay, off the mat):
+ *       no "wrong bay" for it. A match in which it was moved is not "complete" (every goal),
+ *       though its line has no points. At a restart a cube in the claw goes back to its square
+ *       (engine): a blue cube that was only dragged there (less than CARRY_MM, never lifted) is
+ *       then left alone again, and the referee says "back in its place". If another cube stands
+ *       on its square, the engine puts it as close as there is room, and it is still judged
+ *       from its square: more than 5 mm away is moved. (Judge it from where the restart put it
+ *       instead? Part of the question.)          BLUE_PENALTY, BLUE_MOVED_MM, blueMove(), score()
  *
  * Not simulated: field damage (-20), the operator rules, the referee returning a cube (-5),
  * "the robot looks safe", "onboard battery only". The robot is the simulator's mBot2 (it fits
@@ -115,13 +140,16 @@ import {
 } from './field';
 import { START_POSE, WAREHOUSE_SORT_ROBOT } from './robot';
 import {
+  LEAVE_ALONE_COLOR,
   SCENARIO_COUNT,
+  blueWarehouse,
   decodeScenario,
   defaultScenario,
   describeScenario,
   encodeScenario,
   randomScenario,
   scenarioProblems,
+  sortedWarehouses,
   type CubeColor,
   type WarehouseSortScenario,
 } from './scenario';
@@ -139,9 +167,24 @@ export const POINTS_PARK = 10;
 export const POINTS_CLEAN = 5;
 /** Points removed for each restart ("human touch after GO"). */
 export const RESTART_PENALTY = 10;
+/** Four warehouses, one cube on each. */
 export const CUBE_COUNT = WAREHOUSE_IDS.length;
-/** 5 + 4 x 5 + 4 x 15 + 10 + 5 = 100 (the rules' own line items; their "example max = 85" does not add up). */
-export const MAX_SCORE = POINTS_LEAVE_START + CUBE_COUNT * (POINTS_PICK + POINTS_DELIVER) + POINTS_PARK + POINTS_CLEAN;
+/** Three of the four cubes are red or green and go to a bay; the fourth is blue and stays where it is. */
+export const CUBES_TO_SORT = CUBE_COUNT - 1;
+/**
+ * ASSUMPTION (Q15): points removed when the blue cube is not where it was put at the end. The
+ * rules have no blue cube; the owner of the site added it ("the robot checks it; if it is blue,
+ * it leaves it"), and nobody has said yet what moving it costs.
+ */
+export const BLUE_PENALTY = 5;
+/**
+ * ASSUMPTION (Q15): the blue cube counts as moved when one of its corners is more than this (mm)
+ * away from where it stood (a touch that moves it by a millimetre does not count - the same
+ * number and the same measure as Fire Chief's fire target).
+ */
+export const BLUE_MOVED_MM = 5;
+/** 5 + 3 x 5 + 3 x 15 + 10 + 5 = 80 (the rules' own line items for the three cubes that are sorted; their "example max = 85" does not add up). */
+export const MAX_SCORE = POINTS_LEAVE_START + CUBES_TO_SORT * (POINTS_PICK + POINTS_DELIVER) + POINTS_PARK + POINTS_CLEAN;
 /** A match lasts 90 seconds. */
 export const MATCH_DURATION = 90;
 
@@ -163,10 +206,16 @@ export const KIND_CUBE = 'cube';
 /** Body id of the cube that starts in a warehouse: 'cube:W1' ... */
 export const cubeBodyId = (warehouse: WarehouseId): string => `cube:${warehouse}`;
 
-/** The cubes are drawn in the colours of the Fire Rescue buckets. */
-const CUBE_FILL: Record<CubeColor, string> = { red: '#ef4044', green: '#40ad49' };
+/**
+ * The cubes are drawn in the colours of the Fire Rescue buckets - the blue one too: the clear
+ * blue printed on the MakeX mats (0, 174, 239), which the simulator's colour naming reads as
+ * "blue" (core/engine-sensors.ts classifyColor). (The colour sensor at the claw names a cube by
+ * its colorName, so it reads "blue" for the blue cube exactly where it reads "red" or "green"
+ * for the others.)
+ */
+export const CUBE_FILL: Record<CubeColor, string> = { red: '#ef4044', green: '#40ad49', blue: '#00aeef' };
 /** Letter drawn on a cube, so the colour can also be read without seeing colours. */
-const CUBE_LETTER: Record<CubeColor, string> = { red: 'R', green: 'G' };
+export const CUBE_LETTER: Record<CubeColor, string> = { red: 'R', green: 'G', blue: 'B' };
 
 /** Where the cube of a warehouse stands at the start: the middle of its orange square. */
 export function cubeHome(warehouse: WarehouseId): { x: number; y: number } {
@@ -287,7 +336,7 @@ export function obbTouchesEllipse(box: OBB, e: Ellipse): boolean {
   return false;
 }
 
-/** Rules §5: the finish pad the robot touches (the top one first), or null. */
+/** Rules §5: the finish pad the robot touches (the left one first), or null. */
 export function parkedOn(robotShapes: readonly OBB[]): PadId | null {
   return PAD_IDS.find((pad) => robotShapes.some((shape) => obbTouchesEllipse(shape, FINISH_PADS[pad]))) ?? null;
 }
@@ -368,6 +417,49 @@ function judgeCube(cube: Body, ctx: ScoreContext<WarehouseSortScenario>): Delive
   return { result: bay === cube.colorName ? 'own' : 'wrong', bay, why: null };
 }
 
+/**
+ * How far (mm) a cube is from where it stood at the start: the largest distance of one of its
+ * corners (the way Fire Chief measures its fire target, fire-chief/game.ts targetShift).
+ */
+export function blueShift(cube: Pick<Body, 'x' | 'y' | 'w' | 'l' | 'angle' | 'home'>): number {
+  // (almost always it has not moved at all: no need to work out its corners then)
+  if (cube.x === cube.home.x && cube.y === cube.home.y && cube.angle === cube.home.angle) return 0;
+  const now = obbCorners(footprint(cube));
+  const home = obbCorners({ x: cube.home.x, y: cube.home.y, w: cube.w, l: cube.l, angle: cube.home.angle });
+  let far = 0;
+  for (let i = 0; i < 4; i++) far = Math.max(far, Math.hypot(now[i].x - home[i].x, now[i].y - home[i].y));
+  return far;
+}
+
+/**
+ * Q15: why the blue cube is not where it was put - in words for the score sheet - or null when it
+ * is (left alone). It was picked up or lifted at some time (`takenAt`), the robot holds it, it
+ * lies off the mat, or it is more than BLUE_MOVED_MM from its place. `over`: the match has ended.
+ */
+export function blueMove(cube: Body, holding: string | null, takenAt: number | null, over: boolean): string | null {
+  if (isHeld(cube, holding)) return `the robot ${over ? 'still held' : 'is holding'} it`;
+  if (takenAt !== null) return `picked up at ${clock(takenAt)}`;
+  if (isOffMat(cube)) return 'it is off the mat';
+  if (isBlueShifted(cube)) return `${overLimit(blueShift(cube), BLUE_MOVED_MM)} mm from its place`;
+  return null;
+}
+
+/**
+ * A distance that is over its limit, written so that it never reads like the limit itself or
+ * less: 5.01 -> "5.1" (not "5.0 mm, -5"), 5.44 -> "5.4", 7.6 -> "8". (Like Fire Chief's
+ * overLimit, which always rounds the tenths up; here they are rounded up only where the usual
+ * rounding would print the limit.)
+ */
+function overLimit(value: number, limit: number): string {
+  const whole = Math.round(value);
+  if (whole > limit) return String(whole);
+  const tenths = Math.round(value * 10) / 10;
+  return (tenths > limit ? tenths : (Math.floor(value * 10) + 1) / 10).toFixed(1);
+}
+
+/** More than BLUE_MOVED_MM from its place (a push of exactly 5 mm is not more, whatever the last digit of the arithmetic says). */
+const isBlueShifted = (cube: Pick<Body, 'x' | 'y' | 'w' | 'l' | 'angle' | 'home'>): boolean => blueShift(cube) > BLUE_MOVED_MM + 1e-9;
+
 // =============================================================================================
 // Words
 // =============================================================================================
@@ -400,8 +492,13 @@ export const LINE_RESTARTS = 'restarts';
 export const LINE_WRONG_BAY = 'wrong-bay';
 export const LINE_LAST_DELIVERY = 'last-delivery';
 export const LINE_START_POSITION = 'start-position';
+/** The line of the blue cube: left alone 0, moved -5 (Q15). */
+export const LINE_BLUE = 'blue-cube';
 
 function createReferee(scenario: WarehouseSortScenario): Referee<WarehouseSortScenario> {
+  /** the warehouse of the blue cube, and the three whose cubes go to a bay */
+  const blueW = blueWarehouse(scenario);
+  const sorted = sortedWarehouses(scenario);
   /** when the robot first had a part outside the start zone */
   let leftAt: number | null = null;
   /** per warehouse: when its cube was picked */
@@ -416,6 +513,10 @@ function createReferee(scenario: WarehouseSortScenario): Referee<WarehouseSortSc
   const offMat = new Set<WarehouseId>();
   /** per warehouse: the bay the referee last said its cube is in (said again only for the other bay) */
   const announced = new Map<WarehouseId, BayColor>();
+  /** when the blue cube was first picked up or lifted (Q15: this counts, whatever happens later) */
+  let blueTakenAt: number | null = null;
+  /** the referee has said that the blue cube was moved (said once) */
+  let blueSaid = false;
   /** what the referee says on this tick (almost always nothing) */
   let say: string[] | null = null;
   const speak = (text: string): void => {
@@ -436,10 +537,45 @@ function createReferee(scenario: WarehouseSortScenario): Referee<WarehouseSortSc
     return null;
   };
   const colorOf = (w: WarehouseId): CubeColor => scenario.cubes[w];
+  /** the colour of a cube that goes to a bay (only asked for the red and green ones) */
+  const bayColorOf = (w: WarehouseId): BayColor => (scenario.cubes[w] === 'green' ? 'green' : 'red');
 
   function begin(ctx: ScoreContext<WarehouseSortScenario>): void {
     begun = true;
     startedInside = ctx.robotShapes.every((shape) => rectContainsOBB(START_ZONE, shape));
+  }
+
+  /** The blue cube, tick by tick: picked up or lifted (counts for good), or moved out of its place. */
+  function watchBlue(ctx: ScoreContext<WarehouseSortScenario>, cube: Body, time: number): void {
+    const w = blueW as WarehouseId;
+    const name = cubeName(w, LEAVE_ALONE_COLOR);
+    if (isHeld(cube, ctx.world.robot.gripper.holding)) {
+      let from = takenAt.get(w);
+      if (!from) {
+        from = { x: cube.x, y: cube.y };
+        takenAt.set(w, from);
+      }
+      // (gripping alone is no move: lifted off the mat, or carried as far as a picked cube is)
+      const lifted = cube.z > ON_MAT_MM;
+      const carried = Math.hypot(cube.x - from.x, cube.y - from.y) >= CARRY_MM - 1e-9;
+      if (blueTakenAt === null && (lifted || carried)) {
+        blueTakenAt = time;
+        blueSaid = true;
+        speak(`${clock(time)}: ${capital(name)} was picked up: -${BLUE_PENALTY}. The blue cube must stay where it is.`);
+      }
+    } else {
+      takenAt.delete(w);
+    }
+    if (!blueSaid && isBlueShifted(cube)) {
+      blueSaid = true;
+      speak(`${clock(time)}: ${capital(name)} was moved out of its place. The blue cube must stay where it is.`);
+    } else if (blueSaid && blueTakenAt === null && !isHeld(cube, ctx.world.robot.gripper.holding) && !isBlueShifted(cube)) {
+      // Back within BLUE_MOVED_MM of its place, never picked up or lifted, not held: the sheet
+      // says "left alone" again (a restart puts a cube the claw held back on its square; a robot
+      // can also drag it back), so the console must not end on "moved". A new move is said again.
+      blueSaid = false;
+      speak(`${clock(time)}: ${capital(name)} is back in its place.`);
+    }
   }
 
   function observe(ctx: ScoreContext<WarehouseSortScenario>): RefereeCall | null {
@@ -456,6 +592,10 @@ function createReferee(scenario: WarehouseSortScenario): Referee<WarehouseSortSc
     for (const w of WAREHOUSE_IDS) {
       const cube = cubeOf(ctx, w);
       if (!cube) continue;
+      if (w === blueW) {
+        watchBlue(ctx, cube, time);
+        continue;
+      }
       const name = cubeName(w, colorOf(w));
 
       // ---- +5: held and lifted 1 cm, or carried one cube length (once per cube)
@@ -538,9 +678,9 @@ function createReferee(scenario: WarehouseSortScenario): Referee<WarehouseSortSc
       ...(leftAt !== null ? { time: leftAt } : {}),
     });
 
-    // ---- the cubes: picked, delivered
+    // ---- the red and green cubes: picked, delivered (the blue one has a line of its own below)
     const judged = new Map<WarehouseId, Delivery>();
-    for (const w of WAREHOUSE_IDS) {
+    for (const w of sorted) {
       const cube = cubeOf(ctx, w);
       if (cube) judged.set(w, judgeCube(cube, ctx));
     }
@@ -553,7 +693,7 @@ function createReferee(scenario: WarehouseSortScenario): Referee<WarehouseSortSc
       return null;
     };
 
-    for (const w of WAREHOUSE_IDS) {
+    for (const w of sorted) {
       const at = pickedAt.get(w);
       const where = lost(w);
       const earned = at !== undefined && where === null;
@@ -577,8 +717,8 @@ function createReferee(scenario: WarehouseSortScenario): Referee<WarehouseSortSc
     const wrong: WarehouseId[] = [];
     let lastDelivery: number | null = null;
     let delivered = 0;
-    for (const w of WAREHOUSE_IDS) {
-      const color = colorOf(w);
+    for (const w of sorted) {
+      const color = bayColorOf(w);
       const d = judged.get(w);
       const since = inBay.get(w)?.since;
       let detail: string;
@@ -635,7 +775,7 @@ function createReferee(scenario: WarehouseSortScenario): Referee<WarehouseSortSc
         ? `the robot ${over ? 'touched' : 'touches'} the ${pad} pad`
         : over
           ? 'the robot did not touch a finish pad at the end'
-          : 'at the end the robot must touch a round pad (top or bottom)',
+          : 'at the end the robot must touch a round pad (left or right)',
     });
 
     // ---- clean run, restarts
@@ -670,6 +810,20 @@ function createReferee(scenario: WarehouseSortScenario): Referee<WarehouseSortSc
           : `${wrong.map((w) => cubeName(w, colorOf(w))).join(', ')}, -${WRONG_BAY_PENALTY} each`,
     });
 
+    // ---- the blue cube: left alone 0, moved -5 (Q15) - once, wherever it is
+    if (blueW !== null) {
+      const cube = cubeOf(ctx, blueW);
+      const move = cube ? blueMove(cube, ctx.world.robot.gripper.holding, blueTakenAt, over) : null;
+      lines.push({
+        id: LINE_BLUE,
+        label: `Blue cube (${blueW})`,
+        points: move === null ? 0 : -BLUE_PENALTY,
+        max: 0,
+        ok: move === null,
+        detail: move === null ? (cube ? 'left alone' : 'this cube is not on the field') : `moved: ${move}, -${BLUE_PENALTY}`,
+      });
+    }
+
     // ---- tie-breaker 3: the time of the last correct delivery (a line only when there is one:
     // it costs nothing and is no fault, and a line without points that is not "ok" would read
     // as a warning on the sheet)
@@ -699,7 +853,11 @@ function createReferee(scenario: WarehouseSortScenario): Referee<WarehouseSortSc
     }
 
     const sum = lines.reduce((total, line) => total + line.points, 0);
-    const complete = lines.every((line) => line.max === 0 || line.ok);
+    // Every goal: each line with points earned, and the blue cube left alone - its line has no
+    // points (max 0), but leaving it is part of the mission (Q15). (A cube in the wrong bay or a
+    // restart already fails a line with points.) The end of the match ("every goal complete")
+    // and the test window read this.
+    const complete = lines.every((line) => line.ok || (line.max === 0 && line.id !== LINE_BLUE));
     return { total: Math.max(0, sum), max: MAX_SCORE, lines, complete };
   }
 

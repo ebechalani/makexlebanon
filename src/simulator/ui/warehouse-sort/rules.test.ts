@@ -16,7 +16,10 @@ import { createSimulation } from '../../core/simulation';
 import { arm, gripper, moveCm, program, script, turn, wait, whenStart } from '../../vm/builder';
 import { CUBE_SIZE, FINISH_PADS, MAT_SIZE, WAREHOUSES } from '../../warehouse-sort/field';
 import {
+  BLUE_MOVED_MM,
+  BLUE_PENALTY,
   CARRY_MM,
+  CUBES_TO_SORT,
   CUBE_COUNT,
   LIFT_MM,
   LINE_CLEAN,
@@ -36,9 +39,9 @@ import {
   warehouseSortGame,
 } from '../../warehouse-sort/game';
 import { WAREHOUSE_SORT_ROBOT } from '../../warehouse-sort/robot';
-import { defaultScenario } from '../../warehouse-sort/scenario';
+import { decodeScenario, defaultScenario, type WarehouseSortScenario } from '../../warehouse-sort/scenario';
 import type { RulesSection } from '../SimulatorApp';
-import { RULES_EXAMPLE_MAX, WAREHOUSE_SORT_ASSUMPTIONS, WAREHOUSE_SORT_RULES, WAREHOUSE_SORT_RULES_NOTE, robotLength, robotWidth } from './rules';
+import { RULES_EXAMPLE_MAX, RULES_FOUR_CUBES_MAX, WAREHOUSE_SORT_ASSUMPTIONS, WAREHOUSE_SORT_RULES, WAREHOUSE_SORT_RULES_NOTE, robotLength, robotWidth } from './rules';
 
 const sentences = (sections: readonly RulesSection[]): string[] => sections.flatMap((section) => [section.title, ...section.items]);
 const RULES = sentences(WAREHOUSE_SORT_RULES);
@@ -63,7 +66,11 @@ const KNOWN_NUMBERS: ReadonlyArray<[number, string]> = [
   [RESTART_PENALTY, 'RESTART_PENALTY'],
   [MAX_SCORE, 'MAX_SCORE'],
   [RULES_EXAMPLE_MAX, "the rules' example maximum"],
+  [RULES_FOUR_CUBES_MAX, "the rules' line items for four red and green cubes"],
   [CUBE_COUNT, 'CUBE_COUNT (four warehouses, four cubes)'],
+  [CUBES_TO_SORT, 'CUBES_TO_SORT (three red or green cubes, one blue)'],
+  [BLUE_PENALTY, 'BLUE_PENALTY'],
+  [BLUE_MOVED_MM, 'BLUE_MOVED_MM'],
   [MATCH_DURATION, 'MATCH_DURATION'],
   [cm(MAT_SIZE), 'MAT_SIZE in cm'],
   [cm(LIFT_MM), 'LIFT_MM in cm'],
@@ -71,7 +78,7 @@ const KNOWN_NUMBERS: ReadonlyArray<[number, string]> = [
   [cm(CUBE_SIZE), 'CUBE_SIZE in cm'],
   [TOUCH_MM, 'TOUCH_MM'],
   [cm(TABLE_MARGIN), 'TABLE_MARGIN in cm'],
-  [cm(2 * Math.max(FINISH_PADS.top.rx, FINISH_PADS.top.ry)), 'the size of a finish pad in cm'],
+  [cm(2 * Math.max(FINISH_PADS.left.rx, FINISH_PADS.left.ry)), 'the size of a finish pad in cm'],
   [cm(robotLength(WAREHOUSE_SORT_ROBOT)), 'the length of the robot in cm'],
   [cm(robotWidth(WAREHOUSE_SORT_ROBOT)), 'the width of the robot in cm'],
   [cm(WAREHOUSE_SORT_ROBOT.frontColorSensor.rangeMm), 'the range of the colour sensor at the claw in cm'],
@@ -94,11 +101,13 @@ test('every number in the rules window is a number of the game', () => {
 });
 
 test('the numbers are the referee\'s: the points, the time, the restart, the sizes', () => {
-  assert.equal(POINTS_LEAVE_START + CUBE_COUNT * POINTS_PICK + CUBE_COUNT * POINTS_DELIVER + POINTS_PARK + POINTS_CLEAN, MAX_SCORE);
-  assert.equal(MAX_SCORE, 100);
+  assert.equal(POINTS_LEAVE_START + CUBES_TO_SORT * POINTS_PICK + CUBES_TO_SORT * POINTS_DELIVER + POINTS_PARK + POINTS_CLEAN, MAX_SCORE);
+  assert.equal(MAX_SCORE, 80);
+  assert.equal(RULES_FOUR_CUBES_MAX, 100, 'the written rules: four red and green cubes');
   assert.equal(RULES_EXAMPLE_MAX, 85, 'what the rules write as their example');
   assert.ok(RULES_TEXT.includes(`Points (${MAX_SCORE} at most)`));
-  assert.ok(RULES_TEXT.includes(`All together: 5 + 4 x 5 + 4 x 15 + 10 + 5 = 100.`));
+  assert.ok(RULES_TEXT.includes(`All together: 5 + 3 x 5 + 3 x 15 + 10 + 5 = 80.`));
+  assert.ok(RULES_TEXT.includes('The blue cube brings no points.'));
   assert.ok(RULES_TEXT.includes(`A match lasts ${warehouseSortGame.matchDuration} seconds.`));
   assert.ok(RULES_TEXT.includes(`it costs ${warehouseSortGame.restartPenalty} points`));
   assert.equal(warehouseSortGame.restartRules, undefined, 'no limit on restarts, as the window says');
@@ -121,11 +130,17 @@ test('what the simulator only assumes is in the second part; the rules part does
     ['the size of a cube', /A cube is 4 cm on each side and light/],
     ['the table around the mat', /The mat lies on a table\. .* stop 10 cm outside it/],
     ['touching a pad is enough', /Here touching a pad is enough\./],
-    ['a held cube at a restart', /A cube in the gripper at a restart goes back to its own warehouse\./],
+    ['a held cube at a restart', /A cube in the gripper at a restart goes back to its own warehouse, the blue cube too\./],
+    ['its square taken at a restart', /If another cube stands on its square, it is put down as close as there is room\. A blue cube put down more than 5 mm from its place counts as moved\./],
     ['a cube off the mat stays', /The simulator does not do that: the cube stays where it is\./],
-    ['the start zone of the rules and of the mat', /The rules say the start zone is a green area\. On the mat it is the area with the yellow frame/],
-    ['the finish pads of the rules and of the mat', /The rules say the finish pads are yellow circles with a checkerboard\. On the mat they are the two round pictures/],
-    ['85 or 100', /The rules give 85 points as the example maximum, but their own points add up to 100\./],
+    ['the start zone of the rules and of the mat', /The rules say the start zone is a green area\. On the mat it is the area with the yellow frame at the bottom/],
+    ['the finish pads of the rules and of the mat', /The rules say the finish pads are yellow circles with a checkerboard\. On the mat they are the two round pictures on the left and on the right/],
+    ['85 or 80', /The rules give 85 points as the example maximum\. Their own points add up to 80 for 3 cubes \(100 for 4\)\./],
+    ['the turned mat', /Here the whole mat is turned to the right, so the robot starts facing up\./],
+    ['the blue cube is the simulator\'s', /The written rules have only red and green cubes\. This simulator adds one blue cube/],
+    ['what moving the blue cube costs', /The rules do not say what moving the blue cube costs\. Here it costs 5 points, once\./],
+    ['"moved"', /"Moved" means: the robot picked it up or lifted it, even if it was put back\. Or the robot holds it at the end, or it is more than 5 mm from its place\./],
+    ['a touch costs nothing', /A touch that does not move it costs nothing\. In a bay the blue cube brings no points, and it is no wrong bay either\./],
     ['the clean run of a robot that never moves', /a robot that never moves gets it too/],
     ['the total never below 0', /The total is never below 0\./],
     ['the yellow frame', /The yellow frame is part of the start zone\./],
@@ -143,7 +158,7 @@ test('what the simulator only assumes is in the second part; the rules part does
     assert.doesNotMatch(RULES_TEXT, sentence, `${what}: not in the rules part`);
   }
   // the rules part says neither of the two contradicting words about parking, nor any size the rules do not give
-  for (const word of [/touch(es|ing)? a (finish )?pad/i, /entirely inside/i, /\b4 cm\b/, /\b85\b/, /below 0/, /table/i, /yellow frame/i, /partly/i, /no 15 points/, /picking it up/i]) {
+  for (const word of [/touch(es|ing)? a (finish )?pad/i, /entirely inside/i, /\b4 cm\b/, /\b85\b/, /below 0/, /table/i, /yellow frame/i, /partly/i, /no 15 points/, /picking it up/i, /moving the blue/i, /turned/i, /\b100\b/]) {
     assert.doesNotMatch(RULES_TEXT, word, String(word));
   }
   // the wrong bay in the rules part: the rules' own words, nothing more
@@ -178,9 +193,9 @@ test('the two parts: the mission first, every section with a heading of its own 
 // Sentences tried out on the real engine and referee
 // ---------------------------------------------------------------------------------------------
 
-/** Play the default arrangement up to `seconds` (or to the end), with restarts at the given times. */
-function play(blocks: Parameters<typeof script>[1], seconds = MATCH_DURATION, restartsAt: number[] = []) {
-  const sim = createSimulation({ game: warehouseSortGame, scenario: defaultScenario(), program: program([script(whenStart(), blocks)]) });
+/** Play an arrangement (default: the default one) up to `seconds` (or to the end), with restarts at the given times. */
+function play(blocks: Parameters<typeof script>[1], seconds = MATCH_DURATION, restartsAt: number[] = [], scenario: WarehouseSortScenario = defaultScenario()) {
+  const sim = createSimulation({ game: warehouseSortGame, scenario, program: program([script(whenStart(), blocks)]) });
   sim.start();
   const left = [...restartsAt];
   while (sim.status === 'running' && sim.world.time < seconds) {
@@ -210,23 +225,32 @@ test('a restart costs 10 points and the clean run bonus, the clock runs on, and 
   assert.equal(sim.score().total, 0);
 });
 
-test('"a cube in the gripper at a restart goes back to its own warehouse; points earned before a restart stay"', () => {
-  // W4 (bottom right): the route of the integration test, as far as the cube in the raised claw
+test('"a cube in the gripper at a restart goes back to its own warehouse, the blue cube too; points earned before a restart stay"', () => {
+  // W3 (bottom left): the route of the integration test, as far as the cube in the raised claw
   // (the cube is held from 3.3 s on, the turn has carried it away from its square by 6 s; the program ends at about 10 s)
   const route = [moveCm('forward', 4.575), turn('left', 90), moveCm('forward', 36.243), gripper('close'), arm('raise'), turn('right', 90), wait(5)];
-  const before = play(route, 6.9);
-  const carried = before.world.bodies.find((body) => body.id === cubeBodyId('W4'));
-  assert.ok(carried && before.world.robot.gripper.holding === carried.id && carried.z > 50, 'held and lifted before the restart');
-  assert.ok(Math.hypot(carried.x - cubeHome('W4').x, carried.y - cubeHome('W4').y) > 50, 'and carried away from its square');
-  const sim = play(route, 8, [7]);
-  assert.equal(sim.restarts, 1);
-  const cube = sim.world.bodies.find((body) => body.id === cubeBodyId('W4'));
-  assert.ok(cube);
-  assert.equal(sim.world.robot.gripper.holding, null, 'the gripper holds nothing after the restart');
-  const home = cubeHome('W4');
-  assert.ok(Math.hypot(cube.x - home.x, cube.y - home.y) < 1, 'back on the orange square of W4');
-  assert.equal(cube.z, 0);
-  assert.ok(cube.x > WAREHOUSES.W4.frame.x && cube.x < WAREHOUSES.W4.frame.x + WAREHOUSES.W4.frame.w);
-  assert.equal(sim.score().lines.find((line) => line.id === 'pick:W4')?.points, POINTS_PICK, 'the 5 points for picking it up stay');
-  assert.equal(sim.score().lines.find((line) => line.id === 'leave-start')?.points, POINTS_LEAVE_START);
+  // W3 red ("GB-RR"), and W3 blue (the default arrangement, "GR-BR")
+  for (const scenario of [decodeScenario('GB-RR')!, defaultScenario()]) {
+    const blue = scenario.cubes.W3 === 'blue';
+    const before = play(route, 6.9, [], scenario);
+    const carried = before.world.bodies.find((body) => body.id === cubeBodyId('W3'));
+    assert.ok(carried && before.world.robot.gripper.holding === carried.id && carried.z > 50, 'held and lifted before the restart');
+    assert.ok(Math.hypot(carried.x - cubeHome('W3').x, carried.y - cubeHome('W3').y) > 50, 'and carried away from its square');
+    const sim = play(route, 8, [7], scenario);
+    assert.equal(sim.restarts, 1);
+    const cube = sim.world.bodies.find((body) => body.id === cubeBodyId('W3'));
+    assert.ok(cube);
+    assert.equal(sim.world.robot.gripper.holding, null, 'the gripper holds nothing after the restart');
+    const home = cubeHome('W3');
+    assert.ok(Math.hypot(cube.x - home.x, cube.y - home.y) < 1, 'back on the orange square of W3');
+    assert.equal(cube.z, 0);
+    assert.ok(cube.y > WAREHOUSES.W3.frame.y && cube.y < WAREHOUSES.W3.frame.y + WAREHOUSES.W3.frame.h);
+    if (blue) {
+      // the blue cube was lifted before the restart: that counts, also now that it is back
+      assert.equal(sim.score().lines.find((line) => line.id === 'blue-cube')?.points, -BLUE_PENALTY);
+    } else {
+      assert.equal(sim.score().lines.find((line) => line.id === 'pick:W3')?.points, POINTS_PICK, 'the 5 points for picking it up stay');
+    }
+    assert.equal(sim.score().lines.find((line) => line.id === 'leave-start')?.points, POINTS_LEAVE_START);
+  }
 });

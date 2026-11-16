@@ -1,10 +1,10 @@
 /**
  * What "Test on many arrangements" offers in Warehouse Sort (../BatchDialog.tsx).
  *
- * There are only 14 arrangements of the cubes, so the window offers no random lists: one list
+ * There are only 24 arrangements of the cubes, so the window offers no random lists: one list
  * plays them all, the other the arrangement on the stage.
  *
- *   All 14 arrangements    every arrangement once, in number order (scenario.ts: allScenarios)
+ *   All 24 arrangements    every arrangement once, in number order (scenario.ts: allScenarios)
  *   This arrangement       the arrangement on the stage
  *
  * With equal points the rules rank by "more correct deliveries", then by "faster time of last
@@ -14,7 +14,18 @@
  * Plain TypeScript (no DOM, no React), so the tests can read it under Node.
  */
 import type { BatchResult } from '../../core/batch';
-import { LINE_LAST_DELIVERY, deliverLineId, pickLineId } from '../../warehouse-sort/game';
+import {
+  LINE_BLUE,
+  LINE_CLEAN,
+  LINE_LAST_DELIVERY,
+  LINE_LEAVE_START,
+  LINE_PARK,
+  LINE_RESTARTS,
+  LINE_START_POSITION,
+  LINE_WRONG_BAY,
+  deliverLineId,
+  pickLineId,
+} from '../../warehouse-sort/game';
 import { WAREHOUSE_IDS } from '../../warehouse-sort/field';
 import { SCENARIO_COUNT, allScenarios, type WarehouseSortScenario } from '../../warehouse-sort/scenario';
 import type { BatchPreset, BatchTieBreak } from '../BatchDialog';
@@ -23,7 +34,7 @@ export const ARRANGEMENT_BATCH_PRESETS: BatchPreset<WarehouseSortScenario>[] = [
   {
     id: 'all-arrangements',
     label: `All ${SCENARIO_COUNT} arrangements`,
-    hint: `Every way to put red and green cubes in the four warehouses, with at least one of each colour: ${SCENARIO_COUNT} matches.`,
+    hint: `Every way to put the cubes in the four warehouses: one blue, the others red or green, at least one of each. ${SCENARIO_COUNT} matches.`,
     scenarios: () => allScenarios(),
   },
   {
@@ -69,14 +80,42 @@ export const ARRANGEMENT_TIE_BREAK: BatchTieBreak = {
 /**
  * The name of a line in the summary of the test window. The score sheet names a cube with its
  * colour ("Pick up cube W1 (red)"), but the colour changes from one arrangement to the next: the
- * summary names the warehouse only. The time for a tie is no goal and no penalty: it is not in
- * the summary (null), only in its column of the table.
+ * summary names the warehouse only. (A warehouse whose cube is blue has no pick-up and no bay
+ * line in that run: its share counts the runs in which it has them.) The line of the blue cube
+ * names no warehouse - the blue cube stands in another one in each run. The time for a tie is no
+ * goal and no penalty: it is not in the summary (null), only in its column of the table.
  */
 export function arrangementSummaryLabel(line: { id: string; label: string }): string | null {
   if (line.id === LINE_LAST_DELIVERY) return null;
+  if (line.id === LINE_BLUE) return 'Blue cube moved';
   for (const w of WAREHOUSE_IDS) {
     if (line.id === pickLineId(w)) return `Pick up the cube of ${w}`;
     if (line.id === deliverLineId(w)) return `Cube of ${w} in the right bay`;
   }
   return line.label;
+}
+
+/**
+ * The lines of the score sheet in the referee's order, with the pick-up and bay lines of all four
+ * warehouses. (Every run lacks those of the warehouse of its blue cube; without this order the
+ * summary would list the lines of the warehouse that is blue in the first run last, after the
+ * penalties.)
+ */
+const SUMMARY_ORDER: readonly string[] = [
+  LINE_LEAVE_START,
+  ...WAREHOUSE_IDS.map(pickLineId),
+  ...WAREHOUSE_IDS.map(deliverLineId),
+  LINE_PARK,
+  LINE_CLEAN,
+  LINE_RESTARTS,
+  LINE_WRONG_BAY,
+  LINE_BLUE,
+  LINE_LAST_DELIVERY,
+  LINE_START_POSITION,
+];
+
+/** The place of a line in the summary of the test window (a line not in SUMMARY_ORDER comes after them all). */
+export function arrangementSummaryOrder(line: { id: string }): number {
+  const at = SUMMARY_ORDER.indexOf(line.id);
+  return at < 0 ? SUMMARY_ORDER.length : at;
 }

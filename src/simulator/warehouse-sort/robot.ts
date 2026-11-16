@@ -12,7 +12,7 @@
  */
 import { DEFAULT_ROBOT_CONFIG } from '../core/robot';
 import type { Pose, RobotConfig } from '../core/types';
-import { LONG_LINE_Y, START_ZONE } from './field';
+import { LONG_LINE_X, START_ZONE } from './field';
 
 /**
  * ASSUMPTION: the border between "line" and "background" for the learned sensor, in brightness
@@ -48,24 +48,25 @@ export function robotReach(config: RobotConfig): { front: number; rear: number; 
   return { front, rear: config.chassisRear, halfWidth };
 }
 
-/** Facing left, into the field (heading 0 is up the mat, clockwise positive). */
-export const START_HEADING = -Math.PI / 2;
+/** Facing up, into the field (heading 0 is up the mat, clockwise positive). */
+export const START_HEADING = 0;
 
 /**
- * Where a robot starts: facing left, into the field, with the same room in front of it and
- * behind it inside the start zone, and its middle on the middle of the long white line (so a
- * robot that drives straight ahead drives along that line).
+ * Where a robot starts: facing up, into the field, with the same room in front of it and behind
+ * it inside the start zone, and its middle on the middle of the long white line (so a robot that
+ * drives straight ahead drives along that line).
  */
 export function startPoseFor(config: RobotConfig): Pose {
   const { front, rear } = robotReach(config);
-  // facing left, the front is at x - front and the back at x + rear
-  const x = START_ZONE.x + (START_ZONE.w - (front + rear)) / 2 + front;
-  return { x, y: LONG_LINE_Y, heading: START_HEADING };
+  // facing up, the front is at y - front and the back at y + rear
+  const y = START_ZONE.y + (START_ZONE.h - (front + rear)) / 2 + front;
+  return { x: LONG_LINE_X, y, heading: START_HEADING };
 }
 
 /**
- * The start pose of this game's robot: x 1151.09, y 604.88 mm. The robot (237 mm long with its
- * open claw, 130 mm wide) then has 13.9 mm free in front of it and behind it inside the start
- * zone, 60.1 mm above it and 73.4 mm below it.
+ * The start pose of this game's robot: x 630.06, y 1151.09 mm, facing up. The robot (237 mm long
+ * with its open claw, 130 mm wide) then has 13.9 mm free in front of it and behind it inside the
+ * start zone, 73.4 mm on its left and 60.1 mm on its right. (The same room as before the field was
+ * turned: the start zone and the long line turned with it.)
  */
 export const START_POSE: Pose = startPoseFor(WAREHOUSE_SORT_ROBOT);

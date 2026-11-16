@@ -2,10 +2,11 @@
  * Reading an arrangement code that a student typed or pasted into the Warehouse Sort screen
  * (or that the screen saved for the next visit).
  *
- * A code is the four cube colours as they lie on the mat, top row then bottom row: "RG-GR" =
- * W1 red, W2 green, W3 green, W4 red. Letter case, spaces and dashes do not matter. Everything
- * else gets ONE plain sentence - short, for beginners - that says what is wrong. (A number is
- * no code: see decodeScenario.)
+ * A code is the four cube colours as they lie on the mat, top row then bottom row: "GR-BR" =
+ * W1 green, W2 red, W3 blue, W4 red. Letter case, spaces and dashes do not matter. Everything
+ * else gets plain sentences - short, for beginners - that say what is wrong: no blue cube, two
+ * blue cubes, no red or no green cube, or no code at all. (A number is no code: see
+ * decodeScenario.)
  *
  * Plain TypeScript (no DOM, no React), so the tests can read it under Node.
  */
@@ -13,7 +14,7 @@ import { decodeScenario, scenarioOfCode, scenarioProblems, type WarehouseSortSce
 import type { CodeReading } from '../scenario-code';
 import { DEFAULT_ARRANGEMENT_CODE } from './words';
 
-const LOOKS_LIKE = `A code has four letters, R (red) or G (green), like ${DEFAULT_ARRANGEMENT_CODE}.`;
+const LOOKS_LIKE = `A code has four letters, R (red), G (green) or B (blue), like ${DEFAULT_ARRANGEMENT_CODE}.`;
 
 /** Why a text is no code of an arrangement that can be played. Only called for a text the game could not read. */
 function whyNoCode(text: string): string {

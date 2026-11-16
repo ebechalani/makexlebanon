@@ -103,7 +103,7 @@ export interface BatchDialogProps<S> {
   /**
    * false: the window offers no random lists, only the ready-made ones (`presets`), and the first
    * of those is chosen at the beginning. For a game with so few arrangements that a test plays
-   * them all (Warehouse Sort: 14). Left out: the random lists are offered, as always.
+   * them all (Warehouse Sort: 24). Left out: the random lists are offered, as always.
    */
   randomLists?: boolean;
   /** how runs with equal points are ranked, where it is not by the time of the points (left out: as Fire Chief, see BatchTieBreak) */
@@ -116,6 +116,14 @@ export interface BatchDialogProps<S> {
    * the label of every line.
    */
   summaryLabel?: (line: { id: string; label: string }) => string | null;
+  /**
+   * The place of a line in that list: lower numbers first, lines with the same number in the
+   * order they first came. For a game whose runs do not all have the same lines (Warehouse Sort:
+   * the warehouse of the blue cube has no pick-up line in that run, so the lines of the warehouse
+   * that is blue in the first run would otherwise come last, after the penalties). Left out: the
+   * order in which the lines first came.
+   */
+  summaryOrder?: (line: { id: string }) => number;
   /** the game's words (left out: the words of Fire Rescue) */
   words?: ScreenWords;
   /** the student wants to watch this combination on the stage */
@@ -165,7 +173,7 @@ function StatTile({ label, value, note }: { label: string; value: string; note?:
 
 export function BatchDialog<S>(props: BatchDialogProps<S>) {
   const { game, robotConfig, getProgram, startPose, getSampler, currentScenario, presets = [], random, words = DEFAULT_WORDS, onPick, onClose } = props;
-  const { tieBreak, summaryLabel } = props;
+  const { tieBreak, summaryLabel, summaryOrder } = props;
   // (a game that offers no random lists begins with its first ready-made list)
   const offersRandom = props.randomLists !== false || presets.length === 0;
 
@@ -254,6 +262,11 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
   };
 
   const summary = useMemo(() => summarize(rows.map((row) => row.result)), [rows]);
+  // (the game's own order of the lines, where it has one; Array.prototype.sort keeps equal ones in their order)
+  const summaryLines = useMemo(
+    () => (summaryOrder ? [...summary.perLine].sort((a, b) => summaryOrder(a) - summaryOrder(b)) : summary.perLine),
+    [summary, summaryOrder],
+  );
   const penaltyIds = useMemo(() => new Set((rows[0]?.result.lines ?? []).filter((l) => l.max === 0).map((l) => l.id)), [rows]);
   // A game whose referee writes times down ranks by the points and then by the time they were
   // reached: its results show that time and the referee's own words about the end.
@@ -455,7 +468,7 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
             <div>
               <p className="mb-1.5 text-xs font-bold uppercase tracking-wide text-ink-500">How often each line of the score sheet succeeds</p>
               <ul className="grid grid-cols-1 gap-x-6 gap-y-1.5 md:grid-cols-2">
-                {summary.perLine.map((line) => {
+                {summaryLines.map((line) => {
                   // (the game's own name for a line, where it has one; null: not in this list)
                   const name = summaryLabel ? summaryLabel(line) : line.label;
                   if (name === null) return null;

@@ -6,8 +6,8 @@ const PATH = '/training/simulator/warehouse-sort';
 const TITLE = 'mBot2 simulator — Warehouse Sort';
 const DESCRIPTION =
   'Build a program with mBlock-style blocks and watch a Makeblock mBot2 sort red and green cubes ' +
-  'on the MakeX Lebanon Inspire mat: from the four warehouses into the bay of their colour, then ' +
-  'park — with any arrangement of the cubes, scored by the rules of the beginner mission ' +
+  'on the MakeX Lebanon Inspire mat: from the warehouses into the bay of their colour, leaving the ' +
+  'blue cube alone, then park — with any arrangement of the cubes, scored by the rules of the beginner mission ' +
   '“Warehouse Sort”. Free, in the browser.';
 
 /**

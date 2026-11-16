@@ -74,7 +74,7 @@
  *     'sort-cube-colour'     Read the colour of a cube                     (starter)
  *     'sort-one-cube'        Put one cube in its bay                       (intermediate)
  *     'sort-two-cubes'       Two cubes, then park                          (intermediate)
- *     'sort-all-cubes'       Sort all four cubes and park                  (advanced)
+ *     'sort-all-cubes'       Sort the cubes and park                       (advanced)
  *
  * Mind the two that look alike: 'full-mission' is the one of Fire Rescue, 'chief-full-mission'
  * the one of Fire Chief.
