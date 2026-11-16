@@ -180,8 +180,9 @@ export function buildToolbox(only?: CategoryId[]): ToolboxJson {
 }
 
 /**
- * The palette of a game (give Game.id: 'fire-rescue', 'fire-chief'): the categories ./palettes.ts
- * lists for it. Left out, or a game without a palette of its own: the palette of Fire Rescue.
+ * The palette of a game (give Game.id: 'fire-rescue', 'fire-chief', 'warehouse-sort'): the
+ * categories ./palettes.ts lists for it. Left out, or a game without a palette of its own: the
+ * palette of Fire Rescue.
  */
 export function paletteToolbox(gameId?: string): ToolboxJson {
   return buildToolbox(paletteCategories(gameId));

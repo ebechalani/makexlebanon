@@ -53,6 +53,25 @@ export interface BatchRandomKind<S> {
   draw: (count: number, seed: number) => S[];
 }
 
+/**
+ * How a game ranks two runs with the same points, where that is not "the shorter time to reach
+ * them" (ScoreReport.time, Fire Chief). Warehouse Sort ranks them by the number of cubes in the
+ * right bay, then by the time of the last of those deliveries. Its column takes the place of
+ * "Time of the points".
+ */
+export interface BatchTieBreak {
+  /** the heading of its column: "Last delivery" */
+  label: string;
+  /** what the column means, said when the pointer rests on its heading */
+  hint: string;
+  /** the time the column shows for a run (seconds), or undefined for a run that has none */
+  timeOf: (result: BatchResult) => number | undefined;
+  /** what a screen reader hears for a run without that time: "no cube in the right bay" */
+  none: string;
+  /** which of two runs ranks higher: negative when `a` does, positive when `b` does, 0 when they are equal */
+  compare: (a: BatchResult, b: BatchResult) => number;
+}
+
 /** How a game draws its random lists, when it does not leave everything to chance. */
 export interface BatchRandom<S> {
   /** `count` different combinations - the same list every time for the same seed (with `kinds`: the first kind) */
@@ -81,6 +100,22 @@ export interface BatchDialogProps<S> {
   presets?: BatchPreset<S>[];
   /** the game's own random lists (left out: `count` draws of game.randomScenario) */
   random?: BatchRandom<S>;
+  /**
+   * false: the window offers no random lists, only the ready-made ones (`presets`), and the first
+   * of those is chosen at the beginning. For a game with so few arrangements that a test plays
+   * them all (Warehouse Sort: 14). Left out: the random lists are offered, as always.
+   */
+  randomLists?: boolean;
+  /** how runs with equal points are ranked, where it is not by the time of the points (left out: as Fire Chief, see BatchTieBreak) */
+  tieBreak?: BatchTieBreak;
+  /**
+   * The name of a line in "How often each line of the score sheet succeeds", where the game's
+   * label of the line changes from one combination to the next (Warehouse Sort: "Pick up cube
+   * W1 (red)" - the colour is the arrangement's). null: the line is left out of that list - a
+   * line that is neither a goal nor a penalty (Warehouse Sort: the time for a tie). Left out:
+   * the label of every line.
+   */
+  summaryLabel?: (line: { id: string; label: string }) => string | null;
   /** the game's words (left out: the words of Fire Rescue) */
   words?: ScreenWords;
   /** the student wants to watch this combination on the stage */
@@ -130,8 +165,11 @@ function StatTile({ label, value, note }: { label: string; value: string; note?:
 
 export function BatchDialog<S>(props: BatchDialogProps<S>) {
   const { game, robotConfig, getProgram, startPose, getSampler, currentScenario, presets = [], random, words = DEFAULT_WORDS, onPick, onClose } = props;
+  const { tieBreak, summaryLabel } = props;
+  // (a game that offers no random lists begins with its first ready-made list)
+  const offersRandom = props.randomLists !== false || presets.length === 0;
 
-  const [choice, setChoice] = useState<string>('random-50');
+  const [choice, setChoice] = useState<string>(() => (offersRandom ? 'random-50' : presets[0].id));
   const [seed, setSeed] = useState(1);
   /** which kind of random list, where the game has several (the first one at the beginning) */
   const kinds = random?.kinds ?? [];
@@ -220,13 +258,15 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
   // A game whose referee writes times down ranks by the points and then by the time they were
   // reached: its results show that time and the referee's own words about the end.
   const refereeTimes = game.createReferee !== undefined;
+  // (how two runs with equal points are told apart: the game's own way, or the time of the points)
+  const rank = tieBreak?.compare ?? compareRuns;
   const shownRows = useMemo(() => {
     if (!worstFirst) return rows;
     // (worst first: fewest points; where the time ranks too, the later time among equal points)
-    if (refereeTimes) return [...rows].sort((a, b) => compareRuns(b.result, a.result) || a.index - b.index);
+    if (refereeTimes) return [...rows].sort((a, b) => rank(b.result, a.result) || a.index - b.index);
     return [...rows].sort((a, b) => a.result.total - b.result.total || a.index - b.index);
-  }, [rows, worstFirst, refereeTimes]);
-  const extremes = useMemo(() => (refereeTimes ? bestAndWorst(rows.map((row) => row.result)) : null), [rows, refereeTimes]);
+  }, [rows, worstFirst, refereeTimes, rank]);
+  const extremes = useMemo(() => (refereeTimes ? bestAndWorst(rows.map((row) => row.result), rank) : null), [rows, refereeTimes, rank]);
   const programErrors = useMemo(() => {
     const seen = new Set<string>();
     for (const row of rows) for (const e of row.result.errors ?? []) seen.add(e.message);
@@ -242,7 +282,7 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
   const presetNote = presets.find((p) => p.id === choice)?.note?.(currentScenario) ?? null;
   /** "at 0:37.2" under the best and the worst run, where the time of the points ranks (nothing for a run without points) */
   const reachedAt = (result: BatchResult | undefined): string | undefined => {
-    const time = result ? scoreTimeText(result, timeText, '') : '';
+    const time = result ? scoreTimeText(tieBreak ? { scoreTime: tieBreak.timeOf(result) } : result, timeText, '') : '';
     return time === '' ? undefined : `at ${time}`;
   };
 
@@ -255,7 +295,7 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
         <fieldset disabled={running} className="flex flex-col gap-2">
           <legend className="mb-1 text-xs font-bold uppercase tracking-wide text-ink-500">{`Which ${words.scenarios}?`}</legend>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {RANDOM_COUNTS.map((count) => (
+            {offersRandom && RANDOM_COUNTS.map((count) => (
               <label
                 key={count}
                 className={`flex cursor-pointer items-start gap-2 rounded-card border px-3 py-2 text-sm ${choice === `random-${count}` ? 'border-brand-500 bg-brand-50' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
@@ -415,19 +455,24 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
             <div>
               <p className="mb-1.5 text-xs font-bold uppercase tracking-wide text-ink-500">How often each line of the score sheet succeeds</p>
               <ul className="grid grid-cols-1 gap-x-6 gap-y-1.5 md:grid-cols-2">
-                {summary.perLine.map((line) => (
-                  <li
-                    key={line.id}
-                    className="grid grid-cols-[minmax(0,1fr)_6rem_2.75rem] items-center gap-2"
-                    title={`${line.label}: ${percent(line.successRate)} of the runs`}
-                  >
-                    <span className="text-sm leading-tight text-ink-700">{penaltyIds.has(line.id) ? `${words.cleanLine}: ${line.label.toLowerCase()}` : line.label}</span>
-                    <span className="h-2 overflow-hidden rounded-full bg-brand-100" aria-hidden="true">
-                      <span className="block h-full rounded-full bg-brand-600" style={{ width: `${line.successRate * 100}%` }} />
-                    </span>
-                    <span className="text-right font-mono text-sm tabular-nums text-ink-900">{percent(line.successRate)}</span>
-                  </li>
-                ))}
+                {summary.perLine.map((line) => {
+                  // (the game's own name for a line, where it has one; null: not in this list)
+                  const name = summaryLabel ? summaryLabel(line) : line.label;
+                  if (name === null) return null;
+                  return (
+                    <li
+                      key={line.id}
+                      className="grid grid-cols-[minmax(0,1fr)_6rem_2.75rem] items-center gap-2"
+                      title={`${name}: ${percent(line.successRate)} of the runs`}
+                    >
+                      <span className="text-sm leading-tight text-ink-700">{penaltyIds.has(line.id) ? `${words.cleanLine}: ${name.toLowerCase()}` : name}</span>
+                      <span className="h-2 overflow-hidden rounded-full bg-brand-100" aria-hidden="true">
+                        <span className="block h-full rounded-full bg-brand-600" style={{ width: `${line.successRate * 100}%` }} />
+                      </span>
+                      <span className="text-right font-mono text-sm tabular-nums text-ink-900">{percent(line.successRate)}</span>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
 
@@ -450,8 +495,8 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
                       <th scope="col" className="px-2.5 py-2 font-semibold">{capital(words.goals)}</th>
                       {refereeTimes ? (
                         <>
-                          <th scope="col" className="px-2.5 py-2 text-right font-semibold" title="The time on the clock when the last of these points was earned. With equal points, the shorter time ranks higher.">
-                            Time of the points
+                          <th scope="col" className="px-2.5 py-2 text-right font-semibold" title={tieBreak ? tieBreak.hint : 'The time on the clock when the last of these points was earned. With equal points, the shorter time ranks higher.'}>
+                            {tieBreak ? tieBreak.label : 'Time of the points'}
                           </th>
                           <th scope="col" className="px-2.5 py-2 font-semibold">How it ended</th>
                         </>
@@ -497,13 +542,13 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
                           {refereeTimes ? (
                             <>
                               <td className="px-2.5 py-1.5 text-right font-mono text-xs tabular-nums text-ink-600">
-                                {row.result.scoreTime === undefined ? (
+                                {(tieBreak ? tieBreak.timeOf(row.result) : row.result.scoreTime) === undefined ? (
                                   <>
                                     <span aria-hidden="true">-</span>
-                                    <span className="sr-only">no points</span>
+                                    <span className="sr-only">{tieBreak ? tieBreak.none : 'no points'}</span>
                                   </>
                                 ) : (
-                                  scoreTimeText(row.result, timeText)
+                                  scoreTimeText(tieBreak ? { scoreTime: tieBreak.timeOf(row.result) } : row.result, timeText)
                                 )}
                               </td>
                               <td className="min-w-[16rem] px-2.5 py-1.5 text-xs leading-snug text-ink-600">{endSentence(row.result, timeText)}</td>

@@ -25,20 +25,24 @@ export function compareRuns(a: Ranked, b: Ranked): number {
   return (a.scoreTime ?? Infinity) - (b.scoreTime ?? Infinity) || 0;
 }
 
-/** The best and the worst of a list of runs by that ranking (the first of equal ones), or null for an empty list. */
-export function bestAndWorst<R extends Ranked>(runs: readonly R[]): { best: R; worst: R } | null {
+/**
+ * The best and the worst of a list of runs by that ranking (the first of equal ones), or null for
+ * an empty list. A game that ranks equal points in another way brings its own `compare`
+ * (BatchTieBreak in ./BatchDialog.tsx).
+ */
+export function bestAndWorst<R extends Ranked>(runs: readonly R[], compare: (a: R, b: R) => number = compareRuns): { best: R; worst: R } | null {
   if (runs.length === 0) return null;
   let best = runs[0];
   let worst = runs[0];
   for (const run of runs) {
-    if (compareRuns(run, best) < 0) best = run;
-    if (compareRuns(run, worst) > 0) worst = run;
+    if (compare(run, best) < 0) best = run;
+    if (compare(run, worst) > 0) worst = run;
   }
   return { best, worst };
 }
 
 /** The time at which the points of a run were reached, as the referee writes it; `none` for a run without points. */
-export function scoreTimeText(result: Ranked, timeText: TimeText, none = '-'): string {
+export function scoreTimeText(result: Pick<Ranked, 'scoreTime'>, timeText: TimeText, none = '-'): string {
   return typeof result.scoreTime === 'number' && Number.isFinite(result.scoreTime) ? timeText(result.scoreTime) : none;
 }
 

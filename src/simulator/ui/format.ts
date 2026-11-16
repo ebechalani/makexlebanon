@@ -97,8 +97,8 @@ export function inkOn(c: RGB): string {
  * A fixed wall is named after the two cells it stands between or after its side of the field:
  * "wall:A1-B1" -> "the wall between A1 and B1", "wall:top" -> "the top wall".
  */
-export function bodyName(bodyId: string): string {
-  if (bodyId === 'wall') return 'the table wall';
+export function bodyName(bodyId: string, tableEdge = 'the table wall'): string {
+  if (bodyId === 'wall') return tableEdge;
   const [kind, name] = bodyId.split(':');
   if (!name) return bodyId;
   if (kind === 'tower') return `tower ${name}`;
@@ -237,18 +237,20 @@ const FIRST_GAME_RESTART: RestartFacts = { penalty: 5 };
  * Returns null for events that are not worth a line (sounds).
  *
  * `game` says what the lines cannot know from the event alone: what a restart does in the game
- * that is played, how many restarts are left after the one that just happened, and what the game
- * calls one scored run ("match", "attempt"). Left out: the restart and the word of Fire Rescue.
+ * that is played, how many restarts are left after the one that just happened, what the game
+ * calls one scored run ("match", "attempt"), the first words of the line when the gripper closes
+ * on something ("Picked up") and the name of the edge of the table ("the table wall") - see
+ * ScreenWords.grabbed / tableEdge. Left out: the restart and the words of Fire Rescue.
  */
 export function describeEvent(
   event: SimEvent,
-  game: RestartFacts & { left?: number; match?: string } = FIRST_GAME_RESTART,
+  game: RestartFacts & { left?: number; match?: string; grabbed?: string; tableEdge?: string } = FIRST_GAME_RESTART,
 ): Omit<LogLine, 'n' | 'count'> | null {
   switch (event.type) {
     case 'log':
       return { time: event.time, level: event.level, text: event.text, blockId: event.blockId };
     case 'grab':
-      return { time: event.time, level: 'event', text: `Picked up ${bodyName(event.bodyId)}.` };
+      return { time: event.time, level: 'event', text: `${game.grabbed ?? 'Picked up'} ${bodyName(event.bodyId)}.` };
     case 'release':
       return {
         time: event.time,
@@ -256,7 +258,7 @@ export function describeEvent(
         text: `Put down ${bodyName(event.bodyId)} ${event.onto ? `on ${bodyName(event.onto)}` : 'on the mat'}.`,
       };
     case 'bump':
-      return { time: event.time, level: 'event', text: `Bumped into ${bodyName(event.bodyId)}.` };
+      return { time: event.time, level: 'event', text: `Bumped into ${bodyName(event.bodyId, game.tableEdge)}.` };
     case 'restart':
       return { time: event.time, level: 'warn', text: restartLine(game, game.left) };
     case 'finish':

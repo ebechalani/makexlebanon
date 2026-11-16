@@ -10,6 +10,9 @@
  *   Fire Chief    the mBot2 with a fan on DC motor port M1 and a colour sensor fixed to its
  *                 front (it has blocks of its own); no gripper, so no Servos, no Gripper
  *                 shortcuts and no Colour Sensor at the claw.
+ *   Warehouse Sort   the same robot and the same blocks as Fire Rescue. Its mat has WHITE lines
+ *                 on black, and its robot's Quad RGB sensor has learned that: one hover text
+ *                 says so (PALETTE_TOOLTIPS below).
  *
  * The name of a palette is the id of its game (Game.id). To get the palette of a game:
  *
@@ -25,10 +28,10 @@
  *
  * Plain data: no Blockly, no DOM.
  */
-import type { CategoryId } from './catalog';
+import { GRIPPER_SHORTCUT, type CategoryId } from './catalog';
 
 /** The games that have a palette: the same words as Game.id. */
-export type PaletteId = 'fire-rescue' | 'fire-chief';
+export type PaletteId = 'fire-rescue' | 'fire-chief' | 'warehouse-sort';
 
 /** The palette an editor gets when no game is named (and for a game that has no palette of its own). */
 export const DEFAULT_PALETTE: PaletteId = 'fire-rescue';
@@ -40,7 +43,29 @@ const COMMON: CategoryId[] = ['cyberpi', 'sensing', 'events', 'control', 'operat
 export const PALETTES: Record<PaletteId, readonly CategoryId[]> = {
   'fire-rescue': [...COMMON, 'servo', 'gripper', 'quadrgb', 'ultrasonic', 'colorsensor'],
   'fire-chief': [...COMMON, 'extensionport', 'quadrgb', 'ultrasonic', 'frontcolorsensor'],
+  'warehouse-sort': [...COMMON, 'servo', 'gripper', 'quadrgb', 'ultrasonic', 'colorsensor'],
 };
+
+/**
+ * Hover texts that are different in one game. The block is the same block everywhere; only what
+ * it means in that game is different. In Warehouse Sort:
+ *  - the lines are white on a black mat (the robot's Quad RGB sensor has learned that, see
+ *    warehouse-sort/robot.ts), so "the line" is the white line - the text of the catalog says
+ *    "the dark line";
+ *  - the gripper takes cubes - the texts of the catalog name Fire Rescue's buckets and persons.
+ */
+export const PALETTE_TOOLTIPS: Partial<Record<PaletteId, Readonly<Record<string, string>>>> = {
+  'warehouse-sort': {
+    sensing_quadrgb_probe_detects: 'True when this probe is over the white line (or over the black mat).',
+    gripper_claw: `Opens or closes the claw and waits until it has finished. Closing on a cube grabs it. ${GRIPPER_SHORTCUT}`,
+    sensing_claw_object_detected: 'True when there is a cube in (or just in front of) the claw.',
+  },
+};
+
+/** The hover text a block has in a game, when that game has its own (otherwise undefined: the catalog's text). */
+export function paletteTooltip(type: string, gameId: string | undefined): string | undefined {
+  return PALETTE_TOOLTIPS[paletteOf(gameId)]?.[type];
+}
 
 export const PALETTE_IDS: PaletteId[] = Object.keys(PALETTES) as PaletteId[];
 

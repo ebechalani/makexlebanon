@@ -71,6 +71,19 @@ export type MatLayer =
       color: RGB;
       /** optional dash pattern measured along the polyline from its first point */
       dash?: { on: number; off: number };
+    }
+  | {
+      /**
+       * A filled shape with straight edges: a round pad (as a many-sided outline), a hexagon,
+       * the letters of a logo. (Rectangles and lines cannot draw these.)
+       */
+      kind: 'polygon';
+      /**
+       * One or more closed outlines (mm; the last point joins the first). Filled with the
+       * even-odd rule: an outline inside another one cuts a hole, like the inside of a letter "a".
+       */
+      contours: Vec2[][];
+      color: RGB;
     };
 
 /** Geometric description of a mat; layers are painted in order. */
@@ -217,8 +230,18 @@ export interface RobotConfig {
     probeOffsets: [number, number, number, number];
     /** radius of the spot each probe averages over */
     spotRadius: number;
-    /** a probe reports "line" when its brightness (0-100) is below this */
+    /**
+     * the border between "line" and "background" in brightness (0-100): a dark line reads below
+     * it, a light line (see `lightLine`) above it
+     */
     lineThreshold: number;
+    /**
+     * true = the line is LIGHTER than the mat around it (white lines on a black mat). The real
+     * Quad RGB sensor learns which of the two is the line: it is put on the background, its
+     * button is pressed twice and it is swept over line and background. Left out = a dark line
+     * on a light mat, the usual case.
+     */
+    lightLine?: boolean;
   };
   ultrasonic: {
     /** distance of the sensor face ahead of the drive axle */
@@ -443,6 +466,11 @@ export interface ZoneOverlay {
   /** CSS colour */
   color: string;
   kind: 'start' | 'pickup' | 'delivery' | 'tower-area' | 'info';
+  /**
+   * 'ellipse': the zone is the ellipse that fills `rect` (a round pad); left out: the rectangle
+   * itself. (`rect` is still the box around it, for the name of the zone.)
+   */
+  shape?: 'ellipse';
 }
 
 export interface ScoreContext<S> {

@@ -10,6 +10,8 @@
  *    front of its robot. It has no flame sensor: no block, no category, no word of one.
  *  - The texts of the new blocks are not confirmed against mBlock yet; they all come from one
  *    file (./mblock-wording.ts).
+ *  - Warehouse Sort (the beginner Inspire mission) shows exactly the palette of Fire Rescue - the
+ *    same robot. One hover text is its own: its mat has white lines on black.
  *  - The real Blockly library accepts both palettes (it is loaded with a pretend browser, jsdom).
  */
 import assert from 'node:assert/strict';
@@ -20,9 +22,10 @@ import { before, describe, it, test } from 'node:test';
 import { DEFAULT_ROBOT_CONFIG } from '../core/robot';
 import { fireChiefGame } from '../fire-chief/game';
 import { fireRescueGame } from '../fire-rescue/game';
+import { warehouseSortGame } from '../warehouse-sort/game';
 import { BLOCKS, CATEGORIES, getBlockDef, getCategory, type CategoryId } from './catalog';
 import { DC_MOTOR_MENU, DC_MOTOR_STOP_MENU, UNCONFIRMED_BLOCK_TEXTS, UNCONFIRMED_BLOCK_TYPES, UNCONFIRMED_CATEGORY_NAMES } from './mblock-wording';
-import { DEFAULT_PALETTE, isPaletteId, PALETTE_IDS, paletteCategories, paletteOf, PALETTES } from './palettes';
+import { DEFAULT_PALETTE, isPaletteId, PALETTE_IDS, PALETTE_TOOLTIPS, paletteCategories, paletteOf, PALETTES, paletteTooltip } from './palettes';
 import { createEditor, type BlocklyApi } from './register';
 import { buildToolbox, paletteBlockTypes, paletteToolbox, TOOLBOX, toolboxBlockTypes, type ToolboxJson } from './toolbox';
 
@@ -290,9 +293,58 @@ describe('the palette of Fire Chief', () => {
   });
 });
 
+describe('the palette of Warehouse Sort', () => {
+  it('is the palette of Fire Rescue, to the last default value: the same robot with the same parts', () => {
+    assert.equal(warehouseSortGame.id, 'warehouse-sort');
+    assert.equal(isPaletteId('warehouse-sort'), true);
+    assert.deepEqual(paletteCategories('warehouse-sort'), paletteCategories('fire-rescue'));
+    assert.equal(fingerprint(paletteToolbox('warehouse-sort')), FIRE_RESCUE_TOOLBOX_FINGERPRINT);
+    assert.deepEqual(paletteBlockTypes('warehouse-sort'), paletteBlockTypes('fire-rescue'));
+    // (the Gripper shortcuts are the one agreed exception to "real mBlock blocks only": they
+    // come with their "See the real mBlock code" button, as in Fire Rescue)
+    assert.ok(JSON.stringify(paletteToolbox('warehouse-sort')).includes('See the real mBlock code'));
+  });
+
+  it('says in its own hover text that the line is the white line on the black mat; no other game changes', () => {
+    assert.deepEqual(Object.keys(PALETTE_TOOLTIPS), ['warehouse-sort']);
+    assert.deepEqual(Object.keys(PALETTE_TOOLTIPS['warehouse-sort'] ?? {}), ['sensing_quadrgb_probe_detects', 'gripper_claw', 'sensing_claw_object_detected']);
+    assert.equal(
+      paletteTooltip('sensing_quadrgb_probe_detects', 'warehouse-sort'),
+      'True when this probe is over the white line (or over the black mat).',
+    );
+    // the catalog's text stays what Fire Rescue and Fire Chief show
+    assert.equal(getBlockDef('sensing_quadrgb_probe_detects')?.tooltip, 'True when this probe is over the dark line (or over the light background).');
+    for (const game of ['fire-rescue', 'fire-chief', undefined, 'some-future-game']) {
+      assert.equal(paletteTooltip('sensing_quadrgb_probe_detects', game), undefined, String(game));
+    }
+    assert.equal(paletteTooltip('sensing_quadrgb_deviation', 'warehouse-sort'), undefined);
+    // the robot of the game has learned the light line (warehouse-sort/robot.ts)
+    assert.equal(warehouseSortGame.robotConfig?.quadRgb.lightLine, true);
+  });
+
+  it('speaks of cubes, not of the buckets and persons of Fire Rescue, in every hover text of its palette', () => {
+    for (const type of paletteBlockTypes('warehouse-sort')) {
+      const text = paletteTooltip(type, 'warehouse-sort') ?? getBlockDef(type)?.tooltip ?? '';
+      assert.ok(!/bucket|person|people|tower|building/i.test(text), `${type}: ${text}`);
+    }
+    // the claw: the same sentence as in Fire Rescue, with the cube - and the same "real mBlock code" sentence
+    const claw = paletteTooltip('gripper_claw', 'warehouse-sort') ?? '';
+    assert.equal(claw, getBlockDef('gripper_claw')?.tooltip?.replace('a bucket or a person', 'a cube'));
+    assert.match(claw, /right-click it .* to see the real mBlock code\.$/);
+    assert.equal(paletteTooltip('sensing_claw_object_detected', 'warehouse-sort'), 'True when there is a cube in (or just in front of) the claw.');
+    // Fire Rescue and Fire Chief keep the catalog's texts
+    for (const game of ['fire-rescue', 'fire-chief', undefined]) {
+      assert.equal(paletteTooltip('gripper_claw', game), undefined, String(game));
+      assert.equal(paletteTooltip('sensing_claw_object_detected', game), undefined, String(game));
+    }
+    assert.match(getBlockDef('gripper_claw')?.tooltip ?? '', /Closing on a bucket or a person grabs it\./);
+    assert.equal(getBlockDef('sensing_claw_object_detected')?.tooltip, 'True when there is a bucket or a person in (or just in front of) the claw.');
+  });
+});
+
 describe('palettes and games', () => {
   it('there is one palette per game, named by the id of the game', () => {
-    assert.deepEqual([...PALETTE_IDS].sort(), [fireChiefGame.id, fireRescueGame.id].sort());
+    assert.deepEqual([...PALETTE_IDS].sort(), [fireChiefGame.id, fireRescueGame.id, warehouseSortGame.id].sort());
     for (const id of PALETTE_IDS) assert.ok(isPaletteId(id));
     assert.equal(isPaletteId('fire'), false);
     assert.equal(isPaletteId(undefined), false);
@@ -336,7 +388,11 @@ describe('palettes and games', () => {
   });
 
   it('a palette shows the blocks of a part exactly when the robot of the game has that part', () => {
-    const robots = { 'fire-rescue': fireRescueGame.robotConfig ?? DEFAULT_ROBOT_CONFIG, 'fire-chief': fireChiefGame.robotConfig ?? DEFAULT_ROBOT_CONFIG };
+    const robots = {
+      'fire-rescue': fireRescueGame.robotConfig ?? DEFAULT_ROBOT_CONFIG,
+      'fire-chief': fireChiefGame.robotConfig ?? DEFAULT_ROBOT_CONFIG,
+      'warehouse-sort': warehouseSortGame.robotConfig ?? DEFAULT_ROBOT_CONFIG,
+    };
     for (const id of PALETTE_IDS) {
       const robot = robots[id];
       const has = (category: CategoryId): boolean => PALETTES[id].includes(category);
@@ -466,6 +522,32 @@ describe('the editor factory', () => {
     assert.deepEqual(categoryNames(own), ['Events', 'mBot2 Chassis']);
 
     for (const workspace of [rescue, chief, own]) workspace.dispose();
+  });
+
+  test('Warehouse Sort: the palette of Fire Rescue; the hover text of "detects line" is its own, in its editor only', () => {
+    const sort = createEditor(Blockly, 'own', { sounds: false, palette: warehouseSortGame.id });
+    assert.deepEqual(categoryNames(sort), FIRE_RESCUE_PINNED.map((category) => category.name));
+    const rescue = createEditor(Blockly, 'rescue', { sounds: false, palette: fireRescueGame.id });
+    const plain = createEditor(Blockly, 'chief', { sounds: false });
+    const tip = (workspace: ReturnType<typeof createEditor>): unknown => {
+      const block = Blockly.serialization.blocks.append({ type: 'sensing_quadrgb_probe_detects' } as never, workspace);
+      return Blockly.Tooltip.getTooltipOfObject(block);
+    };
+    assert.equal(tip(sort), 'True when this probe is over the white line (or over the black mat).');
+    assert.equal(tip(rescue), 'True when this probe is over the dark line (or over the light background).');
+    assert.equal(tip(plain), 'True when this probe is over the dark line (or over the light background).');
+    // a block whose hover text is the same everywhere keeps it
+    const other = Blockly.serialization.blocks.append({ type: 'sensing_quadrgb_deviation' } as never, sort);
+    assert.equal(Blockly.Tooltip.getTooltipOfObject(other), getBlockDef('sensing_quadrgb_deviation')?.tooltip);
+    // the claw blocks speak of a cube in Warehouse Sort only
+    const tipOf = (type: string, workspace: ReturnType<typeof createEditor>): unknown =>
+      Blockly.Tooltip.getTooltipOfObject(Blockly.serialization.blocks.append({ type } as never, workspace));
+    for (const type of ['gripper_claw', 'sensing_claw_object_detected']) {
+      assert.equal(tipOf(type, sort), paletteTooltip(type, 'warehouse-sort'), type);
+      assert.equal(tipOf(type, rescue), getBlockDef(type)?.tooltip, type);
+      assert.equal(tipOf(type, plain), getBlockDef(type)?.tooltip, type);
+    }
+    for (const workspace of [sort, rescue, plain]) workspace.dispose();
   });
 
   test('Blockly accepts every entry of the Fire Chief palette, and draws the new blocks with their texts', () => {

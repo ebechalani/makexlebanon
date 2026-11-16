@@ -45,14 +45,18 @@ export function classifyColor(rgb: RGB): SensorColor {
   return 'purple';
 }
 
-/** Everything one Quad RGB probe reports for the colour it is looking at. */
-export function makeProbeReading(rgb: RGB, lineThreshold: number): ProbeReading {
+/**
+ * Everything one Quad RGB probe reports for the colour it is looking at. `lightLine`: the line is
+ * lighter than the mat (white lines on a black mat), so "on the line" means brighter than the
+ * threshold instead of darker.
+ */
+export function makeProbeReading(rgb: RGB, lineThreshold: number, lightLine = false): ProbeReading {
   const light = lightOf(rgb);
   return {
     rgb,
     light,
     gray: 100 - light,
-    onLine: light < lineThreshold,
+    onLine: lightLine ? light > lineThreshold : light < lineThreshold,
     color: classifyColor(rgb),
   };
 }
@@ -84,24 +88,31 @@ export function lineStatusOf(readings: readonly ProbeReading[]): number {
  * down -> the robot turns right, back towards the line.
  *
  * The size of the value comes from the average position of the probes that see the line, each
- * weighted by how dark it reads. `probeOffsets` are the positions of L2, L1, R1, R2 across the
- * robot (negative = left of the middle).
+ * weighted by how dark it reads (by how bright, with `lightLine`: white lines on a black mat).
+ * `probeOffsets` are the positions of L2, L1, R1, R2 across the robot (negative = left of the
+ * middle).
  */
 export function lineOffsetOf(
   readings: readonly ProbeReading[],
   probeOffsets: readonly number[],
   lineThreshold: number,
+  lightLine = false,
 ): number {
   let reach = 0;
   for (let i = 0; i < 4; i++) reach = Math.max(reach, Math.abs(probeOffsets[i]));
-  if (reach <= 0 || lineThreshold <= 0) return 0;
+  if (reach <= 0) return 0;
+  // (no probe can ever be on the line: below 0 for a dark line, above 100 for a light one)
+  if (lightLine ? lineThreshold >= 100 : lineThreshold <= 0) return 0;
 
   let weightSum = 0;
   /** where the line is under the sensor: -1 = under the far-left probe .. +1 = under the far-right probe */
   let linePositionSum = 0;
   for (let i = 0; i < 4; i++) {
     // weight 0 at the line threshold, growing to 1 when the probe reads half the threshold or less
-    const weight = Math.min(1, Math.max(0, (lineThreshold - readings[i].light) / (lineThreshold / 2)));
+    // (a light line: half way from the threshold up to 100 or more)
+    const weight = lightLine
+      ? Math.min(1, Math.max(0, (readings[i].light - lineThreshold) / ((100 - lineThreshold) / 2)))
+      : Math.min(1, Math.max(0, (lineThreshold - readings[i].light) / (lineThreshold / 2)));
     weightSum += weight;
     linePositionSum += weight * (probeOffsets[i] / reach);
   }

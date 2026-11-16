@@ -100,6 +100,18 @@ export function paintMatVector(ctx: CanvasRenderingContext2D, mat: MatVector): v
       ctx.fillRect(layer.rect.x, layer.rect.y, layer.rect.w, layer.rect.h);
       continue;
     }
+    if (layer.kind === 'polygon') {
+      // even-odd, like the sensors (core/mat.ts): an outline inside another one is a hole
+      ctx.beginPath();
+      for (const contour of layer.contours) {
+        if (contour.length < 3) continue;
+        contour.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+        ctx.closePath();
+      }
+      ctx.fillStyle = rgbCss(layer.color);
+      ctx.fill('evenodd');
+      continue;
+    }
     if (layer.points.length < 2) continue;
     ctx.beginPath();
     layer.points.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
@@ -347,6 +359,13 @@ function flamePath(ctx: CanvasRenderingContext2D, cx: number, cy: number, height
 }
 
 /**
+ * The kind of body that is a cube: the cargo of Warehouse Sort (KIND_CUBE in
+ * warehouse-sort/game.ts - a test keeps the two words the same). It is drawn as a solid block
+ * seen from above, not as an open bucket.
+ */
+export const CUBE_KIND = 'cube';
+
+/**
  * The kind of body that is "the fire": the wooden flame of Fire Chief (KIND_FIRE_TARGET in
  * fire-chief/game.ts - a test keeps the two words the same). The stage draws a flame sign
  * around it.
@@ -445,6 +464,13 @@ export function drawBody(ctx: CanvasRenderingContext2D, body: Body, devicePerMm:
     ctx.strokeStyle = edge;
     ctx.stroke();
     ink = rgbCss(shade(fill, -0.2));
+  } else if (body.kind === CUBE_KIND) {
+    // cube: a solid block, its top a little lighter than its sides
+    const inset = Math.min(6, size * 0.15);
+    roundRect(ctx, -w / 2 + inset, -l / 2 + inset, w - 2 * inset, l - 2 * inset, 3);
+    ctx.fillStyle = rgbCss(shade(fill, 0.18));
+    ctx.fill();
+    ink = '#ffffff';
   } else if (body.grippable) {
     // bucket: an open container, darker inside
     ctx.beginPath();
@@ -1056,6 +1082,19 @@ function drawZoneAreas(ctx: CanvasRenderingContext2D, overlays: ZoneOverlay[], v
   ctx.save();
   for (const zone of overlays) {
     const { x, y, w, h } = zone.rect;
+    if (zone.shape === 'ellipse') {
+      // a round zone (the finish pads of Warehouse Sort): the ellipse that fills its box
+      ctx.beginPath();
+      ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+      ctx.globalAlpha = 0.3;
+      ctx.fillStyle = zone.color;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = 2 / view.scale;
+      ctx.strokeStyle = zone.color;
+      ctx.stroke();
+      continue;
+    }
     ctx.globalAlpha = zone.kind === 'start' ? 0.1 : 0.3;
     ctx.fillStyle = zone.color;
     ctx.fillRect(x, y, w, h);

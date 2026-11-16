@@ -103,6 +103,10 @@ export interface UseSimulationOptions<S> {
   matchWord?: string;
   /** what the game calls one starting arrangement, for the console line of a start ("combination" when left out) */
   scenarioWord?: string;
+  /** the first words of the console line when the gripper closes on something ("Picked up" when left out: ScreenWords.grabbed) */
+  grabbedWord?: string;
+  /** the console's name for the edge of the table ("the table wall" when left out: ScreenWords.tableEdge) */
+  tableEdgeWord?: string;
 }
 
 export interface SimulationController<S> {
@@ -289,7 +293,13 @@ export function useSimulation<S>(options: UseSimulationOptions<S>): SimulationCo
         }
         if (event.type === 'restart') trail.breakLine();
         // (a restart line says what a restart does in this game and how many are left after it)
-        const line = describeEvent(event, { ...restartFacts(game), left: simRef.current.restartsLeft, match: optionsRef.current.matchWord });
+        const line = describeEvent(event, {
+          ...restartFacts(game),
+          left: simRef.current.restartsLeft,
+          match: optionsRef.current.matchWord,
+          grabbed: optionsRef.current.grabbedWord,
+          tableEdge: optionsRef.current.tableEdgeWord,
+        });
         if (line) addLog(line);
       }
     },

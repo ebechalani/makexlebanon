@@ -69,6 +69,18 @@ export interface ScreenWords {
   batchHint: string;
   /** ... and the first lines of its window */
   batchIntro: string;
+  /**
+   * The console line when the gripper closes on a game element begins with this. Left out:
+   * "Picked up" (Fire Rescue). A game whose referee counts "picked up" only later (Warehouse
+   * Sort: lifted 1 cm or carried) says "Gripped" here, so the console does not claim more.
+   */
+  grabbed?: string;
+  /**
+   * What the console calls the edge of the table the mat lies on, when the robot runs into it:
+   * "Bumped into the table wall." Left out: "the table wall". A game without walls says what
+   * it is there.
+   */
+  tableEdge?: string;
 }
 
 /** The screen's words when a game says nothing else: the words of Fire Rescue. */

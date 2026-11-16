@@ -19,11 +19,17 @@ const PARENT_PAGES: Array<{ label: string; href: string }> = [
 export interface TitleBarProps {
   /** short name of the category, e.g. "Fire Rescue" */
   title: string;
+  /**
+   * true: on a phone a title that is too long for its line goes on over a second line instead of
+   * being cut off ("Warehouse Sort sim..." on a 360 px phone). Left out: cut off with "...", as
+   * it always was - the titles of Fire Rescue and Fire Chief fit a 360 px phone.
+   */
+  wrapOnPhone?: boolean;
   /** the buttons on the right of the row */
   children?: ReactNode;
 }
 
-export function TitleBar({ title, children }: TitleBarProps) {
+export function TitleBar({ title, wrapOnPhone = false, children }: TitleBarProps) {
   return (
     <div className="relative z-30 flex shrink-0 flex-wrap items-center gap-x-2 gap-y-0.5 border-b border-white/10 bg-ink-950 px-3 py-1.5 text-white sm:h-12 sm:flex-nowrap sm:px-4 sm:py-0">
       <nav aria-label="Breadcrumb" className="max-sm:w-full">
@@ -45,7 +51,7 @@ export function TitleBar({ title, children }: TitleBarProps) {
       {/* The title and, under it, who the simulator is powered by. The two lines together are
           lower than the row, so the row keeps its height. */}
       <div className="flex min-w-0 flex-1 flex-col justify-center">
-        <h1 className="truncate text-base font-semibold leading-tight text-white">
+        <h1 className={`truncate text-base font-semibold leading-tight text-white${wrapOnPhone ? ' max-sm:whitespace-normal' : ''}`}>
           {title} simulator <span className="font-medium text-brand-300 max-md:hidden">· mBot2</span>
         </h1>
         <PoweredBy className="truncate max-sm:hidden" />

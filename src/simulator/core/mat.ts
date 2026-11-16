@@ -10,6 +10,7 @@ import type { Vec2 } from './geometry';
 import type { MatLayer, MatSampler, MatVector, RGB } from './types';
 
 type StrokeLayer = Extract<MatLayer, { kind: 'stroke' }>;
+type PolygonLayer = Extract<MatLayer, { kind: 'polygon' }>;
 
 interface PreparedStroke {
   layer: StrokeLayer;
@@ -81,14 +82,69 @@ function strokeCovers(s: PreparedStroke, x: number, y: number): boolean {
   return false;
 }
 
+interface PreparedPolygon {
+  layer: PolygonLayer;
+  /** every edge of every outline: x1, y1, x2, y2 one after the other */
+  edges: Float64Array;
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+function preparePolygon(layer: PolygonLayer): PreparedPolygon {
+  const coords: number[] = [];
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const contour of layer.contours) {
+    const n = contour.length;
+    if (n < 3) continue; // (fewer than three points enclose nothing)
+    for (let i = 0; i < n; i++) {
+      const a = contour[i];
+      const b = contour[(i + 1) % n];
+      coords.push(a.x, a.y, b.x, b.y);
+      minX = Math.min(minX, a.x);
+      minY = Math.min(minY, a.y);
+      maxX = Math.max(maxX, a.x);
+      maxY = Math.max(maxY, a.y);
+    }
+  }
+  return { layer, edges: Float64Array.from(coords), minX, minY, maxX, maxY };
+}
+
+/** Even-odd rule: a ray from the point to the right crosses the outlines an odd number of times. */
+function polygonCovers(p: PreparedPolygon, x: number, y: number): boolean {
+  if (x < p.minX || x > p.maxX || y < p.minY || y > p.maxY) return false;
+  const e = p.edges;
+  let inside = false;
+  for (let i = 0; i < e.length; i += 4) {
+    const y1 = e[i + 1];
+    const y2 = e[i + 3];
+    if (y1 > y !== y2 > y) {
+      const x1 = e[i];
+      const crossX = x1 + ((e[i + 2] - x1) * (y - y1)) / (y2 - y1);
+      if (x < crossX) inside = !inside;
+    }
+  }
+  return inside;
+}
+
 export class VectorMatSampler implements MatSampler {
-  private readonly prepared: Array<{ layer: MatLayer; stroke?: PreparedStroke }>;
+  private readonly prepared: Array<{ layer: MatLayer; stroke?: PreparedStroke; polygon?: PreparedPolygon }>;
 
   constructor(private readonly mat: MatVector) {
     // top-most layer first
     this.prepared = [...mat.layers]
       .reverse()
-      .map((layer) => (layer.kind === 'stroke' ? { layer, stroke: prepareStroke(layer) } : { layer }));
+      .map((layer) =>
+        layer.kind === 'stroke'
+          ? { layer, stroke: prepareStroke(layer) }
+          : layer.kind === 'polygon'
+            ? { layer, polygon: preparePolygon(layer) }
+            : { layer },
+      );
   }
 
   sample(x: number, y: number): RGB {
@@ -99,6 +155,8 @@ export class VectorMatSampler implements MatSampler {
         const r = p.layer.rect;
         if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) return p.layer.color;
       } else if (p.stroke && strokeCovers(p.stroke, x, y)) {
+        return p.layer.color;
+      } else if (p.polygon && polygonCovers(p.polygon, x, y)) {
         return p.layer.color;
       }
     }
