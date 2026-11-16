@@ -1,7 +1,7 @@
 /**
  * The slim title row of the simulator. It sits directly under the website's own header, so it
  * carries no logo and no "Home" button of its own: only where the page is on the site
- * (Home / Training / ...), its title, and the simulator's buttons on the right.
+ * (Home / Simulator / ...), its title, and the simulator's buttons on the right.
  *
  * On screens that show blocks and stage side by side the row is exactly 3rem tall; the size of
  * the mat is worked out from that (see .mbot2-mat in simulator.css). On a phone the path gets a
@@ -10,10 +10,10 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
-/** The pages above the simulator on the website. */
+/** The pages above the simulator on the website: the Simulator page lists all the simulators. */
 const PARENT_PAGES: Array<{ label: string; href: string }> = [
   { label: 'Home', href: '/' },
-  { label: 'Training', href: '/training' },
+  { label: 'Simulator', href: '/simulator' },
 ];
 
 export interface TitleBarProps {

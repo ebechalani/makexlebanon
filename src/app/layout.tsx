@@ -57,7 +57,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   };
 
   return (
-    <html lang="en">
+    // data-scroll-behavior: globals.css makes the page scroll smoothly (anchor links). Next 16
+    // only switches that off while it moves to a new page if this attribute is here; without it,
+    // a page opened from a scrolled page glides down to under the sticky header instead of
+    // starting at its top (the title row of a simulator was hidden behind the header).
+    <html lang="en" data-scroll-behavior="smooth">
       <body className="flex min-h-dvh flex-col">
         <a
           href="#main"

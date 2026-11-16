@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { site } from '@content/site';
 import { FireChiefLoader } from '@/simulator/ui/fire-chief/FireChiefLoader';
 
-const PATH = '/training/simulator/fire-chief';
+const PATH = '/simulator/fire-chief';
 const TITLE = 'mBot2 simulator — Fire Chief';
 const DESCRIPTION =
   'Build a program with mBlock-style blocks and watch a Makeblock mBot2 find its way through the ' +

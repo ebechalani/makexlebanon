@@ -244,23 +244,22 @@ competition mat, on any starting combination the referee could draw, scored by t
 rules. It lives at:
 
 ```
-https://www.makexlebanon.com/training/simulator/fire-rescue
+https://www.makexlebanon.com/simulator/fire-rescue
 ```
 
 The same simulator has a second game, **Fire Chief** (the maze, ages 14–17), and a third,
 **Warehouse Sort** (the beginner mission of the MakeX Lebanon Inspire category, local event):
 see "The Fire Chief simulator" and "The Warehouse Sort simulator" further down.
-`/training/simulator` lists the simulators — see "The list of simulators" there. Nothing is installed, and the
+`/simulator` lists the simulators by season — see "The Simulator page" there. Nothing is installed, and the
 student's blocks are saved in their own browser — they are never sent anywhere. The one thing
 the simulator asks the website's server for is the ready-made examples: the server decides,
 visitor by visitor, which of them to show and to open. See "Member codes for the simulator
 examples" below.
 
-Visitors reach it from the **Training** menu, the Training page, the list of simulators, the
+Visitors reach it from the Simulator page (the **Simulator** item of the menu), the
 Fire Rescue category page and the Season 2027 block on the homepage; the Season 2027 page
-marks the category with an "Online simulator" label. All of that comes from the content files: the `simulator` entry on
-the Fire Rescue category and the training track in `content/seasons.ts`, and the menu in
-`content/site.ts`. Remove those entries and the links disappear; the simulator page itself
+marks the category with an "Online simulator" label. All of that comes from the `simulator` entry on
+the Fire Rescue category in `content/seasons.ts`. Remove that entry and the links disappear; the simulator page itself
 stays.
 
 The older, simpler simulator inside the Smart Logistics lessons
@@ -320,7 +319,7 @@ pointer (how close a click must be to a point, what counts as a click) are in
 | `src/simulator/members/` | The codes (member codes and advanced codes): what a code looks like, its fingerprint, and the check the server makes |
 | `src/app/api/simulator/unlock/` | The address on the website that checks a code and hands out the examples a visitor may see |
 | `src/simulator/ui/` | What you see: the screen, its buttons and panels, the drawing of the mat, and its stylesheet (`simulator.css`) |
-| `src/app/training/simulator/` | The page itself: its address, title and description |
+| `src/app/simulator/fire-rescue/` | The page itself: its address, title and description |
 | `public/simulator/fire-rescue/` | The two pictures of the mat: `mat.webp` is the one shown, `mat-sensor.webp` is the one the line sensor reads |
 | `public/blockly-media/` | Blockly's own small pictures, shared with the Smart Logistics lessons |
 
@@ -682,7 +681,7 @@ every random maze it draws is one — see "Competition mazes: 13 or 16 inner wal
 lives at:
 
 ```
-https://www.makexlebanon.com/training/simulator/fire-chief
+https://www.makexlebanon.com/simulator/fire-chief
 ```
 
 **The rules of this category are a draft** ("MakeX Lebanon 2027, Fire Chief, draft competition
@@ -704,31 +703,43 @@ Everything that is general works as in Fire Rescue and is described above: the b
 their saving, the ruler and the enlarged stage, the examples and their codes, the title row
 with "Powered by …", the header height.
 
-### The list of simulators
+### The Simulator page
 
-`/training/simulator` is a small page with one card per simulator: the picture of its mat, the
-age group (or, for a mission without one, its category and level), two sentences and a button.
-Nothing about a simulator is written in that page itself. Every category
-in `content/seasons.ts` that has a `simulator` entry gets a card, in the order of that file:
+The simulators have a section of their own on the website: **Simulator** in the menu, between
+Training and Videos, leads to `/simulator`. It is one page (`src/app/simulator/page.tsx`) with
+one part per season — "Season 2026", then "Season 2027" — and in each part one card per
+simulator: the picture of its mat, its two labels (age group and season, or for a mission
+without an age group its category and level, and its event), its name and two sentences. The
+whole card is one link to the simulator; under the card of a category is the link "About
+<category>" to its category page. Nothing about a simulator is written in that page itself:
+it shows what `simulatorSeasons()` in `content/seasons.ts` gives. Every category in
+`content/seasons.ts` that has a `simulator` entry gets a card in the part of its season, in the
+order of that file:
 
 ```ts
 simulator: {
-  href: '/training/simulator/fire-chief',   // the simulator's page
+  href: '/simulator/fire-chief',            // the simulator's page
   summary: 'Two sentences …',               // also shown on the category page
-  mat: '/simulator/fire-chief/mat.webp',    // the picture on the list (a file under public/)
+  mat: '/simulator/fire-chief/mat.webp',    // the picture on the card (a file under public/)
 },
 ```
 
 The same entry puts the "Try the simulator" link on the homepage, the "Online simulator" label
 on the season page and the simulator block on the category page. A simulator of a mission that
 is not a category of a season (Warehouse Sort, the beginner mission of a local event) is an
-entry of `missionSimulators` in the same file instead: its card comes after the others, with
-two labels of its own (`label`, `event`) and no "About" link. The card on the Training page
-is the entry in `trainingTracks` (same file), and the lines of the **Training** menu are in
-`content/site.ts`. The menu has one line per simulator, so that each is one click away. The
-list page is linked from the Training page ("All mBot2 simulators", under the cards); it is
-also what visitors get who come to `/training/simulator` itself (that address used to send
-them on to Fire Rescue) and what search engines find.
+entry of `missionSimulators` in the same file instead: its `season` (a year) says in which part
+it is shown, after the categories of that season; it has two labels of its own (`label`,
+`event`) and no "About" link. A season without a simulator gets no part. The Training page
+keeps one card that leads to `/simulator` (`simulatorTrack()` in `trainingTracks`, same file):
+its badge and its sentence name the seasons and the simulators, worked out from
+`simulatorSeasons()` too, so a simulator added later is named there by itself.
+
+The simulators used to be under Training: `/training/simulator` and
+`/training/simulator/<game>`. Those addresses are permanent redirects to the new ones
+(`next.config.mjs`), so old links and bookmarks keep working, and the blocks a student saved
+stay: the browser keeps them under the name of the game, not under the address of the page.
+The pictures of the mats and the Blockly media stay where they were, in `public/simulator/<game>/`
+and `public/blockly-media/`: a file there keeps its address next to the page of its game.
 
 ### How the game is put together
 
@@ -740,7 +751,7 @@ them on to Fire Rescue) and what search engines find.
 | `src/simulator/fire-chief/game.ts` | The game and its referee: the four achievements with their points, the 3 minutes, the 3 seconds of the fan, the one restart, the end of an attempt. At its top: the two lists described below |
 | `src/simulator/fire-chief/sample-catalog.ts`, `samples.ts` | The examples: titles and levels, and the programs with their descriptions. They stay on the server (see "Member codes" above) |
 | `src/simulator/ui/fire-chief/` | What only this game shows: `FireChiefSimulator.tsx` (what the general screen is given), `MazeEditor.tsx` (the Maze panel) with its plain helpers `maze-plan.ts`, `maze-level.ts`, `maze-code.ts`, `maze-words.ts`, `maze-choices.ts`, `maze-batch.ts`, the `rules.ts` of the Rules window and the `words.ts` of the screen |
-| `src/app/training/simulator/fire-chief/page.tsx` | The page: its address, title and description |
+| `src/app/simulator/fire-chief/page.tsx` | The page: its address, title and description |
 | `public/simulator/fire-chief/` | The two pictures of the mat: `mat.webp` is the one shown, `mat-sensor.webp` is the one the line sensor reads |
 
 What the two games share is everything else: the engine (`src/simulator/core/` — it knows
@@ -1221,7 +1232,7 @@ blue one where it is, and parks on one of the two round finish pads (left and ri
 lasts 90 seconds. It lives at:
 
 ```
-https://www.makexlebanon.com/training/simulator/warehouse-sort
+https://www.makexlebanon.com/simulator/warehouse-sort
 ```
 
 The mat is the print file `Capelli_Inspire_1235mm.pdf` (1235 × 1235 mm, black, with **white**
@@ -1252,13 +1263,14 @@ for all three games), the title row with "Powered by …", the header height.
 | `src/simulator/warehouse-sort/play.ts` | Play a program without a screen, on one or on all 24 arrangements (the tests use it) |
 | `src/simulator/warehouse-sort/sample-catalog.ts`, `samples.ts` | The six examples. They stay on the server (see "Member codes" above) |
 | `src/simulator/ui/warehouse-sort/` | What only this game shows: `WarehouseSortSimulator.tsx` (what the general screen is given), `ArrangementEditor.tsx` (the Cube colours panel) with `arrangement-panel.ts`, `arrangement-code.ts` (a typed code), `arrangement-batch.ts` (the lists and the ranking of "Test on many arrangements"), `rules.ts` (the Rules window) and `words.ts` (the screen's words) |
-| `src/app/training/simulator/warehouse-sort/page.tsx` | The page: its address, title and description |
+| `src/app/simulator/warehouse-sort/page.tsx` | The page: its address, title and description |
 | `public/simulator/warehouse-sort/` | The two pictures of the mat: `mat.webp` (2500 px) is shown, `mat-sensor.webp` (1250 px) is what the line sensor reads |
 
-The page is on the **Training** menu, the Training page and the list of simulators. It is not a
-category of a season in `content/seasons.ts`, so its card on the list comes from
-`missionSimulators` in that file (see "The list of simulators" above): "MakeX Inspire ·
-Beginner", "Local event". The rules give no age group, so none is shown.
+The page is on the Simulator page, in the part "Season 2026". It is not a
+category of a season in `content/seasons.ts`, so its card there comes from
+`missionSimulators` in that file (see "The Simulator page" above): "MakeX Inspire ·
+Beginner", "Local event". The rules give no age group, so none is shown. It is not the 2026
+category Smart Logistics either: the organiser has not said that it is the same mission.
 
 What the general screen got for this game — optional props that the other two games do not
 pass, so their screens are as they were:

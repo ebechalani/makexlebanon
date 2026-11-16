@@ -1,14 +1,13 @@
 import type { Metadata } from 'next';
 import { site } from '@content/site';
-import { WarehouseSortLoader } from '@/simulator/ui/warehouse-sort/WarehouseSortLoader';
+import { FireRescueLoader } from '@/simulator/ui/fire-rescue/FireRescueLoader';
 
-const PATH = '/training/simulator/warehouse-sort';
-const TITLE = 'mBot2 simulator — Warehouse Sort';
+const PATH = '/simulator/fire-rescue';
+const TITLE = 'mBot2 simulator — Fire Rescue';
 const DESCRIPTION =
-  'Build a program with mBlock-style blocks and watch a Makeblock mBot2 sort red and green cubes ' +
-  'on the MakeX Lebanon Inspire mat: from the warehouses into the bay of their colour, leaving the ' +
-  'blue cube alone, then park — with any arrangement of the cubes, scored by the rules of the beginner mission ' +
-  '“Warehouse Sort”. Free, in the browser.';
+  'Build a program with mBlock-style blocks and watch a Makeblock mBot2 run it on the MakeX Lebanon ' +
+  '2027 Fire Rescue mat — on any starting combination, scored by the category rules. Free, in the ' +
+  'browser, for ages 11–13.';
 
 /**
  * The site's share card (src/app/opengraph-image.tsx). A page that sets its own `openGraph`
@@ -47,6 +46,6 @@ export const metadata: Metadata = {
  * inside it runs in the browser only. It fills the window under the site header, so this page
  * has no PageHero: its heading and breadcrumb are the simulator's slim title row.
  */
-export default function WarehouseSortSimulatorPage() {
-  return <WarehouseSortLoader />;
+export default function FireRescueSimulatorPage() {
+  return <FireRescueLoader />;
 }

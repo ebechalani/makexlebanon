@@ -73,13 +73,12 @@ export const nav: NavItem[] = [
     href: '/training',
     children: [
       { label: 'Training & hints', href: '/training' },
-      { label: 'Fire Rescue simulator', href: '/training/simulator/fire-rescue' },
-      { label: 'Fire Chief simulator', href: '/training/simulator/fire-chief' },
-      { label: 'Warehouse Sort simulator', href: '/training/simulator/warehouse-sort' },
       { label: 'Workshops & events', href: '/workshops' },
       { label: 'Competition kits', href: '/kits' },
     ],
   },
+  // the mBot2 simulators: one page that lists them by season (src/app/simulator/page.tsx)
+  { label: 'Simulator', href: '/simulator' },
   { label: 'Videos', href: '/media' },
   { label: 'Contact', href: '/contact' },
 ];
