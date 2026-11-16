@@ -7,7 +7,7 @@
  *      where they contradict themselves, and where they differ from the printed mat. Nobody
  *      should take one of these for a rule, so they are never mixed into part 1.
  *      The full list of questions for the organiser, with the constant behind every one, is at
- *      the top of ../../warehouse-sort/game.ts (Q1 - Q14, the same numbers as in the README).
+ *      the top of ../../warehouse-sort/game.ts (Q1 - Q15, the same numbers as in the README).
  *
  * This is the beginner category, and many students read English as a second language: short
  * sentences, plain words, nothing more certain than the rules or the simulator. Every number is
@@ -20,7 +20,10 @@ import { TABLE_MARGIN } from '../../core/engine';
 import type { RobotConfig } from '../../core/types';
 import { CUBE_SIZE, FINISH_PADS, MAT_SIZE } from '../../warehouse-sort/field';
 import {
+  BLUE_MOVED_MM,
+  BLUE_PENALTY,
   CARRY_MM,
+  CUBES_TO_SORT,
   CUBE_COUNT,
   LIFT_MM,
   MATCH_DURATION,
@@ -45,8 +48,10 @@ export const robotLength = (config: RobotConfig): number => robotReach(config).f
 /** ... and across (mm). */
 export const robotWidth = (config: RobotConfig): number => 2 * robotReach(config).halfWidth;
 
-/** The rules' own "example max" (§6), which does not add up: their line items give MAX_SCORE. */
+/** The rules' own "example max" (§6), which does not add up: their line items give MAX_SCORE (three cubes sorted), or ... */
 export const RULES_EXAMPLE_MAX = 85;
+/** ... RULES_FOUR_CUBES_MAX for the four red and green cubes of the written rules. */
+export const RULES_FOUR_CUBES_MAX = POINTS_LEAVE_START + CUBE_COUNT * (POINTS_PICK + POINTS_DELIVER) + POINTS_PARK + POINTS_CLEAN;
 
 /** The sentence under the heading of the rules window. */
 export const WAREHOUSE_SORT_RULES_NOTE = 'Beginner mission of the Inspire category, MakeX Lebanon local event.';
@@ -55,9 +60,10 @@ export const WAREHOUSE_SORT_RULES: RulesSection[] = [
   {
     title: 'The mission',
     items: [
-      `${CUBE_COUNT} warehouses near the corners hold one cube each. A cube is red or green.`,
-      'Take each cube to the bay of its colour: a red cube to the red bay, a green cube to the green bay.',
-      'At the end, park the robot on one of the two round finish pads, at the top or at the bottom.',
+      `${CUBE_COUNT} warehouses near the corners hold one cube each. ${CUBES_TO_SORT} cubes are red or green, one is blue.`,
+      'Take each red or green cube to the bay of its colour: a red cube to the red bay, a green cube to the green bay.',
+      'Leave the blue cube where it is. Check the colour of a cube before you take it.',
+      'At the end, park the robot on one of the two round finish pads, on the left or on the right.',
       'After the start the robot drives on its own. Nobody touches it.',
     ],
   },
@@ -66,9 +72,9 @@ export const WAREHOUSE_SORT_RULES: RulesSection[] = [
     items: [
       `The mat is ${cm(MAT_SIZE)} x ${cm(MAT_SIZE)} cm. It is black, with white lines.`,
       'The white lines are only a help. The robot may drive anywhere on the mat.',
-      'The start zone is on the right edge of the mat.',
-      'The red bay is above the middle of the mat, the green bay below it.',
-      'Before the match the referee puts the cubes in the warehouses: at least one red and one green.',
+      'The start zone is in the middle of the bottom edge. The robot starts facing up.',
+      'The red bay is right of the middle of the mat, the green bay left of it.',
+      'Before the match the cubes are put in the warehouses: one blue, and at least one red and one green.',
     ],
   },
   {
@@ -84,13 +90,15 @@ export const WAREHOUSE_SORT_RULES: RulesSection[] = [
     title: `Points (${MAX_SCORE} at most)`,
     items: [
       `+${POINTS_LEAVE_START}: the robot leaves the start zone. This counts once.`,
-      `+${POINTS_PICK} for each cube picked up: the gripper lifts it at least ${cm(LIFT_MM)} cm, or carries it. Each cube counts once.`,
-      `+${POINTS_DELIVER} for each cube in the bay of its colour at the end: the whole cube inside the bay, standing on the mat, not touching the robot.`,
+      `+${POINTS_PICK} for each red or green cube picked up: the gripper lifts it at least ${cm(LIFT_MM)} cm, or carries it. Each cube counts once.`,
+      `+${POINTS_DELIVER} for each red or green cube in the bay of its colour at the end: the whole cube inside the bay, on the mat, not touching the robot.`,
       // (the rules' own words; how the simulator reads them is in the second part)
       `-${WRONG_BAY_PENALTY} for each cube in the bay of the other colour at the end, and no points for that cube.`,
+      // (what moving it costs is not decided: the second part says what the simulator does)
+      'The blue cube brings no points.',
       `+${POINTS_PARK}: at the end the robot is parked on a finish pad.`,
       `+${POINTS_CLEAN}: clean run, nobody touched the robot.`,
-      `All together: ${POINTS_LEAVE_START} + ${CUBE_COUNT} x ${POINTS_PICK} + ${CUBE_COUNT} x ${POINTS_DELIVER} + ${POINTS_PARK} + ${POINTS_CLEAN} = ${MAX_SCORE}.`,
+      `All together: ${POINTS_LEAVE_START} + ${CUBES_TO_SORT} x ${POINTS_PICK} + ${CUBES_TO_SORT} x ${POINTS_DELIVER} + ${POINTS_PARK} + ${POINTS_CLEAN} = ${MAX_SCORE}.`,
     ],
   },
   {
@@ -116,10 +124,20 @@ export const WAREHOUSE_SORT_ASSUMPTIONS: RulesPart = {
     {
       title: 'Where the rules and the mat disagree',
       items: [
-        'The rules say the start zone is a green area. On the mat it is the area with the yellow frame on the right. The simulator uses that area.',
-        'The rules say the finish pads are yellow circles with a checkerboard. On the mat they are the two round pictures at the top and at the bottom. The simulator uses those.',
-        `The rules say "park touching the circle", and later "entirely inside one circle". A pad is about ${cm(2 * Math.max(FINISH_PADS.top.rx, FINISH_PADS.top.ry))} cm across. The robot is ${cm(robotLength(WAREHOUSE_SORT_ROBOT))} cm long, so it can never be entirely inside. Here touching a pad is enough.`,
-        `The rules give ${RULES_EXAMPLE_MAX} points as the example maximum, but their own points add up to ${MAX_SCORE}. The simulator counts the points one by one.`,
+        'The rules describe the mat as it is printed: the start zone on the right, the red bay above the middle. Here the whole mat is turned to the right, so the robot starts facing up.',
+        'The rules say the start zone is a green area. On the mat it is the area with the yellow frame at the bottom. The simulator uses that area.',
+        'The rules say the finish pads are yellow circles with a checkerboard. On the mat they are the two round pictures on the left and on the right. The simulator uses those.',
+        `The rules say "park touching the circle", and later "entirely inside one circle". A pad is about ${cm(2 * Math.max(FINISH_PADS.left.rx, FINISH_PADS.left.ry))} cm across. The robot is ${cm(robotLength(WAREHOUSE_SORT_ROBOT))} cm long, so it can never be entirely inside. Here touching a pad is enough.`,
+        `The rules give ${RULES_EXAMPLE_MAX} points as the example maximum. Their own points add up to ${MAX_SCORE} for ${CUBES_TO_SORT} cubes (${RULES_FOUR_CUBES_MAX} for ${CUBE_COUNT}). The simulator counts the points one by one.`,
+      ],
+    },
+    {
+      title: 'The blue cube',
+      items: [
+        'The written rules have only red and green cubes. This simulator adds one blue cube: the robot checks a cube, and leaves it if it is blue.',
+        `The rules do not say what moving the blue cube costs. Here it costs ${BLUE_PENALTY} points, once.`,
+        `"Moved" means: the robot picked it up or lifted it, even if it was put back. Or the robot holds it at the end, or it is more than ${BLUE_MOVED_MM} mm from its place.`,
+        'A touch that does not move it costs nothing. In a bay the blue cube brings no points, and it is no wrong bay either.',
       ],
     },
     {
@@ -145,14 +163,15 @@ export const WAREHOUSE_SORT_ASSUMPTIONS: RulesPart = {
       title: 'The start zone and the table',
       items: [
         'The yellow frame is part of the start zone. The robot has left the zone when a part of it is past the frame.',
-        'The zone goes to the right edge of the mat. So a robot that drives backwards off the mat there has also left the zone.',
+        'The zone goes to the bottom edge of the mat. So a robot that drives backwards off the mat there has also left the zone.',
         `The mat lies on a table. The robot and the cubes can leave the mat, and they stop ${cm(TABLE_MARGIN)} cm outside it.`,
       ],
     },
     {
       title: 'Restarts',
       items: [
-        'A cube in the gripper at a restart goes back to its own warehouse. All other cubes stay where they are.',
+        'A cube in the gripper at a restart goes back to its own warehouse, the blue cube too. All other cubes stay where they are.',
+        `If another cube stands on its square, it is put down as close as there is room. A blue cube put down more than ${BLUE_MOVED_MM} mm from its place counts as moved.`,
         'Points earned before a restart stay.',
         'The clean run bonus is given when no restart was used. The rules say no more, so a robot that never moves gets it too.',
         'The total is never below 0.',

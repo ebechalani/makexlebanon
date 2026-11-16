@@ -8,7 +8,7 @@
  *   sort-cube-colour    starter       Read the colour of a cube
  *   sort-one-cube       intermediate  Put one cube in its bay
  *   sort-two-cubes      intermediate  Two cubes, then park
- *   sort-all-cubes      advanced      Sort all four cubes and park
+ *   sort-all-cubes      advanced      Sort the cubes and park
  *
  * Every id starts with "sort-": the ids of the examples must be different across all games
  * (the other lists are ../fire-rescue/sample-catalog.ts and ../fire-chief/sample-catalog.ts).
@@ -54,7 +54,7 @@ export const SAMPLE_CATALOG: readonly ExampleCard[] = [
   { id: 'sort-cube-colour', title: 'Read the colour of a cube', level: 'starter' },
   { id: 'sort-one-cube', title: 'Put one cube in its bay', level: 'intermediate' },
   { id: 'sort-two-cubes', title: 'Two cubes, then park', level: 'intermediate' },
-  { id: 'sort-all-cubes', title: 'Sort all four cubes and park', level: 'advanced' },
+  { id: 'sort-all-cubes', title: 'Sort the cubes and park', level: 'advanced' },
 ];
 
 /** The id, title and level of one example. Throws for an id that is not on the list. */

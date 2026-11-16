@@ -160,6 +160,8 @@ export interface SimulatorAppProps<S> {
   batchTieBreak?: BatchTieBreak;
   /** the names of the lines in the summary of "Test on many ...", where a line's label changes with the combination (null: left out) */
   batchSummaryLabel?: (line: { id: string; label: string }) => string | null;
+  /** the order of the lines in that summary, where the lines first seen come in a poor order (see BatchDialog summaryOrder; left out: as they first came) */
+  batchSummaryOrder?: (line: { id: string }) => number;
 }
 
 type SectionId = 'score' | 'combination' | 'sensors' | 'cyberpi' | 'console';
@@ -1064,6 +1066,7 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
           randomLists={props.batchRandomLists}
           tieBreak={props.batchTieBreak}
           summaryLabel={props.batchSummaryLabel}
+          summaryOrder={props.batchSummaryOrder}
           words={words}
           onPick={(picked) => {
             setBatchOpen(false);

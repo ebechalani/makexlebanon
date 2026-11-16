@@ -20,7 +20,7 @@ import { START_POSE, WAREHOUSE_SORT_ROBOT } from '../../warehouse-sort/robot';
 import type { WarehouseSortScenario } from '../../warehouse-sort/scenario';
 import { SimulatorApp } from '../SimulatorApp';
 import type { ExamplesConfig } from '../useMemberExamples';
-import { ARRANGEMENT_BATCH_PRESETS, ARRANGEMENT_TIE_BREAK, arrangementSummaryLabel } from './arrangement-batch';
+import { ARRANGEMENT_BATCH_PRESETS, ARRANGEMENT_TIE_BREAK, arrangementSummaryLabel, arrangementSummaryOrder } from './arrangement-batch';
 import { readArrangementCode } from './arrangement-code';
 import { ArrangementEditor } from './ArrangementEditor';
 import { WAREHOUSE_SORT_ASSUMPTIONS, WAREHOUSE_SORT_RULES, WAREHOUSE_SORT_RULES_NOTE } from './rules';
@@ -55,19 +55,21 @@ export default function WarehouseSortSimulator() {
       // what is not a rule but an assumption of the simulator has its own part of the window
       rulesExtra={WAREHOUSE_SORT_ASSUMPTIONS}
       words={WAREHOUSE_SORT_WORDS}
-      // in the start zone, facing left along the long white line: the place the examples count on
+      // in the start zone, facing up along the long white line: the place the examples count on
       initialStartPose={START_POSE}
       // the starter examples print what they found ("Cube: red"): the closed CyberPi panel shows the last line
       showLastPrint
       renderCombinationEditor={renderCombinationEditor}
-      // a code that cannot be played ("RR-RR") gets a plain sentence (./arrangement-code.ts)
+      // a code that cannot be played ("RR-GG": no blue cube) gets a plain sentence (./arrangement-code.ts)
       readCode={readArrangementCode}
-      // only 14 arrangements: the test window plays all of them, or the one on the stage (./arrangement-batch.ts)
+      // only 24 arrangements: the test window plays all of them, or the one on the stage (./arrangement-batch.ts)
       batchPresets={ARRANGEMENT_BATCH_PRESETS}
       batchRandomLists={false}
       // with equal points the rules rank by the cubes in the right bay, then by the time of the last delivery
       batchTieBreak={ARRANGEMENT_TIE_BREAK}
       batchSummaryLabel={arrangementSummaryLabel}
+      // the summary lists W1 to W4 in order (each run lacks the lines of its blue cube's warehouse)
+      batchSummaryOrder={arrangementSummaryOrder}
     />
   );
 }

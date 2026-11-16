@@ -396,8 +396,8 @@ export const missionSimulators: MissionSimulator[] = [
     href: '/training/simulator/warehouse-sort',
     summary:
       'Build a program with mBlock-style blocks and watch the mBot2 sort red and green cubes on the ' +
-      'Inspire mat: from the four warehouses into the bay of their colour, then park on a finish pad — ' +
-      'with any arrangement of the cubes, scored by the rules of the beginner mission. ' +
+      'Inspire mat: from the warehouses into the bay of their colour, leaving the blue cube where it is, ' +
+      'then park on a finish pad — with any arrangement of the cubes, scored by the rules of the beginner mission. ' +
       'It runs in the browser: no robot and no installation needed.',
     mat: '/simulator/warehouse-sort/mat.webp',
   },
@@ -449,7 +449,7 @@ export const trainingTracks: TrainingTrack[] = [
     status: 'available',
     href: '/training/simulator/warehouse-sort',
     summary:
-      'Program the mBot2 with blocks and watch it sort red and green cubes on the Inspire mat, with ' +
+      'Program the mBot2 with blocks and watch it sort red and green cubes on the Inspire mat and leave the blue one alone, with ' +
       'any arrangement of the cubes, scored by the rules of the beginner mission. Works in the browser, no robot needed.',
     cta: 'Open the simulator',
   },

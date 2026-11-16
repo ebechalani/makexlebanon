@@ -1212,21 +1212,27 @@ Described in full in "Member codes for the simulator examples" above. In short:
 ## The Warehouse Sort simulator
 
 The third game of the same simulator: **Warehouse Sort**, the beginner mission of the MakeX
-Lebanon **Inspire** category ("Beginner — Warehouse Sort (MakeX Lebanon, Local)"). Four cubes,
-red or green, stand in four warehouses near the corners of the mat. The robot — the mBot2 of
-Fire Rescue, with its gripper and the colour sensor at the claw — picks them up, takes each
-to the bay of its colour (red bay above the middle, green bay below it) and parks on one of
-the two round finish pads. A match lasts 90 seconds. It lives at:
+Lebanon **Inspire** category ("Beginner — Warehouse Sort (MakeX Lebanon, Local)"). Four cubes
+stand in four warehouses near the corners of the mat: three are red or green, one is **blue**.
+The robot — the mBot2 of Fire Rescue, with its gripper and the colour sensor at the claw —
+starts at the bottom of the mat facing up, checks each cube's colour, takes the red and green
+ones to the bay of their colour (red bay right of the middle, green bay left of it), leaves the
+blue one where it is, and parks on one of the two round finish pads (left and right). A match
+lasts 90 seconds. It lives at:
 
 ```
 https://www.makexlebanon.com/training/simulator/warehouse-sort
 ```
 
 The mat is the print file `Capelli_Inspire_1235mm.pdf` (1235 × 1235 mm, black, with **white**
-lines). The rules give no sizes and leave several things open, and in two places they say
-something else than the printed mat; the simulator follows the mat and says so. Its **Rules**
-window has the rules in short beginner words, and a second part, "What this simulator
-assumes", for everything the simulator had to choose. This is the beginner category: every
+lines), **turned 90° to the right** (clockwise): the owner of the site decided that the robot
+starts facing up, so the start zone, which the print file has on its right edge, is in the
+middle of the bottom edge. Everything on the mat turned with it. The **blue cube** is the owner's
+addition too: the written rules have red and green cubes only. The rules give no sizes and leave
+several things open, and in two places they say something else than the printed mat; the
+simulator follows the mat and says so. Its **Rules** window has the rules in short beginner
+words, and a second part, "What this simulator assumes", for everything the simulator had to
+choose. This is the beginner category: every
 text on the screen is short and plain, and many students read English as a second language —
 keep it that way.
 
@@ -1238,12 +1244,12 @@ for all three games), the title row with "Powered by …", the header height.
 
 | File | What is in it |
 | --- | --- |
-| `src/simulator/warehouse-sort/field.ts` | Every measure of the mat (from the vectors of the print file), the colours, the cubes, and the vector drawing of the mat the sensors read in tests (`MAT_VECTOR`) |
+| `src/simulator/warehouse-sort/field.ts` | Every measure of the mat (from the vectors of the print file, turned), the colours, the cubes, and the vector drawing of the mat the sensors read in tests (`MAT_VECTOR`) |
 | `src/simulator/warehouse-sort/sponsor-logo.ts` | The outlines of the sponsor's letters in the middle of the mat (the floor sensors see them) |
 | `src/simulator/warehouse-sort/robot.ts` | The robot: Fire Rescue's mBot2, with its line sensor set for white lines on a black mat; where it starts |
-| `src/simulator/warehouse-sort/scenario.ts` | An arrangement: the colour of the cube in each warehouse (14 of them), its short code, the random draw, the default |
-| `src/simulator/warehouse-sort/game.ts` | The game and its referee, and at its top the questions for the organiser Q1 – Q14 — the same numbers as the list below — each with the constant behind it |
-| `src/simulator/warehouse-sort/play.ts` | Play a program without a screen, on one or on all 14 arrangements (the tests use it) |
+| `src/simulator/warehouse-sort/scenario.ts` | An arrangement: the colour of the cube in each warehouse — one blue, the other three red or green (24 of them) — its short code, the random draw, the default |
+| `src/simulator/warehouse-sort/game.ts` | The game and its referee, and at its top the questions for the organiser Q1 – Q15 — the same numbers as the list below — each with the constant behind it |
+| `src/simulator/warehouse-sort/play.ts` | Play a program without a screen, on one or on all 24 arrangements (the tests use it) |
 | `src/simulator/warehouse-sort/sample-catalog.ts`, `samples.ts` | The six examples. They stay on the server (see "Member codes" above) |
 | `src/simulator/ui/warehouse-sort/` | What only this game shows: `WarehouseSortSimulator.tsx` (what the general screen is given), `ArrangementEditor.tsx` (the Cube colours panel) with `arrangement-panel.ts`, `arrangement-code.ts` (a typed code), `arrangement-batch.ts` (the lists and the ranking of "Test on many arrangements"), `rules.ts` (the Rules window) and `words.ts` (the screen's words) |
 | `src/app/training/simulator/warehouse-sort/page.tsx` | The page: its address, title and description |
@@ -1258,7 +1264,7 @@ What the general screen got for this game — optional props that the other two 
 pass, so their screens are as they were:
 
 - **`batchRandomLists={false}`**: "Test on many arrangements" offers no random lists. There
-  are only 14 arrangements; the window offers **All 14 arrangements** and **This
+  are only 24 arrangements; the window offers **All 24 arrangements** and **This
   arrangement**.
 - **`batchTieBreak`**: with equal points the rules rank by the number of cubes in the right
   bay, then by the time of the last correct delivery. The test window ranks the runs that way
@@ -1266,7 +1272,13 @@ pass, so their screens are as they were:
   the points".
 - **`batchSummaryLabel`**: the score sheet names a cube with its colour ("Pick up cube W1
   (red)"), which changes from one arrangement to the next; the summary of the test window names
-  the warehouse ("Pick up the cube of W1") and leaves out the time for a tie.
+  the warehouse ("Pick up the cube of W1", counted over the runs in which that warehouse holds a
+  red or green cube), calls the line of the blue cube "Blue cube moved", and leaves out the time
+  for a tie.
+- **`batchSummaryOrder`**: that summary lists the lines in the order of the score sheet, W1 to
+  W4 in turn. (The summary takes the lines in the order it first meets them, and every run
+  lacks the lines of the warehouse of its blue cube: the first run, BR-RG, has no W1 lines, so
+  without this order "Pick up the cube of W1" came last, after the penalties.)
 - On the stage a body of the kind `cube` is drawn as a solid block, and a zone can be round
   (`ZoneOverlay.shape: 'ellipse'`): the **Zones** view shows the finish pads as they are.
 - **`stageMargin={TABLE_STRIP}`**: the stage shows the whole 100 mm strip of table around the
@@ -1284,23 +1296,28 @@ pass, so their screens are as they were:
   "detects line" speaks of the white line, and "gripper opens/closes" and "object detected at
   claw" speak of a cube instead of Fire Rescue's bucket or person.
 
-### The field (measured from the print file)
+### The field (measured from the print file, turned)
 
-All in mm, origin at the top-left corner of the mat, +y down. Measured from the vectors of the
-print file (`pdftocairo -svg`, 1 pt = 1235 / 3500.79 mm); `field.test.ts` holds the print
-file's own numbers.
+All in mm, origin at the top-left corner of the mat **as the screen shows it** (turned), +y down.
+Measured from the vectors of the print file turned 90° to the right (the PDF's "rotate right",
+`/Rotate 90`; `pdftocairo -svg`, 1 pt = 1235 / 3500.79 mm); `field.test.ts` holds the turned print
+file's own numbers, and the numbers of the print file as printed with the name each shape has
+now. A point x, y of the field before the turn is at 1234.93 − y, x now (pdftocairo draws the page
+at 3500.58 pt, 0.006 % smaller than the page: every number has always been measured on that
+drawing). The two pictures of the mat are the same pictures, turned pixel for pixel and saved
+without loss.
 
 | What | Measure |
 | --- | --- |
 | Mat | 1235 × 1235, black (35, 31, 32) |
-| White lines | 26.2 wide (a few 25.0 – 27.3); the long line across the middle at y 604.9, from x 134 into the start zone |
-| Yellow band along the edge | 17 – 20 wide, with a gap in the middle of the top and the bottom edge (x 483 – 763) |
-| Warehouses W1 – W4 | thin yellow frames of 155 × 110 (W2: 155 × 107) near the corners, each with an orange square of 40 × 38 – 40 where a cube stands. The rules do not name them; the simulator numbers them like a page is read: W1 top left, W2 top right, W3 bottom left, W4 bottom right |
-| Red bay / green bay | 174.6 × 104.8, red at (531.3, 395.3), green at (533.9, 710.5) |
-| Finish pads | two round pictures, 160.2 × 157.1, centres (619.4, 144.4) and (620.1, 1063.5) |
-| Start zone | the area inside the outer edge of the yellow frame on the right: x 970.2 – 1235, y 479.8 – 743.3 (264.8 × 263.5) |
-| Robot | 237 × 130 with its claw open; it starts facing left on the long line at (1151.1, 604.9), 13.9 mm from the front and the back of the start zone, 60.1 above, 73.4 below |
-| Cube (ASSUMPTION) | 40 × 40 × 40, light (the robot can push it) |
+| White lines | 26.2 wide (a few 25.0 – 27.3); the long line up the middle at x 630.1, from the top line (y 134) down into the start zone (y 1004.5) |
+| Yellow band along the edge | 17 – 20 wide, with a gap in the middle of the left and the right edge (y 483 – 763) |
+| Warehouses W1 – W4 | thin yellow frames of 110 × 155 (W4: 107 × 155) near the corners, each with an orange square of 38 – 40 × 40 where a cube stands. The rules do not name them; the simulator numbers them like a page is read, on the field as the screen shows it: W1 top left, W2 top right, W3 bottom left, W4 bottom right (before the turn they had other numbers) |
+| Red bay / green bay | 104.8 × 174.6, red at (734.9, 531.3) right of the middle, green at (419.6, 533.9) left of it |
+| Finish pads | two round pictures, 157.1 × 160.2, centres (171.4, 620.1) on the left and (1090.5, 619.4) on the right |
+| Start zone | the area inside the outer edge of the yellow frame at the bottom: x 491.7 – 755.1, y 970.2 – 1235 (263.5 × 264.8) |
+| Robot | 237 × 130 with its claw open; it starts facing up on the long line at (630.1, 1151.1), 13.9 mm from the front and the back of the start zone, 73.4 on its left, 60.1 on its right |
+| Cube (ASSUMPTION) | 40 × 40 × 40, light (the robot can push it). The blue cube is drawn in the blue of the MakeX mats (0, 174, 239) with a "B" |
 | Table around the mat (ASSUMPTION) | 100 mm on every side, the engine's table of every game: the robot and the cubes can leave the mat and stop at its edge |
 
 The **line sensor** of this robot is set for a **light line on a dark mat** (`lightLine`,
@@ -1313,15 +1330,16 @@ simulator's robot comes taught. No block was added for it.
 
 | Line | Points | When |
 | --- | --- | --- |
-| Leave the start zone | +5 | the first moment a part of the robot is outside the start zone (kept) — also over the right edge of the mat, where the zone ends (question 11) |
-| Pick up a cube (each) | +5 | the gripper holds it and lifts it at least 10 mm, or has moved it 40 mm while holding it; once per cube |
-| A cube in the bay of its colour (each) | +15 | at the end: the whole cube inside the bay, on the mat, not held, not touching the robot (closer than 0.5 mm, seen from above **and** in height: a raised claw above a cube does not touch it) |
-| A cube in the bay of the other colour (each) | −5 | the same conditions. "And no points for that cube": no +15, and that cube also loses its +5 for being picked up (question 10). A cube only partly in a bay counts neither way |
+| Leave the start zone | +5 | the first moment a part of the robot is outside the start zone (kept) — also over the bottom edge of the mat, where the zone ends (question 11) |
+| Pick up a red or green cube (each) | +5 | the gripper holds it and lifts it at least 10 mm, or has moved it 40 mm while holding it; once per cube |
+| A red or green cube in the bay of its colour (each) | +15 | at the end: the whole cube inside the bay, on the mat, not held, not touching the robot (closer than 0.5 mm, seen from above **and** in height: a raised claw above a cube does not touch it) |
+| A red or green cube in the bay of the other colour (each) | −5 | the same conditions. "And no points for that cube": no +15, and that cube also loses its +5 for being picked up (question 10). A cube only partly in a bay counts neither way |
+| The blue cube | 0 / −5 | ASSUMPTION (question 15): −5, once, when at the end the blue cube is not where it was put — it was picked up or lifted at any time (also when a restart put it back), the robot holds it, or it is more than 5 mm from its place (the largest distance of one of its corners, as Fire Chief measures its target). A touch that does not move it costs nothing. It never scores, and there is no "wrong bay" for it. The sheet says "Blue cube (W3): left alone 0" or "moved: …, −5", and a match in which it was moved does not end "every goal complete" (nor counts as such in the test window). A cube the claw held at a restart goes back to its square; if another cube stands there, the engine puts it as close as there is room, and more than 5 mm from its square counts as moved |
 | Park on a finish pad | +10 | at the end the robot touches one of the two pads |
 | Clean run | +5 | no restart was used |
-| Restart (each) | −10 | the robot goes back to the start zone, the clock runs on; a cube in the gripper goes back to its warehouse, every other cube stays; points earned stay; no limit |
+| Restart (each) | −10 | the robot goes back to the start zone, the clock runs on; a cube in the gripper goes back to its warehouse (the blue one too), every other cube stays; points earned stay; no limit |
 
-Highest score: 5 + 4 × 5 + 4 × 15 + 10 + 5 = **100**. The total is never below 0. The match
+Highest score: 5 + 3 × 5 + 3 × 15 + 10 + 5 = **80**. The total is never below 0. The match
 ends at 90 s, when the team presses "Finished", or when the program has ended and the robot
 stands still; then the field is judged as it lies. The score sheet also shows the **time of the
 last correct delivery** (tie-breaker 3 of the rules): the latest moment at which a cube that
@@ -1335,42 +1353,62 @@ the mat (−5).
 
 ### The examples, as measured
 
-Six examples, played by the tests on all 14 arrangements, on the vector mat and on the picture
-the browser reads. The points are the same on all 14.
+Six examples, in `src/simulator/warehouse-sort/samples.ts`, written for the field as the screen
+shows it (the robot faces up) and for the blue cube. Every example that takes a cube **looks
+first**: it drives its open claw around the cube — the fingers are 12 mm from it on each side
+and do not touch it — reads the colour sensor at the claw, and only then closes the claw. Blue:
+it backs away and the cube stays exactly where it stood. None of them reads which way the robot
+points; they move by "forward … cm" and "turn … degrees" only. Measured by `samples.test.ts` on
+all 24 arrangements, on the vector mat and on the picture the browser reads (the same points
+on both):
 
 | Id | Level | What it does | Points | Ends at |
 | --- | --- | --- | --- | --- |
-| `sort-leave-start` | starter | drives out of the start zone | 10 | 1.85 s |
-| `sort-white-line` | starter | follows the white line on the right to its T-end | 10 | 3.17 s |
-| `sort-cube-colour` | starter | drives to the cube of W4 and reads its colour | 10 | 3.27 s |
-| `sort-one-cube` | intermediate | the cube of W2 into the bay of its colour | 30 | 11.19 s |
-| `sort-two-cubes` | intermediate | the cubes of W2 and W4, then parks | 60 | 31.77 s |
-| `sort-all-cubes` | advanced | all four cubes, then parks | 100 | 62.25 – 64.47 s (last delivery 56.18 – 57.66 s) |
+| `sort-leave-start` | starter | drives 30 cm up, out of the start zone | 10 on all 24 | 1.85 s |
+| `sort-white-line` | starter | follows the white line right of the start zone to its T-end and stops 6.2 mm short of the cube of W4 | 10 on all 24 | 3.17 s |
+| `sort-cube-colour` | starter | drives at the cube of W3 until the claw sensor sees it, shows "Cube: red", "Cube: green" or "Cube: blue" and lights the LEDs in that colour; stops 7.0 mm short of the cube | 10 on all 24 | 3.27 s |
+| `sort-one-cube` | intermediate | looks at the cube of W4; blue: leaves it and takes the cube of W3 instead; the cube goes to the bay of its colour | 30 on all 24 | 11.19 s (W4 not blue, 18 arrangements), 16.71 s (W4 blue, 6) |
+| `sort-two-cubes` | intermediate | one cube from the bottom row (W4, or W3 where W4 is blue) and one from the top row (W2, or W1 where W2 is blue), each to the bay of its colour, then parks on the left pad | 60 on all 24 | 32.43 s (blue in W1 or W3), 37.83 s (W2), 37.95 s (W4) |
+| `sort-all-cubes` | advanced | looks at all four cubes (W4, W2, W1, W3), leaves the blue one, sorts the other three, parks on the left pad | 80 on all 24 (the most there is) | 53.51 – 60.84 s; last delivery 41.58 – 54.40 s |
 
-They drive by distance: the simulated robot is perfect. With wheels that slip by up to 1 %,
-the advanced example kept its 100 points in about a quarter of the matches (measured once, in
-a scratch script). The three starters are open to everyone, the two intermediate ones need a
-member code, the advanced one is shown to advanced codes only — the same rule as in the other
-games, in `content/simulator-codes.ts`.
+**The blue cube is never moved**: in all 144 matches (6 examples × 24 arrangements) it does not
+move by a single step of the engine, the gripper never holds it, and the score sheet says "left
+alone". The "Try …" of each description is tested too (the one-cube example with parking added
+scores 40 on all 24; the advanced one in three other warehouse orders scores 80 on all 24 —
+all 24 orders were measured once, in a scratch script: 80 in all 576 matches, 53.5 – 65.9 s).
+
+They drive by distance: the simulated robot is perfect. With wheels that slip by up to 0.5 %,
+1 % and 2 % (measured once, in a scratch script, 72 matches each), the advanced example kept its
+80 points in 44 %, 25 % and 10 % of the matches, the two-cube example its 60 in 44 %, 25 % and
+11 %, the one-cube example its 30 in 99 %, 89 % and 50 %; the starters never lost a point. A
+robot that drifts can push the blue cube with its fingers: in 2, 8 and 13 of the 72 advanced
+matches, 1, 3 and 7 of the two-cube ones, 0, 0 and 4 of the one-cube ones. The three starters
+are open to everyone, the two intermediate ones need a member code, the advanced one is shown
+to advanced codes only — the same rule as in the other games, in `content/simulator-codes.ts`.
 
 ### Questions for the organiser
 
 Each one is answered in the simulator in the way given here, and listed at the top of
-`src/simulator/warehouse-sort/game.ts` with the constant or function behind it — as Q1 – Q14,
-with the same numbers as here.
+`src/simulator/warehouse-sort/game.ts` with the constant or function behind it — as Q1 – Q15,
+with the same numbers as here. (Two things are not questions: the owner of the site decided
+them. The field is turned 90° to the right, so the robot starts facing up; and one cube is blue
+and must be left alone. The rules describe the mat as printed — "start zone on the right", "RED
+rectangle (upper middle)" — and have no blue cube.)
 
 1. **The start zone.** The rules call it "a large green area on the right"; the mat has a
    yellow-framed area with a blue picture there (the print file has a green rectangle hidden
    under that picture). The simulator uses the yellow-framed area. Does the yellow frame belong
    to the zone? The simulator says yes.
 2. **The finish pads.** The rules call them "yellow circles with checkerboards"; the mat has two
-   round pictures without a checkerboard, top and bottom centre. The simulator uses those.
+   round pictures without a checkerboard, top and bottom centre of the print file (left and
+   right on the turned field). The simulator uses those.
 3. **Touching or entirely inside?** §5 says "park touching the circle", §8 "the robot's
    projection is entirely inside one circle". A pad is 160.2 × 157.1 mm; the mBot2 with its
    gripper is 237 × 130 mm (the smallest circle around it is about 270 mm), so it can never be
    entirely inside. The simulator scores **touching**.
-4. **85 or 100?** §6 says "Example max = 85", but its own line items add up to
-   5 + 4 × 5 + 4 × 15 + 10 + 5 = 100. The simulator uses the line items (100).
+4. **85 or 80?** §6 says "Example max = 85", but its own line items add up to
+   5 + 4 × 5 + 4 × 15 + 10 + 5 = 100 for four cubes — and with the blue cube three cubes are
+   sorted: 5 + 3 × 5 + 3 × 15 + 10 + 5 = 80. The simulator uses the line items (80).
 5. **The clean run bonus** ("no human touch after GO"): taken as written, a robot that never
    moves gets it — and so a team has 5 points before the start. The simulator follows the
    rules as written.
@@ -1391,19 +1429,32 @@ with the same numbers as here.
     loses its 5 points for being picked up — the same reading as "no score" in question 9. A
     cube only partly inside the other bay costs nothing. Is that right? (The other reading, "no
     +15 only", would give a cube in the wrong bay 5 points more.)
-11. **Leaving the start zone over the edge of the mat**: the zone runs to the right edge of the
-    mat, so a robot that drives backwards off the mat there has also "crossed the Start
-    boundary" and gets the 5 points without driving into the field. Should only the frame's
-    side towards the field count?
+11. **Leaving the start zone over the edge of the mat**: the zone runs to the edge of the mat
+    (the bottom edge on the turned field), so a robot that drives backwards off the mat there
+    has also "crossed the Start boundary" and gets the 5 points without driving into the field.
+    Should only the frame's side towards the field count?
 12. **The table around the mat**: what happens when the robot leaves the mat? The rules say only
     that teams may drive freely "as long as they stay on the mat". The simulator has no
     penalty; a table 100 mm wide around the mat stops the robot and the cubes.
 13. **Can the total go below 0?** The simulator says no, as in Fire Rescue.
 14. **The time of the last correct delivery** (tie-breaker 3): is it the moment the last cube
     that counts at the end was put down in its bay? That is what the simulator shows.
+15. **What does touching or moving the blue cube cost?** The rules have no blue cube, so they
+    do not say. The simulator: −5, once, when at the end the blue cube is not where it was put
+    — the robot picked it up or lifted it at any time (also if a restart put it back), holds it
+    at the end, or it is more than 5 mm from its place. A touch that does not move it costs
+    nothing; a blue cube in a bay scores nothing and is no "wrong bay". One constant each:
+    `BLUE_PENALTY` and `BLUE_MOVED_MM` in `game.ts`. Two edges of that answer: a cube that was
+    only dragged in the claw (less than 40 mm, never lifted) and is put back on its square by a
+    restart is "left alone" (the console says "back in its place"); but if another cube stands
+    on its square at that restart, it is put down next to it and counts as moved when that is
+    more than 5 mm away. Should the referee judge it from where the restart put it?
 
 ### What to change, and where
 
+- **What the blue cube costs**: `BLUE_PENALTY` (5) and `BLUE_MOVED_MM` (5 mm) in `game.ts`;
+  the Rules window and the score sheet's note take the numbers from there. Change the README's
+  referee table and question 15 by hand.
 - **A rule decided by the organiser**: the constant in `game.ts` (its list at the top says
   which), then the sentence in `src/simulator/ui/warehouse-sort/rules.ts` — its test
   (`rules.test.ts`) compares every number of the window with the constants and says which
@@ -1435,9 +1486,13 @@ with the same numbers as here.
 - **Closing the claw on a turned cube** straightens it in one step of the simulation (a cube at
   45° snaps to 90°): engine behaviour, the same for Fire Rescue's buckets.
 - **The score shows 5 points before the start** (the clean run bonus, question 5).
-- **Arrangement codes are letters only** ("RG-GR"). Unlike Fire Rescue, a number is no code:
-  the rows of the test window are numbered 1 – 14, and a row number must not name another
-  arrangement.
+- **Arrangement codes are letters only** ("GR-BR": R, G or B). Unlike Fire Rescue, a number is
+  no code: the rows of the test window are numbered 1 – 24, and a row number must not name
+  another arrangement.
+- **One blue cube, always.** In the Cube colours panel, blue for another warehouse moves the
+  blue cube there: the two cubes swap their colours, and a short sentence says which cube
+  changed. Red or green for the blue cube is refused (there must be one), as is a change that
+  leaves no red or no green cube.
 
 ---
 

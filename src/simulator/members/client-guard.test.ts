@@ -711,7 +711,7 @@ describe('the examples stay on the server', () => {
       assert.ok(!REAL_MARKERS.some((marker) => marker.test(harmless)), harmless);
     }
     // and for Warehouse Sort - whose screen speaks of cubes, bays and parking all the time
-    for (const telling of ["'sort-all-cubes'", '"sort-two-cubes"', '`sort-cube-colour`', 'the "Put one cube in its bay" program', 'sort all four\n   cubes and park', 'data-example="sort-white-line"']) {
+    for (const telling of ["'sort-all-cubes'", '"sort-two-cubes"', '`sort-cube-colour`', 'the "Put one cube in its bay" program', 'sort the\n   cubes and park', 'data-example="sort-white-line"']) {
       assert.ok(REAL_MARKERS.some((marker) => marker.test(telling)), telling);
     }
     for (const harmless of ['warehouse-sort', 'sort', 'Warehouse Sort', 'sort-all-cubes-later', 'the white line', 'a cube in its bay', 'two cubes', 'park on a finish pad', 'the colour of the cube', 'leave the start zone', 'Cube colours', 'cubes in the right bay']) {

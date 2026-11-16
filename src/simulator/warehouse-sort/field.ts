@@ -11,24 +11,35 @@
  * field.test.ts holds the print file's own numbers (in points) and checks every rectangle here
  * against them.
  *
+ * THE FIELD IS TURNED. The owner of the site decided that the robot starts facing UP: the whole
+ * print file is turned 90 degrees to the right (clockwise), so the start zone is in the middle of
+ * the bottom edge. Every number here is the print file TURNED that way (a PDF viewer's "turn
+ * right", /Rotate 90), measured as before; the pictures of the mat are the same pictures,
+ * turned. The rules ("RED rectangle (upper middle)", "start zone on the right" ...) describe the
+ * print file as it was printed; on this field the red bay is right of the middle, the green bay
+ * left of it, and the finish pads are on the left and on the right.
+ * (How the turn was checked: a point x, y of the print file as it was is now at
+ * 1234.93 - y, x - pdftocairo draws the page at 3500.58 pt, 0.006 % smaller than its 3500.79 pt,
+ * and every number of this file has always been measured on that drawing. field.test.ts holds
+ * the numbers of the TURNED print file.)
+ *
  * The rules ("Beginner - Warehouse Sort (MakeX Lebanon, Local)") give no sizes at all. Where a
  * number is not on the mat, its comment says ASSUMPTION.
  *
  * Everything is in millimetres, origin at the top-left corner of the mat, +x to the right, +y
- * DOWN, like the other games. "Top" is the top of the print file's page (the round picture
- * there reads upright); the start zone is on the right edge.
+ * DOWN, like the other games.
  *
- *     +=============     =============+     === the yellow band (with a gap at the top and the bottom)
- *     |  W1           ( )          W2  |     W1..W4  the warehouses, a cube on each orange square
- *     |  T             |           T   |     ( )     the two round finish pads
- *     |  |       +-----+-----+     |   |     T       a white line with a T-end
- *     |  |      -|   [red]   |-    |   |     [red], [green]  the two delivery bays
- *     |  +-------+---[logo]--+----[START    START   the start zone, on the right edge
- *     |  |      -|  [green]  |-    |   |
- *     |  |       +-----+-----+     |   |
- *     |  T             |           T   |
- *     |  W3           ( )          W4  |
- *     +=============     =============+
+ *     +==================================+    === the yellow band (with a gap in the middle of
+ *     |  W1  |--------------------|  W2  |        the left and of the right edge)
+ *     |              |                   |    W1..W4  the warehouses, a cube on each orange square
+ *     |       +--|---+-----|---+         |    ( )  the two round finish pads
+ *     |       |      |         |         |    |-   a white line with a T-end
+ *     ( )-----+ [green][logo][red] +-----( )  [red], [green]  the two delivery bays
+ *     |       |      |         |         |    START  the start zone, in the middle of the
+ *     |       +--|---+-----|---+         |           bottom edge: the robot starts facing UP
+ *     |              |                   |
+ *     |  W3  |-----[START]----------|  W4  |
+ *     +=========[       ]================+
  */
 import { TABLE_MARGIN } from '../core/engine';
 import type { Rect, Vec2 } from '../core/geometry';
@@ -51,7 +62,8 @@ export const MAT_SENSOR_IMAGE_URL = '/simulator/warehouse-sort/mat-sensor.webp';
  * ASSUMPTION: the mat lies on a table that goes on this far (mm) on every side; at its edge the
  * robot and the cubes stop. The rules have no walls ("teams may navigate freely as long as they
  * stay on the mat", "cube off the mat"), so the robot and the cubes can leave the mat - onto the
- * table. This is the engine's own table strip (core/engine.ts), the same 100 mm in every game.
+ * table. This is the engine's own table strip (core/engine.ts), the same 100 mm in every game -
+ * and on every side, so it is the same on the turned field.
  */
 export const TABLE_STRIP = TABLE_MARGIN;
 
@@ -87,7 +99,8 @@ const TABLE: RGB = { r: 120, g: 120, b: 120 };
  * green, 20 % black - measured with the probe spot every 1.5 mm). "White" is the name most of
  * each picture gets. Line or background - what a line follower uses - agrees with the picture on
  * 88 to 96 % of each picture. So a test that uses the colour-name blocks over a picture can
- * differ from the browser; a line follower hardly does.
+ * differ from the browser; a line follower hardly does. (Turning the field changes none of this:
+ * the pictures are turned with it.)
  */
 export const PICTURE_COLORS = {
   /**
@@ -112,18 +125,18 @@ export const PICTURE_COLORS = {
 // =============================================================================================
 
 /**
- * The yellow band, about 18 to 20 mm wide, with a gap in the middle of the top edge and of the
- * bottom edge (x 483 to 763 mm at the top, 483 to 761 mm at the bottom). The right band stops at
- * 1233.34 mm: a 1.6 mm black strip is left at the very edge. In the start zone the start-zone
+ * The yellow band, about 18 to 20 mm wide, with a gap in the middle of the left edge and of the
+ * right edge (y 483 to 761 mm on the left, 483 to 763 mm on the right). The bottom band stops at
+ * y 1233.35 mm: a 1.6 mm black strip is left at the very edge. In the start zone the start-zone
  * art is printed over it.
  */
 export const YELLOW_BANDS: readonly Rect[] = [
-  { x: 1.18, y: 0, w: 482.11, h: 17.26 }, // top, left of the gap
-  { x: 763.42, y: 0, w: 471.51, h: 17.62 }, // top, right of the gap
-  { x: 0, y: 0, w: 20.0, h: MAT_SIZE }, // left
-  { x: 1213.7, y: 0, w: 19.65, h: MAT_SIZE }, // right
-  { x: 1.34, y: 1215.21, w: 482.11, h: 19.71 }, // bottom, left of the gap
-  { x: 761.11, y: 1215.21, w: 473.82, h: 19.71 }, // bottom, right of the gap
+  { x: 0, y: 0, w: MAT_SIZE, h: 20.0 }, // top
+  { x: 1217.66, y: 1.18, w: 17.26, h: 482.11 }, // right, above the gap
+  { x: 1217.3, y: 763.42, w: 17.62, h: 471.51 }, // right, below the gap
+  { x: 0, y: 1213.7, w: MAT_SIZE, h: 19.65 }, // bottom
+  { x: 0, y: 1.34, w: 19.71, h: 482.11 }, // left, above the gap
+  { x: 0, y: 761.11, w: 19.71, h: 473.82 }, // left, below the gap
 ];
 
 // =============================================================================================
@@ -135,59 +148,59 @@ export const LINE_WIDTH = 26.2;
 
 /**
  * Every white line of the mat, as the print file has it: one filled rectangle each. Where two
- * of them meet they overlap; some are printed in more than one piece (the left vertical line in
- * three, the middle vertical line in two).
+ * of them meet they overlap; some are printed in more than one piece (the top line in three,
+ * the middle line in two).
  */
 export const WHITE_LINES = {
   // ---- the square loop in the middle
-  loopTop: { x: 385.05, y: 274.94, w: 469.27, h: 26.19 },
-  loopBottom: { x: 385.91, y: 900.36, w: 468.41, h: 26.19 },
-  loopLeft: { x: 385.05, y: 283.2, w: 26.26, h: 643.34 },
-  loopRight: { x: 828.06, y: 283.2, w: 26.26, h: 643.34 },
-  // ---- the four short bars across the left and right sides of the loop
-  barLeftUpper: { x: 349.98, y: 434.06, w: 99.78, h: 26.19 },
-  barRightUpper: { x: 791.3, y: 434.06, w: 99.78, h: 26.19 },
-  barLeftLower: { x: 349.98, y: 749.82, w: 99.78, h: 26.19 },
-  barRightLower: { x: 791.3, y: 749.82, w: 99.78, h: 26.19 },
-  // ---- the middle vertical line: from the top pad, under the red bay, the logo and the green
-  // bay, to the bottom pad (it runs on under the two pads and the two bays)
-  middleUpper: { x: 606.42, y: 164.64, w: 26.26, h: 717.8 },
-  middleLower: { x: 605.43, y: 816.03, w: 27.25, h: 240.11 },
-  // ---- the long line across the middle: from the left vertical line into the start zone
-  long: { x: 134.14, y: 591.78, w: 870.33, h: 26.19 },
-  // ---- the vertical line on the left, with a T-end at each end
-  leftUpper: { x: 121.18, y: 222.48, w: 26.26, h: 316.36 },
-  leftMiddle: { x: 121.01, y: 523.54, w: 26.26, h: 389.91 },
-  leftLower: { x: 121.21, y: 668.19, w: 26.26, h: 316.36 },
-  leftTopT: { x: 84.42, y: 196.84, w: 99.78, h: 26.19 },
-  leftBottomT: { x: 84.45, y: 984.0, w: 99.78, h: 26.19 },
-  // ---- the two vertical lines on the right, above and below the start zone, each with a T-end
+  loopTop: { x: 308.38, y: 385.05, w: 643.34, h: 26.26 },
+  loopBottom: { x: 308.38, y: 828.06, w: 643.34, h: 26.26 },
+  loopLeft: { x: 308.38, y: 385.91, w: 26.19, h: 468.41 },
+  loopRight: { x: 933.8, y: 385.05, w: 26.19, h: 469.27 },
+  // ---- the four short bars across the top and the bottom side of the loop
+  barTopLeft: { x: 458.92, y: 349.98, w: 26.19, h: 99.78 },
+  barTopRight: { x: 774.67, y: 349.98, w: 26.19, h: 99.78 },
+  barBottomLeft: { x: 458.92, y: 791.3, w: 26.19, h: 99.78 },
+  barBottomRight: { x: 774.67, y: 791.3, w: 26.19, h: 99.78 },
+  // ---- the middle line across the mat: from the right pad, under the red bay, the logo and the
+  // green bay, to the left pad (it runs on under the two pads and the two bays)
+  middleRight: { x: 352.49, y: 606.42, w: 717.79, h: 26.26 },
+  middleLeft: { x: 178.79, y: 605.43, w: 240.11, h: 27.25 },
+  // ---- the long line up the middle: from the top line down into the start zone
+  long: { x: 616.96, y: 134.14, w: 26.19, h: 870.33 },
+  // ---- the line along the top, with a T-end at each end
+  topRight: { x: 696.09, y: 121.18, w: 316.36, h: 26.26 },
+  topMiddle: { x: 321.47, y: 121.01, w: 389.91, h: 26.26 },
+  topLeft: { x: 250.37, y: 121.21, w: 316.36, h: 26.26 },
+  topRightT: { x: 1011.9, y: 84.42, w: 26.19, h: 99.78 },
+  topLeftT: { x: 224.74, y: 84.45, w: 26.19, h: 99.78 },
+  // ---- the two lines along the bottom, left and right of the start zone, each with a T-end
   // (they reach 25 mm into the start zone and are printed over its frame)
-  rightUpper: { x: 1092.2, y: 198.82, w: 26.26, h: 306.38 },
-  rightTopT: { x: 1055.44, y: 192.33, w: 99.79, h: 25.36 },
-  rightLower: { x: 1092.2, y: 714.28, w: 26.26, h: 301.39 },
-  rightBottomT: { x: 1055.44, y: 1001.03, w: 99.79, h: 24.95 },
+  bottomLeft: { x: 219.25, y: 1092.2, w: 301.39, h: 26.26 },
+  bottomLeftT: { x: 208.94, y: 1055.44, w: 24.95, h: 99.79 },
+  bottomRight: { x: 729.73, y: 1092.2, w: 306.38, h: 26.26 },
+  bottomRightT: { x: 1017.23, y: 1055.44, w: 25.36, h: 99.79 },
 } satisfies Record<string, Rect>;
 
 export type WhiteLineId = keyof typeof WHITE_LINES;
 
-/** The middle of the long line across the mat (y, mm): the start pose looks along it. */
-export const LONG_LINE_Y = WHITE_LINES.long.y + WHITE_LINES.long.h / 2;
-/** The middle of the middle vertical line (x, mm). */
-export const MIDDLE_LINE_X = WHITE_LINES.middleUpper.x + WHITE_LINES.middleUpper.w / 2;
+/** The middle of the long line up the mat (x, mm): the start pose looks along it. */
+export const LONG_LINE_X = WHITE_LINES.long.x + WHITE_LINES.long.w / 2;
+/** The middle of the middle line across the mat (y, mm). */
+export const MIDDLE_LINE_Y = WHITE_LINES.middleRight.y + WHITE_LINES.middleRight.h / 2;
 
 // =============================================================================================
 // The sponsor's logo (decoration - but the floor sensors see it)
 // =============================================================================================
 
 /**
- * A white rectangle behind the sponsor's logo, between the two bays. The red bay covers its top
- * 20 mm, so it shows from y 500.08 to 709.97 mm. It is wider than a line (70 mm): a robot that
- * follows a line through it sees white under all four probes.
+ * A white rectangle behind the sponsor's logo, between the two bays. The red bay covers its
+ * right 20 mm, so it shows from x 524.96 to 734.85 mm. It is wider than a line (70 mm): a robot
+ * that follows a line through it sees white under all four probes.
  */
-export const SPONSOR_RECT: Rect = { x: 582.35, y: 479.98, w: 70.0, h: 229.99 };
+export const SPONSOR_RECT: Rect = { x: 524.96, y: 582.35, w: 229.99, h: 70.0 };
 /** A second white rectangle the print file puts right under the letters (on top of the lines). */
-export const SPONSOR_INNER_RECT: Rect = { x: 589.41, y: 521.1, w: 56.44, h: 167.56 };
+export const SPONSOR_INNER_RECT: Rect = { x: 546.27, y: 589.41, w: 167.56, h: 56.44 };
 
 /** The black letters of the logo, printed over both white lines (./sponsor-logo.ts). */
 export const LOGO_LETTERS: readonly Vec2[][][] = LOGO_LETTER_OUTLINES.map((shape) =>
@@ -199,17 +212,22 @@ export const LOGO_LETTERS: readonly Vec2[][][] = LOGO_LETTER_OUTLINES.map((shape
 );
 
 /*
- * Not in the vector mat: the "MakeX Lebanon" logo on the left (x 49 to 106 mm, y 505 to 696 mm,
- * red and blue letters on the black ground, left of the left vertical line). It is a picture in
- * the print file; the vector mat shows black ground there. A robot that follows the left line
- * does not see it with its probes (they reach 23 mm left of the line, to x 112 mm).
+ * Not in the vector mat: the "MakeX Lebanon" logo at the top (x 539 to 730 mm, y 49 to 106 mm,
+ * red and blue letters on the black ground, above the top line). It is a picture in the print
+ * file; the vector mat shows black ground there. A robot that follows the top line does not see
+ * it with its probes (they reach 23 mm beside the line, to y 112 mm).
  */
 
 // =============================================================================================
 // The warehouses (rules §2: "4 yellow-framed pads, one near each corner")
 // =============================================================================================
 
-/** The rules do not name the warehouses. The simulator numbers them like a page is read. */
+/**
+ * The rules do not name the warehouses. The simulator numbers them like a page is read, on the
+ * field as the screen shows it (turned): W1 top left, W2 top right, W3 bottom left, W4 bottom
+ * right. (Before the turn the same four had other numbers: the W1 of the print file as printed
+ * is W2 here, W2 is W4, W3 is W1 and W4 is W3.)
+ */
 export type WarehouseId = 'W1' | 'W2' | 'W3' | 'W4';
 export const WAREHOUSE_IDS: WarehouseId[] = ['W1', 'W2', 'W3', 'W4'];
 
@@ -230,65 +248,66 @@ export const WAREHOUSES: Record<WarehouseId, WarehouseDef> = {
   W1: {
     id: 'W1',
     place: 'top left',
-    frame: { x: 57.04, y: 54.17, w: 154.95, h: 110.05 },
-    square: { x: 114.36, y: 89.47, w: 39.91, h: 39.81 },
+    frame: { x: 82.06, y: 56.67, w: 110.05, h: 154.95 },
+    square: { x: 117.36, y: 114.38, w: 39.81, h: 39.91 },
   },
   W2: {
     id: 'W2',
     place: 'top right',
-    // (this frame is 3.5 mm shorter than the other three in the print file)
-    frame: { x: 1028.06, y: 54.17, w: 154.95, h: 106.57 },
-    square: { x: 1085.38, y: 88.35, w: 39.91, h: 38.55 },
+    frame: { x: 1070.7, y: 57.04, w: 110.05, h: 154.95 },
+    square: { x: 1105.65, y: 114.36, w: 39.81, h: 39.91 },
   },
   W3: {
     id: 'W3',
     place: 'bottom left',
-    frame: { x: 56.67, y: 1042.81, w: 154.95, h: 110.05 },
-    square: { x: 114.38, y: 1077.75, w: 39.91, h: 39.81 },
+    frame: { x: 70.77, y: 1028.06, w: 110.05, h: 154.95 },
+    square: { x: 106.65, y: 1085.38, w: 37.92, h: 39.91 },
   },
   W4: {
     id: 'W4',
     place: 'bottom right',
-    frame: { x: 1028.06, y: 1054.1, w: 154.95, h: 110.05 },
-    square: { x: 1085.38, y: 1090.35, w: 39.91, h: 37.92 },
+    // (this frame is 3.5 mm narrower than the other three in the print file)
+    frame: { x: 1074.19, y: 1028.06, w: 106.57, h: 154.95 },
+    square: { x: 1108.03, y: 1085.38, w: 38.55, h: 39.91 },
   },
 };
 
 // =============================================================================================
-// The two delivery bays (rules §2: "RED rectangle (upper middle) and GREEN rectangle (lower middle)")
+// The two delivery bays (rules §2: "RED rectangle (upper middle) and GREEN rectangle (lower
+// middle)" - on the turned field: the red one right of the middle, the green one left of it)
 // =============================================================================================
 
 export type BayColor = Extract<ColorName, 'red' | 'green'>;
 export const BAY_COLORS: BayColor[] = ['red', 'green'];
 
 /**
- * The two bays: filled rectangles of 174.62 x 104.76 mm, no outline. The green one is printed
- * 2.6 mm further right than the red one. A cube counts when it is completely inside (rules §8).
+ * The two bays: filled rectangles of 104.76 x 174.62 mm, no outline. The green one is printed
+ * 2.6 mm lower than the red one. A cube counts when it is completely inside (rules §8).
  */
 export const BAYS: Record<BayColor, Rect> = {
-  red: { x: 531.25, y: 395.32, w: 174.62, h: 104.76 },
-  green: { x: 533.85, y: 710.53, w: 174.62, h: 104.76 },
+  red: { x: 734.85, y: 531.25, w: 104.76, h: 174.62 },
+  green: { x: 419.64, y: 533.85, w: 104.76, h: 174.62 },
 };
 
 /**
  * The "HOME" picture in the red bay: a hexagon with round corners, traced on the render (the
- * print file has it only as a picture). It lies inside the bay, 13 mm from its top edge.
+ * print file has it only as a picture). It lies inside the bay, 13 mm from its right edge.
  */
 export const HOME_HEXAGON: readonly Vec2[] = [
-  { x: 657.4, y: 445.1 },
-  { x: 657.1, y: 449.1 },
-  { x: 638.4, y: 481.6 },
-  { x: 634.9, y: 484.9 },
-  { x: 593.1, y: 484.9 },
-  { x: 589.1, y: 480.6 },
-  { x: 570.4, y: 448.6 },
-  { x: 570.9, y: 444.1 },
-  { x: 588.1, y: 414.6 },
-  { x: 591.9, y: 409.6 },
-  { x: 594.6, y: 408.6 },
-  { x: 633.6, y: 408.6 },
-  { x: 635.9, y: 409.4 },
-  { x: 639.6, y: 414.1 },
+  { x: 789.83, y: 657.4 },
+  { x: 785.83, y: 657.1 },
+  { x: 753.33, y: 638.4 },
+  { x: 750.03, y: 634.9 },
+  { x: 750.03, y: 593.1 },
+  { x: 754.33, y: 589.1 },
+  { x: 786.33, y: 570.4 },
+  { x: 790.83, y: 570.9 },
+  { x: 820.33, y: 588.1 },
+  { x: 825.33, y: 591.9 },
+  { x: 826.33, y: 594.6 },
+  { x: 826.33, y: 633.6 },
+  { x: 825.53, y: 635.9 },
+  { x: 820.83, y: 639.6 },
 ];
 
 /** An ellipse: middle and the two half axes (mm). */
@@ -300,56 +319,59 @@ export interface Ellipse {
 }
 
 /** The round picture in the green bay (the print file clips the picture to this ellipse). */
-export const GREEN_BAY_PICTURE: Ellipse = { cx: 618.68, cy: 762.11, rx: 48.17, ry: 49.46 };
+export const GREEN_BAY_PICTURE: Ellipse = { cx: 472.82, cy: 618.68, rx: 49.46, ry: 48.17 };
 
 // =============================================================================================
 // The two finish pads (rules §2: "two yellow circles with checkerboards (top center & bottom
-// center)" - the mat has two round pictures there, with no checkerboard)
+// center)" - the mat has two round pictures there, with no checkerboard; on the turned field
+// they are in the middle of the left and of the right side)
 // =============================================================================================
 
-export type PadId = 'top' | 'bottom';
-export const PAD_IDS: PadId[] = ['top', 'bottom'];
+export type PadId = 'left' | 'right';
+export const PAD_IDS: PadId[] = ['left', 'right'];
 
 /**
- * The two round pads: not quite circles - 160.18 mm wide and 157.13 mm high (a yellow ellipse in
- * the print file, with the picture clipped to it). The middle vertical line runs into each.
+ * The two round pads: not quite circles - 157.13 mm wide and 160.18 mm high (a yellow ellipse in
+ * the print file, with the picture clipped to it). The middle line runs into each.
  */
 export const FINISH_PADS: Record<PadId, Ellipse> = {
-  top: { cx: 619.44, cy: 144.44, rx: 80.09, ry: 78.57 },
-  bottom: { cx: 620.11, cy: 1063.51, rx: 80.09, ry: 78.57 },
+  left: { cx: 171.42, cy: 620.11, rx: 78.57, ry: 80.09 },
+  right: { cx: 1090.49, cy: 619.44, rx: 78.57, ry: 80.09 },
 };
 
 // =============================================================================================
 // The start zone (rules §2: "large green area on the right" - on the mat it is the yellow-framed
-// area on the right edge, with a blue picture; the green under it is covered by the picture)
+// area at the edge, with a blue picture; the green under it is covered by the picture. On the
+// turned field it is in the middle of the bottom edge.)
 // =============================================================================================
 
 /** The yellow frame of the start zone is 16 pt = 5.64 mm wide. */
 export const START_FRAME_WIDTH = 5.64;
-/** The middle of that frame (its right side runs off the mat: the zone reaches the edge). */
-export const START_FRAME: Rect = { x: 972.99, y: 482.63, w: 265.08, h: 257.82 };
+/** The middle of that frame (its bottom side runs off the mat: the zone reaches the edge). */
+export const START_FRAME: Rect = { x: 494.48, y: 972.99, w: 257.82, h: 265.08 };
 /**
  * The start zone as the simulator counts it: everything inside the outer edge of the yellow
- * frame, up to the right edge of the mat - 264.83 x 263.46 mm. (The rules do not say whether
+ * frame, down to the bottom edge of the mat - 263.46 x 264.83 mm. (The rules do not say whether
  * the frame belongs to the zone. The simulator counts it in, as Fire Rescue does with its
  * outlines, so a robot has left the zone when a part of it is beyond the yellow frame.)
  */
 export const START_ZONE: Rect = {
   x: START_FRAME.x - START_FRAME_WIDTH / 2,
   y: START_FRAME.y - START_FRAME_WIDTH / 2,
-  w: MAT_SIZE - (START_FRAME.x - START_FRAME_WIDTH / 2),
-  h: START_FRAME.h + START_FRAME_WIDTH,
+  w: START_FRAME.w + START_FRAME_WIDTH,
+  h: MAT_SIZE - (START_FRAME.y - START_FRAME_WIDTH / 2),
 };
 /** The start-zone art (clipped to the middle of the frame; the frame is printed over its edge). */
-export const START_ART: Rect = { x: 972.99, y: 482.66, w: MAT_SIZE - 972.99, h: 257.77 };
+export const START_ART: Rect = { x: 494.5, y: 972.99, w: 257.77, h: MAT_SIZE - 972.99 };
 
 // =============================================================================================
-// The cubes (rules §3: "4 total (mixture of red and green)") - no sizes in the rules
+// The cubes (rules §3: "4 total (mixture of red and green)"; the owner of the site added one blue
+// cube that must be left alone - see ./scenario.ts) - no sizes in the rules
 // =============================================================================================
 
 /**
- * ASSUMPTION: a cube is 40 mm on every side. The orange squares it stands on are 39.91 mm wide
- * and 37.92 to 39.81 mm high, so 40 mm fits them. It is also the size of a Fire Rescue bucket,
+ * ASSUMPTION: a cube is 40 mm on every side. The orange squares it stands on are 39.91 mm high
+ * and 37.92 to 39.81 mm wide, so 40 mm fits them. It is also the size of a Fire Rescue bucket,
  * which the gripper is made for (open 64 mm, closed 20 mm).
  */
 export const CUBE_SIZE = 40;
