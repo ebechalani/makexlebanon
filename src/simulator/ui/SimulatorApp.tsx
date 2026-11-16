@@ -4,7 +4,8 @@
  * The simulator screen: block workspace on the left, stage with its controls and panels on the
  * right (stacked on narrow screens). It works for any Game; what is special about one category
  * (its examples, rules, combination editor, a few words) is passed in as props - see
- * ./fire-rescue/FireRescueSimulator.tsx and ./fire-chief/FireChiefSimulator.tsx.
+ * ./fire-rescue/FireRescueSimulator.tsx, ./fire-chief/FireChiefSimulator.tsx and
+ * ./warehouse-sort/WarehouseSortSimulator.tsx.
  *
  * Everything else the screen asks the game, the robot and the simulation:
  *   game.id                 the block palette (../blocks/palettes.ts), the saved work, the program files
@@ -29,7 +30,7 @@ import { DEG } from '../core/geometry';
 import type { GripperVariantId } from '../blocks/gripper-original';
 import { paletteCategories } from '../blocks/palettes';
 import type { Game, Pose, ProgramJson, RobotConfig, Simulation } from '../core/types';
-import { BatchDialog, type BatchPreset, type BatchRandom } from './BatchDialog';
+import { BatchDialog, type BatchPreset, type BatchRandom, type BatchTieBreak } from './BatchDialog';
 import { BlocklyEditor, type BlocklyEditorHandle, type EditorStatus } from './BlocklyEditor';
 import { CombinationPanel, type RandomDraw } from './CombinationPanel';
 import { ConsolePanel } from './ConsolePanel';
@@ -85,6 +86,14 @@ export interface SimulatorAppProps<S> {
   robotConfig: RobotConfig;
   /** short name of the category for the header, e.g. "Fire Rescue" */
   title: string;
+  /** true: on a phone a title too long for its line wraps instead of being cut off (see TitleBarProps.wrapOnPhone) */
+  titleWrapsOnPhone?: boolean;
+  /**
+   * How much of the table around the mat the stage shows, in mm. Left out: STAGE_MARGIN of
+   * ./render.ts (45). A category without walls, in which the robot can drive off the mat, shows
+   * the whole strip of table on which it can still move (Warehouse Sort: 100).
+   */
+  stageMargin?: number;
   /** what the start zone is called in this category, e.g. "Fire Station" */
   startZoneName: string;
   /**
@@ -142,6 +151,15 @@ export interface SimulatorAppProps<S> {
   batchPresets?: BatchPreset<S>[];
   /** the category's own way to draw the random lists of "Test on many ..." (left out: game.randomScenario) */
   batchRandom?: BatchRandom<S>;
+  /**
+   * false: "Test on many ..." offers no random lists, only `batchPresets` (a category with so few
+   * combinations that a test plays them all: Warehouse Sort). Left out: the random lists too.
+   */
+  batchRandomLists?: boolean;
+  /** how "Test on many ..." ranks runs with equal points, where it is not by the time of the points (see BatchTieBreak) */
+  batchTieBreak?: BatchTieBreak;
+  /** the names of the lines in the summary of "Test on many ...", where a line's label changes with the combination (null: left out) */
+  batchSummaryLabel?: (line: { id: string; label: string }) => string | null;
 }
 
 type SectionId = 'score' | 'combination' | 'sensors' | 'cyberpi' | 'console';
@@ -294,6 +312,8 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
     onActiveBlocks: highlightBlocks,
     matchWord: words.match,
     scenarioWord: words.scenario,
+    grabbedWord: words.grabbed,
+    tableEdgeWord: words.tableEdge,
   });
   const { snapshot, setSpeed, setSoundOn, setStartPose } = sim;
   const runState = snapshot.runState;
@@ -672,7 +692,7 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
   return (
     <div className={`${PAGE_FRAME} text-ink-900`}>
       {/* ================================================================ title row (under the site header) */}
-      <TitleBar title={props.title}>
+      <TitleBar title={props.title} wrapOnPhone={props.titleWrapsOnPhone}>
         <button
           type="button"
           onClick={() => {
@@ -840,6 +860,7 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
               onRotate={onRotate}
               ruler={rulerOn ? ruler : null}
               onRuler={setRuler}
+              margin={props.stageMargin}
             />
             {/* (while the ruler is on, the button stands in the ruler's row instead: see sizeButton) */}
             {!rulerOn && sizeButton('mat')}
@@ -1040,6 +1061,9 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
           currentScenario={scenario}
           presets={props.batchPresets}
           random={props.batchRandom}
+          randomLists={props.batchRandomLists}
+          tieBreak={props.batchTieBreak}
+          summaryLabel={props.batchSummaryLabel}
           words={words}
           onPick={(picked) => {
             setBatchOpen(false);

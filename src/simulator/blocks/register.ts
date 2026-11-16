@@ -19,6 +19,7 @@ import type * as BlocklyModule from 'blockly';
 import { blocklyDefinitions, LIST_VARIABLE_TYPE } from './catalog';
 import { gripperVariantOf } from './gripper-original';
 import type { GripperVariantId } from './gripper-original';
+import { PALETTE_TOOLTIPS, paletteTooltip } from './palettes';
 import { EDITOR_LOOK } from './theme';
 import { GRIPPER_CODE_CALLBACK, GROUP_GAP, paletteToolbox, SEE_MBLOCK_CODE, toolboxBlock } from './toolbox';
 import type { ToolboxItem, ToolboxJson } from './toolbox';
@@ -165,6 +166,44 @@ export function registerBlocks(Blockly: BlocklyApi): void {
   applyScratchWording(Blockly);
 
   registerGripperCodeMenu(Blockly);
+
+  useGameTooltips(Blockly);
+}
+
+// =============================================================================================
+// Hover texts of one game (./palettes.ts: PALETTE_TOOLTIPS)
+// =============================================================================================
+
+/** The game whose palette an editor shows, per workspace (createEditor writes it down). */
+const workspacePalettes = new WeakMap<BlocklyModule.Workspace, string>();
+
+/** The game of the editor a block is in (a block in the open palette: the editor of that palette). */
+function gameOfBlock(block: BlocklyModule.Block): string | undefined {
+  const workspace = block.workspace as BlocklyModule.WorkspaceSvg;
+  const editor = workspace.isFlyout ? workspace.targetWorkspace : workspace;
+  return editor ? workspacePalettes.get(editor) : undefined;
+}
+
+/**
+ * A block whose hover text is different in some game asks, each time the text is shown, which
+ * game its editor belongs to. In every other game - and in an editor that names no game - it
+ * shows the catalog's text, as before.
+ */
+function useGameTooltips(Blockly: BlocklyApi): void {
+  const marker = 'mbot2GameTooltip';
+  const types = new Set<string>();
+  for (const texts of Object.values(PALETTE_TOOLTIPS)) for (const type of Object.keys(texts ?? {})) types.add(type);
+  for (const type of types) {
+    const definition = Blockly.Blocks[type] as (Record<string, unknown> & { init?: () => void }) | undefined;
+    if (!definition || definition[marker] || typeof definition.init !== 'function') continue;
+    const init = definition.init;
+    definition.init = function (this: BlocklyModule.Block) {
+      init.call(this);
+      const catalogText = this.tooltip;
+      this.setTooltip(() => paletteTooltip(type, gameOfBlock(this)) ?? (typeof catalogText === 'function' ? catalogText() : catalogText));
+    };
+    definition[marker] = true;
+  }
 }
 
 /**
@@ -409,8 +448,9 @@ export function addBubblesToMyBlocks(Blockly: BlocklyApi, workspace: BlocklyModu
 
 export interface EditorOptions extends Omit<BlocklyModule.BlocklyOptions, 'toolbox'> {
   /**
-   * The game whose palette the editor shows: give Game.id ('fire-rescue', 'fire-chief' - see
-   * ./palettes.ts). Left out, or a game without a palette of its own: the palette of Fire Rescue.
+   * The game whose palette the editor shows: give Game.id ('fire-rescue', 'fire-chief',
+   * 'warehouse-sort' - see ./palettes.ts). Left out, or a game without a palette of its own: the
+   * palette of Fire Rescue. It also picks the hover texts of that game (PALETTE_TOOLTIPS).
    */
   palette?: string;
   /** your own toolbox instead of a game's palette, e.g. buildToolbox([...]) for a smaller one; it wins over `palette` */
@@ -439,6 +479,7 @@ export function createEditor(Blockly: BlocklyApi, container: Element | string, o
     // our toolbox type is a strict subset of Blockly's loosely typed toolbox JSON
     toolbox: toolbox as unknown as BlocklyModule.utils.toolbox.ToolboxDefinition,
   });
+  if (palette !== undefined) workspacePalettes.set(workspace, palette);
   attachToolboxCallbacks(Blockly, workspace);
   addBubblesToMyBlocks(Blockly, workspace);
   if (onGripperCode) attachGripperCode(workspace, onGripperCode);

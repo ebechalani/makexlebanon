@@ -21,7 +21,7 @@
 import { memo, useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type RefObject } from 'react';
 import type { Vec2 } from '../core/geometry';
 import type { Pose, Simulation, ZoneOverlay } from '../core/types';
-import { drawStage, fitView, MatPainter, robotHit, viewToMat, type StageOptions, type StageView } from './render';
+import { drawStage, fitView, MatPainter, robotHit, STAGE_MARGIN, viewToMat, type StageOptions, type StageView } from './render';
 import { addRulerPoint, dragRulerPoint, isRulerClick, rulerClick, rulerHold, type Ruler, type RulerHold, type RulerPointer } from './ruler';
 import type { Trail } from './trail';
 
@@ -43,6 +43,12 @@ export interface StageCanvasProps {
   ruler: Ruler | null;
   /** the student set or moved a point of the ruler */
   onRuler: (ruler: Ruler) => void;
+  /**
+   * How much of the table around the mat the stage shows, in mm (left out: STAGE_MARGIN in
+   * ./render.ts). A game in which the robot can drive off the mat shows the whole strip of table
+   * on which it can still move.
+   */
+  margin?: number;
 }
 
 /** How far outside the robot (mm) a click still grabs it - fingers are thicker than a mouse pointer. */
@@ -79,6 +85,7 @@ interface RulerPress {
 
 function StageCanvasImpl(props: StageCanvasProps) {
   const { simRef, trail, subscribeFrame } = props;
+  const margin = props.margin ?? STAGE_MARGIN;
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const viewRef = useRef<StageView | null>(null);
@@ -133,7 +140,7 @@ function StageCanvasImpl(props: StageCanvasProps) {
       if (canvas.width !== w) canvas.width = w;
       if (canvas.height !== h) canvas.height = h;
       const mat = simRef.current.game.mat;
-      viewRef.current = fitView(rect.width, rect.height, mat.width, mat.height, dpr);
+      viewRef.current = fitView(rect.width, rect.height, mat.width, mat.height, dpr, margin);
       dirtyRef.current = true;
     };
     resize();
@@ -145,7 +152,7 @@ function StageCanvasImpl(props: StageCanvasProps) {
       observer.disconnect();
       window.removeEventListener('resize', resize);
     };
-  }, [simRef]);
+  }, [simRef, margin]);
 
   // ---- draw
   useEffect(

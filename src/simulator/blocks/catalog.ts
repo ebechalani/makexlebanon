@@ -236,7 +236,7 @@ export const LINE_PATTERNS: [string, string][] = Array.from({ length: 16 }, (_, 
  * Said by the tooltip of every Gripper block: real mBlock has no Gripper category. These blocks
  * are shortcuts made for the simulator; what they stand for is in ./gripper-original.ts.
  */
-const GRIPPER_SHORTCUT =
+export const GRIPPER_SHORTCUT =
   'This block is a shortcut that mBlock does not have: right-click it (on a touch screen, press and hold) to see the real mBlock code.';
 
 const listField = (name = 'LIST'): VariableFieldArg => ({

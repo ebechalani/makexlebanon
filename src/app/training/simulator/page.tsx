@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
-import { seasons } from '@content/seasons';
+import { missionSimulators, seasons } from '@content/seasons';
 import { site } from '@content/site';
 import { PageHero } from '@/components/PageHero';
 import { ArrowIcon, Badge, Button, Section, SectionHeading } from '@/components/ui';
@@ -10,9 +10,9 @@ import { POWERED_BY } from '@/simulator/ui/TitleBar';
 const PATH = '/training/simulator';
 const TITLE = 'mBot2 simulators';
 const DESCRIPTION =
-  'Program a Makeblock mBot2 with mBlock-style blocks and watch it play a MakeX Lebanon 2027 ' +
-  'category in the browser: Fire Rescue (ages 11–13) and the Fire Chief maze (ages 14–17). ' +
-  'Free, nothing to install.';
+  'Program a Makeblock mBot2 with mBlock-style blocks and watch it play a MakeX Lebanon mission ' +
+  'in the browser: the 2027 categories Fire Rescue (ages 11–13) and the Fire Chief maze (ages 14–17), ' +
+  'and Warehouse Sort, the beginner mission of the Inspire category. Free, nothing to install.';
 
 /**
  * The site's share card (src/app/opengraph-image.tsx). A page that sets its own `openGraph`
@@ -48,9 +48,10 @@ export const metadata: Metadata = {
 
 /**
  * The list of simulators: one card for every category that has a `simulator` entry in
- * content/seasons.ts, in the order of that file. Nothing about a simulator is written here -
- * its name, age group, sentences, address and picture all come from that entry, so a category
- * that gets a simulator later appears on this page by itself.
+ * content/seasons.ts, in the order of that file, and after them one card for every mission of
+ * `missionSimulators` (same file: a mission that is not a category of a season). Nothing about a
+ * simulator is written here - its name, age group or label, sentences, address and picture all
+ * come from that file, so a simulator that is added later appears on this page by itself.
  */
 const SIMULATORS = seasons.flatMap((season) =>
   season.categories.flatMap((category) => (category.simulator ? [{ season, category, simulator: category.simulator }] : [])),
@@ -108,6 +109,38 @@ export default function SimulatorListPage() {
                       About {category.name}
                       <ArrowIcon className="transition-transform group-hover:translate-x-0.5" />
                     </Link>
+                  </div>
+                </div>
+              </article>
+            </li>
+          ))}
+          {/* the missions that are not a category of a season: the same card, with their own two labels and no category page */}
+          {missionSimulators.map((mission) => (
+            <li key={mission.href}>
+              <article className="flex h-full flex-col overflow-hidden rounded-card bg-white ring-1 ring-slate-200">
+                {mission.mat ? (
+                  <div className="bg-slate-100 p-5 sm:p-6">
+                    <Image
+                      src={mission.mat}
+                      alt={`The mat of the ${mission.name} simulator, seen from above`}
+                      width={640}
+                      height={640}
+                      sizes="(min-width: 768px) 20rem, 80vw"
+                      className="mx-auto h-auto w-full max-w-xs rounded-md bg-white shadow-md ring-1 ring-slate-300"
+                    />
+                  </div>
+                ) : null}
+
+                <div className="flex flex-1 flex-col p-6">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge>{mission.label}</Badge>
+                    <Badge tone="neutral">{mission.event}</Badge>
+                  </div>
+                  <h3 className="mt-4 text-xl text-ink-900">{mission.name} simulator</h3>
+                  <p className="mt-2 flex-1 text-sm leading-relaxed text-ink-600 text-pretty">{mission.summary}</p>
+
+                  <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3">
+                    <Button href={mission.href}>Open the {mission.name} simulator</Button>
                   </div>
                 </div>
               </article>

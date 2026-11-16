@@ -366,6 +366,43 @@ export const internationalEvents: InternationalEvent[] = [
   { slug: 'thailand-2023', name: 'MakeX Intercontinental Competition', location: 'Thailand', year: 2023, kind: 'Intercontinental' },
 ];
 
+/**
+ * A simulator of a mission that is not a category of a season above (the beginner mission of a
+ * local event). The list of simulators (/training/simulator) shows these after the simulators of
+ * the categories, each with its picture; the Training menu (content/site.ts) and the Training
+ * page (trainingTracks below) name them too.
+ */
+export type MissionSimulator = {
+  /** the name of the mission: "Warehouse Sort" */
+  name: string;
+  /** the label of its card, where a category's card shows its age group: its category and level */
+  label: string;
+  /** the second label of its card, where a category's card shows its season */
+  event: string;
+  /** the simulator's page on this site */
+  href: string;
+  /** one or two sentences shown on the card */
+  summary: string;
+  /** picture of the simulator's mat for the list of simulators: a file under public/ */
+  mat?: string;
+};
+
+export const missionSimulators: MissionSimulator[] = [
+  {
+    name: 'Warehouse Sort',
+    // (the rules of this mission give no age group)
+    label: 'MakeX Inspire · Beginner',
+    event: 'Local event',
+    href: '/training/simulator/warehouse-sort',
+    summary:
+      'Build a program with mBlock-style blocks and watch the mBot2 sort red and green cubes on the ' +
+      'Inspire mat: from the four warehouses into the bay of their colour, then park on a finish pad — ' +
+      'with any arrangement of the cubes, scored by the rules of the beginner mission. ' +
+      'It runs in the browser: no robot and no installation needed.',
+    mat: '/simulator/warehouse-sort/mat.webp',
+  },
+];
+
 /** Training tracks for mentors and students. */
 export type TrainingTrack = {
   name: string;
@@ -403,6 +440,17 @@ export const trainingTracks: TrainingTrack[] = [
     summary:
       'Program the mBot2 with blocks and watch it find the fire in the 2027 Fire Chief maze, in any ' +
       'maze, scored by the draft rules of the category. Works in the browser, no robot needed.',
+    cta: 'Open the simulator',
+  },
+  {
+    name: 'Warehouse Sort — mBot2 simulator',
+    // (the rules of this mission give no age group: the card names its category and level instead)
+    ageRange: 'Inspire · Beginner',
+    status: 'available',
+    href: '/training/simulator/warehouse-sort',
+    summary:
+      'Program the mBot2 with blocks and watch it sort red and green cubes on the Inspire mat, with ' +
+      'any arrangement of the cubes, scored by the rules of the beginner mission. Works in the browser, no robot needed.',
     cta: 'Open the simulator',
   },
   { name: 'Inspire — Fruit Wonderland', ageRange: '4–7 years', status: 'coming-soon', summary: 'Introductory driving and mission basics.' },

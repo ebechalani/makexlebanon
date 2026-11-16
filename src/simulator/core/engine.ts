@@ -112,8 +112,12 @@ export type VMFactory = (program: ProgramJson, io: RobotIO) => VM;
 /** Fixed simulation time step: 100 ticks per simulated second. */
 export const SIM_DT = 0.01;
 
-/** The table continues this far (mm) around the mat; beyond it there is a wall. */
-const TABLE_MARGIN = 100;
+/**
+ * The table continues this far (mm) around the mat; beyond it there is a wall. The robot and the
+ * game elements can leave the mat onto the table, but not the table. (Exported so that a game
+ * can name it in its own texts and tests; it is the same for every game.)
+ */
+export const TABLE_MARGIN = 100;
 /** The robot never moves further than this (mm) between two collision checks. */
 const MAX_SUBSTEP_MM = 2.5;
 const MAX_SUBSTEPS = 10;
@@ -2446,11 +2450,11 @@ class EngineSimulation<S> implements Simulation<S> {
         g = clamp(g + noise * hashNoise(this.seed, tick, k * 3 + 1), 0, 255);
         b = clamp(b + noise * hashNoise(this.seed, tick, k * 3 + 2), 0, 255);
       }
-      readings.push(makeProbeReading({ r, g, b }, q.lineThreshold));
+      readings.push(makeProbeReading({ r, g, b }, q.lineThreshold, q.lightLine === true));
     }
     this.probeReadings = readings;
     this.probeStatus = lineStatusOf(readings);
-    this.probeOffset = lineOffsetOf(readings, q.probeOffsets, q.lineThreshold);
+    this.probeOffset = lineOffsetOf(readings, q.probeOffsets, q.lineThreshold, q.lightLine === true);
     this.probeTick = tick;
   }
 

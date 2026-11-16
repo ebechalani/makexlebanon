@@ -247,9 +247,10 @@ rules. It lives at:
 https://www.makexlebanon.com/training/simulator/fire-rescue
 ```
 
-The same simulator has a second game, **Fire Chief** (the maze, ages 14–17): see "The Fire
-Chief simulator" further down. `/training/simulator` lists the simulators — see "The list of
-simulators" there. Nothing is installed, and the
+The same simulator has a second game, **Fire Chief** (the maze, ages 14–17), and a third,
+**Warehouse Sort** (the beginner mission of the MakeX Lebanon Inspire category, local event):
+see "The Fire Chief simulator" and "The Warehouse Sort simulator" further down.
+`/training/simulator` lists the simulators — see "The list of simulators" there. Nothing is installed, and the
 student's blocks are saved in their own browser — they are never sent anywhere. The one thing
 the simulator asks the website's server for is the ready-made examples: the server decides,
 visitor by visitor, which of them to show and to open. See "Member codes for the simulator
@@ -343,27 +344,29 @@ the second is only the summary students read. Change both when a rule changes.
 
 ### Member codes for the simulator examples
 
-The simulator has two games, **Fire Rescue** and **Fire Chief** (the maze), and each has its
-own **Examples** window with ready-made programs: seven in Fire Rescue, six in Fire Chief. In
-both games the examples are in three groups, and there are two kinds of codes:
+The simulator has three games, **Fire Rescue**, **Fire Chief** (the maze) and **Warehouse
+Sort** (Inspire, beginner), and each has its own **Examples** window with ready-made programs:
+seven in Fire Rescue, six in Fire Chief, six in Warehouse Sort. In every game the examples are
+in three groups, and there are two kinds of codes:
 
-| Group | Now in it, in Fire Rescue | Now in it, in Fire Chief | Who sees the card | Who can open it |
-| --- | --- | --- | --- | --- |
-| **Open to everyone** | the three starter examples | the three starter examples | everybody | everybody, without a code |
-| **For members** | the two intermediate examples | the two intermediate examples | everybody — with a lock and "Members only" | a **member code** or an advanced code |
-| **For advanced codes only** | the two advanced examples | the one advanced example | nobody else | an **advanced code** |
+| Group | Now in it, in Fire Rescue | Now in it, in Fire Chief | Now in it, in Warehouse Sort | Who sees the card | Who can open it |
+| --- | --- | --- | --- | --- | --- |
+| **Open to everyone** | the three starter examples | the three starter examples | the three starter examples | everybody | everybody, without a code |
+| **For members** | the two intermediate examples | the two intermediate examples | the two intermediate examples | everybody — with a lock and "Members only" | a **member code** or an advanced code |
+| **For advanced codes only** | the two advanced examples | the one advanced example | the one advanced example | nobody else | an **advanced code** |
 
-So there are three kinds of visitor, and each sees the same in both games:
+So there are three kinds of visitor, and each sees the same in every game:
 
 - **No code.** Three open cards, two locked ones. Nothing else.
 - **A member code** (one of the 500 you already have). Five open cards. Nothing else.
-- **An advanced code.** All the cards of that game — seven in Fire Rescue, six in Fire Chief —
-  under the headings Starter, Intermediate and Advanced.
+- **An advanced code.** All the cards of that game — seven in Fire Rescue, six in Fire Chief,
+  six in Warehouse Sort — under the headings Starter, Intermediate and Advanced.
 
-**One set of codes for both games.** There is no code "for Fire Rescue" or "for Fire Chief".
-A member code opens the examples for members in both games, and an advanced code opens every
-example in both. The codes you have already handed out work in Fire Chief as they are: there
-is nothing to make and nothing to hand out again. Cancelling a code cancels it in both games.
+**One set of codes for all three games.** There is no code "for Fire Rescue", "for Fire Chief"
+or "for Warehouse Sort". A member code opens the examples for members in every game, and an
+advanced code opens every example in every game. The codes you have already handed out work in
+Fire Chief and in Warehouse Sort as they are: there is nothing to make and nothing to hand out
+again. Cancelling a code cancels it in every game.
 
 An example of the third group is *hidden*, not locked. A visitor, and a member with an ordinary
 member code, do not see its card, its title, the "Advanced" heading or a count — nothing on
@@ -382,9 +385,9 @@ member code", **Unlock**. Capitals, dashes and spaces do not matter. The cards o
 with their descriptions and a "Load this example" button. The browser remembers the code, so
 it is typed once per device, and the simulator checks it with the server again on every visit.
 
-The code is remembered once for both games. Somebody who typed a code in Fire Rescue — also
-long ago, before Fire Chief existed — finds the examples of Fire Chief open in the same
-browser without typing anything, and the other way round. Other tabs of the same browser that
+The code is remembered once for all games. Somebody who typed a code in Fire Rescue — also
+long ago, before Fire Chief existed — finds the examples of Fire Chief and of Warehouse Sort
+open in the same browser without typing anything, and the other way round. Other tabs of the same browser that
 have a simulator open follow at once: a code that is accepted in one tab opens the examples in
 the others too (each asks the server what the code opens in its own game). A tab that follows
 stands as it does after a fresh load with that code: what an earlier code had opened there is
@@ -398,7 +401,7 @@ so "Forget" stays forgotten, and tabs never go on asking each other.
   accepted it takes the place of the old one; if it is not — a typing mistake — everything
   stays as it was.
 - **"Forget this code on this device"**, in the same window, removes the code from the
-  browser — useful on a shared computer. It is then forgotten for both games, and every other
+  browser — useful on a shared computer. It is then forgotten for every game, and every other
   tab of that browser that has a simulator open locks its examples in the same moment (also
   the advanced ones): nobody has to remember to close or reload the other tab.
 
@@ -414,18 +417,21 @@ this order, each with its own explanation:
 
 After any change: save, commit and push. The change is live once Vercel has redeployed.
 
-**Moving an example between the three groups.** Every example has an id; the ids of both
-games are listed at the top of the file:
+**Moving an example between the three groups.** Every example has an id; the ids of all
+three games are listed at the top of the file:
 
 - Fire Rescue: `'hello'`, `'line-follow'`, `'gripper-demo'`, `'one-bucket'`, `'one-person'`,
   `'smart-bucket'`, `'full-mission'`
 - Fire Chief: `'chief-first-wall'`, `'chief-count-lines'`, `'chief-flame-fan'`,
   `'chief-wall-follow'`, `'chief-face-flame'`, `'chief-full-mission'`
+- Warehouse Sort: `'sort-leave-start'`, `'sort-white-line'`, `'sort-cube-colour'`,
+  `'sort-one-cube'`, `'sort-two-cubes'`, `'sort-all-cubes'`
 
-Lists 1 and 2 hold the ids of both games together, one below the other. Every id of Fire
-Chief begins with `chief-`, so the two cannot be mixed up: `'full-mission'` is the full
-mission of Fire Rescue, `'chief-full-mission'` the one of Fire Chief. A line decides about
-that one example, in its own game, and about nothing in the other game.
+Lists 1 and 2 hold the ids of all three games together, one below the other. Every id of Fire
+Chief begins with `chief-` and every id of Warehouse Sort with `sort-`, so they cannot be
+mixed up: `'full-mission'` is the full mission of Fire Rescue, `'chief-full-mission'` the one
+of Fire Chief. A line decides about that one example, in its own game, and about nothing in
+another game.
 
 An example is in a group because of the list its id is on:
 
@@ -513,13 +519,13 @@ which kind was made. Then commit and push `content/simulator-codes.ts`.
   for instance). It then changes nothing and writes no CSV file. Undo your last edit of
   `content/simulator-codes.ts` and run it again.
 - If `content/simulator-codes.ts` is not there at all, the script writes a new one: with the
-  same explanations, with the starter examples of both games open to everyone and the advanced
-  examples of both games kept for advanced codes — and with no code on it but the new ones, so
+  same explanations, with the starter examples of every game open to everyone and the advanced
+  examples of every game kept for advanced codes — and with no code on it but the new ones, so
   every code handed out before stops working. (You never need this; it is what happens after
   the file was deleted.) The text of that new file is inside the script. **When an example is
   added to a game, or its id, title or level changes, change `content/simulator-codes.ts` and
   the same lines in `scripts/generate-simulator-codes.mjs`**: a test compares the two, and
-  another one makes a new file and checks that it hides every advanced example of both games.
+  another one makes a new file and checks that it hides every advanced example of every game.
 
 **Never commit the plain codes.** `content/simulator-codes.ts` holds only *fingerprints*: rows
 of letters and digits worked out from the codes, from which a code cannot be read back. The
@@ -533,8 +539,8 @@ in its name.)
 The honest limits:
 
 - **The repository is public on GitHub.** Anyone who looks there can read every example
-  program in `src/simulator/fire-rescue/samples.ts` and `src/simulator/fire-chief/samples.ts`
-  — the advanced ones too — and can read in
+  program in `src/simulator/fire-rescue/samples.ts`, `src/simulator/fire-chief/samples.ts` and
+  `src/simulator/warehouse-sort/samples.ts` — the advanced ones too — and can read in
   `content/simulator-codes.ts` which examples are kept for advanced codes. The lock and the
   hiding keep the examples out of the *website*, not out of GitHub. If that ever matters, the
   repository has to be made private.
@@ -543,7 +549,7 @@ The honest limits:
   this in check — when a code gets around, cancel that one code. Give advanced codes only to
   people you trust with the advanced programs.
 - **A shared computer remembers.** Once somebody has typed a code in a browser, the examples
-  stay open — in both games, and the advanced ones too, if it was an advanced code — for
+  stay open — in every game, and the advanced ones too, if it was an advanced code — for
   everybody who uses that browser on that computer afterwards, until somebody presses "Forget
   this code on this device", or you cancel the code. On school computers, ask people to press
   it when they are done. (Pressing it in one tab locks the examples in every open tab of that
@@ -566,7 +572,7 @@ The honest limits:
   second from that network, and answers "wait a moment" in between. Nobody is locked out
   for a time: as soon as the wrong codes stop, a right code opens the examples again, a
   second later at most. A few typing mistakes never get near the limit. The wrong codes of a
-  network are counted together for both games: trying codes in the other game gives no new
+  network are counted together for all games: trying codes in another game gives no new
   tries.
 
 ### Run its tests after every change
@@ -575,7 +581,7 @@ The honest limits:
 npm run test:sim
 ```
 
-It runs about a thousand checks; among them, every example program of both games is
+It runs about eleven hundred checks; among them, every example program of every game is
 played on the real engine with the real referee and its score is compared. They also check
 `content/simulator-codes.ts` (a misspelt example id, an example that is on both lists, a
 damaged line, a code that is on both lists of codes) and that nothing about an example —
@@ -701,8 +707,8 @@ with "Powered by …", the header height.
 ### The list of simulators
 
 `/training/simulator` is a small page with one card per simulator: the picture of its mat, the
-age group, two sentences and a button. Nothing about a simulator is written in that page
-itself. Every category
+age group (or, for a mission without one, its category and level), two sentences and a button.
+Nothing about a simulator is written in that page itself. Every category
 in `content/seasons.ts` that has a `simulator` entry gets a card, in the order of that file:
 
 ```ts
@@ -714,8 +720,11 @@ simulator: {
 ```
 
 The same entry puts the "Try the simulator" link on the homepage, the "Online simulator" label
-on the season page and the simulator block on the category page. The card on the Training page
-is the entry in `trainingTracks` (same file), and the two lines of the **Training** menu are in
+on the season page and the simulator block on the category page. A simulator of a mission that
+is not a category of a season (Warehouse Sort, the beginner mission of a local event) is an
+entry of `missionSimulators` in the same file instead: its card comes after the others, with
+two labels of its own (`label`, `event`) and no "About" link. The card on the Training page
+is the entry in `trainingTracks` (same file), and the lines of the **Training** menu are in
 `content/site.ts`. The menu has one line per simulator, so that each is one click away. The
 list page is linked from the Training page ("All mBot2 simulators", under the cards); it is
 also what visitors get who come to `/training/simulator` itself (that address used to send
@@ -1124,7 +1133,7 @@ Think twice before changing it, and run `npm run test:sim` when you do.
 
 Use only blocks of the Fire Chief palette — blocks that exist in real mBlock. A test checks it.
 
-### How the examples lock treats the two games
+### How the examples lock treats the games
 
 Described in full in "Member codes for the simulator examples" above. In short:
 
@@ -1139,13 +1148,14 @@ Described in full in "Member codes for the simulator examples" above. In short:
   rightly but did not say the name back: a Fire Chief tab that is still open then shows no
   examples and says "the website could not be reached", although it was. Loading the page
   again cures it, and so does putting the newer server back.
-- **One set of codes.** A member code opens the member examples of both games, an advanced
-  code shows every example of both. There is nothing to make or to hand out for Fire Chief.
-- **Typed once.** The browser keeps the code in one place for both games.
+- **One set of codes.** A member code opens the member examples of every game, an advanced
+  code shows every example of every game. There is nothing to make or to hand out for Fire
+  Chief or for Warehouse Sort.
+- **Typed once.** The browser keeps the code in one place for all games.
 - **The same three groups.** Fire Chief has three starter examples open to everyone, two for
   members and one that only an advanced code shows — and, without such a code, no card, no
   heading and no hint that it exists.
-- **Wrong codes are counted together** for both games.
+- **Wrong codes are counted together** for all games.
 
 ### Known limits of Fire Chief
 
@@ -1198,6 +1208,236 @@ Described in full in "Member codes for the simulator examples" above. In short:
   kinds side by side and says nothing about rounds.
 - **Random mazes are competition mazes only.** The page no longer draws a random practice maze
   (4 to 16 walls); `randomScenario()` still makes them, for the tests.
+
+## The Warehouse Sort simulator
+
+The third game of the same simulator: **Warehouse Sort**, the beginner mission of the MakeX
+Lebanon **Inspire** category ("Beginner — Warehouse Sort (MakeX Lebanon, Local)"). Four cubes,
+red or green, stand in four warehouses near the corners of the mat. The robot — the mBot2 of
+Fire Rescue, with its gripper and the colour sensor at the claw — picks them up, takes each
+to the bay of its colour (red bay above the middle, green bay below it) and parks on one of
+the two round finish pads. A match lasts 90 seconds. It lives at:
+
+```
+https://www.makexlebanon.com/training/simulator/warehouse-sort
+```
+
+The mat is the print file `Capelli_Inspire_1235mm.pdf` (1235 × 1235 mm, black, with **white**
+lines). The rules give no sizes and leave several things open, and in two places they say
+something else than the printed mat; the simulator follows the mat and says so. Its **Rules**
+window has the rules in short beginner words, and a second part, "What this simulator
+assumes", for everything the simulator had to choose. This is the beginner category: every
+text on the screen is short and plain, and many students read English as a second language —
+keep it that way.
+
+Everything that is general works as in Fire Rescue and is described above: the blocks and
+their saving, the ruler and the enlarged stage, the examples and their codes (one set of codes
+for all three games), the title row with "Powered by …", the header height.
+
+### How the game is put together
+
+| File | What is in it |
+| --- | --- |
+| `src/simulator/warehouse-sort/field.ts` | Every measure of the mat (from the vectors of the print file), the colours, the cubes, and the vector drawing of the mat the sensors read in tests (`MAT_VECTOR`) |
+| `src/simulator/warehouse-sort/sponsor-logo.ts` | The outlines of the sponsor's letters in the middle of the mat (the floor sensors see them) |
+| `src/simulator/warehouse-sort/robot.ts` | The robot: Fire Rescue's mBot2, with its line sensor set for white lines on a black mat; where it starts |
+| `src/simulator/warehouse-sort/scenario.ts` | An arrangement: the colour of the cube in each warehouse (14 of them), its short code, the random draw, the default |
+| `src/simulator/warehouse-sort/game.ts` | The game and its referee, and at its top the questions for the organiser Q1 – Q14 — the same numbers as the list below — each with the constant behind it |
+| `src/simulator/warehouse-sort/play.ts` | Play a program without a screen, on one or on all 14 arrangements (the tests use it) |
+| `src/simulator/warehouse-sort/sample-catalog.ts`, `samples.ts` | The six examples. They stay on the server (see "Member codes" above) |
+| `src/simulator/ui/warehouse-sort/` | What only this game shows: `WarehouseSortSimulator.tsx` (what the general screen is given), `ArrangementEditor.tsx` (the Cube colours panel) with `arrangement-panel.ts`, `arrangement-code.ts` (a typed code), `arrangement-batch.ts` (the lists and the ranking of "Test on many arrangements"), `rules.ts` (the Rules window) and `words.ts` (the screen's words) |
+| `src/app/training/simulator/warehouse-sort/page.tsx` | The page: its address, title and description |
+| `public/simulator/warehouse-sort/` | The two pictures of the mat: `mat.webp` (2500 px) is shown, `mat-sensor.webp` (1250 px) is what the line sensor reads |
+
+The page is on the **Training** menu, the Training page and the list of simulators. It is not a
+category of a season in `content/seasons.ts`, so its card on the list comes from
+`missionSimulators` in that file (see "The list of simulators" above): "MakeX Inspire ·
+Beginner", "Local event". The rules give no age group, so none is shown.
+
+What the general screen got for this game — optional props that the other two games do not
+pass, so their screens are as they were:
+
+- **`batchRandomLists={false}`**: "Test on many arrangements" offers no random lists. There
+  are only 14 arrangements; the window offers **All 14 arrangements** and **This
+  arrangement**.
+- **`batchTieBreak`**: with equal points the rules rank by the number of cubes in the right
+  bay, then by the time of the last correct delivery. The test window ranks the runs that way
+  ("Worst first", best and worst run) and shows a column **Last delivery** instead of "Time of
+  the points".
+- **`batchSummaryLabel`**: the score sheet names a cube with its colour ("Pick up cube W1
+  (red)"), which changes from one arrangement to the next; the summary of the test window names
+  the warehouse ("Pick up the cube of W1") and leaves out the time for a tie.
+- On the stage a body of the kind `cube` is drawn as a solid block, and a zone can be round
+  (`ZoneOverlay.shape: 'ellipse'`): the **Zones** view shows the finish pads as they are.
+- **`stageMargin={TABLE_STRIP}`**: the stage shows the whole 100 mm strip of table around the
+  mat (the other games show 45 mm), because here the robot and the cubes can leave the mat and
+  stop only at the edge of the table. The mat is drawn a little smaller for that.
+- **`titleWrapsOnPhone`** (also on the title row of the loader): "Warehouse Sort simulator" is
+  longer than a 360 px phone has room for, so there it goes over two lines instead of being cut
+  off. The other two titles fit and are cut off as before where they do not.
+- Two words of its own for the **Console** (`words.ts`, `ScreenWords.grabbed` and
+  `tableEdge`): closing the claw on a cube says "Gripped the W2 cube." — the referee counts
+  "picked up" only once the cube is lifted 1 cm or carried 4 cm — and running into the end of
+  the table says "Bumped into the edge of the table." (the other games keep "Picked up …" and
+  "the table wall").
+- Three **hover texts** of its own (`PALETTE_TOOLTIPS` in `src/simulator/blocks/palettes.ts`):
+  "detects line" speaks of the white line, and "gripper opens/closes" and "object detected at
+  claw" speak of a cube instead of Fire Rescue's bucket or person.
+
+### The field (measured from the print file)
+
+All in mm, origin at the top-left corner of the mat, +y down. Measured from the vectors of the
+print file (`pdftocairo -svg`, 1 pt = 1235 / 3500.79 mm); `field.test.ts` holds the print
+file's own numbers.
+
+| What | Measure |
+| --- | --- |
+| Mat | 1235 × 1235, black (35, 31, 32) |
+| White lines | 26.2 wide (a few 25.0 – 27.3); the long line across the middle at y 604.9, from x 134 into the start zone |
+| Yellow band along the edge | 17 – 20 wide, with a gap in the middle of the top and the bottom edge (x 483 – 763) |
+| Warehouses W1 – W4 | thin yellow frames of 155 × 110 (W2: 155 × 107) near the corners, each with an orange square of 40 × 38 – 40 where a cube stands. The rules do not name them; the simulator numbers them like a page is read: W1 top left, W2 top right, W3 bottom left, W4 bottom right |
+| Red bay / green bay | 174.6 × 104.8, red at (531.3, 395.3), green at (533.9, 710.5) |
+| Finish pads | two round pictures, 160.2 × 157.1, centres (619.4, 144.4) and (620.1, 1063.5) |
+| Start zone | the area inside the outer edge of the yellow frame on the right: x 970.2 – 1235, y 479.8 – 743.3 (264.8 × 263.5) |
+| Robot | 237 × 130 with its claw open; it starts facing left on the long line at (1151.1, 604.9), 13.9 mm from the front and the back of the start zone, 60.1 above, 73.4 below |
+| Cube (ASSUMPTION) | 40 × 40 × 40, light (the robot can push it) |
+| Table around the mat (ASSUMPTION) | 100 mm on every side, the engine's table of every game: the robot and the cubes can leave the mat and stop at its edge |
+
+The **line sensor** of this robot is set for a **light line on a dark mat** (`lightLine`,
+border at brightness 70): "line" means the white line, and the line blocks — line status,
+deviation, "detects line" — work on the white lines. The real Quad RGB sensor learns this when
+it is taught on the mat (press its button twice and sweep it over line and background); the
+simulator's robot comes taught. No block was added for it.
+
+### The referee
+
+| Line | Points | When |
+| --- | --- | --- |
+| Leave the start zone | +5 | the first moment a part of the robot is outside the start zone (kept) — also over the right edge of the mat, where the zone ends (question 11) |
+| Pick up a cube (each) | +5 | the gripper holds it and lifts it at least 10 mm, or has moved it 40 mm while holding it; once per cube |
+| A cube in the bay of its colour (each) | +15 | at the end: the whole cube inside the bay, on the mat, not held, not touching the robot (closer than 0.5 mm, seen from above **and** in height: a raised claw above a cube does not touch it) |
+| A cube in the bay of the other colour (each) | −5 | the same conditions. "And no points for that cube": no +15, and that cube also loses its +5 for being picked up (question 10). A cube only partly in a bay counts neither way |
+| Park on a finish pad | +10 | at the end the robot touches one of the two pads |
+| Clean run | +5 | no restart was used |
+| Restart (each) | −10 | the robot goes back to the start zone, the clock runs on; a cube in the gripper goes back to its warehouse, every other cube stays; points earned stay; no limit |
+
+Highest score: 5 + 4 × 5 + 4 × 15 + 10 + 5 = **100**. The total is never below 0. The match
+ends at 90 s, when the team presses "Finished", or when the program has ended and the robot
+stands still; then the field is judged as it lies. The score sheet also shows the **time of the
+last correct delivery** (tie-breaker 3 of the rules): the latest moment at which a cube that
+counts at the end was put down in its bay. A cube completely off the mat scores nothing — also
+not its pick-up points — and stays where it is; a cube the gripper still holds out over the
+table is held, not off the mat. Cubes cannot stand on each other: the engine slides a cube that
+is put down on another cube off it (as with Fire Rescue's buckets).
+
+Not simulated: field damage (−20), the operator rules, the referee returning a cube that left
+the mat (−5).
+
+### The examples, as measured
+
+Six examples, played by the tests on all 14 arrangements, on the vector mat and on the picture
+the browser reads. The points are the same on all 14.
+
+| Id | Level | What it does | Points | Ends at |
+| --- | --- | --- | --- | --- |
+| `sort-leave-start` | starter | drives out of the start zone | 10 | 1.85 s |
+| `sort-white-line` | starter | follows the white line on the right to its T-end | 10 | 3.17 s |
+| `sort-cube-colour` | starter | drives to the cube of W4 and reads its colour | 10 | 3.27 s |
+| `sort-one-cube` | intermediate | the cube of W2 into the bay of its colour | 30 | 11.19 s |
+| `sort-two-cubes` | intermediate | the cubes of W2 and W4, then parks | 60 | 31.77 s |
+| `sort-all-cubes` | advanced | all four cubes, then parks | 100 | 62.25 – 64.47 s (last delivery 56.18 – 57.66 s) |
+
+They drive by distance: the simulated robot is perfect. With wheels that slip by up to 1 %,
+the advanced example kept its 100 points in about a quarter of the matches (measured once, in
+a scratch script). The three starters are open to everyone, the two intermediate ones need a
+member code, the advanced one is shown to advanced codes only — the same rule as in the other
+games, in `content/simulator-codes.ts`.
+
+### Questions for the organiser
+
+Each one is answered in the simulator in the way given here, and listed at the top of
+`src/simulator/warehouse-sort/game.ts` with the constant or function behind it — as Q1 – Q14,
+with the same numbers as here.
+
+1. **The start zone.** The rules call it "a large green area on the right"; the mat has a
+   yellow-framed area with a blue picture there (the print file has a green rectangle hidden
+   under that picture). The simulator uses the yellow-framed area. Does the yellow frame belong
+   to the zone? The simulator says yes.
+2. **The finish pads.** The rules call them "yellow circles with checkerboards"; the mat has two
+   round pictures without a checkerboard, top and bottom centre. The simulator uses those.
+3. **Touching or entirely inside?** §5 says "park touching the circle", §8 "the robot's
+   projection is entirely inside one circle". A pad is 160.2 × 157.1 mm; the mBot2 with its
+   gripper is 237 × 130 mm (the smallest circle around it is about 270 mm), so it can never be
+   entirely inside. The simulator scores **touching**.
+4. **85 or 100?** §6 says "Example max = 85", but its own line items add up to
+   5 + 4 × 5 + 4 × 15 + 10 + 5 = 100. The simulator uses the line items (100).
+5. **The clean run bonus** ("no human touch after GO"): taken as written, a robot that never
+   moves gets it — and so a team has 5 points before the start. The simulator follows the
+   rules as written.
+6. **Cube size and weight** are not in the rules. The simulator uses a light 40 mm cube (it fits
+   the orange squares and the gripper).
+7. **"Visibly carried"**: how far? The simulator counts 40 mm moved while held (or a lift of
+   10 mm, as the rules say).
+8. **A restart** ("human touch"): are the points earned before it kept, and where does a cube
+   the robot holds go? The simulator keeps the points and puts that cube back on its own
+   warehouse; every other cube stays.
+9. **A cube off the mat**: the rules let the referee return it to its warehouse for −5, or leave
+   it there "(no score)". The simulator never returns it: the cube stays off the mat and scores
+   nothing — not even its 5 points for being picked up. Is that right? (A cube the robot still
+   holds out over the table is not off the mat.)
+10. **A cube in the wrong bay**: "−5 (and no points for that cube)". The simulator takes the −5
+    only for a cube completely inside the other bay, on the mat, not touching the robot (the
+    conditions of a correct delivery), and reads "no points for that cube" as written: it also
+    loses its 5 points for being picked up — the same reading as "no score" in question 9. A
+    cube only partly inside the other bay costs nothing. Is that right? (The other reading, "no
+    +15 only", would give a cube in the wrong bay 5 points more.)
+11. **Leaving the start zone over the edge of the mat**: the zone runs to the right edge of the
+    mat, so a robot that drives backwards off the mat there has also "crossed the Start
+    boundary" and gets the 5 points without driving into the field. Should only the frame's
+    side towards the field count?
+12. **The table around the mat**: what happens when the robot leaves the mat? The rules say only
+    that teams may drive freely "as long as they stay on the mat". The simulator has no
+    penalty; a table 100 mm wide around the mat stops the robot and the cubes.
+13. **Can the total go below 0?** The simulator says no, as in Fire Rescue.
+14. **The time of the last correct delivery** (tie-breaker 3): is it the moment the last cube
+    that counts at the end was put down in its bay? That is what the simulator shows.
+
+### What to change, and where
+
+- **A rule decided by the organiser**: the constant in `game.ts` (its list at the top says
+  which), then the sentence in `src/simulator/ui/warehouse-sort/rules.ts` — its test
+  (`rules.test.ts`) compares every number of the window with the constants and says which
+  sentence to change. Move a sentence from "What this simulator assumes" into the rules part
+  once it is decided.
+- **The cube size or weight**: `CUBE_SIZE`, `CUBE_MASS` in `field.ts`. The examples are
+  measured for a 40 mm cube: run `npm run test:sim` and look at `samples.test.ts`.
+- **An example**: as in Fire Chief ("Adding an example" above), with an id that begins with
+  `sort-`, in `src/simulator/warehouse-sort/`; then decide its group in
+  `content/simulator-codes.ts` and change the same lines in
+  `scripts/generate-simulator-codes.mjs`. Use only blocks of this game's palette.
+
+### Known limits of Warehouse Sort
+
+- **The rules leave much open** (the list above); every choice of the simulator is in the
+  second part of its Rules window.
+- **The robot is perfect** — no wheel slip, no sensor noise. The examples drive by distance and
+  will drift on a real robot.
+- **The pictures on the mat** (the pads, the start-zone art, the pictures in the bays) are read
+  by the line sensor from the picture of the mat in the browser; the tests read a vector
+  drawing in which each picture is one flat colour (see `MAT_VECTOR` in `field.ts`). Over the
+  pads, the HOME hexagon and the picture in the green bay the sensor names that flat colour
+  "white" — the name most of the real picture gets, not all of it (`PICTURE_COLORS`). Line or
+  background agrees with the picture on 88 – 96 % of each picture.
+- **The texts of the colour sensor blocks at the claw** are Fire Rescue's and have not been
+  compared with real mBlock 5 for this robot.
+- **Cubes do not stack.** A cube put down on top of another cube slides off it, and both move
+  by about 2 cm in one step (engine behaviour, the same for Fire Rescue's buckets).
+- **Closing the claw on a turned cube** straightens it in one step of the simulation (a cube at
+  45° snaps to 90°): engine behaviour, the same for Fire Rescue's buckets.
+- **The score shows 5 points before the start** (the clean run bonus, question 5).
+- **Arrangement codes are letters only** ("RG-GR"). Unlike Fire Rescue, a number is no code:
+  the rows of the test window are numbered 1 – 14, and a row number must not name another
+  arrangement.
 
 ---
 
@@ -1309,7 +1549,7 @@ content/            All editable text and data
 public/
   gallery/          Competition photos, by year and category
   downloads/        Rules, scoresheets, STL archives
-  simulator/        Pictures of the two mats, for the simulators
+  simulator/        Pictures of the three mats, for the simulators
 scripts/
   fetch-legacy-assets.mjs
   generate-simulator-codes.mjs   Makes new member codes for the simulator
@@ -1317,5 +1557,5 @@ src/
   app/              Pages and routing
   components/       Header, Footer, Gallery, shared UI
   lib/gallery.ts    Reads the photo folders
-  simulator/        The mBot2 simulator: Fire Rescue and Fire Chief (see their sections above)
+  simulator/        The mBot2 simulator: Fire Rescue, Fire Chief and Warehouse Sort (see their sections above)
 ```

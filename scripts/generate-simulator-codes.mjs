@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 /**
  * Makes new codes for the examples of the mBot2 simulator: member codes, or - with
- * --advanced - advanced codes. One set of codes serves both games of the simulator, Fire
- * Rescue and Fire Chief: there is no code "for a game".
+ * --advanced - advanced codes. One set of codes serves all three games of the simulator, Fire
+ * Rescue, Fire Chief and Warehouse Sort: there is no code "for a game".
  *
  *   node scripts/generate-simulator-codes.mjs --count 500 --out ~/Documents/makex-simulator-codes.csv
  *   node scripts/generate-simulator-codes.mjs --advanced --count 10 --out ~/Documents/makex-advanced-codes.csv
  *
  * The two kinds of code look alike (FIRE-XXXX-XXXX). What tells them apart is the list their
  * fingerprint is on in content/simulator-codes.ts: a member code opens the examples for
- * members, an advanced code opens every example - in both games (see the top of that file).
+ * members, an advanced code opens every example - in every game (see the top of that file).
  *
  * What it does:
  *
@@ -28,8 +28,8 @@
  *
  * When content/simulator-codes.ts does not exist, the script writes a new one from its own
  * template (freshListFile below). The template holds the same explanations and the same two
- * lists of examples as the real file: the starter examples of both games open to everyone, the
- * advanced examples of both games for advanced codes only. So a file that is made anew never
+ * lists of examples as the real file: the starter examples of every game open to everyone, the
+ * advanced examples of every game for advanced codes only. So a file that is made anew never
  * shows an advanced example to a visitor. WHEN AN EXAMPLE IS ADDED TO A GAME, OR A GAME TO THE
  * SIMULATOR: change the real file and the template together (a test compares the two).
  *
@@ -149,8 +149,8 @@ function entryLine(no, fingerprint, kind) {
 }
 
 /**
- * A new list file: the explanations for the owner, the starter examples of both games open to
- * everyone, the advanced examples of both games hidden, two empty lists of codes.
+ * A new list file: the explanations for the owner, the starter examples of every game open to
+ * everyone, the advanced examples of every game hidden, two empty lists of codes.
  *
  * Everything above "3. THE MEMBER CODES" is, letter for letter, what stands in the real
  * content/simulator-codes.ts. It has to stay that way: a template that knows fewer examples than
@@ -159,12 +159,12 @@ function entryLine(no, fingerprint, kind) {
  */
 export function freshListFile() {
   return `/**
- * Codes for the examples of the mBot2 simulator - for both of its games, Fire Rescue and
- * Fire Chief.
+ * Codes for the examples of the mBot2 simulator - for all three of its games, Fire Rescue,
+ * Fire Chief and Warehouse Sort.
  *
  * Each game has an Examples window with ready-made programs: seven in Fire Rescue, six in
- * Fire Chief. This file decides who gets which of them. The examples are in three groups, and
- * there are two kinds of codes:
+ * Fire Chief, six in Warehouse Sort. This file decides who gets which of them. The examples are
+ * in three groups, and there are two kinds of codes:
  *
  *   GROUP                         WHO SEES THE CARD            WHO CAN OPEN IT
  *   open to everyone              everybody                    everybody, without a code
@@ -177,10 +177,10 @@ export function freshListFile() {
  * code, do not see its card, its title or the heading above it - nothing tells them that it
  * exists.
  *
- * ONE SET OF CODES FOR BOTH GAMES. There is no code "for Fire Rescue" or "for Fire Chief": a
- * member code opens the examples for members in both games, an advanced code opens every
- * example in both. Somebody who has typed a code in one game does not have to type it again in
- * the other. Cancelling a code cancels it in both.
+ * ONE SET OF CODES FOR ALL THREE GAMES. There is no code "for Fire Rescue", "for Fire Chief" or
+ * "for Warehouse Sort": a member code opens the examples for members in every game, an advanced
+ * code opens every example in every game. Somebody who has typed a code in one game does not
+ * have to type it again in another. Cancelling a code cancels it in all three.
  *
  * The four things you decide here, in this order:
  *
@@ -190,8 +190,8 @@ export function freshListFile() {
  *   4. which advanced codes work                             (at the very end of the file)
  *
  * An example that is on neither list 1 nor list 2 is "for members". Lists 1 and 2 hold the
- * examples of both games together: an example is named by its id, and every id of Fire Chief
- * begins with "chief-".
+ * examples of all three games together: an example is named by its id, every id of Fire Chief
+ * begins with "chief-" and every id of Warehouse Sort with "sort-".
  *
  * Read "Member codes for the simulator examples" in README.md first. After every change:
  * save, commit and push. The change is live once Vercel has redeployed the site.
@@ -227,6 +227,15 @@ export function freshListFile() {
  *     'chief-face-flame'     Find the fire in a room and check its colour  (intermediate)
  *     'chief-full-mission'   The whole mission on any maze                 (advanced)
  *
+ *   Warehouse Sort (six)
+ *
+ *     'sort-leave-start'     Leave the start zone and stop                 (starter)
+ *     'sort-white-line'      Follow the white line to a T                  (starter)
+ *     'sort-cube-colour'     Read the colour of a cube                     (starter)
+ *     'sort-one-cube'        Put one cube in its bay                       (intermediate)
+ *     'sort-two-cubes'       Two cubes, then park                          (intermediate)
+ *     'sort-all-cubes'       Sort all four cubes and park                  (advanced)
+ *
  * Mind the two that look alike: 'full-mission' is the one of Fire Rescue, 'chief-full-mission'
  * the one of Fire Chief.
  *
@@ -255,6 +264,10 @@ export const examplesOpenToEveryone: string[] = [
   'chief-first-wall',
   'chief-count-lines',
   'chief-flame-fan',
+  // Warehouse Sort: the three starter examples
+  'sort-leave-start',
+  'sort-white-line',
+  'sort-cube-colour',
 ];
 
 // =====================================================================================
@@ -266,7 +279,7 @@ export const examplesOpenToEveryone: string[] = [
  * and a member with an ordinary member code - does not get to see that these examples exist:
  * no card, no title, no "Advanced" heading.
  *
- * The ids are the same thirteen as above. To hide an example from everybody but the holders of
+ * The ids are the same nineteen as above. To hide an example from everybody but the holders of
  * an advanced code, write its id here. To show it to all members again (with a lock for
  * visitors), take its line out.
  *
@@ -282,6 +295,8 @@ export const examplesForAdvancedCodesOnly: string[] = [
   'full-mission',
   // Fire Chief: the advanced example
   'chief-full-mission',
+  // Warehouse Sort: the advanced example
+  'sort-all-cubes',
 ];
 
 // =====================================================================================
@@ -534,7 +549,7 @@ function isInside(folder, file) {
 function usage() {
   return [
     'Makes new codes for the examples of the mBot2 simulator: member codes, or with --advanced',
-    'advanced codes. The same codes work in both games, Fire Rescue and Fire Chief.',
+    'advanced codes. The same codes work in all three games, Fire Rescue, Fire Chief and Warehouse Sort.',
     '',
     '  node scripts/generate-simulator-codes.mjs --count 500 --out ~/Documents/makex-simulator-codes.csv',
     '  node scripts/generate-simulator-codes.mjs --advanced --count 10 --out ~/Documents/makex-advanced-codes.csv',
@@ -542,7 +557,7 @@ function usage() {
     '  --count N       how many codes to make',
     '  --out FILE      the CSV file for the codes (No, Code, Given to). It must be OUTSIDE the',
     "                  website's folder, and it must not exist yet.",
-    '  --advanced      make advanced codes: they open every example of both games, also the',
+    '  --advanced      make advanced codes: they open every example of every game, also the',
     '                  ones kept for advanced codes only. In the CSV file they are numbered',
     '                  A1, A2, A3 ...',
     '                  Without it: member codes, numbered 1, 2, 3 ...',
@@ -599,7 +614,7 @@ export async function main(argv, print = console.log, draw = drawCode) {
       `${listName} does not look like the list this script writes, so nothing was changed.\n` +
         'Undo the last edit of that file (git can do that). Or, to start over, delete the file and run this script again -\n' +
         'but then every code handed out before stops working, and the two lists of examples are as in a new file again:\n' +
-        'the starter examples of both games open to everyone, the advanced examples of both games for advanced codes only.',
+        'the starter examples of every game open to everyone, the advanced examples of every game for advanced codes only.',
     );
   }
   // (a file from before there were advanced codes has no such list, and member codes can still be made for it;

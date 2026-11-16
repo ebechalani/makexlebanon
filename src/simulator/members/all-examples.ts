@@ -4,8 +4,8 @@
  * levels. This is what the server hands out from (see ./unlock.ts).
  *
  * Server only. This file brings the samples.ts and the sample-catalog.ts of every game along
- * (../fire-rescue and ../fire-chief), so nothing of the simulator screen may import it (a test,
- * ./client-guard.test.ts, watches over this).
+ * (../fire-rescue, ../fire-chief and ../warehouse-sort), so nothing of the simulator screen may
+ * import it (a test, ./client-guard.test.ts, watches over this).
  *
  * A game is named here the way its page names it when it asks the server ("game" in the
  * request), which is also the id of the game in its game.ts.
@@ -19,6 +19,8 @@ import { EXAMPLE_LEVELS as FIRE_CHIEF_LEVELS, SAMPLE_CATALOG as FIRE_CHIEF_CATAL
 import { getSampleProgram as fireChiefProgram } from '../fire-chief/samples';
 import { EXAMPLE_LEVELS as FIRE_RESCUE_LEVELS, SAMPLE_CATALOG as FIRE_RESCUE_CATALOG } from '../fire-rescue/sample-catalog';
 import { getSampleProgram as fireRescueProgram } from '../fire-rescue/samples';
+import { EXAMPLE_LEVELS as WAREHOUSE_SORT_LEVELS, SAMPLE_CATALOG as WAREHOUSE_SORT_CATALOG } from '../warehouse-sort/sample-catalog';
+import { getSampleProgram as warehouseSortProgram } from '../warehouse-sort/samples';
 
 /** The examples of a game in the order of its catalog. Throws - when the server starts - for a card that has no program. */
 function inCatalogOrder<Example>(game: string, catalog: ReadonlyArray<{ id: string }>, programOf: (id: string) => Example | undefined): readonly Example[] {
@@ -46,5 +48,16 @@ export const FIRE_CHIEF = {
   levels: FIRE_CHIEF_LEVELS,
 };
 
+/**
+ * Warehouse Sort (MakeX Lebanon, Inspire, the beginner mission): its six examples, ordered like
+ * the list in ../warehouse-sort/sample-catalog.ts, under headings of its own. Every id starts
+ * with "sort-".
+ */
+export const WAREHOUSE_SORT = {
+  game: 'warehouse-sort',
+  examples: inCatalogOrder('Warehouse Sort', WAREHOUSE_SORT_CATALOG, warehouseSortProgram),
+  levels: WAREHOUSE_SORT_LEVELS,
+};
+
 /** Every game that has examples. A request to the server names one of them (or none, which means Fire Rescue). */
-export const ALL_GAMES = [FIRE_RESCUE, FIRE_CHIEF];
+export const ALL_GAMES = [FIRE_RESCUE, FIRE_CHIEF, WAREHOUSE_SORT];
