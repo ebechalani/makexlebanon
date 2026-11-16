@@ -1,5 +1,5 @@
 /**
- * The Simulator section of the website: the menu item, the one page /simulator with a part per
+ * The Simulator section of the website: the menu item and its dropdown, the one page /simulator with a part per
  * season, the pages of the games under /simulator/<game>, the title row above each game, the
  * old addresses under Training that send visitors on, the sitemap, and the Training page's card
  * that leads to the section.
@@ -8,11 +8,13 @@
  */
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import ts from 'typescript';
 import {
   missionSimulators,
   seasons,
@@ -22,7 +24,7 @@ import {
   type MissionSimulator,
   type Season,
 } from '../../../content/seasons';
-import { nav, site } from '../../../content/site';
+import { nav, simulatorMenu, site } from '../../../content/site';
 import { TitleBar } from './TitleBar';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
@@ -37,22 +39,228 @@ const SIMULATOR_HREFS = [
   ...missionSimulators,
 ].map((simulator) => ({ href: simulator.href, mat: simulator.mat }));
 
-test('menu: "Simulator" is a plain link to /simulator, between Training and Videos; Training no longer lists the simulators', () => {
+test('menu: "Simulator" links to /simulator, between Training and Videos; Training no longer lists the simulators', () => {
   const labels = nav.map((item) => item.label);
   assert.deepEqual(labels, ['Home', 'Seasons', 'Competitions', 'Gallery', 'Training', 'Simulator', 'Videos', 'Contact']);
   const simulator = nav.find((item) => item.label === 'Simulator');
   assert.equal(simulator?.href, '/simulator');
-  assert.equal(simulator?.children, undefined, 'no dropdown, like Gallery');
   const training = nav.find((item) => item.label === 'Training');
   assert.deepEqual(
     training?.children?.map((child) => child.href),
     ['/training', '/workshops', '/kits'],
   );
-  // (no line of the menu leads to a simulator but "Simulator" itself)
+  // (no line of the menu leads to a simulator but "Simulator" and its dropdown)
   for (const item of nav) {
+    if (item === simulator) continue;
     for (const link of [item, ...(item.children ?? [])]) {
-      if (link !== simulator) assert.ok(!link.href.startsWith('/simulator') && !/simulator/i.test(link.label), link.label);
+      assert.ok(!link.href.startsWith('/simulator') && !/simulator/i.test(link.label), link.label);
     }
+  }
+});
+
+test('menu: the dropdown of "Simulator" is the Simulator page, then each simulator in the order of that page', () => {
+  const simulator = nav.find((item) => item.label === 'Simulator');
+  assert.deepEqual(simulator?.children, [
+    { label: 'All simulators', href: '/simulator' },
+    { label: 'Warehouse Sort — Season 2026', href: '/simulator/warehouse-sort' },
+    { label: 'Fire Rescue — Season 2027', href: '/simulator/fire-rescue' },
+    { label: 'Fire Chief — Season 2027', href: '/simulator/fire-chief' },
+  ]);
+  // the same simulators as the cards of /simulator, in the same order
+  assert.deepEqual(
+    simulator?.children?.slice(1).map((child) => child.href),
+    simulatorSeasons().flatMap((section) => section.simulators.map((card) => card.href)),
+  );
+  // (built from the season data, not typed by hand)
+  assert.deepEqual(simulator?.children, simulatorMenu());
+  // (on a computer the dropdown is as wide as its longest line: "Warehouse Sort — Season 2026" would break in the usual width)
+  assert.equal(simulator?.childrenOnOneLine, true);
+});
+
+test('menu: a simulator added to a season appears in the dropdown by itself, in its season\'s place', () => {
+  const withSummary = { summary: 'Two sentences.', mat: '/simulator/new/mat.webp' };
+  const added: Season[] = seasons.map((season) =>
+    season.year === 2025
+      ? { ...season, categories: season.categories.map((category, i) => (i === 0 ? { ...category, simulator: { href: '/simulator/new', ...withSummary } } : category)) }
+      : season,
+  );
+  const first2025 = seasons.find((season) => season.year === 2025)?.categories[0].name;
+  assert.ok(first2025);
+  const missions: MissionSimulator[] = [
+    ...missionSimulators,
+    { name: 'Later Mission', season: 2027, label: 'Level', event: 'Local event', href: '/simulator/later', ...withSummary },
+  ];
+  assert.deepEqual(simulatorMenu(simulatorSeasons(added, missions)), [
+    { label: 'All simulators', href: '/simulator' },
+    { label: `${first2025} — Season 2025`, href: '/simulator/new' },
+    { label: 'Warehouse Sort — Season 2026', href: '/simulator/warehouse-sort' },
+    { label: 'Fire Rescue — Season 2027', href: '/simulator/fire-rescue' },
+    { label: 'Fire Chief — Season 2027', href: '/simulator/fire-chief' },
+    { label: 'Later Mission — Season 2027', href: '/simulator/later' },
+  ]);
+  // no simulator at all: only the Simulator page
+  assert.deepEqual(simulatorMenu([]), [{ label: 'All simulators', href: '/simulator' }]);
+});
+
+test('menu: every line of the Simulator dropdown opens a page of the website', () => {
+  const simulator = nav.find((item) => item.label === 'Simulator');
+  assert.ok(simulator?.children?.length);
+  for (const { href } of simulator.children) {
+    const page = `src/app${href}/page.tsx`;
+    assert.ok(existsSync(fromRoot(page)), `${href}: ${page}`);
+  }
+});
+
+test('menu: the other items and their dropdowns are as before', () => {
+  assert.deepEqual(
+    nav.filter((item) => item.label !== 'Simulator'),
+    [
+      { label: 'Home', href: '/' },
+      {
+        label: 'Seasons',
+        href: '/season/2026',
+        children: [
+          { label: 'Season 2027 — Fire Rescue ✨', href: '/season/2027' },
+          { label: 'Season 2026 — Capelli Sport', href: '/season/2026' },
+        ],
+      },
+      {
+        label: 'Competitions',
+        href: '/competitions',
+        children: [
+          { label: 'National', href: '/competitions/national' },
+          { label: 'International', href: '/competitions/international' },
+        ],
+      },
+      { label: 'Gallery', href: '/gallery' },
+      {
+        label: 'Training',
+        href: '/training',
+        children: [
+          { label: 'Training & hints', href: '/training' },
+          { label: 'Workshops & events', href: '/workshops' },
+          { label: 'Competition kits', href: '/kits' },
+        ],
+      },
+      { label: 'Videos', href: '/media' },
+      { label: 'Contact', href: '/contact' },
+    ],
+  );
+});
+
+test('menu: content/seasons.ts imports nothing, so content/site.ts can take the simulators from it without an import cycle', () => {
+  // (the menu is drawn by a client component: what content/site.ts imports goes to every visitor's
+  // browser, so it takes plain data only. preProcessFile lists imports, re-exports, require() and import().)
+  const importsOf = (file: string): string[] =>
+    ts.preProcessFile(readFileSync(fromRoot(file), 'utf8'), true, true).importedFiles.map((imported) => imported.fileName);
+  assert.deepEqual(importsOf('content/seasons.ts'), []);
+  assert.deepEqual(importsOf('content/site.ts'), ['./seasons']);
+});
+
+/**
+ * Give Node the few browser globals React needs to draw into a document. Returns the function that
+ * takes them away again (the other tests of this file run without them), or null without jsdom.
+ */
+function withDom(): (() => void) | null {
+  let JSDOM: new (html: string, options?: object) => { window: Record<string, unknown> & { close(): void } };
+  try {
+    ({ JSDOM } = createRequire(import.meta.url)('jsdom') as { JSDOM: typeof JSDOM });
+  } catch {
+    return null;
+  }
+  const dom = new JSDOM('<!DOCTYPE html><div id="root"></div>', { pretendToBeVisual: true, url: 'http://localhost/contact' });
+  const names = ['self', 'window', 'document', 'navigator', 'Node', 'Element', 'HTMLElement', 'Event', 'MouseEvent', 'KeyboardEvent', 'FocusEvent',
+    'getComputedStyle', 'requestAnimationFrame', 'cancelAnimationFrame', 'IS_REACT_ACT_ENVIRONMENT']; // prettier-ignore
+  const before = names.map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)] as const);
+  for (const name of names) {
+    const value = name === 'window' || name === 'self' ? dom.window : name === 'IS_REACT_ACT_ENVIRONMENT' ? true : dom.window[name];
+    if (value !== undefined) Object.defineProperty(globalThis, name, { value, configurable: true, writable: true });
+  }
+  return () => {
+    for (const [name, descriptor] of before) {
+      if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+      else delete (globalThis as Record<string, unknown>)[name];
+    }
+    dom.window.close();
+  };
+}
+
+test('menu on a computer: a line picked in a dropdown lets go of the focus, so the list does not stay open over the new page', async (t) => {
+  const removeDom = withDom();
+  if (!removeDom) {
+    t.skip('jsdom is not installed');
+    return;
+  }
+  const { act } = await import('react');
+  const { createRoot } = await import('react-dom/client');
+  // (usePathname() reads the page's address from this context, which Next fills on the website)
+  const { PathnameContext } = createRequire(import.meta.url)('next/dist/shared/lib/hooks-client-context.shared-runtime') as {
+    PathnameContext: import('react').Context<string | null>;
+  };
+  const { Header } = await import('../../components/Header');
+  const root = createRoot(document.getElementById('root') as HTMLElement);
+  // (a link here would lead jsdom to a page it cannot open: the click only does what the menu does)
+  const stay = (event: Event) => event.preventDefault();
+  window.addEventListener('click', stay);
+  try {
+    await act(async () => root.render(createElement(PathnameContext.Provider, { value: '/contact' }, createElement(Header))));
+    const groups = [...document.querySelectorAll('nav[aria-label="Main"] > div.group')];
+    const groupOf = (label: string): Element => {
+      const group = groups.find((g) => g.querySelector(':scope > a')?.textContent === label);
+      assert.ok(group, label);
+      return group;
+    };
+    // (the list shows on :focus-within of its menu item, that is while the focus is inside it; asked
+    // this way because jsdom's own :focus-within still matches after the focus has gone)
+    const open = (group: Element): boolean => group.contains(document.activeElement);
+    // (what has the focus, in words: a failed assert.equal on the elements themselves would print all of jsdom)
+    const focused = (): string => {
+      const element = document.activeElement;
+      return element === document.body ? 'the page' : `${element?.tagName} ${element?.textContent}`;
+    };
+    let lines = 0;
+    for (const item of nav.filter((navItem) => navItem.children)) {
+      const group = groupOf(item.label);
+      const links = [...group.querySelectorAll<HTMLAnchorElement>(':scope > div a')];
+      assert.deepEqual(
+        links.map((link) => link.textContent),
+        item.children?.map((child) => child.label),
+      );
+      for (const link of links) {
+        // the list shows while one of its lines has the focus (that is how the keyboard opens it) ...
+        link.focus();
+        assert.equal(focused(), `A ${link.textContent}`);
+        assert.ok(open(group), `${item.label} / ${link.textContent}: open on focus`);
+        // ... and a click on the line (or Enter, which is a click too) lets go of it: Next changes the
+        // page without a reload, so a line that kept the focus would keep the list open over the new
+        // page, where on a game it covers the Start button and a click there opened another game
+        await act(async () => link.click());
+        assert.equal(focused(), 'the page', `${item.label} / ${link.textContent}: focus let go`);
+        assert.ok(!open(group), `${item.label} / ${link.textContent}: closed once the mouse leaves`);
+        lines += 1;
+      }
+    }
+    assert.equal(lines, nav.reduce((sum, item) => sum + (item.children?.length ?? 0), 0));
+    // the menu item itself keeps the focus after a click: on a touch screen, which has no hover, a tap on
+    // "Simulator" opens the Simulator page and shows its list, from which a game is then picked
+    const simulator = groupOf('Simulator').querySelector<HTMLAnchorElement>(':scope > a');
+    assert.ok(simulator);
+    simulator.focus();
+    await act(async () => simulator.click());
+    assert.equal(focused(), 'A Simulator');
+    assert.ok(open(groupOf('Simulator')));
+
+    // the width of the lists: the usual 14rem (w-56); Simulator's as wide as its longest line, but at most
+    // 24rem (max-w-sm), so that a long simulator name wraps instead of running off the window at 1024 px,
+    // where the list starts about 621 px from the left (621 + 384 = 1005)
+    const widthOf = (label: string): string[] =>
+      (groupOf(label).querySelector(':scope > div')?.className ?? '').split(/\s+/).filter((name) => /^(min-|max-)?w-/.test(name));
+    assert.deepEqual(widthOf('Simulator'), ['w-max', 'min-w-56', 'max-w-sm']);
+    for (const label of ['Seasons', 'Competitions', 'Training']) assert.deepEqual(widthOf(label), ['w-56'], label);
+  } finally {
+    window.removeEventListener('click', stay);
+    await act(async () => root.unmount());
+    removeDom();
   }
 });
 
