@@ -35,15 +35,15 @@ export type Category = {
   /**
    * An online simulator for this category. When set, the category page shows a
    * "try the simulator" block, the season page labels the category "Online simulator",
-   * the season block on the homepage links to it, and the list of simulators
-   * (/training/simulator) shows it with its picture.
+   * the season block on the homepage links to it, and the Simulator page (/simulator)
+   * shows it with its picture, in the section of its season.
    */
   simulator?: {
-    /** The simulator's page on this site. */
+    /** The simulator's page on this site: /simulator/<name>. */
     href: string;
     /** One or two sentences shown next to the button. */
     summary: string;
-    /** Picture of the simulator's mat for the list of simulators: a file under public/. */
+    /** Picture of the simulator's mat for the Simulator page: a file under public/. */
     mat?: string;
   };
 };
@@ -105,7 +105,7 @@ export const seasons: Season[] = [
         platform: 'mBot2',
         summary: 'Nothing goes as planned. Sense the situation, decide, adapt.',
         simulator: {
-          href: '/training/simulator/fire-rescue',
+          href: '/simulator/fire-rescue',
           summary:
             'Build a program with mBlock-style blocks and watch the mBot2 run it on the Fire Rescue ' +
             'mat — on any starting combination the referee could draw, scored by the category rules. ' +
@@ -132,7 +132,7 @@ export const seasons: Season[] = [
         platform: 'mBot2',
         summary: 'One robot, on its own. A maze that can change between rounds. Find the fire.',
         simulator: {
-          href: '/training/simulator/fire-chief',
+          href: '/simulator/fire-chief',
           summary:
             'Build a program with mBlock-style blocks and watch the mBot2 find its way through the ' +
             'Fire Chief maze to the fire, with a colour sensor and a fan — in any maze you build or ' +
@@ -368,32 +368,36 @@ export const internationalEvents: InternationalEvent[] = [
 
 /**
  * A simulator of a mission that is not a category of a season above (the beginner mission of a
- * local event). The list of simulators (/training/simulator) shows these after the simulators of
- * the categories, each with its picture; the Training menu (content/site.ts) and the Training
- * page (trainingTracks below) name them too.
+ * local event). The Simulator page (/simulator) shows these in the section of their `season`,
+ * after the simulators of that season's categories, each with its picture.
  */
 export type MissionSimulator = {
   /** the name of the mission: "Warehouse Sort" */
   name: string;
+  /** the year of the season whose section of the Simulator page lists it */
+  season: number;
   /** the label of its card, where a category's card shows its age group: its category and level */
   label: string;
   /** the second label of its card, where a category's card shows its season */
   event: string;
-  /** the simulator's page on this site */
+  /** the simulator's page on this site: /simulator/<name> */
   href: string;
   /** one or two sentences shown on the card */
   summary: string;
-  /** picture of the simulator's mat for the list of simulators: a file under public/ */
+  /** picture of the simulator's mat for the Simulator page: a file under public/ */
   mat?: string;
 };
 
 export const missionSimulators: MissionSimulator[] = [
   {
     name: 'Warehouse Sort',
+    // (the owner put it in Season 2026. It is NOT the 2026 category Smart Logistics: the organiser
+    // has not said that it is the same mission, so it keeps its own two labels)
+    season: 2026,
     // (the rules of this mission give no age group)
     label: 'MakeX Inspire · Beginner',
     event: 'Local event',
-    href: '/training/simulator/warehouse-sort',
+    href: '/simulator/warehouse-sort',
     summary:
       'Build a program with mBlock-style blocks and watch the mBot2 sort red and green cubes on the ' +
       'Inspire mat: from the warehouses into the bay of their colour, leaving the blue cube where it is, ' +
@@ -402,6 +406,71 @@ export const missionSimulators: MissionSimulator[] = [
     mat: '/simulator/warehouse-sort/mat.webp',
   },
 ];
+
+/** One simulator as the Simulator page shows it: a card of a category or of a mission. */
+export type SimulatorCard = {
+  /** "Fire Rescue", "Warehouse Sort" */
+  name: string;
+  href: string;
+  summary: string;
+  mat?: string;
+  /** the two small labels: age group and season (a category), or category and level, and event (a mission) */
+  labels: [string, string];
+  /** the category's own page, for the "About ..." link under the card (a mission has none) */
+  about?: string;
+};
+
+/**
+ * The sections of the Simulator page: one per season that has a simulator, the oldest season
+ * first (Season 2026, then Season 2027). In a section: the categories of that season that have a
+ * `simulator`, in the order of `seasons`, then the `missionSimulators` of that season, in their
+ * order. Everything comes from the lists above, so a simulator added later appears in its
+ * section by itself, and a season without a simulator gets no section. (The two lists can be
+ * handed in, for the tests; the page uses the ones of this file.)
+ */
+export function simulatorSeasons(
+  seasonList: Season[] = seasons,
+  missions: MissionSimulator[] = missionSimulators,
+): Array<{ year: number; simulators: SimulatorCard[] }> {
+  const years = [...new Set([...seasonList.map((season) => season.year), ...missions.map((mission) => mission.season)])];
+  return years
+    .sort((a, b) => a - b)
+    .map((year) => ({
+      year,
+      simulators: [
+        ...seasonList
+          .filter((season) => season.year === year)
+          .flatMap((season) =>
+            season.categories.flatMap((category): SimulatorCard[] =>
+              category.simulator
+                ? [
+                    {
+                      name: category.name,
+                      href: category.simulator.href,
+                      summary: category.simulator.summary,
+                      mat: category.simulator.mat,
+                      labels: [category.ageRange, `Season ${season.year}`],
+                      about: `/season/${season.slug}/${category.slug}`,
+                    },
+                  ]
+                : [],
+            ),
+          ),
+        ...missions
+          .filter((mission) => mission.season === year)
+          .map(
+            (mission): SimulatorCard => ({
+              name: mission.name,
+              href: mission.href,
+              summary: mission.summary,
+              mat: mission.mat,
+              labels: [mission.label, mission.event],
+            }),
+          ),
+      ],
+    }))
+    .filter((section) => section.simulators.length > 0);
+}
 
 /** Training tracks for mentors and students. */
 export type TrainingTrack = {
@@ -414,6 +483,35 @@ export type TrainingTrack = {
   cta?: string;
 };
 
+/** "A", "A and B", "A, B and C" */
+function namesList(names: string[]): string {
+  return names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names.join('');
+}
+
+/**
+ * The card of the Training page that leads to the Simulator page (the simulators have a section
+ * of their own, /simulator, "Simulator" in the menu; this card is the way there for whoever still
+ * looks for them under Training). Its badge and its sentence name the seasons and the simulators
+ * of the Simulator page, worked out from the same `simulatorSeasons()`, so that a simulator added
+ * above is named here too. (The badge is not an age group: the Simulator page shows each one's.)
+ */
+export function simulatorTrack(sections = simulatorSeasons()): TrainingTrack {
+  const years = sections.map((section) => section.year);
+  const named = sections.map(
+    (section) => `${namesList(section.simulators.map((simulator) => simulator.name))} (Season ${section.year})`,
+  );
+  return {
+    name: 'mBot2 simulators',
+    ageRange: `${years.length > 1 ? 'Seasons' : 'Season'} ${years.join(' · ')}`,
+    status: 'available',
+    href: '/simulator',
+    summary:
+      `Program the mBot2 with blocks and watch it play on the competition mat: ${named.join(', ')}. ` +
+      'Works in the browser, no robot needed.',
+    cta: 'Go to the simulators',
+  };
+}
+
 export const trainingTracks: TrainingTrack[] = [
   {
     name: 'Inspire — Smart Logistics',
@@ -422,37 +520,7 @@ export const trainingTracks: TrainingTrack[] = [
     href: '/training/interactive/smart-logistics',
     summary: 'Setup, sensor calibration and scoring strategy for the logistics field.',
   },
-  {
-    name: 'Fire Rescue — mBot2 simulator',
-    ageRange: '11–13 years',
-    status: 'available',
-    href: '/training/simulator/fire-rescue',
-    summary:
-      'Program the mBot2 with blocks and watch it run on the 2027 Fire Rescue mat, on any ' +
-      'starting combination, scored by the category rules. Works in the browser, no robot needed.',
-    cta: 'Open the simulator',
-  },
-  {
-    name: 'Fire Chief — mBot2 simulator',
-    ageRange: '14–17 years',
-    status: 'available',
-    href: '/training/simulator/fire-chief',
-    summary:
-      'Program the mBot2 with blocks and watch it find the fire in the 2027 Fire Chief maze, in any ' +
-      'maze, scored by the draft rules of the category. Works in the browser, no robot needed.',
-    cta: 'Open the simulator',
-  },
-  {
-    name: 'Warehouse Sort — mBot2 simulator',
-    // (the rules of this mission give no age group: the card names its category and level instead)
-    ageRange: 'Inspire · Beginner',
-    status: 'available',
-    href: '/training/simulator/warehouse-sort',
-    summary:
-      'Program the mBot2 with blocks and watch it sort red and green cubes on the Inspire mat and leave the blue one alone, with ' +
-      'any arrangement of the cubes, scored by the rules of the beginner mission. Works in the browser, no robot needed.',
-    cta: 'Open the simulator',
-  },
+  simulatorTrack(),
   { name: 'Inspire — Fruit Wonderland', ageRange: '4–7 years', status: 'coming-soon', summary: 'Introductory driving and mission basics.' },
   { name: 'Starter — All Core Journey', ageRange: '8–13 years', status: 'coming-soon', summary: 'Core mechanics and autonomous routines.' },
   { name: 'Explorer — Digital Pioneer', ageRange: '13–15 years', status: 'coming-soon', summary: 'Advanced sensing and control.' },

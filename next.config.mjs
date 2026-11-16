@@ -25,6 +25,13 @@ const nextConfig = {
       // Training & Hints page — now the interactive course.
       { source: '/hints-smart-logistics', destination: '/training/interactive/smart-logistics', permanent: true },
       // /newsletters keeps its own route on the new site — no redirect needed.
+
+      // The mBot2 simulators were under Training until they got a section of their own,
+      // /simulator. Shared links and bookmarks go on working (a query string is kept).
+      { source: '/training/simulator', destination: '/simulator', permanent: true },
+      { source: '/training/simulator/fire-rescue', destination: '/simulator/fire-rescue', permanent: true },
+      { source: '/training/simulator/fire-chief', destination: '/simulator/fire-chief', permanent: true },
+      { source: '/training/simulator/warehouse-sort', destination: '/simulator/warehouse-sort', permanent: true },
     ];
   },
 };

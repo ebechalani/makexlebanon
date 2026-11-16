@@ -504,7 +504,7 @@ function levelMarkersInText(levels: ReadonlyArray<{ id: string; title: string; a
  * "advanced" categories.) The few words after a heading are another matter: they are the
  * simulator's own words, and they are looked for in every file the browser gets.
  */
-const SIMULATOR_FILES = ['src/simulator/', 'src/app/training/simulator/'];
+const SIMULATOR_FILES = ['src/simulator/', 'src/app/simulator/'];
 
 /** The words after the headings alone ("explore, find the fire and blow it out"). */
 function aboutMarkers(levels: ReadonlyArray<{ about: string }>): RegExp[] {
@@ -613,9 +613,9 @@ describe('the examples stay on the server', () => {
     }
     // the page of every game reaches its screen (through a dynamic import), and the screen reaches what asks the server
     for (const [page, loader, simulator, own] of [
-      ['src/app/training/simulator/fire-rescue/page.tsx', 'src/simulator/ui/fire-rescue/FireRescueLoader.tsx', 'src/simulator/ui/fire-rescue/FireRescueSimulator.tsx', 'src/simulator/fire-rescue/game.ts'],
-      ['src/app/training/simulator/fire-chief/page.tsx', 'src/simulator/ui/fire-chief/FireChiefLoader.tsx', 'src/simulator/ui/fire-chief/FireChiefSimulator.tsx', 'src/simulator/fire-chief/game.ts'],
-      ['src/app/training/simulator/warehouse-sort/page.tsx', 'src/simulator/ui/warehouse-sort/WarehouseSortLoader.tsx', 'src/simulator/ui/warehouse-sort/WarehouseSortSimulator.tsx', 'src/simulator/warehouse-sort/game.ts'],
+      ['src/app/simulator/fire-rescue/page.tsx', 'src/simulator/ui/fire-rescue/FireRescueLoader.tsx', 'src/simulator/ui/fire-rescue/FireRescueSimulator.tsx', 'src/simulator/fire-rescue/game.ts'],
+      ['src/app/simulator/fire-chief/page.tsx', 'src/simulator/ui/fire-chief/FireChiefLoader.tsx', 'src/simulator/ui/fire-chief/FireChiefSimulator.tsx', 'src/simulator/fire-chief/game.ts'],
+      ['src/app/simulator/warehouse-sort/page.tsx', 'src/simulator/ui/warehouse-sort/WarehouseSortLoader.tsx', 'src/simulator/ui/warehouse-sort/WarehouseSortSimulator.tsx', 'src/simulator/warehouse-sort/game.ts'],
     ]) {
       assert.ok(roots.pages.includes(page), page);
       const fromPage = reachableFrom(graph, page);
@@ -645,7 +645,7 @@ describe('the examples stay on the server', () => {
       assert.ok(sortScreen.has(file), `the Warehouse Sort screen -> ${file}`);
     }
     // the page that lists the simulators is a page of the website like any other
-    assert.ok(roots.pages.includes('src/app/training/simulator/page.tsx'));
+    assert.ok(roots.pages.includes('src/app/simulator/page.tsx'));
   });
 
   test('the files that hold the examples are known to the guard', () => {
@@ -882,8 +882,8 @@ describe('the guard catches a leak', () => {
       assert.ok(findLeaks(files).some((leak) => leak.startsWith('src/simulator/ui/Screen.tsx  ->  src/simulator/ui/helper.ts  ->  src/simulator/fire-chief/sample-catalog.ts')), line);
     }
     // a page of the game, and the server's list of every game's examples
-    const page = findLeaks(withFile('src/app/training/simulator/fire-chief/page.tsx', "import { SAMPLE_CATALOG } from '@/simulator/fire-chief/sample-catalog';\nexport default function Page() { return SAMPLE_CATALOG.length; }\n"));
-    assert.ok(page.some((leak) => leak.startsWith('src/app/training/simulator/fire-chief/page.tsx  ->  src/simulator/fire-chief/sample-catalog.ts')));
+    const page = findLeaks(withFile('src/app/simulator/fire-chief/page.tsx', "import { SAMPLE_CATALOG } from '@/simulator/fire-chief/sample-catalog';\nexport default function Page() { return SAMPLE_CATALOG.length; }\n"));
+    assert.ok(page.some((leak) => leak.startsWith('src/app/simulator/fire-chief/page.tsx  ->  src/simulator/fire-chief/sample-catalog.ts')));
     const all = findLeaks(withFile('src/simulator/ui/Screen.tsx', "'use client';\nimport { ALL_GAMES } from '../members/all-examples';\nexport const Screen = () => ALL_GAMES;\n"));
     for (const file of ['src/simulator/fire-rescue/samples.ts', 'src/simulator/fire-rescue/sample-catalog.ts', 'src/simulator/fire-chief/samples.ts', 'src/simulator/fire-chief/sample-catalog.ts']) {
       assert.ok(all.some((leak) => leak.startsWith('src/simulator/ui/Screen.tsx  ->  src/simulator/members/all-examples.ts') && leak.includes(`(${file} `)), file);
@@ -906,7 +906,7 @@ describe('the guard catches a leak', () => {
         const leaks = findLeaks(withFile(file, `'use client';\n${line}\nexport const Screen = () => null;\n`));
         assert.ok(leaks.some((leak) => leak.startsWith(file) && leak.includes('holds the title or the id of an example')), `${file}: ${line}`);
       }
-      assert.ok(findLeaks(withFile('src/app/training/simulator/fire-chief/page.tsx', `${line}\nexport default function Page() { return null; }\n`)).length > 0, line);
+      assert.ok(findLeaks(withFile('src/app/simulator/fire-chief/page.tsx', `${line}\nexport default function Page() { return null; }\n`)).length > 0, line);
       // on the server and in a test it is nobody's business
       assert.deepEqual(findLeaks(withFile('src/simulator/members/server-helper.ts', `${line}\n`)), [], line);
       assert.deepEqual(findLeaks(withFile('src/simulator/ui/cards.test.ts', `${line}\n`)), [], line);
@@ -943,7 +943,7 @@ describe('the guard catches a leak', () => {
         assert.equal(named.length, 1, `${file}: ${level.about}`);
         assert.ok(named[0].includes(level.about));
       }
-      assert.equal(findLevelNames(withFile('src/app/training/simulator/fire-chief/page.tsx', `export default function Page() { return '${level.title}: ${level.about}'; }\n`)).length, 1, level.about);
+      assert.equal(findLevelNames(withFile('src/app/simulator/fire-chief/page.tsx', `export default function Page() { return '${level.title}: ${level.about}'; }\n`)).length, 1, level.about);
       // in a comment, on the server and on another page of the website it is nobody's business
       assert.deepEqual(findLevelNames(withFile('src/simulator/ui/Screen.tsx', `'use client';\n// ${level.about}\nexport const Screen = () => null;\n`)), [], level.about);
       assert.deepEqual(findLevelNames(withFile('src/simulator/members/server-helper.ts', `export const about = '${level.about}';\n`)), [], level.about);
@@ -1000,7 +1000,7 @@ describe('the guard catches a leak', () => {
       'export const Card = () => <p>The whole mission on any&#160;maze</p>;',
       "export const card = 'The whole mission on any&nbsp;maze';",
     ]) {
-      for (const file of ['src/app/training/simulator/fire-chief/page.tsx', 'src/simulator/ui/Screen.tsx']) {
+      for (const file of ['src/app/simulator/fire-chief/page.tsx', 'src/simulator/ui/Screen.tsx']) {
         const leaks = findLeaks(withFile(file, `${file.includes('/ui/') ? "'use client';\n" : ''}${line}\nexport default function Page() { return null; }\n`));
         assert.ok(leaks.some((leak) => leak.startsWith(file) && leak.includes('holds the title or the id of an example')), `${file}: ${line}`);
       }
@@ -1125,7 +1125,7 @@ describe('the guard catches a leak', () => {
     harmless.set('src/simulator/ui/Screen.tsx', "'use client';\nimport './screen.css';\nexport const Screen = () => null;\n");
     assert.deepEqual(findLevelNames(harmless, levels), []);
     // the page the simulator stands on must not name a level either; another page of the website may say "Advanced"
-    assert.equal(findLevelNames(withFile('src/app/training/simulator/fire-rescue/page.tsx', "export default function Page() { return 'Starter, Intermediate and Advanced examples'; }\n"), levels).length, 1);
+    assert.equal(findLevelNames(withFile('src/app/simulator/fire-rescue/page.tsx', "export default function Page() { return 'Starter, Intermediate and Advanced examples'; }\n"), levels).length, 1);
     assert.deepEqual(findLevelNames(withFile('src/app/season/page.tsx', "export default function Page() { return 'Advanced sensing'; }\n"), levels), []);
   });
 

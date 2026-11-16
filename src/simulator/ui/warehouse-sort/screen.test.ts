@@ -626,8 +626,8 @@ test('page: the Warehouse Sort screen hands the general screen its game, robot, 
 });
 
 test('page: its address, title and description; the loader shows the name of the game while the simulator loads', () => {
-  const page = read('../../../app/training/simulator/warehouse-sort/page.tsx');
-  assert.match(page, /const PATH = '\/training\/simulator\/warehouse-sort';/);
+  const page = read('../../../app/simulator/warehouse-sort/page.tsx');
+  assert.match(page, /const PATH = '\/simulator\/warehouse-sort';/);
   assert.match(page, /const TITLE = 'mBot2 simulator — Warehouse Sort';/);
   assert.match(page, /alternates: \{ canonical: PATH \}/);
   assert.match(page, /return <WarehouseSortLoader \/>;/);
@@ -638,16 +638,15 @@ test('page: its address, title and description; the loader shows the name of the
   assert.match(read('./WarehouseSortSimulator.tsx'), /^'use client';/);
 });
 
-test('site: the menu, the sitemap, the Training page and the list of simulators name the page', async () => {
-  const { nav } = await import('../../../../content/site');
-  const { missionSimulators, trainingTracks } = await import('../../../../content/seasons');
-  const training = nav.find((item) => item.label === 'Training');
-  assert.ok(training?.children?.some((child) => child.href === '/training/simulator/warehouse-sort' && child.label === 'Warehouse Sort simulator'));
-  assert.ok(read('../../../app/sitemap.ts').includes("{ path: '/training/simulator/warehouse-sort', priority: 0.7 },"));
-  assert.ok(trainingTracks.some((track) => track.href === '/training/simulator/warehouse-sort' && track.status === 'available'));
+test('site: the Simulator page lists the page in Season 2026, and the sitemap names it', async () => {
+  const { missionSimulators, simulatorSeasons } = await import('../../../../content/seasons');
+  assert.ok(read('../../../app/sitemap.ts').includes("{ path: '/simulator/warehouse-sort', priority: 0.7 },"));
   assert.deepEqual(
-    missionSimulators.map((mission) => [mission.name, mission.label, mission.href, mission.mat]),
-    [['Warehouse Sort', 'MakeX Inspire · Beginner', '/training/simulator/warehouse-sort', '/simulator/warehouse-sort/mat.webp']],
+    missionSimulators.map((mission) => [mission.name, mission.season, mission.label, mission.event, mission.href, mission.mat]),
+    [['Warehouse Sort', 2026, 'MakeX Inspire · Beginner', 'Local event', '/simulator/warehouse-sort', '/simulator/warehouse-sort/mat.webp']],
   );
-  assert.ok(code(read('../../../app/training/simulator/page.tsx')).includes('missionSimulators.map('));
+  // (its card in the part "Season 2026", with its own two labels and no "About" link: it is not the category Smart Logistics)
+  const card = simulatorSeasons().find((section) => section.year === 2026)?.simulators.find((simulator) => simulator.name === 'Warehouse Sort');
+  assert.deepEqual(card && [card.href, card.labels, card.about], ['/simulator/warehouse-sort', ['MakeX Inspire · Beginner', 'Local event'], undefined]);
+  assert.ok(code(read('../../../app/simulator/page.tsx')).includes('simulatorSeasons()'));
 });

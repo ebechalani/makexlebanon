@@ -47,10 +47,12 @@ export function Header() {
               const active = isActive(pathname, item.href);
               return (
                 <div key={item.href} className="group relative">
+                  {/* (px-2 below 1280 px: from 1024 px, where this menu starts, the eight items, the
+                      logo and the portal button only fit one line with the narrower padding) */}
                   <Link
                     href={item.href}
                     aria-current={active ? 'page' : undefined}
-                    className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                    className={`rounded-md px-2 py-2 text-sm font-medium transition-colors xl:px-3 ${
                       active ? 'text-brand-300' : 'text-white/75 hover:text-white'
                     }`}
                   >
