@@ -62,6 +62,7 @@ test('menu: the dropdown of "Simulator" is the Simulator page, then each simulat
   const simulator = nav.find((item) => item.label === 'Simulator');
   assert.deepEqual(simulator?.children, [
     { label: 'All simulators', href: '/simulator' },
+    { label: 'Locker Room — Season 2026', href: '/simulator/locker-room' },
     { label: 'Warehouse Sort — Season 2026', href: '/simulator/warehouse-sort' },
     { label: 'Fire Rescue — Season 2027', href: '/simulator/fire-rescue' },
     { label: 'Fire Chief — Season 2027', href: '/simulator/fire-chief' },
@@ -93,6 +94,7 @@ test('menu: a simulator added to a season appears in the dropdown by itself, in 
   assert.deepEqual(simulatorMenu(simulatorSeasons(added, missions)), [
     { label: 'All simulators', href: '/simulator' },
     { label: `${first2025} — Season 2025`, href: '/simulator/new' },
+    { label: 'Locker Room — Season 2026', href: '/simulator/locker-room' },
     { label: 'Warehouse Sort — Season 2026', href: '/simulator/warehouse-sort' },
     { label: 'Fire Rescue — Season 2027', href: '/simulator/fire-rescue' },
     { label: 'Fire Chief — Season 2027', href: '/simulator/fire-chief' },
@@ -100,6 +102,24 @@ test('menu: a simulator added to a season appears in the dropdown by itself, in 
   ]);
   // no simulator at all: only the Simulator page
   assert.deepEqual(simulatorMenu([]), [{ label: 'All simulators', href: '/simulator' }]);
+});
+
+test('menu: a category with a long name can give the dropdown a shorter one (menuName); the Simulator page keeps the full name', () => {
+  const locker = simulatorSeasons()
+    .flatMap((section) => section.simulators)
+    .find((card) => card.href === '/simulator/locker-room');
+  assert.equal(locker?.name, 'Capelli Starter — Locker Room');
+  assert.equal(locker?.menuName, 'Locker Room');
+  // only Locker Room has one: the other cards carry no menuName at all
+  assert.deepEqual(
+    simulatorSeasons()
+      .flatMap((section) => section.simulators)
+      .filter((card) => 'menuName' in card)
+      .map((card) => card.href),
+    ['/simulator/locker-room'],
+  );
+  // no line of the dropdown has two dashes
+  for (const child of simulatorMenu().slice(1)) assert.equal(child.label.split(' — ').length, 2, child.label);
 });
 
 test('menu: every line of the Simulator dropdown opens a page of the website', () => {

@@ -45,6 +45,8 @@ export type Category = {
     summary: string;
     /** Picture of the simulator's mat for the Simulator page: a file under public/. */
     mat?: string;
+    /** A shorter name for the Simulator dropdown of the menu, when the category's name is long. */
+    menuName?: string;
   };
 };
 
@@ -215,6 +217,7 @@ export const seasons: Season[] = [
             "by the organiser's newest rules (newer than the v2.3 rules file). It runs in the browser: no " +
             'robot and no installation needed.',
           mat: '/simulator/locker-room/mat.webp',
+          menuName: 'Locker Room',
         },
       },
       {
@@ -430,6 +433,8 @@ export type SimulatorCard = {
   labels: [string, string];
   /** the category's own page, for the "About ..." link under the card (a mission has none) */
   about?: string;
+  /** a shorter name for the menu's Simulator dropdown ("Locker Room"); without it the menu uses `name` */
+  menuName?: string;
 };
 
 /**
@@ -463,6 +468,7 @@ export function simulatorSeasons(
                       mat: category.simulator.mat,
                       labels: [category.ageRange, `Season ${season.year}`],
                       about: `/season/${season.slug}/${category.slug}`,
+                      ...(category.simulator.menuName ? { menuName: category.simulator.menuName } : {}),
                     },
                   ]
                 : [],

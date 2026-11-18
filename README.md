@@ -747,7 +747,10 @@ line per simulator in the order of the page, as "<name> — Season <year>" ("War
 Season 2026"). A simulator added later gets its line by itself; on a phone the lines are listed
 under "Simulator" in the menu. Keep simulator names short: on a computer the dropdown is as
 wide as its longest line but at most 24rem (`max-w-sm` in `src/components/Header.tsx`), so that
-at 1024 px it still ends inside the window; a longer line breaks onto a second one.
+at 1024 px it still ends inside the window; a longer line breaks onto a second one. A category
+with a long name gives its simulator a shorter one for the menu with `menuName` (Capelli
+Starter — Locker Room is "Locker Room — Season 2026" in the dropdown); the Simulator page keeps
+the full name.
 
 The simulators used to be under Training: `/training/simulator` and
 `/training/simulator/<game>`. Those addresses are permanent redirects to the new ones
