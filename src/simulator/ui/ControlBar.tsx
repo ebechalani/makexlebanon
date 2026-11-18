@@ -29,6 +29,12 @@ export interface ControlBarProps {
   restartRules?: RestartRules;
   /** restarts the team may still use in this match (Simulation.restartsLeft); left out = no limit */
   restartsLeft?: number;
+  /**
+   * false: there is no "Restart" button at all - for a game whose rules have no restarts (Locker
+   * Room: anyone touching the robot after GO voids the run). Left out: the button is there, as in
+   * every other game.
+   */
+  restartButton?: boolean;
   /** the game's words (left out: the words of Fire Rescue) */
   words?: ScreenWords;
   speed: Speed;
@@ -195,30 +201,33 @@ export function ControlBar(props: ControlBarProps) {
 
       {/* what the team may do during a match, and how fast the simulation runs */}
       <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={usedUp ? undefined : props.onRestart}
-          disabled={!active}
-          aria-disabled={usedUp ? true : undefined}
-          className={usedUp ? SMALL_USED_UP : SMALL}
-          title={restart.hint}
-        >
-          <RestartIcon className={`${smallIcon} text-amber-600`} />
-          Restart
-          {restart.badge !== '' && (
-            <span
-              className={
-                // (none left: grey, like everything about a button that is off)
-                restart.tone === 'none'
-                  ? 'whitespace-nowrap rounded-md bg-slate-200 px-1.5 py-0.5 text-xs font-bold text-ink-700'
-                  : 'rounded-md bg-amber-100 px-1.5 py-0.5 text-xs font-bold text-amber-800' + (restart.tone === 'left' ? ' whitespace-nowrap' : '')
-              }
-            >
-              {/* (a cost is written as "-" and the number, two pieces of text, as it always was: see the note in ScoreSheet.tsx) */}
-              {restart.tone === 'cost' ? <>-{props.restartPenalty}</> : restart.badge}
-            </span>
-          )}
-        </button>
+        {/* (a game whose rules have no restarts has no Restart button: `restartButton`) */}
+        {props.restartButton !== false && (
+          <button
+            type="button"
+            onClick={usedUp ? undefined : props.onRestart}
+            disabled={!active}
+            aria-disabled={usedUp ? true : undefined}
+            className={usedUp ? SMALL_USED_UP : SMALL}
+            title={restart.hint}
+          >
+            <RestartIcon className={`${smallIcon} text-amber-600`} />
+            Restart
+            {restart.badge !== '' && (
+              <span
+                className={
+                  // (none left: grey, like everything about a button that is off)
+                  restart.tone === 'none'
+                    ? 'whitespace-nowrap rounded-md bg-slate-200 px-1.5 py-0.5 text-xs font-bold text-ink-700'
+                    : 'rounded-md bg-amber-100 px-1.5 py-0.5 text-xs font-bold text-amber-800' + (restart.tone === 'left' ? ' whitespace-nowrap' : '')
+                }
+              >
+                {/* (a cost is written as "-" and the number, two pieces of text, as it always was: see the note in ScoreSheet.tsx) */}
+                {restart.tone === 'cost' ? <>-{props.restartPenalty}</> : restart.badge}
+              </span>
+            )}
+          </button>
+        )}
         <button
           type="button"
           onClick={props.onFinished}

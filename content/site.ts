@@ -70,7 +70,10 @@ export function simulatorMenu(sections = simulatorSeasons()): NonNullable<NavIte
   return [
     { label: 'All simulators', href: '/simulator' },
     ...sections.flatMap((section) =>
-      section.simulators.map((simulator) => ({ label: `${simulator.name} — Season ${section.year}`, href: simulator.href })),
+      section.simulators.map((simulator) => ({
+        label: `${simulator.menuName ?? simulator.name} — Season ${section.year}`,
+        href: simulator.href,
+      })),
     ),
   ];
 }

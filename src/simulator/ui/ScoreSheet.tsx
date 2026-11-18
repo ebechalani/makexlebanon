@@ -245,7 +245,14 @@ export function StatusLine({
     }
   } else if (runState === 'running') {
     tone = 'border-brand-200 bg-brand-50 text-ink-900';
-    content = (
+    // (what the referee is doing right now, where a game says it - ScoreReport.now - in place of
+    // the count of goals: a robot that stands still for seconds is waiting for the referee)
+    content = score.now ? (
+      <>
+        <span className="font-bold">{`${Match} running.`}</span> {score.now}
+        {penaltyNote && <span className="font-semibold text-amber-800"> {penaltyNote}.</span>}
+      </>
+    ) : (
       <>
         <span className="font-bold">{`${Match} running.`}</span> {done} of {missions.length}
         {` ${words.goals} complete.`}

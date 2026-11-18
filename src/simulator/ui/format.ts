@@ -96,12 +96,17 @@ export function inkOn(c: RGB): string {
  * "tower:W1" -> "tower W1", "bucket:red" -> "the red bucket", "wall" -> "the table wall".
  * A fixed wall is named after the two cells it stands between or after its side of the field:
  * "wall:A1-B1" -> "the wall between A1 and B1", "wall:top" -> "the top wall".
+ * Locker Room: "cube:team-red" -> "the RED team cube", "token:A" -> "the token of zone A",
+ * "wall:gate" -> "the stadium gate" (no other game has bodies with such names).
  */
 export function bodyName(bodyId: string, tableEdge = 'the table wall'): string {
   if (bodyId === 'wall') return tableEdge;
   const [kind, name] = bodyId.split(':');
   if (!name) return bodyId;
   if (kind === 'tower') return `tower ${name}`;
+  if (kind === 'cube' && /^team-[a-z]+$/.test(name)) return `the ${name.slice(5).toUpperCase()} team cube`;
+  if (kind === 'token') return `the token of zone ${name}`;
+  if (kind === 'wall' && name === 'gate') return 'the stadium gate';
   if (kind === 'wall') {
     const cells = name.split('-');
     if (cells.length === 2 && cells[0] !== '' && cells[1] !== '') return `the wall between ${cells[0]} and ${cells[1]}`;

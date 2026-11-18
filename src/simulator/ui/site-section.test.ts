@@ -30,7 +30,7 @@ import { TitleBar } from './TitleBar';
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const fromRoot = (file: string): string => path.join(REPO_ROOT, file);
 
-/** The old address of the list and of the three games, under Training. */
+/** The old address of the list and of the three games of before, under Training. (Locker Room came later and never had one.) */
 const OLD = '/training/simulator';
 
 /** Every simulator in content/seasons.ts: of a category, or of a mission. */
@@ -62,6 +62,7 @@ test('menu: the dropdown of "Simulator" is the Simulator page, then each simulat
   const simulator = nav.find((item) => item.label === 'Simulator');
   assert.deepEqual(simulator?.children, [
     { label: 'All simulators', href: '/simulator' },
+    { label: 'Locker Room — Season 2026', href: '/simulator/locker-room' },
     { label: 'Warehouse Sort — Season 2026', href: '/simulator/warehouse-sort' },
     { label: 'Fire Rescue — Season 2027', href: '/simulator/fire-rescue' },
     { label: 'Fire Chief — Season 2027', href: '/simulator/fire-chief' },
@@ -93,6 +94,7 @@ test('menu: a simulator added to a season appears in the dropdown by itself, in 
   assert.deepEqual(simulatorMenu(simulatorSeasons(added, missions)), [
     { label: 'All simulators', href: '/simulator' },
     { label: `${first2025} — Season 2025`, href: '/simulator/new' },
+    { label: 'Locker Room — Season 2026', href: '/simulator/locker-room' },
     { label: 'Warehouse Sort — Season 2026', href: '/simulator/warehouse-sort' },
     { label: 'Fire Rescue — Season 2027', href: '/simulator/fire-rescue' },
     { label: 'Fire Chief — Season 2027', href: '/simulator/fire-chief' },
@@ -100,6 +102,24 @@ test('menu: a simulator added to a season appears in the dropdown by itself, in 
   ]);
   // no simulator at all: only the Simulator page
   assert.deepEqual(simulatorMenu([]), [{ label: 'All simulators', href: '/simulator' }]);
+});
+
+test('menu: a category with a long name can give the dropdown a shorter one (menuName); the Simulator page keeps the full name', () => {
+  const locker = simulatorSeasons()
+    .flatMap((section) => section.simulators)
+    .find((card) => card.href === '/simulator/locker-room');
+  assert.equal(locker?.name, 'Capelli Starter — Locker Room');
+  assert.equal(locker?.menuName, 'Locker Room');
+  // only Locker Room has one: the other cards carry no menuName at all
+  assert.deepEqual(
+    simulatorSeasons()
+      .flatMap((section) => section.simulators)
+      .filter((card) => 'menuName' in card)
+      .map((card) => card.href),
+    ['/simulator/locker-room'],
+  );
+  // no line of the dropdown has two dashes
+  for (const child of simulatorMenu().slice(1)) assert.equal(child.label.split(' — ').length, 2, child.label);
 });
 
 test('menu: every line of the Simulator dropdown opens a page of the website', () => {
@@ -267,7 +287,7 @@ test('menu on a computer: a line picked in a dropdown lets go of the focus, so t
 test('pages: every simulator is /simulator/<game>, with its page folder, its address in the page, and its mat picture in public/simulator/<game>/', async () => {
   assert.deepEqual(
     SIMULATOR_HREFS.map((simulator) => simulator.href).sort(),
-    ['/simulator/fire-chief', '/simulator/fire-rescue', '/simulator/warehouse-sort'],
+    ['/simulator/fire-chief', '/simulator/fire-rescue', '/simulator/locker-room', '/simulator/warehouse-sort'],
   );
   for (const { href, mat } of SIMULATOR_HREFS) {
     const game = /^\/simulator\/([a-z0-9-]+)$/.exec(href)?.[1];
@@ -287,21 +307,23 @@ test('pages: every simulator is /simulator/<game>, with its page folder, its add
   const folders = readdirSync(fromRoot('src/app/simulator'), { withFileTypes: true });
   assert.deepEqual(
     folders.map((entry) => (entry.isDirectory() ? `${entry.name}/` : entry.name)).sort(),
-    ['fire-chief/', 'fire-rescue/', 'page.tsx', 'warehouse-sort/'],
+    ['fire-chief/', 'fire-rescue/', 'locker-room/', 'page.tsx', 'warehouse-sort/'],
   );
   assert.ok(!existsSync(fromRoot('src/app/training/simulator')), 'the old folder is gone');
 });
 
-test('Simulator page: Season 2026 (Warehouse Sort), then Season 2027 (Fire Rescue, Fire Chief)', () => {
+test('Simulator page: Season 2026 (Locker Room, Warehouse Sort), then Season 2027 (Fire Rescue, Fire Chief)', () => {
   assert.deepEqual(
     simulatorSeasons().map((section) => [section.year, section.simulators.map((simulator) => simulator.name)]),
     [
-      [2026, ['Warehouse Sort']],
+      [2026, ['Capelli Starter — Locker Room', 'Warehouse Sort']],
       [2027, ['Fire Rescue', 'Fire Chief']],
     ],
   );
   const [season2026, season2027] = simulatorSeasons();
+  // (the category first, with its age group, its season and its "About" link; then the mission of the local event)
   assert.deepEqual(season2026.simulators.map((card) => [card.href, card.labels, card.about]), [
+    ['/simulator/locker-room', ['13–15 years', 'Season 2026'], '/season/2026/locker-room'],
     ['/simulator/warehouse-sort', ['MakeX Inspire · Beginner', 'Local event'], undefined],
   ]);
   assert.deepEqual(season2027.simulators.map((card) => [card.href, card.labels, card.about]), [
@@ -325,7 +347,7 @@ test('Simulator page: a simulator added to a season appears in its part by itsel
     simulatorSeasons(added, missions).map((section) => [section.year, section.simulators.map((simulator) => simulator.href)]),
     [
       [2025, ['/simulator/new']],
-      [2026, ['/simulator/warehouse-sort']],
+      [2026, ['/simulator/locker-room', '/simulator/warehouse-sort']],
       [2027, ['/simulator/fire-rescue', '/simulator/fire-chief', '/simulator/later']],
     ],
   );
@@ -379,11 +401,12 @@ test('title row of a game: Home / Simulator, not Training', () => {
     ['/simulator', 'Simulator'],
   ]);
   assert.match(html, /<h1[^>]*>Fire Rescue simulator /);
-  // the three games show the same row: they all hand only their title to it
+  // the four games show the same row: they all hand only their title to it
   for (const [loader, title] of [
     ['fire-rescue/FireRescueLoader.tsx', 'Fire Rescue'],
     ['fire-chief/FireChiefLoader.tsx', 'Fire Chief'],
     ['warehouse-sort/WarehouseSortLoader.tsx', 'Warehouse Sort'],
+    ['locker-room/LockerRoomLoader.tsx', 'Locker Room'],
   ]) {
     assert.match(readFileSync(fromRoot(`src/simulator/ui/${loader}`), 'utf8'), new RegExp(`<TitleBar title="${title}"`), loader);
   }
@@ -434,7 +457,7 @@ test('Training page: the card names the seasons and the simulators of the Simula
   assert.equal(card?.ageRange, 'Seasons 2026 · 2027');
   assert.equal(
     card?.summary,
-    'Program the mBot2 with blocks and watch it play on the competition mat: Warehouse Sort (Season 2026), ' +
+    'Program the mBot2 with blocks and watch it play on the competition mat: Capelli Starter — Locker Room and Warehouse Sort (Season 2026), ' +
       'Fire Rescue and Fire Chief (Season 2027). Works in the browser, no robot needed.',
   );
   // a simulator added later is named on the card too, in its season
@@ -442,9 +465,9 @@ test('Training page: the card names the seasons and the simulators of the Simula
     ...missionSimulators,
     { name: 'Later Mission', season: 2027, label: 'Level', event: 'Local event', href: '/simulator/later', summary: 'Two sentences.' },
   ];
-  assert.match(simulatorTrack(simulatorSeasons(seasons, missions)).summary, /: Warehouse Sort \(Season 2026\), Fire Rescue, Fire Chief and Later Mission \(Season 2027\)\. /);
+  assert.match(simulatorTrack(simulatorSeasons(seasons, missions)).summary, /: Capelli Starter — Locker Room and Warehouse Sort \(Season 2026\), Fire Rescue, Fire Chief and Later Mission \(Season 2027\)\. /);
   // one season only: "Season", not "Seasons"
-  const only2027 = simulatorTrack(simulatorSeasons(seasons, []));
+  const only2027 = simulatorTrack(simulatorSeasons(seasons.filter((season) => season.year !== 2026), []));
   assert.equal(only2027.ageRange, 'Season 2027');
   assert.match(only2027.summary, /: Fire Rescue and Fire Chief \(Season 2027\)\. /);
 });

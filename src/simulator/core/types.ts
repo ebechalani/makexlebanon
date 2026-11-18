@@ -153,7 +153,8 @@ export interface Body {
  * `angle`) that stands on the mat and is `h` mm high. The robot and everything it pushes are
  * stopped by it and can slide along it, the ultrasonic sensor sees it, and a colour sensor that
  * looks forward sees nothing behind it. A game returns its walls from Game.createWalls(); the
- * engine never changes them.
+ * engine never moves or changes them - only a referee can take one off the field
+ * (RefereeCall.removeWalls: a gate that opens).
  */
 export interface FixedWall {
   /** unique, e.g. 'wall:A1-B1'; reported in 'bump' events */
@@ -417,8 +418,53 @@ export interface World {
   tick: number;
   robot: RobotState;
   bodies: Body[];
-  /** the fixed walls of this match (the engine always sets it; empty when the game has none) */
+  /**
+   * the fixed walls of this match (the engine always sets it; empty when the game has none). When
+   * the referee takes a wall off the field (RefereeCall.removeWalls) this becomes a NEW list
+   * without it.
+   */
   walls?: readonly FixedWall[];
+  /**
+   * What the referee holds, or has put on the robot, right now (Referee.props). Left out in a game
+   * whose referee has none - every game before Locker Room.
+   */
+  props?: readonly RefereeProp[];
+}
+
+/**
+ * Something the referee holds, or has put on the robot, that is NOT a game element: it is not a
+ * Body, nothing collides with it, the robot cannot push or grip it, and the ultrasonic sensor does
+ * not see it. The screen draws it. The front colour sensor (either kind) sees it when it has a
+ * colour name: it is then one more thing on the sensor's line of sight, and the nearest thing
+ * wins (a game element exactly as near wins over it).
+ * Locker Room: the Team Box that rides on the robot until the referee lifts it, and the colour
+ * card the referee holds in front of the robot at the Scan Station.
+ */
+export interface RefereeProp {
+  /** unique, e.g. 'team-box', 'card' */
+  id: string;
+  /** short text drawn on it */
+  label: string;
+  /** CSS colour used to draw it */
+  fill: string;
+  /**
+   * 'robot': it rides on the robot and moves with it - x is how far AHEAD of the middle of the
+   * drive axle its middle is (mm), y how far to the RIGHT of it, angle its turn against the
+   * robot's heading. 'mat': x, y and angle on the mat, like a Body.
+   */
+  frame: 'robot' | 'mat';
+  x: number;
+  y: number;
+  angle: number;
+  /** size across (mm) */
+  w: number;
+  /** size along its own heading (mm) */
+  l: number;
+  /** it occupies z .. z + h above the mat (mm) */
+  z: number;
+  h: number;
+  /** what a front colour sensor that looks at it reads (left out: the sensor does not see it) */
+  colorName?: SensorColor;
 }
 
 export type SimStatus = 'ready' | 'running' | 'finished';
@@ -456,6 +502,14 @@ export interface ScoreReport {
   complete: boolean;
   /** match time (seconds) at which this total was reached, when the game ranks by time */
   time?: number;
+  /**
+   * Optional: what the referee is doing right now that explains why nothing seems to happen, in
+   * one short sentence, while the match runs ("The referee shows the GREEN card in front of the
+   * robot."). The status line above the stage shows it in place of the count of goals. Only
+   * Locker Room sets it (while its robot waits at the Scan Station); a game that leaves it out
+   * gets the status line as before.
+   */
+  now?: string;
 }
 
 /** A coloured area or label the renderer can draw over the mat. */
@@ -471,6 +525,12 @@ export interface ZoneOverlay {
    * itself. (`rect` is still the box around it, for the name of the zone.)
    */
   shape?: 'ellipse';
+  /**
+   * A zone of another shape (Locker Room: a rectangle turned by 45 degrees): its outline, closed
+   * (mm; the last point joins the first). When given it is the zone, and `rect` is only the box
+   * around it, for the name of the zone. Left out by every game before Locker Room.
+   */
+  outline?: readonly Vec2[];
 }
 
 export interface ScoreContext<S> {
@@ -488,6 +548,12 @@ export interface RefereeCall {
   say?: string[];
   /** set to end the match right now: why (for the program) and the referee's sentence (for people) */
   end?: { reason: FinishReason; detail: string };
+  /**
+   * Fixed walls (FixedWall.id) the referee takes off the field now - Locker Room: the stadium gate
+   * opens. From the next tick on nothing collides with them and no sensor sees them, and
+   * World.walls is a new list without them. They do not come back in this match.
+   */
+  removeWalls?: string[];
 }
 
 /**
@@ -522,6 +588,13 @@ export interface Referee<S = unknown> {
   finished?(ctx: ScoreContext<S>, reason: FinishReason): void;
   /** the score sheet "if the match ended now" (after the end: the final sheet) */
   score(ctx: ScoreContext<S>): ScoreReport;
+  /**
+   * Optional. What the referee holds, or has put on the robot, right now (see RefereeProp). The
+   * simulation asks once when it is created and again after every call of observe(), restart()
+   * and finished(), and puts the answer into World.props. Return the same list as long as nothing
+   * changes.
+   */
+  props?(): readonly RefereeProp[];
 }
 
 /** What a restart does in a game, beyond "the robot goes back to the start zone". */

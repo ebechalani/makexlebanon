@@ -4,8 +4,8 @@
  * The simulator screen: block workspace on the left, stage with its controls and panels on the
  * right (stacked on narrow screens). It works for any Game; what is special about one category
  * (its examples, rules, combination editor, a few words) is passed in as props - see
- * ./fire-rescue/FireRescueSimulator.tsx, ./fire-chief/FireChiefSimulator.tsx and
- * ./warehouse-sort/WarehouseSortSimulator.tsx.
+ * ./fire-rescue/FireRescueSimulator.tsx, ./fire-chief/FireChiefSimulator.tsx,
+ * ./warehouse-sort/WarehouseSortSimulator.tsx and ./locker-room/LockerRoomSimulator.tsx.
  *
  * Everything else the screen asks the game, the robot and the simulation:
  *   game.id                 the block palette (../blocks/palettes.ts), the saved work, the program files
@@ -18,6 +18,7 @@
  *   game.createReferee      how a moment of a match is written (./format.ts: timeTextOf)
  *   robotConfig             which sensors and motors the Sensors panel and the stage show (./robot-parts.ts)
  *   Simulation.world.walls  the walls on the stage
+ *   Simulation.world.props  what the referee holds or has put on the robot, on the stage
  *   Simulation.finishDetail the referee's own sentence about the end of a match
  *   ScoreLine.time,         the times on the score sheet
  *     ScoreReport.time
@@ -132,6 +133,12 @@ export interface SimulatorAppProps<S> {
    * opens it, and the message would be said where nobody looks.)
    */
   showLastPrint?: boolean;
+  /**
+   * false: the match controls have no "Restart" button - for a category whose rules have no
+   * restarts (Locker Room). Left out: the button is there, and the game's restart rules say what
+   * it does and when it is off.
+   */
+  restartButton?: boolean;
   /** the category's own editor for a combination */
   renderCombinationEditor: (scenario: S, onChange: (next: S) => void) => ReactNode;
   /**
@@ -815,6 +822,7 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
             restartPenalty={game.restartPenalty}
             restartRules={game.restartRules}
             restartsLeft={snapshot.restartsLeft}
+            restartButton={props.restartButton}
             words={words}
             speed={sim.speed}
             onSpeed={sim.setSpeed}

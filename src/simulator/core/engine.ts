@@ -446,6 +446,8 @@ class EngineSimulation<S> implements Simulation<S> {
   private readonly rayDirY = new Float64Array(ULTRASONIC_RAYS);
   /** cosine of the half opening angle of the ultrasonic beam */
   private readonly beamCos: number;
+  /** how far away the prop is that propOnSight() found last (mm) */
+  private propDistance = 0;
 
   constructor(opts: SimulationOptions<S>, createVM: VMFactory) {
     const cfg = opts.robotConfig ?? opts.game.robotConfig ?? DEFAULT_ROBOT_CONFIG;
@@ -589,6 +591,8 @@ class EngineSimulation<S> implements Simulation<S> {
     this.refereeView = this.referee
       ? new RefereeView<S>(opts.scenario, this.world, cfg, () => this.robotShapes())
       : null;
+    // what the referee holds or has put on the robot before the start (a box riding on the robot)
+    this.refreshProps();
     this.io = this.createIO();
     this.vm = createVM(opts.program, this.io);
   }
@@ -709,7 +713,10 @@ class EngineSimulation<S> implements Simulation<S> {
 
     this.pushEvent({ type: 'restart', time: this.world.time });
     // a referee with memory forgets what the rules say a restart costs
-    if (this.referee) this.referee.restart(this.scoreContext());
+    if (this.referee) {
+      this.referee.restart(this.scoreContext());
+      this.refreshProps();
+    }
 
     // the clock keeps running; the program starts again from the top
     this.vm.stopAll();
@@ -831,10 +838,12 @@ class EngineSimulation<S> implements Simulation<S> {
     if (this.referee) {
       // (what happens on the very last tick of the match still counts)
       const call = this.referee.observe(this.scoreContext());
+      this.refreshProps();
       if (call) {
         if (call.say) {
           for (const text of call.say) this.pushEvent({ type: 'log', level: 'info', text, time: world.time });
         }
+        if (call.removeWalls) this.removeWalls(call.removeWalls);
         if (call.end) {
           this.finish(call.end.reason, call.end.detail);
           return;
@@ -849,6 +858,7 @@ class EngineSimulation<S> implements Simulation<S> {
     // The referee hears about the end first, while the field still is as the match left it:
     // below, the program is stopped, and with it the wheels and the DC motors (a fan).
     if (this.referee?.finished) this.referee.finished(this.scoreContext(), reason);
+    this.refreshProps();
     this.currentStatus = 'finished';
     this.currentFinishReason = reason;
     this.currentFinishDetail = detail ?? null;
@@ -2244,6 +2254,41 @@ class EngineSimulation<S> implements Simulation<S> {
     this.lastFixedWallBump = tick;
   }
 
+  /**
+   * World.props: what the referee holds or has put on the robot right now (Referee.props). A game
+   * whose referee has no props never gets the field at all.
+   */
+  private refreshProps(): void {
+    const referee = this.referee;
+    if (referee?.props) this.world.props = referee.props();
+  }
+
+  /**
+   * The referee takes fixed walls off the field (RefereeCall.removeWalls: a gate that opens). From
+   * now on nothing collides with them and no sensor sees them: every test of a wall looks first at
+   * the box around it or at its height, and a removed wall has neither (an empty box, a top below
+   * the mat). World.walls becomes a new list without them, so a screen that keeps a picture of the
+   * walls draws them again. An id that is not a wall here, or a wall that is gone already, changes
+   * nothing.
+   */
+  private removeWalls(ids: readonly string[]): void {
+    const data = this.wallData;
+    let removed = false;
+    for (let w = 0, at = 0; w < this.wallCount; w++, at += WALL_STRIDE) {
+      if (data[at + WALL_H] === -Infinity || !ids.includes(this.walls[w].id)) continue;
+      data[at + WALL_H] = -Infinity;
+      data[at + WALL_MIN_X] = Infinity;
+      data[at + WALL_MAX_X] = -Infinity;
+      data[at + WALL_MIN_Y] = Infinity;
+      data[at + WALL_MAX_Y] = -Infinity;
+      removed = true;
+    }
+    if (!removed) return;
+    this.world.walls = this.walls.filter((_, w) => data[w * WALL_STRIDE + WALL_H] !== -Infinity);
+    // (a sensor value worked out before the wall went is not kept)
+    this.epoch++;
+  }
+
   // ===========================================================================================
   // Restart rule
   // ===========================================================================================
@@ -2652,6 +2697,15 @@ class EngineSimulation<S> implements Simulation<S> {
       }
     }
 
+    // what the referee holds in front of the robot (World.props; only Locker Room has any)
+    if (this.world.props !== undefined) {
+      const held = this.propOnSight(ox, oy, s, c, height, best, 0);
+      if (held !== null) {
+        best = this.propDistance;
+        seen = held;
+      }
+    }
+
     if (this.wallCount > 0) {
       // only a wall that reaches into the box around the line of sight can be on it
       const endX = ox + s * best;
@@ -2728,7 +2782,53 @@ class EngineSimulation<S> implements Simulation<S> {
         }
       }
     }
+    // what the referee holds in front of the claw (World.props; only Locker Room has any): seen
+    // when it is nearer than every game element on the same lines
+    if (this.world.props !== undefined) {
+      const held = this.propOnSight(ex, ey, s, c, eyeHeight, seen === null ? best + FRONT_EYE_SLACK : best, FRONT_EYE_SPREAD);
+      if (held !== null) return held;
+    }
     return seen?.colorName ?? 'none';
+  }
+
+  /**
+   * The nearest of the referee's props (World.props) that has a colour name, on the line of sight
+   * from (ox, oy) straight ahead of the robot (sin s, cos c of its heading) - and with `spread`,
+   * also on the lines `spread` mm to its left and right - at the height `height`, nearer than
+   * `best` mm. Its colour name (and its distance in propDistance), or null.
+   */
+  private propOnSight(ox: number, oy: number, s: number, c: number, height: number, best: number, spread: number): SensorColor | null {
+    const props = this.world.props;
+    if (props === undefined) return null;
+    const pose = this.robot.pose;
+    const ps = Math.sin(pose.heading);
+    const pc = Math.cos(pose.heading);
+    let seen: SensorColor | null = null;
+    for (const p of props) {
+      if (p.colorName === undefined) continue;
+      if (p.z > height || p.z + p.h < height) continue; // the sensor looks under or over it
+      let x = p.x;
+      let y = p.y;
+      let angle = p.angle;
+      if (p.frame === 'robot') {
+        // p.x ahead of the axle and p.y to its right: forward is (sin, -cos), right is (cos, sin)
+        x = pose.x + p.x * ps + p.y * pc;
+        y = pose.y - p.x * pc + p.y * ps;
+        angle = pose.heading + p.angle;
+      }
+      const bs = Math.sin(angle);
+      const bc = Math.cos(angle);
+      for (let k = spread > 0 ? -1 : 0; k <= (spread > 0 ? 1 : 0); k++) {
+        const side = k * spread;
+        const d = rayBoxDistance(ox + side * c, oy + side * s, s, -c, x, y, p.w / 2, p.l / 2, bs, bc);
+        if (d >= 0 && d < best) {
+          best = d;
+          seen = p.colorName;
+        }
+      }
+    }
+    this.propDistance = best;
+    return seen;
   }
 
   // ===========================================================================================

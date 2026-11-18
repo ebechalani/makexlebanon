@@ -2,10 +2,10 @@
  * The guard on the examples: nothing a visitor's browser gets may contain an example program,
  * the text that explains one - or so much as the title of one.
  *
- * Every game of the simulator has examples of its own: Fire Rescue, Fire Chief and Warehouse
- * Sort. The programs and descriptions (samples.ts in ../fire-rescue, ../fire-chief and
- * ../warehouse-sort) and the lists of the titles (sample-catalog.ts, next to them) stay on the
- * server. They leave it only through
+ * Every game of the simulator has examples of its own: Fire Rescue, Fire Chief, Warehouse Sort
+ * and Locker Room. The programs and descriptions (samples.ts in ../fire-rescue, ../fire-chief,
+ * ../warehouse-sort and ../locker-room) and the lists of the titles (sample-catalog.ts, next to
+ * them) stay on the server. They leave it only through
  * /api/simulator/unlock, which decides for every request what that visitor may see: an example
  * the owner keeps for advanced codes only must not show anywhere - not even its title, not
  * even the heading of its level - before an advanced code was checked. If a file of the
@@ -62,6 +62,7 @@ import ts from 'typescript';
 
 import { EXAMPLE_LEVELS as CHIEF_LEVELS, SAMPLE_CATALOG as CHIEF_CATALOG } from '../fire-chief/sample-catalog';
 import { EXAMPLE_LEVELS as RESCUE_LEVELS, SAMPLE_CATALOG as RESCUE_CATALOG } from '../fire-rescue/sample-catalog';
+import { EXAMPLE_LEVELS as LOCKER_LEVELS, SAMPLE_CATALOG as LOCKER_CATALOG } from '../locker-room/sample-catalog';
 import { EXAMPLE_LEVELS as SORT_LEVELS, SAMPLE_CATALOG as SORT_CATALOG } from '../warehouse-sort/sample-catalog';
 import { ALL_GAMES } from './all-examples';
 
@@ -71,33 +72,38 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..
 const CATALOG = 'src/simulator/fire-rescue/sample-catalog.ts';
 /** The same list for Fire Chief ... */
 const CHIEF_CATALOG_FILE = 'src/simulator/fire-chief/sample-catalog.ts';
-/** ... and for Warehouse Sort. */
+/** ... for Warehouse Sort ... */
 const SORT_CATALOG_FILE = 'src/simulator/warehouse-sort/sample-catalog.ts';
+/** ... and for Locker Room. */
+const LOCKER_CATALOG_FILE = 'src/simulator/locker-room/sample-catalog.ts';
 /** The list of every game, with the number of examples it holds. */
 const CATALOGS: ReadonlyArray<{ file: string; samples: string; game: string; examples: number }> = [
   { file: CATALOG, samples: 'src/simulator/fire-rescue/samples.ts', game: 'Fire Rescue', examples: 7 },
   { file: CHIEF_CATALOG_FILE, samples: 'src/simulator/fire-chief/samples.ts', game: 'Fire Chief', examples: 6 },
   { file: SORT_CATALOG_FILE, samples: 'src/simulator/warehouse-sort/samples.ts', game: 'Warehouse Sort', examples: 6 },
+  { file: LOCKER_CATALOG_FILE, samples: 'src/simulator/locker-room/samples.ts', game: 'Locker Room', examples: 6 },
 ];
 
 /** The cards of every game: what the titles and the ids are taken from. */
-const SAMPLE_CATALOG = [...RESCUE_CATALOG, ...CHIEF_CATALOG, ...SORT_CATALOG];
+const SAMPLE_CATALOG = [...RESCUE_CATALOG, ...CHIEF_CATALOG, ...SORT_CATALOG, ...LOCKER_CATALOG];
 /**
- * The headings of every game. (The three games call their levels the same - Starter,
- * Intermediate, Advanced - but the few words after a heading are a game's own, and all nine are
- * looked for.)
+ * The headings of every game. (The four games call their levels the same - Starter,
+ * Intermediate, Advanced - but the few words after a heading are a game's own, and all twelve
+ * are looked for.)
  */
-const EXAMPLE_LEVELS = [...RESCUE_LEVELS, ...CHIEF_LEVELS, ...SORT_LEVELS];
+const EXAMPLE_LEVELS = [...RESCUE_LEVELS, ...CHIEF_LEVELS, ...SORT_LEVELS, ...LOCKER_LEVELS];
 
 /** The files that hold the examples (paths from the repository's folder), and what they hold. */
 const HOLDERS: Record<string, string> = {
   'src/simulator/fire-rescue/samples.ts': 'holds example programs and descriptions',
   'src/simulator/fire-chief/samples.ts': 'holds example programs and descriptions',
   'src/simulator/warehouse-sort/samples.ts': 'holds example programs and descriptions',
+  'src/simulator/locker-room/samples.ts': 'holds example programs and descriptions',
   'src/simulator/members/all-examples.ts': 'holds example programs and descriptions',
   [CATALOG]: 'holds the titles of the examples',
   [CHIEF_CATALOG_FILE]: 'holds the titles of the examples',
   [SORT_CATALOG_FILE]: 'holds the titles of the examples',
+  [LOCKER_CATALOG_FILE]: 'holds the titles of the examples',
 };
 
 /** Files that belong to the server for other reasons: the lists of codes and the code that checks one. */
@@ -608,6 +614,9 @@ describe('the examples stay on the server', () => {
       'src/simulator/ui/warehouse-sort/WarehouseSortSimulator.tsx',
       'src/simulator/ui/warehouse-sort/WarehouseSortLoader.tsx',
       'src/simulator/ui/warehouse-sort/ArrangementEditor.tsx',
+      'src/simulator/ui/locker-room/LockerRoomSimulator.tsx',
+      'src/simulator/ui/locker-room/LockerRoomLoader.tsx',
+      'src/simulator/ui/locker-room/CardsEditor.tsx',
     ]) {
       assert.ok(roots.client.includes(screen), `${screen} begins with 'use client'`);
     }
@@ -616,6 +625,7 @@ describe('the examples stay on the server', () => {
       ['src/app/simulator/fire-rescue/page.tsx', 'src/simulator/ui/fire-rescue/FireRescueLoader.tsx', 'src/simulator/ui/fire-rescue/FireRescueSimulator.tsx', 'src/simulator/fire-rescue/game.ts'],
       ['src/app/simulator/fire-chief/page.tsx', 'src/simulator/ui/fire-chief/FireChiefLoader.tsx', 'src/simulator/ui/fire-chief/FireChiefSimulator.tsx', 'src/simulator/fire-chief/game.ts'],
       ['src/app/simulator/warehouse-sort/page.tsx', 'src/simulator/ui/warehouse-sort/WarehouseSortLoader.tsx', 'src/simulator/ui/warehouse-sort/WarehouseSortSimulator.tsx', 'src/simulator/warehouse-sort/game.ts'],
+      ['src/app/simulator/locker-room/page.tsx', 'src/simulator/ui/locker-room/LockerRoomLoader.tsx', 'src/simulator/ui/locker-room/LockerRoomSimulator.tsx', 'src/simulator/locker-room/game.ts'],
     ]) {
       assert.ok(roots.pages.includes(page), page);
       const fromPage = reachableFrom(graph, page);
@@ -644,6 +654,18 @@ describe('the examples stay on the server', () => {
     ]) {
       assert.ok(sortScreen.has(file), `the Warehouse Sort screen -> ${file}`);
     }
+    // ... and so has the Locker Room screen: its words, its rules window, its Cards panel, its code reader and its test lists
+    const lockerScreen = reachableFrom(graph, 'src/simulator/ui/locker-room/LockerRoomSimulator.tsx');
+    for (const file of [
+      'src/simulator/ui/locker-room/words.ts',
+      'src/simulator/ui/locker-room/rules.ts',
+      'src/simulator/ui/locker-room/CardsEditor.tsx',
+      'src/simulator/ui/locker-room/cards-panel.ts',
+      'src/simulator/ui/locker-room/cards-code.ts',
+      'src/simulator/ui/locker-room/cards-batch.ts',
+    ]) {
+      assert.ok(lockerScreen.has(file), `the Locker Room screen -> ${file}`);
+    }
     // the page that lists the simulators is a page of the website like any other
     assert.ok(roots.pages.includes('src/app/simulator/page.tsx'));
   });
@@ -654,7 +676,7 @@ describe('the examples stay on the server', () => {
     // the examples of every game: its list of titles and its programs
     assert.deepEqual(
       CATALOGS.map((catalog) => catalog.game),
-      ['Fire Rescue', 'Fire Chief', 'Warehouse Sort'],
+      ['Fire Rescue', 'Fire Chief', 'Warehouse Sort', 'Locker Room'],
     );
     for (const catalog of CATALOGS) {
       assert.match(forbidden.get(catalog.file) ?? '', /titles/, catalog.file);
@@ -677,11 +699,12 @@ describe('the examples stay on the server', () => {
     assert.equal(exampleMarkers(RESCUE_CATALOG).length, 7 + 2 + 6, 'Fire Rescue: seven titles, two first halves of a title, six ids of more than one word');
     assert.equal(exampleMarkers(CHIEF_CATALOG).length, 6 + 0 + 6, 'Fire Chief: six titles (none with a colon), six ids of more than one word');
     assert.equal(exampleMarkers(SORT_CATALOG).length, 6 + 0 + 6, 'Warehouse Sort: six titles (none with a colon), six ids of more than one word');
-    assert.equal(TITLE_MARKERS.length, 15 + 12 + 12, 'and the guard looks for all of them');
-    assert.equal(SAMPLE_CATALOG.length, 7 + 6 + 6);
-    // ... and for the sentences of every description: of all nineteen examples, several each
+    assert.equal(exampleMarkers(LOCKER_CATALOG).length, 6 + 0 + 6, 'Locker Room: six titles (none with a colon), six ids of more than one word');
+    assert.equal(TITLE_MARKERS.length, 15 + 12 + 12 + 12, 'and the guard looks for all of them');
+    assert.equal(SAMPLE_CATALOG.length, 7 + 6 + 6 + 6);
+    // ... and for the sentences of every description: of all twenty-five examples, several each
     const everyExample = ALL_GAMES.flatMap((game) => game.examples);
-    assert.equal(everyExample.length, 7 + 6 + 6);
+    assert.equal(everyExample.length, 7 + 6 + 6 + 6);
     for (const example of everyExample) {
       const mine = descriptionMarkers([example]);
       assert.ok(mine.length >= 2, `${example.id}: ${mine.length} sentences of its description are looked for`);
@@ -717,6 +740,29 @@ describe('the examples stay on the server', () => {
     for (const harmless of ['warehouse-sort', 'sort', 'Warehouse Sort', 'sort-all-cubes-later', 'the white line', 'a cube in its bay', 'two cubes', 'park on a finish pad', 'the colour of the cube', 'leave the start zone', 'Cube colours', 'cubes in the right bay']) {
       assert.ok(!REAL_MARKERS.some((marker) => marker.test(harmless)), harmless);
     }
+    // and for Locker Room - whose screen speaks of the Scan Station, the card, the team cube and the tokens all the time
+    for (const telling of ["'locker-whole-mission'", '"locker-two-tokens"', '`locker-read-card`', 'the "Deliver the team cube" program', 'the whole locker room\n   mission', 'data-example="locker-to-station"', 'DRIVE TO THE SCAN STATION']) {
+      assert.ok(REAL_MARKERS.some((marker) => marker.test(telling)), telling);
+    }
+    for (const harmless of [
+      'locker-room',
+      'Locker Room',
+      'locker',
+      'locker-whole-mission-later',
+      'the Scan Station',
+      'reach the Scan Station',
+      'the colour card',
+      'the card',
+      'the team cube',
+      'deliver the team-colour cube',
+      'the bottom line',
+      'two tokens',
+      'sort the 3 tokens',
+      'the whole mission',
+      'Cards',
+    ]) {
+      assert.ok(!REAL_MARKERS.some((marker) => marker.test(harmless)), harmless);
+    }
   });
 
   test("nothing reachable from a 'use client' file, a page, a layout or a component imports a file that holds programs, descriptions or titles", () => {
@@ -744,8 +790,8 @@ describe('the examples stay on the server', () => {
         'must not get the word "Advanced" either.\n',
     );
     // the headings of every game are looked for: the names of the three levels, and the words after each heading
-    assert.equal(EXAMPLE_LEVELS.length, 3 + 3 + 3);
-    assert.equal(new Set(EXAMPLE_LEVELS.map((level) => level.about)).size, 9, 'nine different texts');
+    assert.equal(EXAMPLE_LEVELS.length, 3 + 3 + 3 + 3);
+    assert.equal(new Set(EXAMPLE_LEVELS.map((level) => level.about)).size, 12, 'twelve different texts');
     assert.deepEqual([...new Set(EXAMPLE_LEVELS.map((level) => level.id))], ['starter', 'intermediate', 'advanced']);
     // (the check looks at the screen's own files, and at their code, not at their comments)
     const screen = reachableFrom(graph, 'src/simulator/ui/fire-rescue/FireRescueSimulator.tsx');
@@ -807,6 +853,8 @@ describe('the examples stay on the server', () => {
     assert.deepEqual(importers('src/simulator/fire-chief/samples.ts'), ['src/simulator/members/all-examples.ts']);
     assert.deepEqual(importers(SORT_CATALOG_FILE), ['src/simulator/members/all-examples.ts', 'src/simulator/warehouse-sort/samples.ts']);
     assert.deepEqual(importers('src/simulator/warehouse-sort/samples.ts'), ['src/simulator/members/all-examples.ts']);
+    assert.deepEqual(importers(LOCKER_CATALOG_FILE), ['src/simulator/locker-room/samples.ts', 'src/simulator/members/all-examples.ts']);
+    assert.deepEqual(importers('src/simulator/locker-room/samples.ts'), ['src/simulator/members/all-examples.ts']);
     assert.deepEqual(importers('src/simulator/members/all-examples.ts'), ['src/app/api/simulator/unlock/route.ts']);
     assert.deepEqual(importers('src/simulator/members/unlock.ts'), ['src/app/api/simulator/unlock/route.ts']);
     assert.deepEqual(importers('content/simulator-codes.ts'), ['src/app/api/simulator/unlock/route.ts']);

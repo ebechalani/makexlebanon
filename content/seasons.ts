@@ -45,6 +45,8 @@ export type Category = {
     summary: string;
     /** Picture of the simulator's mat for the Simulator page: a file under public/. */
     mat?: string;
+    /** A shorter name for the Simulator dropdown of the menu, when the category's name is long. */
+    menuName?: string;
   };
 };
 
@@ -204,6 +206,19 @@ export const seasons: Season[] = [
           { label: 'Capelli Starter Locker Room Rules v2.3', href: '/downloads/capelli-starter-locker-room-rules-v2.3.pdf', kind: 'rules' },
           { label: 'Inspire + Starter cube STL files', href: '/downloads/inspire-starter-cube-stl.zip', kind: 'stl' },
         ],
+        // (the simulator follows the organiser's newer rules - 150 s, half points for a token partly
+        // in its target, no 4-second pause - not the v2.3 file above: its Rules window says so)
+        simulator: {
+          href: '/simulator/locker-room',
+          summary:
+            'Build a program with mBlock-style blocks and watch the mBot2 carry the Team Box to the Scan ' +
+            'Station, scan the team colour, bring the cube of that colour to its big circle to open the ' +
+            'stadium gate, then sort the three tokens in the maze — with any draw of the two cards, scored ' +
+            "by the organiser's newest rules (newer than the v2.3 rules file). It runs in the browser: no " +
+            'robot and no installation needed.',
+          mat: '/simulator/locker-room/mat.webp',
+          menuName: 'Locker Room',
+        },
       },
       {
         slug: 'football',
@@ -418,6 +433,8 @@ export type SimulatorCard = {
   labels: [string, string];
   /** the category's own page, for the "About ..." link under the card (a mission has none) */
   about?: string;
+  /** a shorter name for the menu's Simulator dropdown ("Locker Room"); without it the menu uses `name` */
+  menuName?: string;
 };
 
 /**
@@ -451,6 +468,7 @@ export function simulatorSeasons(
                       mat: category.simulator.mat,
                       labels: [category.ageRange, `Season ${season.year}`],
                       about: `/season/${season.slug}/${category.slug}`,
+                      ...(category.simulator.menuName ? { menuName: category.simulator.menuName } : {}),
                     },
                   ]
                 : [],

@@ -11,8 +11,9 @@ const PATH = '/simulator';
 const TITLE = 'mBot2 simulators';
 const DESCRIPTION =
   'Program a Makeblock mBot2 with mBlock-style blocks and watch it play a MakeX Lebanon mission ' +
-  'in the browser: Warehouse Sort, the beginner mission of the Inspire category (Season 2026), and ' +
-  'the 2027 categories Fire Rescue (ages 11–13) and Fire Chief (ages 14–17). Free, nothing to install.';
+  'in the browser: the Season 2026 category Locker Room (Capelli, ages 13–15) and Warehouse Sort, the ' +
+  'beginner mission of the Inspire category (Season 2026), and the 2027 categories ' +
+  'Fire Rescue (ages 11–13) and Fire Chief (ages 14–17). Free, nothing to install.';
 
 /**
  * The site's share card (src/app/opengraph-image.tsx). A page that sets its own `openGraph`

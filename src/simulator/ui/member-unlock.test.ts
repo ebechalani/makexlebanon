@@ -9,7 +9,7 @@
 import assert from 'node:assert/strict';
 import { before, describe, test } from 'node:test';
 
-import { ALL_GAMES, FIRE_CHIEF, FIRE_RESCUE, WAREHOUSE_SORT } from '../members/all-examples';
+import { ALL_GAMES, FIRE_CHIEF, FIRE_RESCUE, LOCKER_ROOM, WAREHOUSE_SORT } from '../members/all-examples';
 import { fingerprintOf } from '../members/code-fingerprint.mjs';
 import { normalizeCode } from '../members/code-format.mjs';
 import { GAME_WHEN_NONE_IS_NAMED, handleUnlockRequest, type UnlockSetup } from '../members/unlock';
@@ -47,6 +47,7 @@ const ALL_EXAMPLES = FIRE_RESCUE.examples;
 const RESCUE: ExamplesSource = { unlockUrl: '/u', game: 'fire-rescue' };
 const CHIEF: ExamplesSource = { unlockUrl: '/u', game: 'fire-chief' };
 const SORT: ExamplesSource = { unlockUrl: '/u', game: 'warehouse-sort' };
+const LOCKER: ExamplesSource = { unlockUrl: '/u', game: 'locker-room' };
 
 const STARTER = { id: 'starter', title: 'Starter', about: 'first steps' };
 const HARDER = { id: 'harder', title: 'Harder', about: 'one whole mission' };
@@ -438,6 +439,34 @@ describe('two games behind one address', () => {
       assert.deepEqual(await requestUnlock(SORT, null, other), { kind: 'unreachable' }, JSON.stringify(named));
     }
     // the code is kept in the one place of every game: there is nothing of its own to type in Warehouse Sort
+    assert.equal(SAVED_CODE_KEY, storageKey('fire-rescue', 'member-code'));
+  });
+
+  test('Locker Room: the page names its game; a visitor gets 5 cards and 3 to open, a member code opens all 5, an advanced code shows 6 - and never a word of another game', async () => {
+    const server = pretendServer(setup);
+    const counts: string[] = [];
+    for (const code of [null, CODE, ADVANCED_CODE]) {
+      const outcome = await requestUnlock(LOCKER, code, server.fetch);
+      assert.ok(outcome.kind === 'examples');
+      assert.equal(outcome.member, code !== null);
+      counts.push(`${outcome.cards.length} / ${outcome.examples.length}`);
+      const got = JSON.stringify(outcome);
+      for (const example of [...FIRE_RESCUE.examples, ...FIRE_CHIEF.examples, ...WAREHOUSE_SORT.examples]) assert.ok(!got.includes(`"${example.id}"`) && !got.includes(example.title), `nothing about ${example.id}`);
+      if (code !== ADVANCED_CODE) {
+        for (const secret of ['locker-whole-mission', LOCKER_ROOM.examples[5].title, 'dvanced', LOCKER_ROOM.levels[2].about]) assert.ok(!got.includes(secret), `${code ?? 'a visitor'} does not get "${secret}"`);
+      }
+    }
+    assert.deepEqual(counts, ['5 / 3', '5 / 5', '6 / 6']);
+    assert.deepEqual(server.sent, ['{"game":"locker-room"}', `{"game":"locker-room","code":"${CODE}"}`, `{"game":"locker-room","code":"${ADVANCED_CODE}"}`]);
+    // an answer about another game - or one without a name - is no answer for this page
+    for (const named of [{ game: 'fire-rescue' }, { game: 'fire-chief' }, { game: 'warehouse-sort' }, {}]) {
+      const other = (async () => Response.json({ ...answer(false, [], []), ...named })) as unknown as typeof fetch;
+      assert.deepEqual(await requestUnlock(LOCKER, null, other), { kind: 'unreachable' }, JSON.stringify(named));
+    }
+    // a server of before Locker Room does not know the game: "unknown-game" is no "wrong code"
+    const before = (async () => Response.json({ ok: false, reason: 'unknown-game' }, { status: 400 })) as unknown as typeof fetch;
+    assert.deepEqual(await requestUnlock(LOCKER, CODE, before), { kind: 'unreachable' });
+    // the code is kept in the one place of every game: a code typed in another game works here too
     assert.equal(SAVED_CODE_KEY, storageKey('fire-rescue', 'member-code'));
   });
 
