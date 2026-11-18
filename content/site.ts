@@ -3,6 +3,10 @@
  * Edit this file to change contact details, links, and navigation.
  */
 
+// (seasons.ts imports nothing, so there is no import cycle; it is plain data, which the menu of
+// every page then carries: the Header is a client component)
+import { simulatorSeasons } from './seasons';
+
 export const site = {
   name: 'MakeX Lebanon',
   shortName: 'MakeX Lebanon',
@@ -47,7 +51,29 @@ export type NavItem = {
   label: string;
   href: string;
   children?: { label: string; href: string }[];
+  /**
+   * The desktop dropdown is as wide as its longest line (never narrower than the usual w-56), so
+   * that no line breaks: "Warehouse Sort — Season 2026" does not fit in w-56. It is at most
+   * max-w-sm wide, so that it still ends inside the window at 1024 px: a longer line breaks. (Set
+   * only where it is needed, so that the other dropdowns stay as they are.)
+   */
+  childrenOnOneLine?: boolean;
 };
+
+/**
+ * The dropdown of "Simulator": the Simulator page, then every simulator in the order of that page
+ * (Season 2026 first), as "Warehouse Sort — Season 2026". Built from `simulatorSeasons()`, the
+ * list the page shows, so a simulator added in content/seasons.ts appears here by itself, in its
+ * season's place. (The sections can be handed in, for the tests.)
+ */
+export function simulatorMenu(sections = simulatorSeasons()): NonNullable<NavItem['children']> {
+  return [
+    { label: 'All simulators', href: '/simulator' },
+    ...sections.flatMap((section) =>
+      section.simulators.map((simulator) => ({ label: `${simulator.name} — Season ${section.year}`, href: simulator.href })),
+    ),
+  ];
+}
 
 export const nav: NavItem[] = [
   { label: 'Home', href: '/' },
@@ -77,8 +103,9 @@ export const nav: NavItem[] = [
       { label: 'Competition kits', href: '/kits' },
     ],
   },
-  // the mBot2 simulators: one page that lists them by season (src/app/simulator/page.tsx)
-  { label: 'Simulator', href: '/simulator' },
+  // the mBot2 simulators: one page that lists them by season (src/app/simulator/page.tsx), and a
+  // dropdown that opens each one directly
+  { label: 'Simulator', href: '/simulator', children: simulatorMenu(), childrenOnOneLine: true },
   { label: 'Videos', href: '/media' },
   { label: 'Contact', href: '/contact' },
 ];

@@ -256,8 +256,9 @@ the simulator asks the website's server for is the ready-made examples: the serv
 visitor by visitor, which of them to show and to open. See "Member codes for the simulator
 examples" below.
 
-Visitors reach it from the Simulator page (the **Simulator** item of the menu), the
-Fire Rescue category page and the Season 2027 block on the homepage; the Season 2027 page
+Visitors reach it from the Simulator page (the **Simulator** item of the menu, whose
+dropdown also opens each simulator directly), the Fire Rescue category page and the Season
+2027 block on the homepage; the Season 2027 page
 marks the category with an "Online simulator" label. All of that comes from the `simulator` entry on
 the Fire Rescue category in `content/seasons.ts`. Remove that entry and the links disappear; the simulator page itself
 stays.
@@ -733,6 +734,14 @@ it is shown, after the categories of that season; it has two labels of its own (
 keeps one card that leads to `/simulator` (`simulatorTrack()` in `trainingTracks`, same file):
 its badge and its sentence name the seasons and the simulators, worked out from
 `simulatorSeasons()` too, so a simulator added later is named there by itself.
+
+The **Simulator** item of the menu has a dropdown, built by `simulatorMenu()` in
+`content/site.ts` from the same `simulatorSeasons()`: "All simulators" (this page), then one
+line per simulator in the order of the page, as "<name> — Season <year>" ("Warehouse Sort —
+Season 2026"). A simulator added later gets its line by itself; on a phone the lines are listed
+under "Simulator" in the menu. Keep simulator names short: on a computer the dropdown is as
+wide as its longest line but at most 24rem (`max-w-sm` in `src/components/Header.tsx`), so that
+at 1024 px it still ends inside the window; a longer line breaks onto a second one.
 
 The simulators used to be under Training: `/training/simulator` and
 `/training/simulator/<game>`. Those addresses are permanent redirects to the new ones
