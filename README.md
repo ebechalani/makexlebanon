@@ -343,29 +343,30 @@ the second is only the summary students read. Change both when a rule changes.
 
 ### Member codes for the simulator examples
 
-The simulator has three games, **Fire Rescue**, **Fire Chief** (the maze) and **Warehouse
-Sort** (Inspire, beginner), and each has its own **Examples** window with ready-made programs:
-seven in Fire Rescue, six in Fire Chief, six in Warehouse Sort. In every game the examples are
-in three groups, and there are two kinds of codes:
+The simulator has four games, **Fire Rescue**, **Fire Chief** (the maze), **Warehouse
+Sort** (Inspire, beginner) and **Locker Room** (Capelli Starter, Season 2026), and each has its
+own **Examples** window with ready-made programs: seven in Fire Rescue, six in Fire Chief, six
+in Warehouse Sort, six in Locker Room. In every game the examples are in three groups, and
+there are two kinds of codes:
 
-| Group | Now in it, in Fire Rescue | Now in it, in Fire Chief | Now in it, in Warehouse Sort | Who sees the card | Who can open it |
-| --- | --- | --- | --- | --- | --- |
-| **Open to everyone** | the three starter examples | the three starter examples | the three starter examples | everybody | everybody, without a code |
-| **For members** | the two intermediate examples | the two intermediate examples | the two intermediate examples | everybody — with a lock and "Members only" | a **member code** or an advanced code |
-| **For advanced codes only** | the two advanced examples | the one advanced example | the one advanced example | nobody else | an **advanced code** |
+| Group | Now in it, in Fire Rescue | Now in it, in Fire Chief, Warehouse Sort and Locker Room | Who sees the card | Who can open it |
+| --- | --- | --- | --- | --- |
+| **Open to everyone** | the three starter examples | the three starter examples | everybody | everybody, without a code |
+| **For members** | the two intermediate examples | the two intermediate examples | everybody — with a lock and "Members only" | a **member code** or an advanced code |
+| **For advanced codes only** | the two advanced examples | the one advanced example | nobody else | an **advanced code** |
 
 So there are three kinds of visitor, and each sees the same in every game:
 
 - **No code.** Three open cards, two locked ones. Nothing else.
 - **A member code** (one of the 500 you already have). Five open cards. Nothing else.
 - **An advanced code.** All the cards of that game — seven in Fire Rescue, six in Fire Chief,
-  six in Warehouse Sort — under the headings Starter, Intermediate and Advanced.
+  Warehouse Sort and Locker Room — under the headings Starter, Intermediate and Advanced.
 
-**One set of codes for all three games.** There is no code "for Fire Rescue", "for Fire Chief"
-or "for Warehouse Sort". A member code opens the examples for members in every game, and an
-advanced code opens every example in every game. The codes you have already handed out work in
-Fire Chief and in Warehouse Sort as they are: there is nothing to make and nothing to hand out
-again. Cancelling a code cancels it in every game.
+**One set of codes for all four games.** There is no code "for Fire Rescue", "for Fire Chief",
+"for Warehouse Sort" or "for Locker Room". A member code opens the examples for members in every
+game, and an advanced code opens every example in every game. The codes you have already handed
+out work in Fire Chief, Warehouse Sort and Locker Room as they are: there is nothing to make and
+nothing to hand out again. Cancelling a code cancels it in every game.
 
 An example of the third group is *hidden*, not locked. A visitor, and a member with an ordinary
 member code, do not see its card, its title, the "Advanced" heading or a count — nothing on
@@ -385,8 +386,8 @@ with their descriptions and a "Load this example" button. The browser remembers 
 it is typed once per device, and the simulator checks it with the server again on every visit.
 
 The code is remembered once for all games. Somebody who typed a code in Fire Rescue — also
-long ago, before Fire Chief existed — finds the examples of Fire Chief and of Warehouse Sort
-open in the same browser without typing anything, and the other way round. Other tabs of the same browser that
+long ago, before Fire Chief existed — finds the examples of Fire Chief, Warehouse Sort and
+Locker Room open in the same browser without typing anything, and the other way round. Other tabs of the same browser that
 have a simulator open follow at once: a code that is accepted in one tab opens the examples in
 the others too (each asks the server what the code opens in its own game). A tab that follows
 stands as it does after a fresh load with that code: what an earlier code had opened there is
@@ -417,7 +418,7 @@ this order, each with its own explanation:
 After any change: save, commit and push. The change is live once Vercel has redeployed.
 
 **Moving an example between the three groups.** Every example has an id; the ids of all
-three games are listed at the top of the file:
+four games are listed at the top of the file:
 
 - Fire Rescue: `'hello'`, `'line-follow'`, `'gripper-demo'`, `'one-bucket'`, `'one-person'`,
   `'smart-bucket'`, `'full-mission'`
@@ -425,10 +426,12 @@ three games are listed at the top of the file:
   `'chief-wall-follow'`, `'chief-face-flame'`, `'chief-full-mission'`
 - Warehouse Sort: `'sort-leave-start'`, `'sort-white-line'`, `'sort-cube-colour'`,
   `'sort-one-cube'`, `'sort-two-cubes'`, `'sort-all-cubes'`
+- Locker Room: `'locker-to-station'`, `'locker-follow-line'`, `'locker-read-card'`,
+  `'locker-team-cube'`, `'locker-two-tokens'`, `'locker-whole-mission'`
 
-Lists 1 and 2 hold the ids of all three games together, one below the other. Every id of Fire
-Chief begins with `chief-` and every id of Warehouse Sort with `sort-`, so they cannot be
-mixed up: `'full-mission'` is the full mission of Fire Rescue, `'chief-full-mission'` the one
+Lists 1 and 2 hold the ids of all four games together, one below the other. Every id of Fire
+Chief begins with `chief-`, every id of Warehouse Sort with `sort-` and every id of Locker Room
+with `locker-`, so they cannot be mixed up: `'full-mission'` is the full mission of Fire Rescue, `'chief-full-mission'` the one
 of Fire Chief. A line decides about that one example, in its own game, and about nothing in
 another game.
 
@@ -724,8 +727,11 @@ simulator: {
 },
 ```
 
-The same entry puts the "Try the simulator" link on the homepage, the "Online simulator" label
-on the season page and the simulator block on the category page. A simulator of a mission that
+The same entry puts the "Online simulator" label on the season page and the simulator block on
+the category page — and, for a category of the coming season (Season 2027), the "Try the
+simulator" link in the homepage's block of that season. (The homepage's block of the current
+season, Season 2026, links to the category pages only: Locker Room is reached from there through
+its category page.) A simulator of a mission that
 is not a category of a season (Warehouse Sort, the beginner mission of a local event) is an
 entry of `missionSimulators` in the same file instead: its `season` (a year) says in which part
 it is shown, after the categories of that season; it has two labels of its own (`label`,
@@ -1148,7 +1154,7 @@ Use only blocks of the Fire Chief palette — blocks that exist in real mBlock. 
 
 Described in full in "Member codes for the simulator examples" above. In short:
 
-- **One address, two games.** Both simulators ask `/api/simulator/unlock`, and each says which
+- **One address, four games.** Every simulator asks `/api/simulator/unlock`, and each says which
   game it is. The answer holds the cards and the programs of that game only, and says the name
   of the game back. A page takes an answer only when it is about its own game: should a tab
   stay open while the website is put back to a state from before Fire Chief, that older server
@@ -1161,7 +1167,7 @@ Described in full in "Member codes for the simulator examples" above. In short:
   again cures it, and so does putting the newer server back.
 - **One set of codes.** A member code opens the member examples of every game, an advanced
   code shows every example of every game. There is nothing to make or to hand out for Fire
-  Chief or for Warehouse Sort.
+  Chief, Warehouse Sort or Locker Room.
 - **Typed once.** The browser keeps the code in one place for all games.
 - **The same three groups.** Fire Chief has three starter examples open to everyone, two for
   members and one that only an advanced code shows — and, without such a code, no card, no
@@ -1249,7 +1255,7 @@ keep it that way.
 
 Everything that is general works as in Fire Rescue and is described above: the blocks and
 their saving, the ruler and the enlarged stage, the examples and their codes (one set of codes
-for all three games), the title row with "Powered by …", the header height.
+for all games), the title row with "Powered by …", the header height.
 
 ### How the game is put together
 
@@ -1508,6 +1514,326 @@ rectangle (upper middle)" — and have no blue cube.)
 
 ---
 
+## The Locker Room simulator
+
+The fourth game of the same simulator: **Locker Room**, the Season 2026 category **Capelli
+Starter — Locker Room** (ages 13–15, mBot2). The robot is the team's helper on match day. It
+starts in the **Locker Room** (bottom left) with the **Team Box** on it, drives to the **Scan
+Station** (bottom right), where the referee holds up a **colour card** — RED or GREEN, the team
+colour of the match — and then lifts the Team Box off the robot (the coach's approval). The
+robot then takes the **cube of the team colour** from its pickup zone to the **big circle** of
+that colour, which opens the **stadium gate**, and last it sorts the **three tokens** (RED,
+GREEN, BLUE) from the zones A, B and C into the **maze targets** of their colours. A match lasts
+150 seconds. It lives at:
+
+```
+https://www.makexlebanon.com/simulator/locker-room
+```
+
+**Which rules.** The simulator follows the organiser's **latest rules** ("Starter — Locker Room
+Mission", 150 s, half points for a token that is only partly inside its target, the 4-second
+pause cancelled). **The rules file you can download on the category page is still the older
+v2.3** (`public/downloads/capelli-starter-locker-room-rules-v2.3.pdf`: it still has the
+mandatory 4-second pause, no half points and no match time). The simulator uses v2.3 only for
+what the latest rules leave out: where things are on the field. Its **Rules** window says this
+in its first line. Replace the download when the organiser publishes the new rules as a file.
+
+The mat is the print file `Capelli-Starter_1235mm.idml` (an InDesign file, one page of 1235 ×
+1235 mm, black, with **white** lines). Its pictures (the Locker Room art, the coach badge, the
+zone pictures, the blue disc, the logos) are linked files that are not in the IDML: their look
+comes from the organiser's own render of the whole mat in the rules v2.3, cut out at the
+frames of the print file, and is therefore soft. The rules give no sizes and leave several
+things open; every choice the simulator had to make is in the second part of the Rules window,
+"What this simulator assumes", and in the questions below. This category is for ages 13–15, and
+many students read English as a second language: every text on the screen is short and plain —
+keep it that way.
+
+Everything that is general works as in Fire Rescue and is described above: the blocks and their
+saving, the ruler and the enlarged stage, the examples and their codes (one set of codes for all
+games), the title row with "Powered by …", the header height. The block palette is the one of
+Warehouse Sort (only blocks of real mBlock 5, plus the Gripper shortcuts).
+
+### How the game is put together
+
+| File | What is in it |
+| --- | --- |
+| `src/simulator/locker-room/field.ts` | Every measure of the mat (from the vectors of the print file), the colours, the cubes, the gate, the Team Box and the card, and the vector drawing of the mat the sensors read in tests (`MAT_VECTOR`). **`MARK_ROLES`**: the one table that says which marks are the pickup zones and which the targets |
+| `src/simulator/locker-room/robot.ts` | The robot: the mBot2 of Warehouse Sort, part for part; where it starts |
+| `src/simulator/locker-room/scenario.ts` | A draw: the Team Colour card (RED/GREEN) and the Zone Assignment card (option 1 – 6, numbered as in the rules §3.2) — 12 draws — the short code ("G5"), the random draw, the default |
+| `src/simulator/locker-room/game.ts` | The game and its referee, the timings at the Scan Station, and at its top the open questions L1 – L11, each with the constant behind it |
+| `src/simulator/locker-room/play.ts` | Play a program without a screen, on one or on all 12 draws (the tests use it) |
+| `src/simulator/locker-room/sample-catalog.ts`, `samples.ts` | The six examples. They stay on the server (see "Member codes" above) |
+| `src/simulator/ui/locker-room/` | What only this game shows: `LockerRoomSimulator.tsx` (what the general screen is given), `CardsEditor.tsx` (the Cards panel) with `cards-panel.ts`, `cards-code.ts` (a typed code), `cards-batch.ts` (the lists of "Test on many draws"), `rules.ts` (the Rules window) and `words.ts` (the screen's words) |
+| `src/app/simulator/locker-room/page.tsx` | The page: its address, title and description |
+| `public/simulator/locker-room/` | The two pictures of the mat: `mat.webp` (2500 px) is shown, `mat-sensor.webp` (1250 px) is what the line sensor reads |
+
+The category has a `simulator` entry in `content/seasons.ts`, so the Simulator page shows it in
+the part "Season 2026" (before Warehouse Sort, a mission and not a category), the season page
+labels it "Online simulator", its category page has the "Try the … simulator" block, and the
+Training page's card names it.
+
+What the general screen got for this game — optional, and the other three games pass none of
+it, so their screens are as they were:
+
+- **`restartButton={false}`**: the match controls have **no Restart button**. The rules have no
+  restarts (anyone but the referee touching the robot after GO voids the run); the Rules window
+  says so. The game itself allows none (`restartRules: { maxRestarts: 0 }`).
+- **What the referee holds is drawn on the stage** (`World.props`, see below): the Team Box on
+  top of the robot (drawn see-through, so that the CyberPi and its LEDs still show), and the
+  colour card in front of the claw while the referee holds it, with its name ("GREEN card")
+  beside it. A game without props draws nothing more.
+- **A zone of another shape** (`ZoneOverlay.outline`): the **Zones** view draws the two pickup
+  zones as the turned rectangles they are.
+- **What the referee is doing right now** (`ScoreReport.now`): while the robot waits at the Scan
+  Station, the status line above the stage says "The referee shows the GREEN card in front of
+  the robot." (and the step before and after it) in place of the count of goals, so that a robot
+  standing still for 4 s is explained without opening the score sheet or the console.
+- The **Console** names the things of this game plainly: "Picked up the GREEN team cube.", "Put
+  down the token of zone A on the mat.", "Bumped into the stadium gate." (`bodyName` in
+  `src/simulator/ui/format.ts`; the names of the other games are unchanged.)
+- As in Warehouse Sort: `stageMargin={TABLE_STRIP}` (the whole 100 mm table strip, the robot can
+  leave the mat), `batchRandomLists={false}` (**All 12 draws** and **This draw**),
+  `batchSummaryLabel` (the summary names "Step 5: the team colour cube in its circle" and "Step
+  7: the RED token", without the colour or the zone of one draw), and `showLastPrint`.
+- **`batchTieBreak`**: the rules rank by the better of two runs and say nothing about equal
+  points. The test window does not invent a tie-breaker — equal points keep their order — and
+  its column **Last step** shows when the last step with a time was done (Steps 1, 2, 3, 5, 6).
+  The **Best run** and **Worst run** tiles say "last step at 0:28.0" (`BatchTieBreak.tileWords`),
+  not "at 0:28.0": the tokens count at the end, so a plain "at" would read as the moment the
+  points were reached. (Warehouse Sort passes no `tileWords` and keeps "at".)
+
+What the engine got for this game (also optional: the three other games get no new field at
+all, which `src/simulator/core/engine-referee-props.test.ts` checks; their examples, traces and
+sensor readings were also compared before and after the change, once, in a scratch script): a
+referee can take a wall off the field (`RefereeCall.removeWalls`:
+the gate opens), a referee can hold things or put them on the robot (`Referee.props()`,
+`World.props`, `RefereeProp`: nothing collides with them, the ultrasonic sensor does not see
+them, the colour sensor at the claw reads one that has a colour), and a zone can have an outline.
+
+The screen's word for one starting arrangement is a **draw** ("Test on many draws", "Random
+draw", "Default draw"), and its panel is **Cards**: the Team Colour card (RED/GREEN), the six
+zone cards by number (each shows its three colours), and the three zones as they lie on the mat
+(C at the top, B, A at the bottom) with a colour each. A colour picked for a zone moves that
+token there, and the token that was there takes its place — one sentence says which zone changed
+too — so the panel never shows anything that is not one of the six cards. The code is the two
+cards as the referee draws them: `G5` = team GREEN, option 5 (BLUE in A, RED in B, GREEN in C),
+the default draw (not the first of anything). A code like `G7` or `Y2`, or a number alone, gets
+one plain sentence.
+
+### The field (measured from the print file)
+
+All in mm, origin at the top-left corner of the mat, +y down. Measured from the vectors of the
+IDML (1 pt = 1235 / 3500.787 mm); `field.test.ts` holds the print file's own numbers.
+
+| What | Measure |
+| --- | --- |
+| Mat | 1235 × 1235, black (35, 31, 32) |
+| White lines | 26.2 wide; the maze x 446.2 – 785.6, y 445.4 – 785.2; the long line on the left x 235.7 – 261.9, y 408.8 – 822.4, with two **yellow** pieces in it (y 507.6 – 566.3 and 665.1 – 723.7); the bottom line from the Locker Room to the Scan Station, centre y 1108.1 |
+| Yellow band | 20 wide, gaps in the middle of the top (x 484.5 – 759.3) and the bottom edge (x 483.8 – 749.7) |
+| Locker Room | its frame (yellow, 12 wide) included, to the edge of the mat: x 0 – 252.8, y 981.4 – 1235. Inside the frame alone there are only 236.0 mm |
+| Scan Station | frame included: x 982.3 – 1235, y 983.0 – 1235 |
+| Big circles | RED centre (1107.7, 505.3), r 103.5; GREEN centre (623.6, 933.2), r 104.8 |
+| Turned rectangles at the top (pickup zones, `MARK_ROLES`) | 104.8 × 62.9, turned 45°: red at (130.8, 118.5), green at (1102.5, 118.9) |
+| Maze targets (`MARK_ROLES`) | red square x 600.9 – 642.8, y 485.5 – 527.4 (**41.9 mm**); green square the same x, y 702.3 – 744.2; blue disc (picture) centre (618.4, 615.1), r 68.1 |
+| Zones A, B, C | the part of each picture that shows, 56.0 × 57.7: A (the lowest) y 747.5, B y 582.2, C (the top) y 429.1; x 102.8 (C 105.6) |
+| Light-blue rectangle | x 568.8 – 673.6, y 87.1 – 150.0 — no role in the rules |
+| Gate mark | dotted rectangle x 430.5 – 488.1, y 829.0 – 915.6 |
+| Gate (ASSUMPTION) | a wall with that footprint, 60 high, until it opens |
+| Cube (MEASURED, from the published STL) | **50 × 50 × 70** (not Warehouse Sort's 40 mm assumption); light |
+| Team Box (ASSUMPTION) | 90 × 110 × 80 on top of the chassis; not part of the robot's footprint; no sensor sees it |
+| Card (ASSUMPTION) | 60 wide, 100 high, 2 thick, held upright with its face 5 mm beyond the claw tips: the colour sensor at the claw reads it, with the arm down or up |
+| Robot | 237 × 130 with its claw open; it starts facing right on the bottom line at (77.9, 1108.1), 7.9 mm from the back and the front of the Locker Room, 61.8 and 61.9 on its sides |
+| Table around the mat (ASSUMPTION) | 100 mm on every side, as in Warehouse Sort |
+
+The two small orange squares of the print file (in the top-left corner of the Locker Room and
+the top-right corner of the Scan Station) lie **under** the Locker Room picture and the Scan
+Station's glow and do not show on the organiser's render; the simulator does not draw them. The
+line sensor is set for white lines on black as in Warehouse Sort: white reads as line, the
+yellow pieces read as line and as "yellow", everything else (red, green, light blue, the
+pictures) as background.
+
+### The referee
+
+| Line | Points | When |
+| --- | --- | --- |
+| Step 1: leave the Locker Room | +5 | the first moment the **whole** robot is outside the Locker Room (frame included) with the Team Box on it; kept |
+| Step 2: reach the Scan Station | +10 | the first moment the whole robot is inside the Scan Station (frame included) with the Team Box on it; kept |
+| Step 3: coach approval | +15 | the robot stands still (no wheel turns) completely inside the Scan Station with the Team Box: the referee shows the card of the team colour **0.5 s** later, takes it away at **2.5 s**, and lifts the Team Box at **4.0 s** (`CARD_SHOW_S`, `CARD_AWAY_S`, `BOX_LIFT_S`). If the robot moves before that, the card goes away, the box stays on, and it all starts again at the next stop in the station. The score sheet's line says live what the referee is doing. **The referee does not check that the program read the card**: the simulator cannot see what a program reads, so a robot that only stands there for 4 s gets the +15 too (the rules: "the robot scans the color card"; question 16). The Rules window says so |
+| Step 5: deliver the team-colour cube | +20 / −10 | the **first** moment a team cube stands on the mat, released, not touching the robot, completely inside one of the big circles decides it once: the team-colour cube in the circle of that colour +20, anything else −10 — also the cube of the **other** colour in **its own** circle (the rules say only "Wrong color circle"; question 18). Later deliveries change nothing. The card does not have to be read first. (Both team cubes delivered on the same 1/100 s: the team colour's cube is looked at first) |
+| Step 6: stadium gate bonus | +5 | with a correct Step 5; the gate is taken off the field at that moment |
+| Touching the gate | −10 | the robot touches the closed gate — once per match; a cube pushed against it is not the robot |
+| Step 7: each token | +10 / +5 / −10 | at the end, for a token on the mat, not held, not touching the robot: completely inside the target of its colour +10, partly inside +5, otherwise (not on its own target at all) at least partly inside a target of another colour −10. On a target too small for a whole cube (the two 41.9 mm squares), +5 is the most there is: the line says so and counts it as done, so the best possible run is "complete" |
+
+**The closed gate does not keep the robot out of the maze** (question 17): it is a block on the
+floor that the robot can drive around (the maze has no walls), and the tokens count whether the
+gate is open or not. The latest rules give Step 7 no condition on the gate; their story sorts
+the tokens "once the gate is open", and v2.3 says "Only then may the robot enter the maze area".
+
+Highest score: 5 + 10 + 15 + 20 + 5 + 3 × 10 = **85**. With the published 50 mm cube and the
+targets of `MARK_ROLES`, the RED and the GREEN token can never be *completely* inside their
+41.9 mm squares, so **75 is the most a robot can score here**; the Rules window works this out
+from the marks and says it. The total is never below 0. The match ends at 150 s, with
+"Finished" (the referee's "STOP"), or when the program has ended and the robot stands still —
+so **a program must keep running while it waits at the Scan Station**, or the match ends before
+the box is lifted. A token in a big circle, or a team cube on a maze target, counts for nothing.
+Not simulated: a voided run, field damage, the two runs of the ranking.
+
+### The examples, as measured
+
+Six examples in `src/simulator/locker-room/samples.ts`, measured by `samples.test.ts` on all 12
+draws, on the vector mat and on the picture the browser reads (the same points on both):
+
+| Id | Level | What it does | Points | Ends at |
+| --- | --- | --- | --- | --- |
+| `locker-to-station` | starter | drives 98.2 cm and stops inside the Scan Station (the program ends before the box can be lifted) | 15 on all 12 | 5.92 s |
+| `locker-follow-line` | starter | follows the white bottom line until a probe sees the station's yellow frame, then 16.4 cm more | 15 on all 12 | 7.01 s |
+| `locker-read-card` | starter | stops in the station, waits for the card, shows "Team: red/green" on the screen and the LEDs, waits until the box is lifted | 30 on all 12 | 10.42 s |
+| `locker-team-cube` | intermediate | the card, then the cube of the colour it read into the big circle of that colour (the gate opens) | 55 on all 12 | RED 29.10 s, GREEN 26.04 s |
+| `locker-two-tokens` | intermediate | takes the tokens of zones A and B, reads each one's colour and puts it on its target; it never opens the gate, and its text says the tokens count all the same here (question 17) | 15 or 20 | 15.8 – 17.7 s |
+| `locker-whole-mission` | advanced | the card, the team cube, then zones A, B and C | **75 on all 12** (the most there is) | 50.8 – 56.7 s |
+
+On the default draw G5: 15, 15, 30, 55, 20 and 75 points. The "Try" of the line follower is to
+move the robot 1 cm up or down in the Locker Room before Start (it still finds the line: 15 on
+all 12 draws). It used to be "wait 5 seconds at the end", which earns the +15 of Step 3 without
+reading the card — that taught that Step 3 needs no scan (question 16); reading the card is the
+next example. No example ever pushes a cube, touches
+the gate or makes a wrong delivery. They drive by distance and will drift on a real robot. The
+three starters are open to everyone, the two intermediate ones need a member code, the advanced
+one is shown to advanced codes only (`content/simulator-codes.ts`).
+
+### Questions for the organiser
+
+Each one is answered in the simulator in the way given here (the list L1 – L11 at the top of
+`src/simulator/locker-room/game.ts` names the constant behind each).
+
+The website's own photos of the 2026 competition day (`public/gallery/2026/locker-room/`, shown
+on `/season/2026/locker-room`) bear on several of them; they are cited below. We could not tell
+from the photos whether they show a field before a match or after one, so they settle nothing on
+their own:
+
+1. **Which marks are the pickup zones, and which are the targets?** (L1, `MARK_ROLES` in
+   `field.ts`.) The match procedure of v2.3 says "Go to RED pickup zone (top-left)", "GREEN
+   pickup zone (top-right)" and "RED → red rectangle, GREEN → green rectangle, BLUE → blue
+   target"; another sentence of v2.3 says "the cube located in the center zone on the matching
+   RED or GREEN square". The simulator follows the match procedure: team cubes on the two turned
+   rectangles at the top, tokens to the small squares and the blue disc in the maze. The
+   evidence for the other reading: the small red and green squares are cube-sized marks (41.9
+   mm, like the cube squares of the Inspire mat); the published 50 mm cube can never be
+   completely inside them (so the RED and GREEN tokens can only earn +5, and 75 is the most);
+   and the three rectangles at the top — red, light blue, green — are all 104.8 × 62.9 mm, room
+   for a whole cube. The **latest rules** (§2.6) say: "Inside the maze, there are 3 colored
+   target rectangles: RED, GREEN, and BLUE. Each colored cube must be delivered to its matching
+   color target. A Colored cube only counts if it ends FULLY inside its target" — the BLUE target
+   the simulator uses is a round picture, not a rectangle, and the rules call what goes to a
+   target a "colored cube". The photos: `event-021.webp` shows a red cube on the turned red
+   rectangle at the top left and a blue cube on the light-blue rectangle; `event-025.webp` and
+   `event-008.webp` show a red cube on the small red square in the maze and the turned red
+   rectangle empty. Swapping is a change of `MARK_ROLES` (see below).
+2. **The two orange squares** in the corners of the Locker Room and the Scan Station: the print
+   file hides them under pictures. Are they printed? Is it where the Team Box stands?
+3. **The light-blue rectangle** at the top: what is it for? (It would be the BLUE target if
+   question 1 is answered the other way.)
+4. **The two yellow pieces** in the long line on the left: do they have a role?
+5. **The timings at the Scan Station** (L3): when does the referee show the card, take it away
+   and lift the Team Box? The simulator: 0.5 s, 2.5 s and 4.0 s after the robot came to rest.
+6. **Must the robot scan the card before it delivers?** The simulator does not require it.
+7. **The card** (L4): the rules say "a color cube" and "the card". Where is it held? Does the
+   ultrasonic sensor see it? The simulator: a card held just in front of the claw, seen by the
+   colour sensor at the claw only. The photo `event-008.webp` shows a green cube standing just in
+   front of a robot in the Scan Station — a cube, not a card held up.
+8. **Touching the gate** (L7): every touch −10, or once per match? The simulator: once.
+9. **A token partly inside a target of another colour** (L8): −10? The simulator says yes.
+10. **The cube**: is the published "Inspire + Starter" cube (50 × 50 × 70) the one of this
+    category? (Warehouse Sort assumes 40 mm.)
+11. **The Team Box**: its size (the simulator: 90 × 110 × 80 on top of the robot, drawn
+    orange). Does it count for the robot's size at the start? The photo `event-025.webp` shows a
+    light-blue box with a handle on a robot.
+12. **"Drives out" and "reaches"** (L2): the whole robot? The simulator says yes. Does the
+    yellow frame belong to the zones? Without it the 237 mm robot does not fit inside the Locker
+    Room facing straight (236 mm inside the frame). On a real field the Locker Room runs to the
+    edge of the mat: could a robot leave it backwards over the edge? (Not in the simulator: its
+    100 mm table stops the robot first — the robot is at least 130 mm across.)
+13. **The table around the mat** and **the gate's size**: the simulator has a 100 mm table and a
+    60 mm high gate on its dotted rectangle. The photos (`event-008.webp`, `event-021.webp`,
+    `event-025.webp`) show tables with a raised rim right at the edge of the mat, and the gate as
+    a yellow block with an arm, on the dotted rectangle.
+14. **Can the total go below 0?** The simulator says no, as in the other games.
+15. **The first delivery decides Step 5** (L5), and a token in a big circle or a team cube on a
+    maze target counts for nothing (L6): is that right?
+16. **How does the referee know that the robot scanned the card?** (L3.) The rules: "At the Scan
+    Station, the robot scans the color card. The referee removes the card. The referee lifts the
+    Team Box … +15" and "After scanning, the referee removes the cube and lifts the Team Box"
+    (§2.2). The simulator cannot see what a program reads, so its referee lifts the box 4.0 s
+    after the robot stopped, read or not: a program that only drives into the station and waits
+    gets the +15 (30 points on all 12 draws). The Rules window says this. Must the robot show
+    what it read (a screen, the LEDs)? Giving the +15 only when the program read the colour sensor
+    while the card was out would be a change of the referee, not made without an answer.
+17. **May the robot sort the tokens while the gate is closed, and do they count?** (L11.) The
+    latest rules: "Once the gate is open, the robot finishes by sorting the rest of the equipment
+    inside the maze" (§1), the gate is "near the entrance to the maze" (§2.4), and "If Step 5 was
+    wrong or skipped, the gate stays closed" (Step 6) — but Step 7 has no condition on the gate.
+    v2.3, Phase 4: "If correct delivery was made, the referee declares the gate open. Only then
+    may the robot enter the maze area." The simulator: the tokens count whether the gate is open
+    or not, and the closed gate is a block the robot can drive around. The intermediate example
+    "Sort two tokens" never opens the gate and scores 15 or 20 (its text says so).
+18. **The cube of the other colour in its own circle** (L5): the rules say "Wrong color circle:
+    −10". Team GREEN puts the RED cube into the RED circle: −10 (the simulator), or "not
+    delivered", 0? The simulator gives −10 and the gate stays closed; the Rules window says so.
+
+### What to change, and where
+
+- **The pickup zones and the targets** (question 1): `MARK_ROLES` in `field.ts`, for example
+  `pickup: { red: 'redSquare', green: 'greenSquare' }` and
+  `target: { red: 'redDiamond', green: 'greenDiamond', blue: 'cyanRect' }`. The cubes, the
+  referee, the Zones view and the Rules window follow by themselves (the highest reachable score
+  is worked out). The examples drive by distance to the marks of today: `samples.test.ts` fails
+  first and names the numbers in `samples.ts` to change.
+- **The timings at the Scan Station**: `CARD_SHOW_S`, `CARD_AWAY_S`, `BOX_LIFT_S` in `game.ts`;
+  the Rules window takes them from there. The examples wait 2 s after the card is gone — check
+  `samples.test.ts`.
+- **A rule decided by the organiser**: the constant in `game.ts` (its list at the top says
+  which), then the sentence in `src/simulator/ui/locker-room/rules.ts` — its test compares every
+  number of the window with the constants. Move a sentence from "What this simulator assumes"
+  into the rules part once it is decided.
+- **The cube, the gate, the Team Box, the card**: `CUBE_SIZE`, `CUBE_HEIGHT`, `CUBE_MASS`,
+  `GATE_HEIGHT`, `TEAM_BOX`, `CARD` in `field.ts`.
+- **An example**: as in Fire Chief ("Adding an example" above), with an id that begins with
+  `locker-`, in `src/simulator/locker-room/`; then decide its group in
+  `content/simulator-codes.ts` and change the same lines in
+  `scripts/generate-simulator-codes.mjs`. Do not write the title of an example, or a sentence of
+  its description, anywhere else: the guard (`client-guard.test.ts`) fails. Note that the word
+  "Starter" is the name of a level of the examples, so the simulator's own files that a browser
+  gets cannot say "Capelli Starter" (the page says "Locker Room" and "Capelli").
+
+### Known limits of Locker Room
+
+- **The rules leave much open** (the list above); every choice is in the second part of the
+  Rules window.
+- **The pictures on the mat are soft**: the print file links them, and the only source is the
+  organiser's render in the rules v2.3 (0.49 px per mm). The line sensor reads them from the
+  picture in the browser; the tests read the vector drawing, in which a picture is one flat
+  colour.
+- **The robot is perfect** — no wheel slip, no sensor noise. The intermediate and advanced
+  examples drive by distance and will drift on a real robot.
+- **The Team Box hides part of the robot on the stage** (it is drawn see-through on top).
+- **No restarts, no voided run**: touching the robot is not simulated, so neither is a run that
+  counts 0. The CyberPi buttons work during a match; at the competition nobody may steer the
+  robot.
+- **The two runs of the ranking** are not simulated: the test window can play all 12 draws.
+- **The gate is perfectly smooth** (engine behaviour, as every wall of the simulator): a robot that
+  turns right beside it is pushed away along it instead of catching on it (about 15 cm in under a
+  second, measured), and a cube put down on top of the gate — carried there with the arm up — is
+  moved off it, possibly to the other side, in one step. Nothing goes through it.
+- **Cubes do not stack.** A cube put down on top of another cube slides off it, and both move by
+  up to about 3 cm in one step (engine behaviour, as in Warehouse Sort).
+- **Closing the claw on a turned cube** straightens it (a cube at 45° ends square to the claw):
+  engine behaviour, as in Warehouse Sort. The team cubes stand turned by 45°: the examples
+  come at them along the tree's diagonal lines, square to them.
+- **The referee does not check the scan** (question 16) and **the closed gate does not keep the
+  robot out of the maze** (question 17): both are said in the Rules window.
+
+---
+
 ## Deploying
 
 The site is designed for Vercel, the same platform already hosting the 2026 team portal.
@@ -1616,7 +1942,7 @@ content/            All editable text and data
 public/
   gallery/          Competition photos, by year and category
   downloads/        Rules, scoresheets, STL archives
-  simulator/        Pictures of the three mats, for the simulators
+  simulator/        Pictures of the four mats, for the simulators
 scripts/
   fetch-legacy-assets.mjs
   generate-simulator-codes.mjs   Makes new member codes for the simulator

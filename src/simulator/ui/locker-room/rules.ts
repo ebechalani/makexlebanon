@@ -1,0 +1,266 @@
+/**
+ * What the "Rules" button of the Locker Room simulator shows. Two parts, kept clearly apart:
+ *
+ *   1. LOCKER_ROOM_RULES - the mission ("Starter - Locker Room Mission", the organiser's latest
+ *      rules, 150 s) in short, plain words, with the points as the simulator counts them. Where
+ *      the latest rules do not say where something is on the field, the older published rules
+ *      v2.3 do, and those words are used.
+ *   2. LOCKER_ROOM_ASSUMPTIONS - "What this simulator assumes": where the rules are open, where
+ *      they say two things, and every number the simulator had to choose. Nobody should take one
+ *      of these for a rule, so they are never mixed into part 1. The list of questions for the
+ *      organiser, with the constant behind every one, is at the top of
+ *      ../../locker-room/game.ts (L1 - L11) and in the README.
+ *
+ * The category is for ages 13 to 15, and many students read English as a second language: short
+ * sentences, plain words, nothing more certain than the rules or the simulator. Every number is
+ * written from the constant that holds it, and ./rules.test.ts checks every number of every
+ * sentence against the game. Which mark is a pickup zone and which a target is read from the one
+ * table of ../../locker-room/field.ts (MARK_ROLES): if the organiser's answer swaps them, the
+ * texts follow.
+ *
+ * (The referee itself is in ../../locker-room/game.ts; this is only what students read.)
+ */
+import { TABLE_MARGIN } from '../../core/engine';
+import type { RobotConfig } from '../../core/types';
+import {
+  CARD,
+  CUBE_HEIGHT,
+  CUBE_SIZE,
+  FRAME_WIDTH,
+  GATE_HEIGHT,
+  LOCKER_ROOM_FRAME,
+  MAT_SIZE,
+  TEAM_BOX,
+  TEAM_COLORS,
+  pickupZone,
+  targetOf,
+} from '../../locker-room/field';
+import {
+  BOX_LIFT_S,
+  CARD_AWAY_S,
+  CARD_SHOW_S,
+  GATE_TOUCH_PENALTY,
+  MATCH_DURATION,
+  MAX_SCORE,
+  POINTS_APPROVAL,
+  POINTS_DELIVERY,
+  POINTS_GATE,
+  POINTS_LEAVE,
+  POINTS_SCAN_STATION,
+  POINTS_TOKEN,
+  POINTS_TOKEN_PARTLY,
+  WRONG_DELIVERY_PENALTY,
+  WRONG_TOKEN_PENALTY,
+  cubeFitsInside,
+} from '../../locker-room/game';
+import { LOCKER_ROOM_ROBOT, robotReach } from '../../locker-room/robot';
+import { TOKEN_COLORS, ZONE_OPTION_NUMBERS, type TokenColor } from '../../locker-room/scenario';
+import type { RulesPart, RulesSection } from '../SimulatorApp';
+import { COLOR_WORD } from './cards-panel';
+
+/** mm in cm, as a sentence writes it: 50 -> "5", 1235 -> "123.5". */
+const cm = (mm: number): string => String(Math.round(mm) / 10);
+/** seconds as a sentence writes them: 0.5 -> "0.5", 4 -> "4". */
+const s = (seconds: number): string => String(seconds);
+
+/** The whole robot seen from above, with its claw open: from the back of the chassis to the tips of the fingers (mm). */
+export const robotLength = (config: RobotConfig): number => robotReach(config).front + robotReach(config).rear;
+/** ... and across (mm). */
+export const robotWidth = (config: RobotConfig): number => 2 * robotReach(config).halfWidth;
+
+/** The room inside the yellow frame of the Locker Room (mm): the frame is drawn on the middle of its square. */
+export const INSIDE_THE_FRAME = LOCKER_ROOM_FRAME.w - FRAME_WIDTH;
+
+/** (Can a cube stand completely inside a mark? The referee asks the same: ../../locker-room/game.ts.) */
+export { cubeFitsInside };
+
+/** The token colours whose target can never hold a whole cube (with the published cube: RED and GREEN, the 4.2 cm squares). */
+export const TOO_SMALL_TARGETS: readonly TokenColor[] = TOKEN_COLORS.filter((color) => !cubeFitsInside(targetOf(color)));
+
+/** The most a robot can score in this simulator: every point, less what the targets that are too small for a cube cannot give. */
+export const REACHABLE_MAX = MAX_SCORE - TOO_SMALL_TARGETS.length * (POINTS_TOKEN - POINTS_TOKEN_PARTLY);
+
+/** "the RED and the GREEN token", "the BLUE token" */
+const tokensWord = (colors: readonly TokenColor[]): string =>
+  colors.length === 1 ? `the ${COLOR_WORD[colors[0]]} token` : `${colors.slice(0, -1).map((c) => `the ${COLOR_WORD[c]}`).join(', ')} and the ${COLOR_WORD[colors[colors.length - 1]]} token`;
+
+/** The sentence under the heading of the rules window. */
+export const LOCKER_ROOM_RULES_NOTE =
+  `MakeX Lebanon, Season 2026, ages 13 to 15. This simulator follows the newest rules of the organiser (${MATCH_DURATION} s). ` +
+  'The rules file on this website is the older version 2.3.';
+
+export const LOCKER_ROOM_RULES: RulesSection[] = [
+  {
+    title: 'The mission',
+    items: [
+      'The robot carries the Team Box from the Locker Room to the Scan Station.',
+      'There it reads a colour card: the team colour, RED or GREEN.',
+      'Then it takes the cube of the team colour to the big circle of that colour. This opens the stadium gate.',
+      `Last, it sorts the ${TOKEN_COLORS.length} tokens (RED, GREEN, BLUE) to the targets of their colour in the maze.`,
+      'After GO the robot works on its own. Nobody touches it.',
+    ],
+  },
+  {
+    title: 'The field',
+    items: [
+      `The mat is ${cm(MAT_SIZE)} x ${cm(MAT_SIZE)} cm. It is black, with white lines.`,
+      'The Locker Room (the start) is at the bottom left. The Scan Station is at the bottom right.',
+      'The big RED circle is on the right. The big GREEN circle is in the lower middle.',
+      // (the newest rules do not say where the pickup zones are; the older rules v2.3 do)
+      'The older rules (v2.3) put the RED pickup zone at the top left and the GREEN pickup zone at the top right.',
+      'Zones A, B and C are on the left of the maze: A at the bottom, C at the top. Each holds one token.',
+      'The maze has a RED, a GREEN and a BLUE target.',
+      'The stadium gate stands left of the big GREEN circle. It is closed at the start.',
+    ],
+  },
+  {
+    title: 'Before the match',
+    items: [
+      'The referee draws two cards: the Team Colour card (RED or GREEN) and the Zone Assignment card.',
+      `The Zone Assignment card is one of ${ZONE_OPTION_NUMBERS.length} options. It says which token stands in zone A, B and C.`,
+      'Here the Cards panel shows the two cards, and you can change them.',
+      'The robot starts completely inside the Locker Room, with the Team Box. It holds no cube.',
+    ],
+  },
+  {
+    title: 'The match',
+    items: [
+      `A match lasts ${MATCH_DURATION} seconds.`,
+      'It ends when the time is up, or when the referee says "STOP". Here the "Finished" button is that "STOP".',
+      'Here the match also ends when your program has ended and the robot stands still.',
+      'Then the referee looks at the field as it is.',
+      'There are no restarts. If anyone but the referee touches the robot after GO, the run counts 0. So there is no Restart button here.',
+    ],
+  },
+  {
+    title: 'At the Scan Station',
+    items: [
+      'The robot drives into the Scan Station with the Team Box.',
+      // (the rules say "places a color cube" and "scans the card": how it is shown is the simulator's choice, in part 2)
+      'The referee puts the team colour (RED or GREEN) in front of the robot. The robot reads it by itself.',
+      'Then the referee takes the card away and lifts the Team Box off the robot. This is the coach approval.',
+      `The rules say: it is better when the robot waits ${s(BOX_LIFT_S)} seconds, so that the referee can lift the Team Box.`,
+    ],
+  },
+  {
+    title: `Points (${MAX_SCORE} at most)`,
+    items: [
+      `+${POINTS_LEAVE}: Step 1, the robot leaves the Locker Room with the Team Box.`,
+      `+${POINTS_SCAN_STATION}: Step 2, the robot reaches the Scan Station with the Team Box.`,
+      `+${POINTS_APPROVAL}: Step 3, the referee lifts the Team Box (coach approval).`,
+      '(Step 4, a pause, is cancelled in the rules.)',
+      `+${POINTS_DELIVERY}: Step 5, the cube of the team colour in the big circle of that colour. In the wrong circle: -${WRONG_DELIVERY_PENALTY}.`,
+      `+${POINTS_GATE}: Step 6, the gate bonus. It comes with a correct Step 5, and the gate opens.`,
+      `+${POINTS_TOKEN} for each token completely inside the target of its colour, +${POINTS_TOKEN_PARTLY} when it is only partly inside. A wrong delivery: -${WRONG_TOKEN_PENALTY}.`,
+      `-${GATE_TOUCH_PENALTY}: the robot touches the gate.`,
+      `All together: ${POINTS_LEAVE} + ${POINTS_SCAN_STATION} + ${POINTS_APPROVAL} + ${POINTS_DELIVERY} + ${POINTS_GATE} + ${TOKEN_COLORS.length} x ${POINTS_TOKEN} = ${MAX_SCORE}.`,
+    ],
+  },
+  {
+    title: 'Ranking',
+    items: ['Every team has 2 runs. The better one counts.'],
+  },
+];
+
+/** The second part of the window: what the simulator had to choose because the rules do not say it, or say two things. */
+export const LOCKER_ROOM_ASSUMPTIONS: RulesPart = {
+  title: 'What this simulator assumes',
+  note: 'These are not rules. The rules do not say these things, or say two different things, so the simulator had to choose.',
+  sections: [
+    {
+      title: 'Pickup zones and targets',
+      items: [
+        `Here the team cubes start on ${TEAM_COLORS.map((team) => pickupZone(team).name).join(' and on ')}.`,
+        `The tokens go to their targets: ${TOKEN_COLORS.map((color) => `${COLOR_WORD[color]} to ${targetOf(color).name}`).join(', ')}.`,
+        'The older rules say both "pickup zone (top left)" and "the cube on the matching square". The organiser has been asked which marks are which.',
+        TOO_SMALL_TARGETS.length > 0
+          ? `A cube is ${cm(CUBE_SIZE)} cm wide, and here ${tokensWord(TOO_SMALL_TARGETS)} ${TOO_SMALL_TARGETS.length === 1 ? 'has a target' : 'have targets'} that ${TOO_SMALL_TARGETS.length === 1 ? 'is' : 'are'} smaller. So ${TOO_SMALL_TARGETS.length === 1 ? 'it' : 'they'} can never be completely inside: +${POINTS_TOKEN_PARTLY} at most. The most a robot can score here is ${REACHABLE_MAX}.`
+          : `A cube is ${cm(CUBE_SIZE)} cm wide. It fits completely inside every target.`,
+        ...(TOO_SMALL_TARGETS.length > 0 ? [`So on the score sheet, +${POINTS_TOKEN_PARTLY} counts as done for ${TOO_SMALL_TARGETS.length === 1 ? 'that token' : 'those tokens'}.`] : []),
+      ],
+    },
+    {
+      title: 'The Team Box and the card',
+      items: [
+        `The Team Box rides on top of the robot from the start: ${cm(TEAM_BOX.w)} x ${cm(TEAM_BOX.l)} x ${cm(TEAM_BOX.h)} cm here. The rules give no size.`,
+        'It does not make the robot bigger on the mat, and no sensor sees it.',
+        'The rules say "a color cube" and "the card". Here the referee holds a card of the team colour just in front of the claw.',
+        `The card is ${cm(CARD.w)} x ${cm(CARD.h)} cm. It is read by the colour sensor at the claw. The robot cannot push it, and the ultrasonic sensor does not see it.`,
+      ],
+    },
+    {
+      title: 'When the referee acts',
+      items: [
+        'The rules give no times. Here the referee waits until the robot stands still, completely inside the Scan Station, with the Team Box.',
+        `${s(CARD_SHOW_S)} seconds later the referee shows the card. At ${s(CARD_AWAY_S)} seconds the referee takes it away. At ${s(BOX_LIFT_S)} seconds the referee lifts the Team Box: +${POINTS_APPROVAL}.`,
+        'If the robot moves before that, the card goes away and the box stays on. It all starts again when the robot stops in the Scan Station again.',
+        'If your program ends while the robot waits, the match ends too - before the box is lifted.',
+        `The simulator cannot see if your program read the card. Here the box is lifted after ${s(BOX_LIFT_S)} seconds, read or not.`,
+        'At the competition the robot must read the card. The rules do not say how the referee checks it.',
+      ],
+    },
+    {
+      title: 'Leaving and reaching',
+      items: [
+        'Step 1 counts when the whole robot is outside the Locker Room, its yellow frame included.',
+        'Step 2 counts when the whole robot is inside the Scan Station, its yellow frame included.',
+        `The frame is part of the zone here: inside the frame there are only ${cm(INSIDE_THE_FRAME)} cm, and the robot is ${cm(robotLength(LOCKER_ROOM_ROBOT))} cm long.`,
+      ],
+    },
+    {
+      title: 'The deliveries',
+      items: [
+        'A team cube is delivered when it stands on the mat, completely inside a big circle, not held and not touching the robot.',
+        'The first delivery decides Step 5. Later deliveries change nothing.',
+        `The rules say only "Wrong color circle". Here the cube of the other colour in any big circle is a wrong delivery too: -${WRONG_DELIVERY_PENALTY}.`,
+        'The rules do not say that the robot must read the card first. Here it does not have to.',
+        'A token in a big circle, or a team cube on a maze target, counts for nothing.',
+      ],
+    },
+    {
+      title: 'The tokens',
+      items: [
+        'They are judged at the end: standing on the mat, not held and not touching the robot.',
+        `A token that is partly inside a target of another colour, and not in its own, counts as a wrong delivery: -${WRONG_TOKEN_PENALTY}.`,
+        'A token that is partly inside its own target counts for it, even if it touches another target too.',
+      ],
+    },
+    {
+      title: 'The gate',
+      items: [
+        `It is a yellow barrier on its dotted rectangle, ${cm(GATE_HEIGHT)} cm high. The rules give no size.`,
+        `Touching it costs ${GATE_TOUCH_PENALTY} points once, however often the robot touches it.`,
+        'A cube that the robot pushes against the gate is not the robot touching it.',
+        'After a wrong delivery, or none, the gate stays closed for the whole match.',
+        'Here the closed gate does not stop the robot from sorting the tokens: they count all the same. The robot can drive around the gate.',
+        'The story of the rules sorts the tokens after the gate opens. The older rules (v2.3) let the robot enter the maze only then.',
+      ],
+    },
+    {
+      title: 'The cubes and the mat',
+      items: [
+        `A cube is ${cm(CUBE_SIZE)} x ${cm(CUBE_SIZE)} cm and ${cm(CUBE_HEIGHT)} cm high, as the cube file on this website. It is light: the robot can push it.`,
+        `The mat lies on a table. The robot and the cubes can leave the mat, and they stop ${cm(TABLE_MARGIN)} cm outside it.`,
+        'The two yellow pieces in the long line on the left, and the light-blue rectangle at the top, have no role in the rules. The line sensor sees the yellow pieces as yellow.',
+      ],
+    },
+    {
+      title: 'The robot',
+      items: [
+        `It is the mBot2 of Warehouse Sort, with the gripper at the front: ${cm(robotLength(LOCKER_ROOM_ROBOT))} cm long and ${cm(robotWidth(LOCKER_ROOM_ROBOT))} cm wide. It fits inside the Locker Room.`,
+        'Its line sensor is set for white lines on a black mat. "Line" means a light colour: white, and also yellow (the frames, the band, the pieces).',
+        `The colour sensor at the claw sees a cube that is at most ${cm(LOCKER_ROOM_ROBOT.frontColorSensor.rangeMm)} cm in front of the middle of the claw.`,
+        'The robot is perfect: its wheels do not slip and its sensors make no mistakes. A real robot drifts.',
+        'The CyberPi buttons work during a match. At the competition nobody may steer the robot.',
+      ],
+    },
+    {
+      title: 'The total',
+      items: ['The total is never below 0. The rules do not say.'],
+    },
+    {
+      title: 'Not in the simulator',
+      items: ['A run that counts 0 because somebody touched the robot, damage to the field, and the 2 runs of the ranking.'],
+    },
+  ],
+};

@@ -15,6 +15,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: '/simulator/fire-rescue', priority: 0.7 },
     { path: '/simulator/fire-chief', priority: 0.7 },
     { path: '/simulator/warehouse-sort', priority: 0.7 },
+    { path: '/simulator/locker-room', priority: 0.7 },
     { path: '/workshops', priority: 0.6 },
     { path: '/kits', priority: 0.6 },
     { path: '/media', priority: 0.6 },

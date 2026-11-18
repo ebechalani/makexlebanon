@@ -13,14 +13,14 @@
  *              an advanced code of its list: every example of that game
  *   403        { "ok": false, "reason": "invalid-code" }              the code is on neither list
  *
- *   400        { "ok": false, "reason": "unknown-game" }              "game" is not "fire-rescue", "fire-chief" or "warehouse-sort", letter for letter
+ *   400        { "ok": false, "reason": "unknown-game" }              "game" is not "fire-rescue", "fire-chief", "warehouse-sort" or "locker-room", letter for letter
  *   400        { "ok": false, "reason": "bad-request" }               not such a request
  *   415        { "ok": false, "reason": "bad-request" }               a request with a text that does not say "Content-Type: application/json"
  *   405        { "ok": false, "reason": "method-not-allowed" }        anything but POST
  *   413        { "ok": false, "reason": "too-large" }
  *   429        { "ok": false, "reason": "too-many-attempts" }         too many wrong codes just now: wait a moment (Retry-After) and try again
  *
- * "game" is "fire-rescue", "fire-chief" or "warehouse-sort". A request without "game" - `{}` or
+ * "game" is "fire-rescue", "fire-chief", "warehouse-sort" or "locker-room". A request without "game" - `{}` or
  * `{ "code": "..." }` - is about Fire Rescue: that is how its page asked while it was the only
  * game, and a page that was loaded then is still open in somebody's browser. Its answer has no
  * "game": it is what it always was. The answer to a request that names its game says the name

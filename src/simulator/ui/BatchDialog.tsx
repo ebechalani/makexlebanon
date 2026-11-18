@@ -68,6 +68,12 @@ export interface BatchTieBreak {
   timeOf: (result: BatchResult) => number | undefined;
   /** what a screen reader hears for a run without that time: "no cube in the right bay" */
   none: string;
+  /**
+   * The words before that time under "Best run" and "Worst run" - "last step at" - where a plain
+   * "at" would read as the moment the points were reached (Locker Room: the tokens count at the
+   * end, after the last step with a time). Left out: "at".
+   */
+  tileWords?: string;
   /** which of two runs ranks higher: negative when `a` does, positive when `b` does, 0 when they are equal */
   compare: (a: BatchResult, b: BatchResult) => number;
 }
@@ -296,7 +302,7 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
   /** "at 0:37.2" under the best and the worst run, where the time of the points ranks (nothing for a run without points) */
   const reachedAt = (result: BatchResult | undefined): string | undefined => {
     const time = result ? scoreTimeText(tieBreak ? { scoreTime: tieBreak.timeOf(result) } : result, timeText, '') : '';
-    return time === '' ? undefined : `at ${time}`;
+    return time === '' ? undefined : `${tieBreak?.tileWords ?? 'at'} ${time}`;
   };
 
   return (

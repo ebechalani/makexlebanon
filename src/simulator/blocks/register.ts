@@ -449,8 +449,9 @@ export function addBubblesToMyBlocks(Blockly: BlocklyApi, workspace: BlocklyModu
 export interface EditorOptions extends Omit<BlocklyModule.BlocklyOptions, 'toolbox'> {
   /**
    * The game whose palette the editor shows: give Game.id ('fire-rescue', 'fire-chief',
-   * 'warehouse-sort' - see ./palettes.ts). Left out, or a game without a palette of its own: the
-   * palette of Fire Rescue. It also picks the hover texts of that game (PALETTE_TOOLTIPS).
+   * 'warehouse-sort', 'locker-room' - see ./palettes.ts). Left out, or a game without a palette
+   * of its own: the palette of Fire Rescue. It also picks the hover texts of that game
+   * (PALETTE_TOOLTIPS).
    */
   palette?: string;
   /** your own toolbox instead of a game's palette, e.g. buildToolbox([...]) for a smaller one; it wins over `palette` */

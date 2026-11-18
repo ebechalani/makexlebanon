@@ -13,6 +13,9 @@
  *   Warehouse Sort   the same robot and the same blocks as Fire Rescue. Its mat has WHITE lines
  *                 on black, and its robot's Quad RGB sensor has learned that: one hover text
  *                 says so (PALETTE_TOOLTIPS below).
+ *   Locker Room   the robot of Warehouse Sort (it carries a Team Box on top, which no block
+ *                 touches): the same blocks, and the same hover texts about the white line and
+ *                 the cubes; the colour sensor at the claw also reads the referee's colour card.
  *
  * The name of a palette is the id of its game (Game.id). To get the palette of a game:
  *
@@ -31,7 +34,7 @@
 import { GRIPPER_SHORTCUT, type CategoryId } from './catalog';
 
 /** The games that have a palette: the same words as Game.id. */
-export type PaletteId = 'fire-rescue' | 'fire-chief' | 'warehouse-sort';
+export type PaletteId = 'fire-rescue' | 'fire-chief' | 'warehouse-sort' | 'locker-room';
 
 /** The palette an editor gets when no game is named (and for a game that has no palette of its own). */
 export const DEFAULT_PALETTE: PaletteId = 'fire-rescue';
@@ -44,6 +47,7 @@ export const PALETTES: Record<PaletteId, readonly CategoryId[]> = {
   'fire-rescue': [...COMMON, 'servo', 'gripper', 'quadrgb', 'ultrasonic', 'colorsensor'],
   'fire-chief': [...COMMON, 'extensionport', 'quadrgb', 'ultrasonic', 'frontcolorsensor'],
   'warehouse-sort': [...COMMON, 'servo', 'gripper', 'quadrgb', 'ultrasonic', 'colorsensor'],
+  'locker-room': [...COMMON, 'servo', 'gripper', 'quadrgb', 'ultrasonic', 'colorsensor'],
 };
 
 /**
@@ -59,6 +63,12 @@ export const PALETTE_TOOLTIPS: Partial<Record<PaletteId, Readonly<Record<string,
     sensing_quadrgb_probe_detects: 'True when this probe is over the white line (or over the black mat).',
     gripper_claw: `Opens or closes the claw and waits until it has finished. Closing on a cube grabs it. ${GRIPPER_SHORTCUT}`,
     sensing_claw_object_detected: 'True when there is a cube in (or just in front of) the claw.',
+  },
+  // (the white lines and the cubes of Warehouse Sort; the referee's colour card is seen too)
+  'locker-room': {
+    sensing_quadrgb_probe_detects: 'True when this probe is over the white line (or over the black mat).',
+    gripper_claw: `Opens or closes the claw and waits until it has finished. Closing on a cube grabs it. ${GRIPPER_SHORTCUT}`,
+    sensing_claw_object_detected: "True when there is a cube or the referee's colour card in (or just in front of) the claw.",
   },
 };
 

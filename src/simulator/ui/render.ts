@@ -23,6 +23,7 @@ import {
   type FixedWall,
   type MatVector,
   type Pose,
+  type RefereeProp,
   type RobotConfig,
   type SensorSnapshot,
   type Simulation,
@@ -751,6 +752,97 @@ function drawRobot(ctx: CanvasRenderingContext2D, sim: StageSim, devicePerMm: nu
 }
 
 // =============================================================================================
+// What the referee holds, or has put on the robot (World.props)
+// =============================================================================================
+
+/**
+ * Where a referee's prop is on the mat, seen from above: its box. A prop that rides on the robot
+ * (frame 'robot': x ahead of the middle of the axle, y to its right) moves and turns with it - the
+ * same placement the engine's colour sensor uses (core/engine.ts propOnSight).
+ */
+export function propBox(prop: Pick<RefereeProp, 'frame' | 'x' | 'y' | 'angle' | 'w' | 'l'>, pose: Pose): OBB {
+  if (prop.frame === 'mat') return { x: prop.x, y: prop.y, w: prop.w, l: prop.l, angle: prop.angle };
+  const at = localToWorld(pose, prop.x, prop.y);
+  return { x: at.x, y: at.y, w: prop.w, l: prop.l, angle: pose.heading + prop.angle };
+}
+
+/** A prop that is thinner than this many screen pixels (the referee's card, seen from above: 2 mm) is drawn this thick, so that it can be seen. */
+export const PROP_MIN_PIXELS = 5;
+
+/**
+ * Draw what the referee holds or has put on the robot, over the robot (Locker Room: the Team Box
+ * on top of it, the colour card in front of it). A game whose referee has none (World.props left
+ * out) draws nothing here.
+ *
+ * Something on top of the robot is drawn see-through, so that the robot - its CyberPi and its
+ * LEDs - can still be seen under it. Each prop has its name written on it (the box) or beside it
+ * (a card is too thin for letters), always upright.
+ */
+function drawProps(ctx: CanvasRenderingContext2D, sim: StageSim, view: StageView, devicePerMm: number): void {
+  const props = sim.world.props;
+  if (!props || props.length === 0) return;
+  const pose = sim.world.robot.pose;
+  const minThickness = PROP_MIN_PIXELS / view.scale;
+  const fontSize = 11 / view.scale;
+  for (const prop of props) {
+    const box = propBox(prop, pose);
+    const thin = Math.min(box.w, box.l) < minThickness;
+    const w = Math.max(box.w, thin && box.w <= box.l ? minThickness : 0);
+    const l = Math.max(box.l, thin && box.l < box.w ? minThickness : 0);
+    const fill = parseHex(prop.fill);
+    ctx.save();
+    ctx.translate(box.x, box.y);
+    ctx.rotate(box.angle);
+    castShadow(ctx, prop.z + prop.h, devicePerMm);
+    // (a card drawn thicker than it is grows away from the robot: the face that the colour sensor reads stays where it is)
+    const near = box.l / 2;
+    roundRect(ctx, -w / 2, near - l, w, l, thin ? Math.min(w, l) / 2 : 6);
+    // (over the robot: see-through; held up in front of it: solid)
+    const onTop = prop.frame === 'robot' && prop.z > 0;
+    ctx.globalAlpha = onTop ? 0.72 : 1;
+    ctx.fillStyle = prop.fill;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    noShadow(ctx);
+    ctx.lineWidth = Math.max(1.6, 1.25 / view.scale);
+    ctx.strokeStyle = rgbCss(shade(fill, -0.45));
+    ctx.stroke();
+    ctx.rotate(-box.angle);
+    ctx.font = `700 ${fontSize}px ${FONT}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    if (thin) {
+      // beside a card: its name ("GREEN card") just clear of it - on the side away from the robot,
+      // or, where that is off the stage (the robot at the edge of the table), at one of its ends;
+      // where none of these fits (a small stage: the letters are large there), at its end on the
+      // robot's left, moved onto the stage
+      const text = `${prop.label} card`;
+      const half = { w: ctx.measureText(text).width / 2, h: fontSize / 2 };
+      const gap = 3 / view.scale;
+      const ahead = { x: Math.sin(box.angle), y: -Math.cos(box.angle) };
+      const side = { x: Math.cos(box.angle), y: Math.sin(box.angle) };
+      const extentAlong = (d: Vec2): number => Math.abs(d.x) * half.w + Math.abs(d.y) * half.h;
+      const places = [
+        { x: ahead.x * (l - near + gap + extentAlong(ahead)), y: ahead.y * (l - near + gap + extentAlong(ahead)) },
+        ...[-1, 1].map((k) => ({ x: k * side.x * (w / 2 + gap + extentAlong(side)), y: k * side.y * (w / 2 + gap + extentAlong(side)) })),
+      ];
+      const corner = viewToMat(view, 0, 0);
+      const stage = { left: corner.x + half.w, right: corner.x + view.cssWidth / view.scale - half.w, top: corner.y + half.h, bottom: corner.y + view.cssHeight / view.scale - half.h };
+      const onStage = (at: Vec2): boolean => box.x + at.x >= stage.left && box.x + at.x <= stage.right && box.y + at.y >= stage.top && box.y + at.y <= stage.bottom;
+      const moved = (at: Vec2): Vec2 => ({
+        x: Math.min(Math.max(box.x + at.x, stage.left), stage.right) - box.x,
+        y: Math.min(Math.max(box.y + at.y, stage.top), stage.bottom) - box.y,
+      });
+      const at = places.find(onStage) ?? moved(places[1]);
+      haloText(ctx, text, at.x, at.y, '#0f172a', 'rgba(255, 255, 255, 0.92)', 3 / view.scale);
+    } else {
+      haloText(ctx, prop.label, 0, 0, '#0f172a', 'rgba(255, 255, 255, 0.85)', 3 / view.scale);
+    }
+    ctx.restore();
+  }
+}
+
+// =============================================================================================
 // Sensor view
 // =============================================================================================
 
@@ -1082,6 +1174,20 @@ function drawZoneAreas(ctx: CanvasRenderingContext2D, overlays: ZoneOverlay[], v
   ctx.save();
   for (const zone of overlays) {
     const { x, y, w, h } = zone.rect;
+    if (zone.outline && zone.outline.length >= 3) {
+      // a zone of another shape (Locker Room: a rectangle turned by 45 degrees): its outline is the zone
+      polygon(ctx, [...zone.outline]);
+      ctx.globalAlpha = zone.kind === 'start' ? 0.1 : 0.3;
+      ctx.fillStyle = zone.color;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = 2 / view.scale;
+      ctx.strokeStyle = zone.color;
+      ctx.setLineDash(zone.kind === 'delivery' ? [6 / view.scale, 4 / view.scale] : []);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      continue;
+    }
     if (zone.shape === 'ellipse') {
       // a round zone (the finish pads of Warehouse Sort): the ellipse that fills its box
       ctx.beginPath();
@@ -1387,6 +1493,8 @@ export function drawStage(ctx: CanvasRenderingContext2D, scene: StageScene): voi
     }
   }
   drawRobot(ctx, sim, devicePerMm);
+  // (only a game whose referee holds something has World.props: every other game draws nothing more here)
+  drawProps(ctx, sim, view, devicePerMm);
   drawFanAir(ctx, sim, view);
   if (sensors) drawColourSight(ctx, sim, sensors, view);
   if (sensors) drawProbes(ctx, sim, sensors);
