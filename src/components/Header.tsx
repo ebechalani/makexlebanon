@@ -60,12 +60,22 @@ export function Header() {
                   </Link>
 
                   {item.children ? (
-                    <div className="invisible absolute left-0 top-full w-56 pt-2 opacity-0 transition-opacity group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100">
+                    <div
+                      className={`invisible absolute left-0 top-full pt-2 opacity-0 transition-opacity group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100 ${
+                        // (max-w-sm: a long line wraps instead of running off the window at 1024 px)
+                        item.childrenOnOneLine ? 'w-max min-w-56 max-w-sm' : 'w-56'
+                      }`}
+                    >
                       <ul className="overflow-hidden rounded-lg bg-white py-1.5 shadow-xl ring-1 ring-black/5">
                         {item.children.map((child) => (
                           <li key={child.href}>
                             <Link
                               href={child.href}
+                              // The page changes without a reload, so the clicked line would keep the
+                              // focus and the list (shown on focus-within) would stay open over the
+                              // new page, on top of a game's Start button. Letting go of the focus
+                              // closes it as soon as the mouse leaves.
+                              onClick={(event) => event.currentTarget.blur()}
                               className="block px-4 py-2 text-sm text-ink-700 hover:bg-brand-50 hover:text-brand-700"
                             >
                               {child.label}
