@@ -54,7 +54,7 @@ export const DRAW_TIE_BREAK: BatchTieBreak = {
   hint: 'The time on the clock when the last step with a time was done (Steps 1, 2, 3, 5, 6; the tokens count at the end). The rules do not say how equal points are ranked: here runs with equal points keep their order.',
   timeOf: lastStepTime,
   none: 'no step done',
-  // (the tokens count at the end: "Best run 75 at 0:28.0" would read as if the 75 were reached then)
+  // (the tokens count at the end: "Best run 85 at 0:28.0" would read as if the 85 were reached then)
   tileWords: 'last step at',
   compare: compareDrawRuns,
 };

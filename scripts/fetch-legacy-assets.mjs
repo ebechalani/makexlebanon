@@ -28,10 +28,9 @@ const ASSETS = [
     'downloads/capelli-smartlogistics-rules-v3.0.docx',
     `${BLOB}/7a6d6c52-5593-4663-9a8c-b77e287177ae/02_SmartLogistics_Rules.docx`,
   ],
-  [
-    'downloads/capelli-starter-locker-room-rules-v2.3.pdf',
-    `${BLOB}/b4509345-411c-4d9e-9a90-85f433d23c37/Capelli%20Sport%20Cup%20-%20Starter%20Locker%20room%20Rules%20.pdf`,
-  ],
+  // (No Locker Room rules here: the old site's v2.3 was replaced by the organiser's newer rules,
+  // capelli-starter-locker-room-rules.pdf, and its address redirects to them. Fetching v2.3 again
+  // would only put the old file back - README, "Rules, scoresheets and other downloads".)
   [
     'downloads/capelli-sport-soccer-rules-v2.3.pdf',
     `${BLOB}/515c62e6-31bd-44fd-9c57-83b6f2127ceb/Capelli%20Sport%20soccer%20rules%20v2.3.pdf`,

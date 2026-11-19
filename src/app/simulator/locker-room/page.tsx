@@ -10,8 +10,8 @@ const DESCRIPTION =
   'Build a program with mBlock-style blocks and watch a Makeblock mBot2 play the Capelli “Locker Room” ' +
   'mission of MakeX Lebanon Season 2026 (ages 13–15): carry the Team Box to the Scan Station, scan the ' +
   'team colour, bring the cube of that colour to its big circle to open the stadium gate, then sort the ' +
-  'three tokens in the maze — with any draw of the two cards, scored by the organiser’s newest rules. ' +
-  'Free, in the browser.';
+  'three tokens into their warehouses — with any draw of the two cards, scored by the organiser’s newest rules ' +
+  '(the rules file on this website). Free, in the browser.';
 
 /**
  * The site's share card (src/app/opengraph-image.tsx). A page that sets its own `openGraph`

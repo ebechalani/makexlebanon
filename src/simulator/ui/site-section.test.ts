@@ -484,6 +484,19 @@ test('a page opened from a link of a scrolled page starts at its top, not under 
   if (smooth) assert.match(html, /\sdata-scroll-behavior="smooth"/);
 });
 
+test('home page on a phone: a champion\'s card keeps to its column, so the page does not scroll sideways', () => {
+  // "Season 2026 champions" is a grid of cards, one column on a phone. A grid item is as wide as its content wants
+  // unless it has min-w-0: a card with a long name on one line wanted 448 px on a 390 px screen, and the whole page
+  // scrolled sideways (measured in Chromium: scrollWidth 468). With min-w-0 the card keeps to its column, and the
+  // long line is cut with "..." as its `truncate` means it to be.
+  const page = readFileSync(fromRoot('src/app/page.tsx'), 'utf8');
+  const list = /<ul className="[^"]*\bgrid\b[^"]*">\s*\{champions\.map\(\(champion\) => \([\s\S]*?<\/ul>/.exec(page)?.[0] ?? '';
+  assert.ok(list, 'the list of the champions');
+  assert.match(list, /<li key=\{champion\.key \+ champion\.name\} className="(?:[^"]* )?min-w-0(?: [^"]*)?">/);
+  // (the lines that can be long are cut, inside a text column that may shrink too)
+  assert.match(list, /<span className="min-w-0">\s*<span className="block truncate [^"]*">\s*\{champion\.name\}/);
+});
+
 test('no source file names an old address, except the redirects (next.config.mjs), this test and the README note on the redirects', () => {
   const thisFile = path.relative(REPO_ROOT, fileURLToPath(import.meta.url));
   const TEXT = /\.(?:[cm]?[jt]sx?|json|css|html?|svg|txt|xml|md)$/;

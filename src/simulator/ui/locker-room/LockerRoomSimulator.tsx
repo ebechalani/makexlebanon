@@ -14,7 +14,8 @@
  *
  * What the stage shows beyond the other games comes from the simulation itself: the Team Box on
  * the robot and the referee's colour card (World.props), the stadium gate (World.walls, gone once
- * it opens) and the turned pickup zones (ZoneOverlay.outline) - see ../render.ts.
+ * it opens) and the two turned warehouses, the RED and the GREEN target (ZoneOverlay.outline) -
+ * see ../render.ts.
  */
 import type { ReactNode } from 'react';
 import { TABLE_STRIP } from '../../locker-room/field';
@@ -26,7 +27,7 @@ import type { ExamplesConfig } from '../useMemberExamples';
 import { DRAW_BATCH_PRESETS, DRAW_TIE_BREAK, drawSummaryLabel } from './cards-batch';
 import { readCardsCode } from './cards-code';
 import { CardsEditor } from './CardsEditor';
-import { LOCKER_ROOM_ASSUMPTIONS, LOCKER_ROOM_RULES, LOCKER_ROOM_RULES_NOTE } from './rules';
+import { LOCKER_ROOM_ASSUMPTIONS, LOCKER_ROOM_RULES, LOCKER_ROOM_RULES_LINK, LOCKER_ROOM_RULES_NOTE } from './rules';
 import { LOCKER_ROOM_START_ZONE, LOCKER_ROOM_WORDS } from './words';
 
 function renderCombinationEditor(scenario: LockerRoomScenario, onChange: (next: LockerRoomScenario) => void): ReactNode {
@@ -53,6 +54,8 @@ export default function LockerRoomSimulator() {
       examples={EXAMPLES}
       rules={LOCKER_ROOM_RULES}
       rulesNote={LOCKER_ROOM_RULES_NOTE}
+      // the note says the rules can be downloaded on this website: the link goes to the page that has the file
+      rulesNoteLink={LOCKER_ROOM_RULES_LINK}
       // what is not a rule but an assumption of the simulator has its own part of the window
       rulesExtra={LOCKER_ROOM_ASSUMPTIONS}
       words={LOCKER_ROOM_WORDS}
@@ -60,7 +63,7 @@ export default function LockerRoomSimulator() {
       initialStartPose={START_POSE}
       // the starter examples show what they read ("Team: green"): the closed CyberPi panel shows the last line
       showLastPrint
-      // the rules have no restarts (anyone touching the robot after GO voids the run): no Restart button
+      // the rules name no restart (they only void a run when anyone but the referee touches the robot after GO): no Restart button
       restartButton={false}
       renderCombinationEditor={renderCombinationEditor}
       // a code that is no draw ("G7", "Y2") gets a plain sentence (./cards-code.ts)

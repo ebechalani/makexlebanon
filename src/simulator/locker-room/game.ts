@@ -22,27 +22,33 @@
  *        the team colour in the other circle, or the cube of the other colour in either circle)
  *   +5   Step 6, the stadium gate bonus, with a correct Step 5; the gate opens then
  *   -10  touching the closed gate (once per match)
- *   +10 / +5 / -10  Step 7, each token at the end: completely inside the target of its colour,
- *        partly inside it, or (otherwise, not on its own target at all) at least partly inside a
- *        target of another colour
+ *   +10 / +5 / -10  Step 7, each token at the end: completely inside the target of its colour
+ *        (its "warehouse" at the top), partly inside it, or (otherwise, not on its own target at
+ *        all) at least partly inside a target of another colour
  *   The total is never below 0. Highest score: 5 + 10 + 15 + 20 + 5 + 3 x 10 = 85.
  *
  * A match lasts 150 s. It ends then, or when the program has ended and the robot stands still (as
- * in Warehouse Sort); then the field is judged as it lies. There are no restarts (the rules have
- * none: touching the robot after GO voids the run).
+ * in Warehouse Sort); then the field is judged as it lies. The simulator has no restarts: the
+ * rules never name one - they only void a run when anyone but the referee touches the robot after
+ * GO (README, question 19).
  *
  * Plain TypeScript only (no DOM, no React), so it also runs headless under Node.
  *
  * =====================================================================================
  *  WHERE THE RULES ARE OPEN - what the simulator does, and the constant behind it
  * =====================================================================================
- *   L1. Which marks are pickup zones and which are targets: the rules v2.3 say both "RED pickup
- *       zone (top-left)" and "the cube located in the center zone on the matching RED or GREEN
- *       square". The simulator: team cubes on the two turned rectangles at the top, tokens to the
- *       small squares and the blue disc in the maze. ONE table: MARK_ROLES (./field.ts). With the
- *       published 50 mm cube, a token can never be COMPLETELY inside a 41.9 mm square: the red and
- *       the green token can only earn +5, and their line of the sheet counts +5 as done (it says
- *       why), so that the best a robot can do here is "complete".    cubeFitsInside()
+ *   L1. Which marks are pickup zones and which are targets - DECIDED by the organiser ("the
+ *       warehouses are on the top of the map"): the team cubes start on the two small squares in
+ *       the maze, the tokens go to the three rectangles at the top; the blue disc has no role.
+ *       ONE table: MARK_ROLES (./field.ts), with the evidence. The 50 mm cube fits completely into
+ *       each of these 104.76 x 62.86 mm rectangles - into the two turned ones only when it is
+ *       turned with them: standing straight, a cube of at most 44.4 mm (62.86 / sqrt 2) would fit,
+ *       and centred it may be turned up to 17.7 degrees off (turnRoom(); the same in the BLUE one,
+ *       which is not turned). onMark() is exact: "completely" = every corner of the cube inside
+ *       the rectangle, "partly" = the separating-axis test. On a target too small for a whole cube
+ *       (none with this table; a 41.9 mm square would be) the line counts "partly inside" as done
+ *       and says why, so that the best run is always "complete".
+ *                                                 cubeFitsInside(), cubeFitsTurned(), turnRoom()
  *   L2. "Drives out of the locker room": the WHOLE robot outside it (frame included).  isOutside()
  *   L3. Step 3: when does the referee show the card, take it away, lift the box? 0.5 s, 2.5 s and
  *       4.0 s after the robot came to rest (no wheel turning) completely inside the Scan Station
@@ -60,21 +66,23 @@
  *       say only "Wrong color circle: -10": the cube of the other colour in ITS OWN circle is a
  *       wrong delivery here too. (Two team cubes delivered on the same tick: the cube of the team
  *       colour is looked at first.)                                         watchTeamCubes()
- *   L6. A token in a big circle, and a team cube on a maze target, count for nothing.
+ *   L6. A token in a big circle, and a team cube in a target (a warehouse), count for nothing.
  *   L7. Gate penalty: once per match, however often the robot touches the closed gate; a cube
  *       pushed against the gate is not the robot touching it.            GATE_TOUCH_PENALTY
  *   L8. Step 7: "partly inside" a target of another colour counts as a wrong delivery (-10), like
- *       completely inside - unless the token is also partly on its own target (+5): the red square
- *       and the blue disc are only 19.6 mm apart; a token that is held, lifted or touching the
- *       robot at the end is not judged (0).                                        judgeToken()
+ *       completely inside - unless the token is also partly on its own target (+5). (The three
+ *       warehouses lie more than 36 cm apart, so no token touches two of them; the rule is kept
+ *       for any table of MARK_ROLES: the earlier one had the red square 19.6 mm from the disc.) A
+ *       token that is held, lifted or touching the robot at the end is not judged (0). judgeToken()
  *   L9. The total is never below 0 (as in the other games).
  *   L10. Gate, Team Box and card sizes, the cube's weight: ./field.ts (GATE_HEIGHT, TEAM_BOX, CARD,
  *       CUBE_MASS).
- *   L11. The closed gate and the maze: the tokens are judged whether the gate is open or not, and
- *       the closed gate is only a block on the floor that the robot can drive around (the maze has
- *       no walls). The rules' story sorts the tokens "once the gate is open"; the rules v2.3 say
- *       "Only then may the robot enter the maze area." The latest rules give no penalty and no
- *       condition on the gate in Step 7, so the simulator adds none.             score()
+ *   L11. The closed gate: the tokens are judged whether the gate is open or not, and the closed
+ *       gate is only a block on the floor that the robot can drive around (the maze has no walls).
+ *       The rules' story sorts the tokens "once the gate is open"; the latest rules give no
+ *       penalty and no condition on the gate in Step 7, so the simulator adds none. (The rules v2.3
+ *       let the robot into the maze only after a correct delivery - with the decided layout the
+ *       team cubes stand in the maze, so a robot goes in before the gate can open.)    score()
  *
  * Not simulated: a voided run (score 0), field damage, the two runs of the ranking (the best of
  * two counts). The CyberPi buttons work during a match, so a program that reads them can be
@@ -106,6 +114,7 @@ import {
   MAT_SENSOR_IMAGE_URL,
   MAT_SIZE,
   MAT_VECTOR,
+  ROLE_WORD,
   SCAN_STATION,
   TEAM_BOX,
   TEAM_COLORS,
@@ -195,14 +204,14 @@ export const GATE_ID = 'wall:gate';
 export const CUBE_FILL: Record<MarkColor, string> = { red: '#ef4044', green: '#40ad49', blue: '#00aeef' };
 export const CUBE_LETTER: Record<MarkColor, string> = { red: 'R', green: 'G', blue: 'B' };
 
-/** The middle of a mark (where a cube stands on it) and how a cube stands on it (turned with it). */
+/** The middle of a mark (where a cube stands on it) and how a cube stands on it: turned with it (a square or a disc: straight). */
 function markPlace(mark: Mark): { x: number; y: number; angle: number } {
   if (mark.circle) return { x: mark.circle.cx, y: mark.circle.cy, angle: 0 };
   const box = mark.box as OBB;
   return { x: box.x, y: box.y, angle: box.angle };
 }
 
-/** Where the team cube of a colour stands at the start: in the middle of its pickup zone, turned with it (MARK_ROLES). */
+/** Where the team cube of a colour stands at the start: in the middle of its pickup zone, turned like it (MARK_ROLES; a square: straight). */
 export function teamCubeHome(color: TeamColor): { x: number; y: number; angle: number } {
   return markPlace(pickupZone(color));
 }
@@ -274,7 +283,7 @@ function createWalls(): FixedWall[] {
 
 const COLOR_CSS: Record<MarkColor, string> = { red: '#dc2626', green: '#16a34a', blue: '#0284c7' };
 const WORD: Record<MarkColor, string> = { red: 'RED', green: 'GREEN', blue: 'BLUE' };
-/** a colour at the start of a zone's name: "Red pickup zone" */
+/** a colour at the start of a zone's name: "Red pickup zone", "Red warehouse" */
 const NAME: Record<MarkColor, string> = { red: 'Red', green: 'Green', blue: 'Blue' };
 
 function boxAround(points: readonly Vec2[]): Rect {
@@ -287,7 +296,7 @@ function boxAround(points: readonly Vec2[]): Rect {
 
 const circleBox = (c: Circle): Rect => ({ x: c.cx - c.r, y: c.cy - c.r, w: 2 * c.r, h: 2 * c.r });
 
-/** A mark as a zone of the screen: a circle as an ellipse, a turned rectangle by its outline. */
+/** A mark as a zone of the screen: a circle as an ellipse, a turned rectangle by its outline (with the decided table: the RED and the GREEN warehouse). */
 function markOverlay(mark: Mark, id: string, label: string, kind: ZoneOverlay['kind']): ZoneOverlay {
   const color = COLOR_CSS[mark.color];
   if (mark.circle) return { id, label, rect: circleBox(mark.circle), color, kind, shape: 'ellipse' };
@@ -303,14 +312,14 @@ function overlays(s: LockerRoomScenario): ZoneOverlay[] {
   ];
   for (const color of TEAM_COLORS) {
     const yours = color === s.team ? ' (your team)' : '';
-    out.push(markOverlay(pickupZone(color), `pickup:${color}`, `${NAME[color]} pickup zone${yours}`, 'pickup'));
+    out.push(markOverlay(pickupZone(color), `pickup:${color}`, `${NAME[color]} ${ROLE_WORD.pickup}${yours}`, 'pickup'));
     out.push({ id: `circle:${color}`, label: `${NAME[color]} circle${yours}`, rect: circleBox(BIG_CIRCLES[color]), color: COLOR_CSS[color], kind: 'delivery', shape: 'ellipse' });
   }
   const tokens = tokensOf(s);
   for (const zone of ZONE_IDS) {
     out.push({ id: `zone:${zone}`, label: `Zone ${zone}: ${WORD[tokens[zone]]}`, rect: ZONES[zone], color: COLOR_CSS[tokens[zone]], kind: 'pickup' });
   }
-  for (const color of TOKEN_COLORS) out.push(markOverlay(targetOf(color), `target:${color}`, `${NAME[color]} target`, 'delivery'));
+  for (const color of TOKEN_COLORS) out.push(markOverlay(targetOf(color), `target:${color}`, `${NAME[color]} ${ROLE_WORD.target}`, 'delivery'));
   out.push({ id: 'gate', label: 'Stadium gate', rect: GATE_MARK, color: '#facc15', kind: 'info' });
   return out;
 }
@@ -382,13 +391,46 @@ export function onMark(fp: OBB, mark: Mark): 'full' | 'part' | null {
 }
 
 /**
- * Can a cube stand COMPLETELY inside this mark? A square or rectangle must be at least as wide as
- * the cube; a disc must hold the cube however it is turned (its corners on the circle).
+ * Can a cube stand COMPLETELY inside this mark at all? A square or rectangle must be at least as
+ * wide as the cube (the cube turned with it, if it is turned); a disc must hold the cube however
+ * it is turned (its corners on the circle). With the decided marks every target holds a cube.
  */
 export function cubeFitsInside(mark: Mark, cube = CUBE_SIZE): boolean {
   if (mark.circle) return mark.circle.r >= (cube * Math.SQRT2) / 2;
   const box = mark.box;
   return box !== undefined && Math.min(box.w, box.l) >= cube;
+}
+
+/**
+ * Can a cube that stands turned by `angle` be COMPLETELY inside this mark, at the best place? Seen
+ * along the rectangle's sides, a square turned by t off them is cube x (|cos t| + |sin t|) wide on
+ * both: that must fit the shorter side. So a 50 mm cube fits the turned 104.76 x 62.86 mm
+ * warehouses only within 17.7 degrees of their turn, and a straight cube there would have to be
+ * 44.4 mm or less. (A disc does not care how the cube is turned.)
+ */
+export function cubeFitsTurned(mark: Mark, angle: number, cube = CUBE_SIZE): boolean {
+  if (mark.circle) return cubeFitsInside(mark, cube);
+  const box = mark.box;
+  if (box === undefined) return false;
+  const t = angle - box.angle;
+  return cube * (Math.abs(Math.cos(t)) + Math.abs(Math.sin(t))) <= Math.min(box.w, box.l) + 1e-6;
+}
+
+/**
+ * How far (radians) a cube may be turned off the sides of a mark and still stand COMPLETELY inside
+ * it, at the best place (in the middle across the shorter side): the largest t for which
+ * cubeFitsTurned() says yes, cube x (cos t + sin t) = the shorter side. For the 50 mm cube in the
+ * 62.86 mm wide warehouses that is 17.74 degrees - so "turned the same way" is too strict a word for
+ * what the referee asks, and the Rules window says "almost", with this number. A quarter of a turn
+ * (any turn, for a square) when the mark holds the cube's diagonal, or is a disc that holds the
+ * cube; 0 for a mark that holds no whole cube.
+ */
+export function turnRoom(mark: Mark, cube = CUBE_SIZE): number {
+  if (!cubeFitsInside(mark, cube)) return 0;
+  if (mark.circle) return Math.PI / 4;
+  const shorter = Math.min((mark.box as OBB).w, (mark.box as OBB).l);
+  // (cos t + sin t = sqrt 2 x sin(t + 45 degrees))
+  return Math.asin(Math.min(1, shorter / (cube * Math.SQRT2))) - Math.PI / 4;
 }
 
 /** The cube is held by the gripper. */
@@ -474,6 +516,8 @@ export function clock(seconds: number): string {
 const teamCubeName = (color: TeamColor): string => `the ${WORD[color]} team cube`;
 const circleName = (color: TeamColor): string => `the ${WORD[color]} circle`;
 const tokenName = (color: TokenColor): string => `the ${WORD[color]} token`;
+/** "the RED warehouse at the top left": the target of a token colour, by its role and its place (MARK_ROLES). */
+export const targetName = (color: TokenColor): string => `the ${WORD[color]} ${ROLE_WORD.target} ${targetOf(color).place}`;
 
 // =============================================================================================
 // The referee
@@ -811,36 +855,38 @@ function createReferee(scenario: LockerRoomScenario): Referee<LockerRoomScenario
       const j: TokenJudgement = token ? judgeToken(token, ctx) : { result: 'none', target: null, why: 'no-target' };
       let points = 0;
       let detail: string;
+      const target = targetOf(color);
       switch (j.result) {
         case 'full':
           points = POINTS_TOKEN;
-          detail = `completely inside ${targetOf(color).name}`;
+          detail = `completely inside ${targetName(color)}`;
           break;
         case 'part':
           points = POINTS_TOKEN_PARTLY;
-          detail = cubeFitsInside(targetOf(color))
-            ? `only partly inside ${targetOf(color).name}: half points`
-            : `partly inside ${targetOf(color).name}: ${POINTS_TOKEN_PARTLY} points, the most here (a cube is bigger than this target)`;
+          // (why only half: the target cannot hold a whole cube at all, or not one turned like this one)
+          if (!cubeFitsInside(target)) detail = `partly inside ${targetName(color)}: ${POINTS_TOKEN_PARTLY} points, the most here (a cube is bigger than this target)`;
+          else if (token && !cubeFitsTurned(target, token.angle, token.w)) detail = `only partly inside ${targetName(color)}: half points - turned like this, it cannot be completely inside`;
+          else detail = `only partly inside ${targetName(color)}: half points`;
           break;
         case 'wrong':
           points = -WRONG_TOKEN_PENALTY;
-          detail = `in ${targetOf(j.target as TokenColor).name} - wrong target, -${WRONG_TOKEN_PENALTY}`;
+          detail = `in ${targetName(j.target as TokenColor)} - wrong ${ROLE_WORD.target}, -${WRONG_TOKEN_PENALTY}`;
           break;
         default:
           if (!token) detail = 'this token is not on the field';
-          else if (j.why === 'held') detail = `the robot ${over ? 'still held' : 'is holding'} it - put it down in ${targetOf(color).name}`;
-          else if (j.why === 'lifted') detail = `not standing on the mat - put it down in ${targetOf(color).name}`;
+          else if (j.why === 'held') detail = `the robot ${over ? 'still held' : 'is holding'} it - put it down in ${targetName(color)}`;
+          else if (j.why === 'lifted') detail = `not standing on the mat - put it down in ${targetName(color)}`;
           else if (j.why === 'touching') detail = `touching the robot${over ? '' : ' - move away'}`;
-          else detail = over ? 'not in a target' : `not yet - put it in ${targetOf(color).name}`;
+          else detail = over ? `not in a ${ROLE_WORD.target}` : `not yet - put it in ${targetName(color)}`;
       }
       lines.push({
         id: tokenLineId(color),
         label: `Step 7: ${tokenName(color)} (zone ${zone})`,
         points,
         max: POINTS_TOKEN,
-        // (done: completely inside - or, on a target too small for a whole cube (L1), partly
-        // inside, the most a robot can do there; it follows MARK_ROLES)
-        ok: j.result === 'full' || (j.result === 'part' && !cubeFitsInside(targetOf(color))),
+        // (done: completely inside - or, only on a target too small for a whole cube (L1; none
+        // with the decided table), partly inside, the most a robot can do there)
+        ok: j.result === 'full' || (j.result === 'part' && !cubeFitsInside(target)),
         detail,
       });
     }
@@ -917,7 +963,8 @@ export const lockerRoomGame: Game<LockerRoomScenario> = {
   robotConfig: LOCKER_ROOM_ROBOT,
   createWalls,
   createReferee,
-  // RULE: no restarts - "anyone touching the robot after GO voids the run"
+  // no restarts here. The rules never name one: they only void a run when "anyone except the
+  // referee touches the robot or the field after GO" (README, question 19)
   restartRules: { maxRestarts: 0 },
   scenarioProblems,
 };

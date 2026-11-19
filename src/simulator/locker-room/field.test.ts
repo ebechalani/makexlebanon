@@ -5,6 +5,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { TABLE_MARGIN } from '../core/engine';
 import { classifyColor, lightOf, makeProbeReading } from '../core/engine-sensors';
 import { obbCorners, rectContainsOBB, type OBB, type Rect } from '../core/geometry';
@@ -61,6 +62,9 @@ import {
   ZONE_IDS,
   frameSides,
   gateDashes,
+  MARK_IDS,
+  ROLE_WORD,
+  marksWithoutRole,
   pickupZone,
   targetOf,
   type MarkId,
@@ -342,27 +346,51 @@ test('field: the gate\'s dotted line has a dash on every corner: 8 on the short 
 });
 
 // =============================================================================================
-// The one table of the roles of the marks (the first question for the organiser)
+// The one table of the roles of the marks (decided by the organiser)
 // =============================================================================================
 
-test('the marks: the team cubes start on the two turned rectangles at the top, the tokens go to the squares and the disc in the maze', () => {
+test('the marks (decided by the organiser): the team cubes start on the squares in the maze, the tokens go to the warehouses at the top', () => {
   assert.deepEqual(MARK_ROLES, {
-    pickup: { red: 'redDiamond', green: 'greenDiamond' },
-    target: { red: 'redSquare', green: 'greenSquare', blue: 'blueDisc' },
+    pickup: { red: 'redSquare', green: 'greenSquare' },
+    target: { red: 'redDiamond', green: 'greenDiamond', blue: 'cyanRect' },
   });
-  // every role is a mark of its own colour, and no mark has two roles
+  assert.deepEqual(ROLE_WORD, { pickup: 'pickup zone', target: 'warehouse' });
+  // every role is a mark of its own colour, no mark has two roles, and the blue disc has none
   for (const color of ['red', 'green'] as const) assert.equal(pickupZone(color).color, color);
   for (const color of ['red', 'green', 'blue'] as const) assert.equal(targetOf(color).color, color);
   const used = [...Object.values(MARK_ROLES.pickup), ...Object.values(MARK_ROLES.target)];
   assert.equal(new Set(used).size, used.length);
-  // the red pickup zone is at the top left, the green one at the top right (rules v2.3 match procedure)
-  assert.ok((pickupZone('red').box as OBB).x < MAT_SIZE / 2 && (pickupZone('red').box as OBB).y < 200);
-  assert.ok((pickupZone('green').box as OBB).x > MAT_SIZE / 2 && (pickupZone('green').box as OBB).y < 200);
-  // the maze targets are inside the maze
+  assert.deepEqual(marksWithoutRole().map((mark) => mark.id), ['blueDisc']);
+  assert.deepEqual([...MARK_IDS].sort(), Object.keys(MARKS).sort());
+  // the pickup zones are "the squares in center": inside the maze, the red one above its middle, the green one below
   const maze = { x: WHITE_LINES.mazeLeft.x, y: WHITE_LINES.mazeTop.y, w: WHITE_LINES.mazeRight.x + WHITE_LINES.mazeRight.w - WHITE_LINES.mazeLeft.x, h: WHITE_LINES.mazeBottom.y + WHITE_LINES.mazeBottom.h - WHITE_LINES.mazeTop.y };
-  for (const color of ['red', 'green'] as const) assert.ok(rectContainsOBB(maze, targetOf(color).box as OBB), color);
-  const disc = targetOf('blue').circle!;
-  assert.ok(disc.cx - disc.r > maze.x && disc.cx + disc.r < maze.x + maze.w);
+  for (const color of ['red', 'green'] as const) assert.ok(rectContainsOBB(maze, pickupZone(color).box as OBB), color);
+  const middle = maze.y + maze.h / 2;
+  assert.ok((pickupZone('red').box as OBB).y < middle && (pickupZone('green').box as OBB).y > middle);
+  // ... one above the other, with the blue disc between them: the three share one column of the mat
+  const [red, green, disc] = [pickupZone('red').box as OBB, pickupZone('green').box as OBB, MARKS.blueDisc.circle!];
+  assert.ok(red.y < disc.cy && disc.cy < green.y);
+  assert.ok(Math.abs(red.x - disc.cx) < red.w / 2 && Math.abs(green.x - disc.cx) < green.w / 2 && red.x === green.x);
+  // The little drawing at the top of field.ts is what the next engineer looks at first: it must show them so too
+  // ([r] above o, [g] below it, in one column). It once drew the three side by side.
+  const drawing = readFileSync(new URL('./field.ts', import.meta.url), 'utf8')
+    .split('\n')
+    .filter((line) => /^ \*     [+|]/.test(line))
+    .map((line) => line.slice(7, 36)); // (the drawing alone: what follows on a line is its legend)
+  assert.equal(drawing.length, 12, 'the drawing of the mat in the comment at the top of field.ts');
+  const where = (mark: string): { row: number; column: number } => {
+    const rows = drawing.flatMap((line, row) => (line.includes(mark) ? [{ row, column: line.indexOf(mark) + (mark.length - 1) / 2 }] : []));
+    assert.equal(rows.length, 1, `"${mark}" is drawn once`);
+    return rows[0];
+  };
+  const [r, o, g] = [where('[r]'), where(' o '), where('[g]')];
+  assert.ok(r.row < o.row && o.row < g.row, 'the drawing: [r] above the disc, [g] below it');
+  assert.deepEqual([r.column, g.column], [o.column, o.column], 'the drawing: in one column');
+  // "the warehouses are on the top of the map": red at the top left, blue in the middle, green at the top right
+  for (const color of ['red', 'green', 'blue'] as const) assert.ok((targetOf(color).box as OBB).y < WHITE_LINES.treeTopT.y, color);
+  assert.ok((targetOf('red').box as OBB).x < (targetOf('blue').box as OBB).x && (targetOf('blue').box as OBB).x < (targetOf('green').box as OBB).x);
+  near((targetOf('blue').box as OBB).x, MAT_SIZE / 2, 5, 'the BLUE one in the middle (3.7 mm right of it)');
+  assert.deepEqual(['red', 'green', 'blue'].map((color) => targetOf(color as 'red').place), ['at the top left', 'at the top right', 'at the top in the middle']);
 });
 
 // =============================================================================================
@@ -379,14 +407,24 @@ test('cubes: the published "Inspire + Starter cube" - 50 x 50 mm, 70 mm high, li
   assert.ok(g.clawOpenGap > CUBE_SIZE && g.clawClosedGap < CUBE_SIZE);
   assert.ok(LOCKER_ROOM_ROBOT.ultrasonic.height < CUBE_HEIGHT, 'the ultrasonic sensor sees a cube');
   assert.ok(g.liftUpHeight > CUBE_HEIGHT, 'the raised claw passes over a cube');
-  // a cube fits completely into a turned rectangle at the top (turned with it) and into the blue disc ...
+  // a cube fits completely into each warehouse at the top (into a turned one turned with it) ...
   const square = (x: number, y: number, angle = 0): OBB => ({ x, y, w: CUBE_SIZE, l: CUBE_SIZE, angle });
-  const diamond = MARKS.redDiamond.box as OBB;
-  assert.ok(Math.min(diamond.w, diamond.l) > CUBE_SIZE);
-  const disc = MARKS.blueDisc.circle!;
-  assert.ok(obbCorners(square(disc.cx, disc.cy)).every((p) => Math.hypot(p.x - disc.cx, p.y - disc.cy) <= disc.r));
-  // ... but NEVER completely into a 41.9 mm square in the maze (question 1 for the organiser)
+  for (const color of ['red', 'green', 'blue'] as const) {
+    const box = targetOf(color).box as OBB;
+    assert.ok(Math.min(box.w, box.l) > CUBE_SIZE, color);
+    const inside = (p: { x: number; y: number }) => {
+      const dx = p.x - box.x;
+      const dy = p.y - box.y;
+      return Math.abs(dx * Math.sin(box.angle) - dy * Math.cos(box.angle)) <= box.l / 2 && Math.abs(dx * Math.cos(box.angle) + dy * Math.sin(box.angle)) <= box.w / 2;
+    };
+    assert.ok(obbCorners(square(box.x, box.y, box.angle)).every(inside), `${color}: turned with it`);
+    // (standing straight, it fits only the light-blue one, which is not turned)
+    assert.equal(obbCorners(square(box.x, box.y, 0)).every(inside), box.angle === 0, `${color}: straight`);
+  }
+  // ... but a team cube is bigger than its 41.9 mm pickup square (it stands over its edges: the rules do not mind)
   for (const id of ['redSquare', 'greenSquare'] as const) assert.ok((MARKS[id].box as OBB).w < CUBE_SIZE, id);
+  const disc = MARKS.blueDisc.circle!;
+  assert.ok(obbCorners(square(disc.cx, disc.cy)).every((p) => Math.hypot(p.x - disc.cx, p.y - disc.cy) <= disc.r), 'the disc would hold one too');
   // and it covers a zone picture nearly (56 x 58 mm)
   for (const zone of ZONE_IDS) assert.ok(ZONES[zone].w > CUBE_SIZE && ZONES[zone].h > CUBE_SIZE);
 });
