@@ -83,8 +83,9 @@
  *       printed white lines: the three short lines that join the long line to the maze, one at
  *       the height of each zone, and the cross line of the "tree" at the top. On the road the
  *       robot always faces up; "robot y" says where it is (cm from the top edge).
- *       The two-tokens example finds its place with "forward to a white line" (the line next to
- *       zone A); the whole mission knows it from the white line of its team cube's way. The
+ *       The two-tokens example learns how far up the road it is with "forward to a white line"
+ *       (the line next to zone A); the whole mission knows it from the white line of its team
+ *       cube's way. (Only how far up: "WHAT A WHITE-LINE STOP MAKES UP FOR" below.) The
  *       numbers that follow such a stop (LINE_A_Y_CM, RED_WAY.up, GREEN_TO_ROAD.y, RED_TO_ROAD.y)
  *       and the zone heights have two decimals: they are measured, so that the claw closes within
  *       0.75 mm of the middle of every cube, on the drawing and on the picture of the mat, for a

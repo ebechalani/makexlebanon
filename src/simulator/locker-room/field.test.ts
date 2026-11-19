@@ -5,6 +5,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { TABLE_MARGIN } from '../core/engine';
 import { classifyColor, lightOf, makeProbeReading } from '../core/engine-sensors';
 import { obbCorners, rectContainsOBB, type OBB, type Rect } from '../core/geometry';
@@ -366,6 +367,25 @@ test('the marks (decided by the organiser): the team cubes start on the squares 
   for (const color of ['red', 'green'] as const) assert.ok(rectContainsOBB(maze, pickupZone(color).box as OBB), color);
   const middle = maze.y + maze.h / 2;
   assert.ok((pickupZone('red').box as OBB).y < middle && (pickupZone('green').box as OBB).y > middle);
+  // ... one above the other, with the blue disc between them: the three share one column of the mat
+  const [red, green, disc] = [pickupZone('red').box as OBB, pickupZone('green').box as OBB, MARKS.blueDisc.circle!];
+  assert.ok(red.y < disc.cy && disc.cy < green.y);
+  assert.ok(Math.abs(red.x - disc.cx) < red.w / 2 && Math.abs(green.x - disc.cx) < green.w / 2 && red.x === green.x);
+  // The little drawing at the top of field.ts is what the next engineer looks at first: it must show them so too
+  // ([r] above o, [g] below it, in one column). It once drew the three side by side.
+  const drawing = readFileSync(new URL('./field.ts', import.meta.url), 'utf8')
+    .split('\n')
+    .filter((line) => /^ \*     [+|]/.test(line))
+    .map((line) => line.slice(7, 36)); // (the drawing alone: what follows on a line is its legend)
+  assert.equal(drawing.length, 12, 'the drawing of the mat in the comment at the top of field.ts');
+  const where = (mark: string): { row: number; column: number } => {
+    const rows = drawing.flatMap((line, row) => (line.includes(mark) ? [{ row, column: line.indexOf(mark) + (mark.length - 1) / 2 }] : []));
+    assert.equal(rows.length, 1, `"${mark}" is drawn once`);
+    return rows[0];
+  };
+  const [r, o, g] = [where('[r]'), where(' o '), where('[g]')];
+  assert.ok(r.row < o.row && o.row < g.row, 'the drawing: [r] above the disc, [g] below it');
+  assert.deepEqual([r.column, g.column], [o.column, o.column], 'the drawing: in one column');
   // "the warehouses are on the top of the map": red at the top left, blue in the middle, green at the top right
   for (const color of ['red', 'green', 'blue'] as const) assert.ok((targetOf(color).box as OBB).y < WHITE_LINES.treeTopT.y, color);
   assert.ok((targetOf('red').box as OBB).x < (targetOf('blue').box as OBB).x && (targetOf('blue').box as OBB).x < (targetOf('green').box as OBB).x);

@@ -1618,9 +1618,10 @@ Training page's card names it.
 What the general screen got for this game — optional, and the other three games pass none of
 it, so their screens are as they were:
 
-- **`restartButton={false}`**: the match controls have **no Restart button**. The rules have no
-  restarts (anyone but the referee touching the robot after GO voids the run); the Rules window
-  says so. The game itself allows none (`restartRules: { maxRestarts: 0 }`).
+- **`restartButton={false}`**: the match controls have **no Restart button**. The rules never
+  name a restart — they only void a run when anyone but the referee touches the robot after GO
+  (question 19) — and the Rules window says just that. The game itself allows none
+  (`restartRules: { maxRestarts: 0 }`).
 - **What the referee holds is drawn on the stage** (`World.props`, see below): the Team Box on
   top of the robot (drawn see-through, so that the CyberPi and its LEDs still show), and the
   colour card in front of the claw while the referee holds it, with its name ("GREEN card")
@@ -1871,6 +1872,13 @@ their own:
 21. **Who draws the two cards?** The rules: "Two random cards are drawn", and the setup steps
     "Draw the Team Color card", "Draw the Zone Assignment card" — by the referee, or by the team?
     The Rules window says "Two cards are drawn" and no more.
+22. **How closely is "completely inside" a warehouse judged?** (L1.) The rules: +10 "completely
+    inside", half points "if PARTIALLY inside". The simulator measures: every corner of the 50 mm
+    token inside the printed 104.8 × 62.9 mm rectangle. That leaves 6.4 mm to each side across
+    the warehouse, and a token in its middle may be turned up to 17.7° off the warehouse — so in
+    the turned RED and GREEN ones a token that stands straight on the mat gets +5 only. Will a
+    referee judge it like that, by eye? The Rules window says it under "What this simulator
+    assumes" ("turned almost the same way … about 17 degrees off, not more"), not as a rule.
 
 ### What to change, and where
 

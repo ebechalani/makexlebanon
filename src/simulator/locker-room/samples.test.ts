@@ -587,7 +587,7 @@ describe('the blocks of the examples', () => {
     // the three that carry cubes: the gripper, the colour read at the claw, my-blocks, and a decision
     for (const id of ['locker-team-cube', 'locker-two-tokens', 'locker-whole-mission']) {
       for (const type of ['gripper_claw', 'sensing_claw_color', 'operator_equals', 'control_if_else', 'procedures_defnoreturn']) assert.ok(uses(id).has(type), `${id}: ${type}`);
-      // ... and on the way they stop at a white line ("forward to a white line"): there they find their place again
+      // ... and on the way they stop at a white line ("forward to a white line"): there they learn how far up the mat they are
       for (const type of ['mbot2_move_direction', 'control_wait_until', 'sensing_quadrgb_probe_detects', 'mbot2_stop']) assert.ok(uses(id).has(type), `${id}: ${type}`);
       definitionOf(sample(id).program, 'forward to a white line');
     }
@@ -1090,7 +1090,8 @@ describe('locker-two-tokens: sort two tokens', () => {
     const guess = Math.round((2 * ZONE_Y_CM.B - ZONE_Y_CM.A) * 100) / 100;
     assert.equal(guess, 44.57);
     for (const scenario of ARRANGEMENTS) {
-      const missed = play(withZoneC(guess), scenario).sim;
+      // (the type is written out: the checks below narrow `guess`, so TypeScript cannot work out `missed` by itself in this loop)
+      const missed: Sim = play(withZoneC(guess), scenario).sim;
       assert.equal(missed.score().total, 25, `${label(scenario)}: the guess ${guess}`);
       assert.equal(pointsOf(missed, tokenLineId(tokensOf(scenario).C)), 0, label(scenario));
     }
@@ -1228,7 +1229,7 @@ describe('locker-whole-mission: the whole Locker Room mission', () => {
 // =============================================================================================
 
 describe('every example, the robot moved 1 cm (or 5 mm) up or down before Start', () => {
-  test('the same points on all 12 draws, nothing pushed - the examples that carry cubes find their place again at a white line', () => {
+  test('the same points on all 12 draws, nothing pushed - the examples that carry cubes learn at a white line how far up they are', () => {
     for (const side of [-10, -5, 5, 10]) {
       const startPose = { ...START_POSE, y: START_POSE.y + side };
       assert.ok(robotShapesAt(LOCKER_ROOM_ROBOT, startPose).every((shape) => insideRect(shape, LOCKER_ROOM)), `${side} mm: still completely inside the Locker Room`);

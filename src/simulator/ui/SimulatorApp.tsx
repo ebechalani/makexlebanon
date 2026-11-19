@@ -109,8 +109,9 @@ export interface SimulatorAppProps<S> {
   rulesNote?: string;
   /**
    * A link to a page of this website at the end of that sentence - where the rules file can be
-   * downloaded, when the sentence names it (Locker Room). Left out: no link, and the sentence is
-   * drawn exactly as it always was. Without `rulesNote` it is not shown.
+   * downloaded, when the sentence names it (Locker Room). The link ends the sentence, so a full
+   * stop is drawn after it. Left out: no link, and the sentence is drawn exactly as it always
+   * was. Without `rulesNote` it is not shown.
    */
   rulesNoteLink?: { label: string; href: string };
   /** a second part under the rules, with its own heading (left out: the window ends with the rules) */
@@ -746,6 +747,7 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
                       <Link href={props.rulesNoteLink.href} className="rounded-sm underline underline-offset-2 hover:text-amber-950" data-rules-note-link>
                         {props.rulesNoteLink.label}
                       </Link>
+                      .
                     </>
                   )}
                 </p>

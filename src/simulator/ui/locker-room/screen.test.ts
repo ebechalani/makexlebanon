@@ -669,9 +669,9 @@ test('page: the Locker Room screen hands the general screen its game, robot, exa
     assert.ok(!read(other).includes('rulesNoteLink'), other);
   }
   // the note of the Rules window says the rules can be downloaded "on this website:" - the general screen puts the link
-  // right after that sentence, inside the same note, and only when a game hands it one
+  // right after that sentence, inside the same note, with the full stop that ends it, and only when a game hands it one
   const note = app.slice(app.indexOf('{props.rulesNote && ('), app.indexOf('{props.rules.map('));
-  assert.match(note, /\{props\.rulesNote\}\s+(?:\{\}\s+)?\{props\.rulesNoteLink && \(\s+<>\s+\{' '\}\s+<Link href=\{props\.rulesNoteLink\.href\} [^>]*>\s+\{props\.rulesNoteLink\.label\}\s+<\/Link>\s+<\/>\s+\)\}\s+<\/p>/);
+  assert.match(note, /\{props\.rulesNote\}\s+(?:\{\}\s+)?\{props\.rulesNoteLink && \(\s+<>\s+\{' '\}\s+<Link href=\{props\.rulesNoteLink\.href\} [^>]*>\s+\{props\.rulesNoteLink\.label\}\s+<\/Link>\s+\.\s+<\/>\s+\)\}\s+<\/p>/);
   assert.equal(app.split('rulesNoteLink').length - 1, 4, 'the prop, and the one place that draws it');
   // the start pose is the game's, and the game allows no restart
   assert.deepEqual(START_POSE, lockerRoomGame.defaultStartPose);

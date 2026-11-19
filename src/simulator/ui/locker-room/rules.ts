@@ -126,8 +126,9 @@ const tokensWord = (colors: readonly TokenColor[], noun = 'token'): string =>
  * these newest rules since they replaced v2.3: content/seasons.ts. No name of the category here:
  * "Starter" is also the name of a level of the examples - ./rules.test.ts.)
  *
- * It ends with a colon: the window puts LOCKER_ROOM_RULES_LINK right after it. "On this website"
- * alone did not say where, and the simulator's page has no other way to the file.
+ * It ends with a colon: the window puts LOCKER_ROOM_RULES_LINK right after it, and a full stop
+ * (../SimulatorApp.tsx). "On this website" alone did not say where, and the simulator's page has
+ * no other way to the file.
  */
 export const LOCKER_ROOM_RULES_NOTE =
   `MakeX Lebanon, Season 2026, ages 13 to 15. This simulator follows the newest rules of the organiser (${MATCH_DURATION} s). ` +
@@ -243,7 +244,7 @@ export const LOCKER_ROOM_ASSUMPTIONS: RulesPart = {
         // (the same room to turn in a target that is not turned)
         ...(STRAIGHT_TARGETS.length > 0 && TURN_ROOM_DEGREES < 45
           ? [
-              `${tokensWord(STRAIGHT_TARGETS, ROLE_WORD.target).replace(/^t/, 'T')} ${STRAIGHT_TARGETS.length === 1 ? 'is' : 'are'} not turned. There a token must stand almost straight: about ${TURN_ROOM_DEGREES} degrees off, not more.`,
+              `${tokensWord(STRAIGHT_TARGETS, ROLE_WORD.target).replace(/^t/, 'T')} ${STRAIGHT_TARGETS.length === 1 ? 'is' : 'are'} not turned. There a token is completely inside only if it stands almost straight. It may be about ${TURN_ROOM_DEGREES} degrees off, not more.`,
             ]
           : []),
       ],

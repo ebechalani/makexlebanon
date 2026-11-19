@@ -28,8 +28,9 @@
  *   The total is never below 0. Highest score: 5 + 10 + 15 + 20 + 5 + 3 x 10 = 85.
  *
  * A match lasts 150 s. It ends then, or when the program has ended and the robot stands still (as
- * in Warehouse Sort); then the field is judged as it lies. There are no restarts (the rules have
- * none: touching the robot after GO voids the run).
+ * in Warehouse Sort); then the field is judged as it lies. The simulator has no restarts: the
+ * rules never name one - they only void a run when anyone but the referee touches the robot after
+ * GO (README, question 19).
  *
  * Plain TypeScript only (no DOM, no React), so it also runs headless under Node.
  *
@@ -962,7 +963,8 @@ export const lockerRoomGame: Game<LockerRoomScenario> = {
   robotConfig: LOCKER_ROOM_ROBOT,
   createWalls,
   createReferee,
-  // RULE: no restarts - "anyone touching the robot after GO voids the run"
+  // no restarts here. The rules never name one: they only void a run when "anyone except the
+  // referee touches the robot or the field after GO" (README, question 19)
   restartRules: { maxRestarts: 0 },
   scenarioProblems,
 };

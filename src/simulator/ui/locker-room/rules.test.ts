@@ -194,7 +194,7 @@ test('the turned warehouses: the window tells how a token must stand to be compl
   assert.ok(ASSUMED_TEXT.includes('"Almost": in the middle of the warehouse, the token may be about 17 degrees off, not more.'));
   assert.ok(ASSUMED_TEXT.includes('A token that stands straight in one of them is only partly inside: +5.'));
   assert.deepEqual(STRAIGHT_TARGETS, ['blue']);
-  assert.ok(ASSUMED_TEXT.includes('The BLUE warehouse is not turned. There a token must stand almost straight: about 17 degrees off, not more.'));
+  assert.ok(ASSUMED_TEXT.includes('The BLUE warehouse is not turned. There a token is completely inside only if it stands almost straight. It may be about 17 degrees off, not more.'));
   // not "the same way": the referee gives +10 to a token that is off by less than 17.74 degrees, and the window must not be
   // stricter than the referee. The number of the sentences is the referee's edge, rounded down - tried on the referee's own
   // test, in every warehouse, to both sides: that many degrees off is still completely inside, one degree more is not.

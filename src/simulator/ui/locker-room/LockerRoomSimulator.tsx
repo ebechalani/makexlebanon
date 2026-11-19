@@ -63,7 +63,7 @@ export default function LockerRoomSimulator() {
       initialStartPose={START_POSE}
       // the starter examples show what they read ("Team: green"): the closed CyberPi panel shows the last line
       showLastPrint
-      // the rules have no restarts (anyone touching the robot after GO voids the run): no Restart button
+      // the rules name no restart (they only void a run when anyone but the referee touches the robot after GO): no Restart button
       restartButton={false}
       renderCombinationEditor={renderCombinationEditor}
       // a code that is no draw ("G7", "Y2") gets a plain sentence (./cards-code.ts)
