@@ -23,8 +23,9 @@
  * Three examples stop at a white line on their way ("forward to a white line"): there they learn
  * how far up the mat they are - and no more. So every example is also played with the start moved
  * 1 cm up and down (what the try of the line follower asks a student to do), and must score the
- * same; and the three are played with the start turned, and moved to the left and right, where the
- * stop does not help and points are lost - so that no text of an example says it would.
+ * same; and the three are played with the start turned, and moved to the left and right (on the
+ * drawing and on the picture of the mat), where the stop does not help and points are lost - so
+ * that no text of an example says it would.
  */
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -1256,13 +1257,50 @@ describe('every example, the robot moved 1 cm (or 5 mm) up or down before Start'
 describe('what a stop at a white line does not make up for: a start that is turned, or moved to the left or right', () => {
   const DEG = Math.PI / 180;
   /** The points on all 12 draws from this start (the same match as play(), without the tick-by-tick watching). */
-  const totals = (blocks: ProgramJson, startPose: Pose): number[] =>
-    ARRANGEMENTS.map((scenario) => runMatch({ game: lockerRoomGame, scenario, program: blocks, startPose, seed: 1 }).total);
+  const totals = (blocks: ProgramJson, startPose: Pose, sampler?: MatSampler): number[] =>
+    ARRANGEMENTS.map((scenario) => runMatch({ game: lockerRoomGame, scenario, program: blocks, startPose, sampler, seed: 1 }).total);
   const turned = (degrees: number): Pose => ({ ...START_POSE, heading: START_POSE.heading + degrees * DEG });
   const moved = (mm: number): Pose => ({ ...START_POSE, x: START_POSE.x + mm });
   const inside = (pose: Pose): boolean => robotShapesAt(LOCKER_ROOM_ROBOT, pose).every((shape) => insideRect(shape, LOCKER_ROOM));
 
-  test('what a student can do before Start - turn the robot 1 degree, move it 5 mm to the left or right - costs the advanced example points on every draw', () => {
+  /** Between which turns (degrees) and moves (mm; negative: to the left) an example keeps its points on all 12 draws. */
+  type Holds = Record<string, { points: number; turn: [number, number]; move: [number, number] }>;
+  /**
+   * Tried in steps of 0.1 degree and 0.5 mm: at these ends every draw scores as from the usual start; one step
+   * further out, at least one draw scores less.
+   */
+  function assertHolds(holds: Holds, where: string, sampler?: MatSampler): void {
+    for (const [id, { points, turn, move }] of Object.entries(holds)) {
+      const blocks = sample(id).program;
+      const same = (startPose: Pose): boolean => totals(blocks, startPose, sampler).every((p) => p === points);
+      for (const end of turn) {
+        const beyond = Math.round((end + Math.sign(end) * 0.1) * 10) / 10;
+        assert.ok(same(turned(end)), `${where}, ${id}: turned ${end} degrees it still scores ${points} on all 12`);
+        assert.ok(!same(turned(beyond)), `${where}, ${id}: turned ${beyond} degrees it scores less on a draw`);
+      }
+      for (const end of move) {
+        const beyond = end + Math.sign(end) * 0.5;
+        assert.ok(inside(moved(end)) && same(moved(end)), `${where}, ${id}: moved ${end} mm it still scores ${points} on all 12`);
+        // (the first one holds for every move that leaves the robot inside the Locker Room: 7.9 mm of room each way)
+        if (inside(moved(beyond))) assert.ok(!same(moved(beyond)), `${where}, ${id}: moved ${beyond} mm it scores less on a draw`);
+        else assert.equal(id, 'locker-team-cube');
+      }
+    }
+  }
+  /** On the vector drawing of the mat (what the other tests of this file play on). */
+  const ON_THE_DRAWING: Holds = {
+    'locker-team-cube': { points: 55, turn: [-1.2, 1.1], move: [-7.5, 7.5] },
+    'locker-two-tokens': { points: 25, turn: [-0.6, 0.4], move: [-4, 3] },
+    'locker-whole-mission': { points: 85, turn: [-0.2, 0.3], move: [-2.5, 3] },
+  };
+  /**
+   * On the picture of the mat, which is what the line sensor reads in the browser - so these are the ends a student
+   * meets. The same, but for the advanced example: to the right it holds one step less far (the picture's line edges
+   * lie about 0.5 mm off the drawing's, and its long way leaves the least room).
+   */
+  const ON_THE_PICTURE: Holds = { ...ON_THE_DRAWING, 'locker-whole-mission': { points: 85, turn: [-0.2, 0.2], move: [-2.5, 2.5] } };
+
+  test('what a student can do before Start - turn the robot 1 degree, move it 5 mm to the left or right - costs the advanced example points on every draw', async (t) => {
     const s = sample('locker-whole-mission');
     assert.deepEqual(totals(s.program, START_POSE), ARRANGEMENTS.map(() => 85));
     const starts: Array<[string, Pose]> = [
@@ -1279,32 +1317,32 @@ describe('what a stop at a white line does not make up for: a start that is turn
     // (as the comment at the top of samples.ts says: 55 on the RED draws and 75 to 80 on the GREEN ones; 80 on all 12)
     assert.deepEqual(totals(s.program, turned(1)), [55, 55, 55, 55, 55, 55, 75, 75, 75, 75, 80, 80]);
     assert.deepEqual(totals(s.program, moved(5)), ARRANGEMENTS.map(() => 80));
+    // ... and on the picture the browser reads: 75 on all six GREEN draws (a browser showed 75 on the default draw, G5)
+    const mat = await loadMatPicture();
+    if (!mat) return t.diagnostic('the mat picture could not be decoded (sharp is not installed): not tried on the picture');
+    for (const [what, startPose] of starts) {
+      const points = totals(s.program, startPose, mat);
+      assert.ok(points.every((p) => p < 85), `on the picture, ${what}: ${points.join(' ')}`);
+    }
+    assert.deepEqual(totals(s.program, turned(1), mat), [55, 55, 55, 55, 55, 55, 75, 75, 75, 75, 75, 75]);
+    assert.deepEqual(totals(s.program, moved(5), mat), ARRANGEMENTS.map(() => 80));
   });
 
   test('how little is enough: the turns and the moves between which each example that carries cubes keeps its points on all 12 draws', () => {
-    // Tried in steps of 0.1 degree and 0.5 mm (negative: to the left). Inside these ends every draw scores as from the
-    // usual start; one step outside, at least one draw scores less. The table at the top of samples.ts and the README
-    // say these numbers - and the texts of the examples promise none of this ("every description says ..." above).
-    const holds: Record<string, { points: number; turn: [number, number]; move: [number, number] }> = {
-      'locker-team-cube': { points: 55, turn: [-1.2, 1.1], move: [-7.5, 7.5] },
-      'locker-two-tokens': { points: 25, turn: [-0.6, 0.4], move: [-4, 3] },
-      'locker-whole-mission': { points: 85, turn: [-0.2, 0.3], move: [-2.5, 3] },
-    };
-    for (const [id, { points, turn, move }] of Object.entries(holds)) {
-      const blocks = sample(id).program;
-      const same = (startPose: Pose): boolean => totals(blocks, startPose).every((p) => p === points);
-      for (const end of turn) {
-        const beyond = Math.round((end + Math.sign(end) * 0.1) * 10) / 10;
-        assert.ok(same(turned(end)), `${id}: turned ${end} degrees it still scores ${points} on all 12`);
-        assert.ok(!same(turned(beyond)), `${id}: turned ${beyond} degrees it scores less on a draw`);
-      }
-      for (const end of move) {
-        const beyond = end + Math.sign(end) * 0.5;
-        assert.ok(inside(moved(end)) && same(moved(end)), `${id}: moved ${end} mm it still scores ${points} on all 12`);
-        // (the first one holds for every move that leaves the robot inside the Locker Room: 7.9 mm of room each way)
-        if (inside(moved(beyond))) assert.ok(!same(moved(beyond)), `${id}: moved ${beyond} mm it scores less on a draw`);
-        else assert.equal(id, 'locker-team-cube');
-      }
+    // The table at the top of samples.ts and the README say these numbers - and the texts of the examples promise
+    // none of this ("every description says ..." above).
+    assertHolds(ON_THE_DRAWING, 'on the drawing');
+  });
+
+  test('... and on the picture the browser reads: the same ends, but the advanced example holds one step less far to the right', async (t) => {
+    const mat = await loadMatPicture();
+    if (!mat) return t.skip('the mat picture could not be decoded (sharp is not installed)');
+    assertHolds(ON_THE_PICTURE, 'on the picture', mat);
+    // (what differs from the drawing, said once more plainly: 0.3 degrees and 3 mm to the right hold there, not here)
+    const blocks = sample('locker-whole-mission').program;
+    for (const startPose of [turned(0.3), moved(3)]) {
+      assert.ok(totals(blocks, startPose).every((p) => p === 85));
+      assert.ok(totals(blocks, startPose, mat).some((p) => p < 85));
     }
   });
 });

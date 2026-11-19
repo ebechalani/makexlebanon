@@ -1766,21 +1766,24 @@ drawing's).
 
 **A start that is turned, or moved to the left or right, is not made up for** — the three that
 carry cubes drive by distance, and the stop at a white line only tells them how far up they are.
-Tried on the vector mat in steps of 0.1° and 0.5 mm, each keeps its points on all 12 draws only
-for a start
+Tried in steps of 0.1° and 0.5 mm, on the vector mat and on the picture the browser reads, each
+keeps its points on all 12 draws only for a start
 
 | Example | turned by | moved (along the bottom line) by |
 | --- | --- | --- |
 | `locker-team-cube` | 1.2° to the left … 1.1° to the right | anything that stays inside the Locker Room (7.5 mm each way) |
 | `locker-two-tokens` | 0.6° to the left … 0.4° to the right | 4 mm to the left … 3 mm to the right |
-| `locker-whole-mission` | 0.2° to the left … 0.3° to the right | 2.5 mm to the left … 3 mm to the right |
+| `locker-whole-mission` | 0.2° to the left … 0.3° to the right (on the picture: 0.2°) | 2.5 mm to the left … 3 mm to the right (on the picture: 2.5 mm) |
 
-and one step further at least one draw scores less. The screen turns the robot in steps of 1° and
-moves it in steps of 5 mm (1 mm with Shift): turned 1°, the advanced example scores 55 on the RED
-draws and 75 to 80 on the GREEN ones; moved 5 mm to the right, 80 on all 12. No text of an
-example promises otherwise: the note on "forward to a white line" says "This does not help if it
-started turned, or too far left or right", and `samples.test.ts` holds both the numbers and the
-wording. On a real robot all of them will drift.
+and one step further at least one draw scores less. The two mats give the same ends but for the
+advanced example, which on the picture — what a student's browser plays on — holds one step less
+far to the right. The screen turns the robot in steps of 1° and moves it in steps of 5 mm (1 mm
+with Shift): turned 1° to the right, the advanced example scores 55 on the RED draws and 75 to 80
+on the GREEN ones (on the picture 75 on all six; a browser showed 75 on the default draw); moved
+5 mm to the right, 80 on all 12. No text of an example promises otherwise: the note on "forward to
+a white line" says "This does not help if it started turned, or too far left or right", and
+`samples.test.ts` holds both the numbers (on both mats) and the wording. On a real robot all of
+them will drift.
 
 The three starters are open to everyone, the two intermediate ones need a member code, the
 advanced one is shown to advanced codes only (`content/simulator-codes.ts`).

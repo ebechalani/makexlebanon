@@ -121,14 +121,16 @@
  *     1 cm either way, every example scores the same;
  *   - a start that is turned, or moved to the left or right (along the bottom line), is NOT: the
  *     robot is then at an angle to its way or beside it, and the stop does not see that. Tried in
- *     steps of 0.1 degree and 0.5 mm on the drawing of the mat, an example keeps its points on all
- *     12 draws only for a start
+ *     steps of 0.1 degree and 0.5 mm, an example keeps its points on all 12 draws only for a start
  *                                 turned by                          moved by
  *       "Deliver the team cube"   1.2 degrees left to 1.1 right      anything inside the Locker Room (7.5 mm)
  *       "Sort two tokens"         0.6 degrees left to 0.4 right      4 mm left to 3 mm right
  *       the whole mission         0.2 degrees left to 0.3 right      2.5 mm left to 3 mm right
+ *     on the drawing of the mat. On the picture of the mat - what the line sensor reads in the
+ *     browser, so what a student meets - the same, but for the whole mission: there it holds only
+ *     to 0.2 degrees and 2.5 mm to the right.
  *     Turned 1 degree to the right, the whole mission scores 55 on the RED draws and 75 to 80 on
- *     the GREEN ones; moved 5 mm to the right, 80 on all 12.
+ *     the GREEN ones (on the picture 75 on all six); moved 5 mm to the right, 80 on all 12.
  * The screen turns the robot in steps of 1 degree and moves it in steps of 5 mm (1 mm with Shift),
  * so a student can try all of this. No text may promise more than the first line: the note on
  * "forward to a white line" says both halves.
