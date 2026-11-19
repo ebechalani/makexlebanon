@@ -2,9 +2,10 @@
  * What the "Rules" button of the Locker Room simulator shows. Two parts, kept clearly apart:
  *
  *   1. LOCKER_ROOM_RULES - the mission ("Starter - Locker Room Mission", the organiser's latest
- *      rules, 150 s) in short, plain words, with the points as the simulator counts them. Where
- *      the latest rules do not say where something is on the field, the older published rules
- *      v2.3 do, and those words are used.
+ *      rules, 150 s) in short, plain words, with the points as the simulator counts them, and
+ *      where the pickup zones and the targets are - which the organiser confirmed (the team cubes
+ *      on the squares in the maze, the tokens to the "warehouses" at the top: ../../locker-room/field.ts
+ *      MARK_ROLES).
  *   2. LOCKER_ROOM_ASSUMPTIONS - "What this simulator assumes": where the rules are open, where
  *      they say two things, and every number the simulator had to choose. Nobody should take one
  *      of these for a rule, so they are never mixed into part 1. The list of questions for the
@@ -15,13 +16,13 @@
  * sentences, plain words, nothing more certain than the rules or the simulator. Every number is
  * written from the constant that holds it, and ./rules.test.ts checks every number of every
  * sentence against the game. Which mark is a pickup zone and which a target is read from the one
- * table of ../../locker-room/field.ts (MARK_ROLES): if the organiser's answer swaps them, the
- * texts follow.
+ * table of ../../locker-room/field.ts (MARK_ROLES): should it ever change, the texts follow.
  *
  * (The referee itself is in ../../locker-room/game.ts; this is only what students read.)
  */
 import { TABLE_MARGIN } from '../../core/engine';
 import type { RobotConfig } from '../../core/types';
+import { distanceToSegment, type OBB } from '../../core/geometry';
 import {
   CARD,
   CUBE_HEIGHT,
@@ -30,10 +31,14 @@ import {
   GATE_HEIGHT,
   LOCKER_ROOM_FRAME,
   MAT_SIZE,
+  ROLE_WORD,
   TEAM_BOX,
   TEAM_COLORS,
+  markOutline,
+  marksWithoutRole,
   pickupZone,
   targetOf,
+  type Mark,
 } from '../../locker-room/field';
 import {
   BOX_LIFT_S,
@@ -74,20 +79,45 @@ export const INSIDE_THE_FRAME = LOCKER_ROOM_FRAME.w - FRAME_WIDTH;
 /** (Can a cube stand completely inside a mark? The referee asks the same: ../../locker-room/game.ts.) */
 export { cubeFitsInside };
 
-/** The token colours whose target can never hold a whole cube (with the published cube: RED and GREEN, the 4.2 cm squares). */
+/** The token colours whose target can never hold a whole cube (with the decided marks: none - the warehouses all hold one). */
 export const TOO_SMALL_TARGETS: readonly TokenColor[] = TOKEN_COLORS.filter((color) => !cubeFitsInside(targetOf(color)));
 
-/** The most a robot can score in this simulator: every point, less what the targets that are too small for a cube cannot give. */
+/** The most a robot can score in this simulator: every point, less what the targets that are too small for a cube cannot give (85). */
 export const REACHABLE_MAX = MAX_SCORE - TOO_SMALL_TARGETS.length * (POINTS_TOKEN - POINTS_TOKEN_PARTLY);
 
-/** "the RED and the GREEN token", "the BLUE token" */
-const tokensWord = (colors: readonly TokenColor[]): string =>
-  colors.length === 1 ? `the ${COLOR_WORD[colors[0]]} token` : `${colors.slice(0, -1).map((c) => `the ${COLOR_WORD[c]}`).join(', ')} and the ${COLOR_WORD[colors[colors.length - 1]]} token`;
+/** The token colours whose target is turned (with the decided marks: RED and GREEN, the warehouses at the top left and right). */
+export const TURNED_TARGETS: readonly TokenColor[] = TOKEN_COLORS.filter((color) => (targetOf(color).box?.angle ?? 0) !== 0);
+/** How far those targets are turned, in whole degrees, as a sentence says it (45). */
+export const TURNED_DEGREES = TURNED_TARGETS.length > 0 ? Math.round(Math.abs(((targetOf(TURNED_TARGETS[0]).box as OBB).angle * 180) / Math.PI)) : 0;
 
-/** The sentence under the heading of the rules window. */
+/** The shortest distance between the outlines of two marks that do not overlap (mm). */
+export function markGap(a: Mark, b: Mark): number {
+  const pa = markOutline(a);
+  const pb = markOutline(b);
+  let best = Infinity;
+  for (const [from, to] of [[pa, pb], [pb, pa]]) {
+    for (const p of from) {
+      for (let i = 0; i < to.length; i++) best = Math.min(best, distanceToSegment(p, to[i], to[(i + 1) % to.length]).dist);
+    }
+  }
+  return best;
+}
+
+/** One cube might lie on two targets at once: two of them are closer than a cube's diagonal (with the decided marks: no, they are over 36 cm apart). */
+export const TARGETS_CLOSE = TOKEN_COLORS.some((a, i) => TOKEN_COLORS.slice(i + 1).some((b) => markGap(targetOf(a), targetOf(b)) < CUBE_SIZE * Math.SQRT2));
+
+/** "the RED and the GREEN token", "the BLUE token" */
+const tokensWord = (colors: readonly TokenColor[], noun = 'token'): string =>
+  colors.length === 1 ? `the ${COLOR_WORD[colors[0]]} ${noun}` : `${colors.slice(0, -1).map((c) => `the ${COLOR_WORD[c]}`).join(', ')} and the ${COLOR_WORD[colors[colors.length - 1]]} ${noun}`;
+
+/**
+ * The sentence under the heading of the rules window. (The rules file on the category page is
+ * these newest rules since they replaced v2.3: content/seasons.ts. No name of the category here:
+ * "Starter" is also the name of a level of the examples - ./rules.test.ts.)
+ */
 export const LOCKER_ROOM_RULES_NOTE =
   `MakeX Lebanon, Season 2026, ages 13 to 15. This simulator follows the newest rules of the organiser (${MATCH_DURATION} s). ` +
-  'The rules file on this website is the older version 2.3.';
+  'They are the rules you can download on this website.';
 
 export const LOCKER_ROOM_RULES: RulesSection[] = [
   {
@@ -96,7 +126,7 @@ export const LOCKER_ROOM_RULES: RulesSection[] = [
       'The robot carries the Team Box from the Locker Room to the Scan Station.',
       'There it reads a colour card: the team colour, RED or GREEN.',
       'Then it takes the cube of the team colour to the big circle of that colour. This opens the stadium gate.',
-      `Last, it sorts the ${TOKEN_COLORS.length} tokens (RED, GREEN, BLUE) to the targets of their colour in the maze.`,
+      `Last, it sorts the ${TOKEN_COLORS.length} tokens (RED, GREEN, BLUE) into the ${ROLE_WORD.target}s of their colour.`,
       'After GO the robot works on its own. Nobody touches it.',
     ],
   },
@@ -106,10 +136,12 @@ export const LOCKER_ROOM_RULES: RulesSection[] = [
       `The mat is ${cm(MAT_SIZE)} x ${cm(MAT_SIZE)} cm. It is black, with white lines.`,
       'The Locker Room (the start) is at the bottom left. The Scan Station is at the bottom right.',
       'The big RED circle is on the right. The big GREEN circle is in the lower middle.',
-      // (the newest rules do not say where the pickup zones are; the older rules v2.3 do)
-      'The older rules (v2.3) put the RED pickup zone at the top left and the GREEN pickup zone at the top right.',
+      // (where the pickup zones and the targets are: the organiser's answer, ../../locker-room/field.ts MARK_ROLES)
+      `The team cubes start in the ${ROLE_WORD.pickup}s: ${TEAM_COLORS.map((team) => `${COLOR_WORD[team]} on ${pickupZone(team).name}`).join(', ')}.`,
       'Zones A, B and C are on the left of the maze: A at the bottom, C at the top. Each holds one token.',
-      'The maze has a RED, a GREEN and a BLUE target.',
+      `The targets of the tokens are the ${TOKEN_COLORS.length} ${ROLE_WORD.target}s: ${TOKEN_COLORS.map((color) => `${COLOR_WORD[color]} ${targetOf(color).place}`).join(', ')}.`,
+      // (the written rules: "Inside the maze, there are 3 colored target rectangles")
+      'The written rules say the targets are "inside the maze". The organiser has confirmed the places above.',
       'The stadium gate stands left of the big GREEN circle. It is closed at the start.',
     ],
   },
@@ -168,15 +200,20 @@ export const LOCKER_ROOM_ASSUMPTIONS: RulesPart = {
   note: 'These are not rules. The rules do not say these things, or say two different things, so the simulator had to choose.',
   sections: [
     {
-      title: 'Pickup zones and targets',
+      title: `The ${ROLE_WORD.target}s`,
       items: [
-        `Here the team cubes start on ${TEAM_COLORS.map((team) => pickupZone(team).name).join(' and on ')}.`,
-        `The tokens go to their targets: ${TOKEN_COLORS.map((color) => `${COLOR_WORD[color]} to ${targetOf(color).name}`).join(', ')}.`,
-        'The older rules say both "pickup zone (top left)" and "the cube on the matching square". The organiser has been asked which marks are which.',
         TOO_SMALL_TARGETS.length > 0
           ? `A cube is ${cm(CUBE_SIZE)} cm wide, and here ${tokensWord(TOO_SMALL_TARGETS)} ${TOO_SMALL_TARGETS.length === 1 ? 'has a target' : 'have targets'} that ${TOO_SMALL_TARGETS.length === 1 ? 'is' : 'are'} smaller. So ${TOO_SMALL_TARGETS.length === 1 ? 'it' : 'they'} can never be completely inside: +${POINTS_TOKEN_PARTLY} at most. The most a robot can score here is ${REACHABLE_MAX}.`
-          : `A cube is ${cm(CUBE_SIZE)} cm wide. It fits completely inside every target.`,
+          : `A cube is ${cm(CUBE_SIZE)} cm wide. It fits completely inside every ${ROLE_WORD.target}.`,
         ...(TOO_SMALL_TARGETS.length > 0 ? [`So on the score sheet, +${POINTS_TOKEN_PARTLY} counts as done for ${TOO_SMALL_TARGETS.length === 1 ? 'that token' : 'those tokens'}.`] : []),
+        // (how a cube must stand in a turned target: ../../locker-room/game.ts cubeFitsTurned)
+        ...(TURNED_TARGETS.length > 0
+          ? [
+              `${tokensWord(TURNED_TARGETS, ROLE_WORD.target).replace(/^t/, 'T')} ${TURNED_TARGETS.length === 1 ? 'is' : 'are'} turned by ${TURNED_DEGREES} degrees. A token is completely inside only if it is turned the same way.`,
+              `A token that stands straight in one of them is only partly inside: +${POINTS_TOKEN_PARTLY}.`,
+              'Here the claw holds a cube square to the robot. So the robot puts the token down facing along the turned white line that leads there.',
+            ]
+          : []),
       ],
     },
     {
@@ -214,7 +251,7 @@ export const LOCKER_ROOM_ASSUMPTIONS: RulesPart = {
         'The first delivery decides Step 5. Later deliveries change nothing.',
         `The rules say only "Wrong color circle". Here the cube of the other colour in any big circle is a wrong delivery too: -${WRONG_DELIVERY_PENALTY}.`,
         'The rules do not say that the robot must read the card first. Here it does not have to.',
-        'A token in a big circle, or a team cube on a maze target, counts for nothing.',
+        `A token in a big circle, or a team cube in a ${ROLE_WORD.target}, counts for nothing.`,
       ],
     },
     {
@@ -222,7 +259,8 @@ export const LOCKER_ROOM_ASSUMPTIONS: RulesPart = {
       items: [
         'They are judged at the end: standing on the mat, not held and not touching the robot.',
         `A token that is partly inside a target of another colour, and not in its own, counts as a wrong delivery: -${WRONG_TOKEN_PENALTY}.`,
-        'A token that is partly inside its own target counts for it, even if it touches another target too.',
+        // (only where two targets are close enough for one cube to touch both: not with the decided marks)
+        ...(TARGETS_CLOSE ? ['A token that is partly inside its own target counts for it, even if it touches another target too.'] : []),
       ],
     },
     {
@@ -233,7 +271,7 @@ export const LOCKER_ROOM_ASSUMPTIONS: RulesPart = {
         'A cube that the robot pushes against the gate is not the robot touching it.',
         'After a wrong delivery, or none, the gate stays closed for the whole match.',
         'Here the closed gate does not stop the robot from sorting the tokens: they count all the same. The robot can drive around the gate.',
-        'The story of the rules sorts the tokens after the gate opens. The older rules (v2.3) let the robot enter the maze only then.',
+        'The story of the rules sorts the tokens after the gate opens, but Step 7 does not ask for an open gate.',
       ],
     },
     {
@@ -241,7 +279,7 @@ export const LOCKER_ROOM_ASSUMPTIONS: RulesPart = {
       items: [
         `A cube is ${cm(CUBE_SIZE)} x ${cm(CUBE_SIZE)} cm and ${cm(CUBE_HEIGHT)} cm high, as the cube file on this website. It is light: the robot can push it.`,
         `The mat lies on a table. The robot and the cubes can leave the mat, and they stop ${cm(TABLE_MARGIN)} cm outside it.`,
-        'The two yellow pieces in the long line on the left, and the light-blue rectangle at the top, have no role in the rules. The line sensor sees the yellow pieces as yellow.',
+        `The two yellow pieces in the long line on the left${marksWithoutRole().map((mark) => `, and ${mark.name},`).join('')} have no role in the rules. The line sensor sees the yellow pieces as yellow.`,
       ],
     },
     {

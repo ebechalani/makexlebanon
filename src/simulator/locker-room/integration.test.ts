@@ -6,9 +6,11 @@
  * A program made of real blocks leaves the Locker Room along the bottom line, stops in the Scan
  * Station, waits until the referee shows the card, READS IT with the colour sensor at the claw, waits
  * until the referee has lifted the Team Box, and then - by what it read - takes the cube of its team
- * colour from its pickup zone with the gripper and puts it into the big circle of that colour (the
- * gate opens); then it takes the blue token from zone A and puts it completely inside the blue
- * disc. It is played through the headless helper (./play.ts), which the examples use too.
+ * colour from its pickup square in the maze with the gripper and puts it into the big circle of that
+ * colour (the gate opens). Then it takes the three tokens of zone card 5 (BLUE in A, RED in B,
+ * GREEN in C) to their warehouses at the top - the RED and the GREEN one turned with their turned
+ * warehouses - and so reaches every point there is: 85. It is played through the headless helper
+ * (./play.ts), which the examples use too.
  *
  * The moves are mBlock's "moves forward ... cm" and "turns ... degrees", worked out from the
  * numbers of ./field.ts by a small route planner below (the simulated robot is perfect).
@@ -18,7 +20,7 @@ import { test } from 'node:test';
 import { createSimulation } from '../core/simulation';
 import type { ProgramJson } from '../core/types';
 import { arm, clawColor, eq, gripper, ifElse, moveCm, print, program, script, setVar, turn, v, wait, whenStart, type BlockNode } from '../vm/builder';
-import { BIG_CIRCLES, MARKS, SCAN_STATION, type TeamColor } from './field';
+import { BIG_CIRCLES, MARKS, SCAN_STATION, targetOf, type TeamColor } from './field';
 import {
   BOX_LIFT_S,
   CARD_AWAY_S,
@@ -29,7 +31,10 @@ import {
   LINE_GATE_TOUCH,
   LINE_LEAVE,
   LINE_SCAN_STATION,
+  MAX_SCORE,
+  footprint,
   lockerRoomGame,
+  onMark,
   teamCubeHome,
   teamCubeId,
   tokenHome,
@@ -38,6 +43,7 @@ import {
 } from './game';
 import { arrangement, playEveryArrangement, playLockerRoom } from './play';
 import { LOCKER_ROOM_ROBOT, START_POSE } from './robot';
+import type { TokenColor } from './scenario';
 
 const DEG = 180 / Math.PI;
 /** How far ahead of the axle the gripping centre is (mm). */
@@ -84,40 +90,60 @@ class Route {
     return this;
   }
   /** put the cube in the claw down with its middle at (x, y), arriving with heading h; then back away */
-  put(c: { x: number; y: number }, h: number): this {
+  put(c: { x: number; y: number }, h: number, back = BACK): this {
     this.go(c.x - GRIP * Math.sin(h / DEG), c.y + GRIP * Math.cos(h / DEG)).face(h);
     this.blocks.push(arm('lower'), gripper('open'));
-    return this.back(BACK);
+    return this.back(back);
   }
 }
 
 /** The middle of the Scan Station's room for the robot facing right (it can stop anywhere within 15.7 mm of it). */
 const STATION_X = 1060;
-/** Where both routes meet again: below the long line, clear of the gate (x 430 .. 488). */
+/** Where both routes meet again: below zone A and the long line, clear of the gate (x 430 .. 488). */
 const MEET = { x: 350, y: tokenHome('A').y + GRIP + STAGE };
 
-/** From the Scan Station (facing right, box lifted) to the team cube of `color`, into its circle, and on to MEET (facing down). */
+/** From the Scan Station (facing right, box lifted) to the team cube of `color` on its square in the maze, into its circle, and on to MEET (facing down). */
 function teamRoute(color: TeamColor): BlockNode[] {
   const r = new Route(STATION_X, START_POSE.y, 90);
   const cube = teamCubeHome(color);
   if (color === 'green') {
-    // up the right side (the claw stays clear of the cube), then at it heading up-right
-    r.go(STATION_X, 420).grab(cube, 45);
+    // at it from the right, heading left; then down into the green circle below the maze
+    r.grab(cube, 270);
     r.put({ x: BIG_CIRCLES.green.cx, y: BIG_CIRCLES.green.cy }, 180);
   } else {
-    // up, then along y 360 (clear of the token in zone C), then at it heading up-left
-    r.go(STATION_X, 360).go(MEET.x - 41, 360).grab(cube, -45);
+    // up the right side and along the cross line of the tree, then down at it; then right into the red circle
+    r.go(STATION_X, cube.y - GRIP - STAGE).grab(cube, 180);
     r.put({ x: BIG_CIRCLES.red.cx, y: BIG_CIRCLES.red.cy }, 90);
   }
   r.go(MEET.x, r.y).go(MEET.x, MEET.y);
   return r.blocks;
 }
 
-/** From MEET to the blue token in zone A (arrangements 5 and 6: BLUE in A), and completely onto the blue disc. */
-function blueTokenRoute(): BlockNode[] {
+/** The warehouse of a token colour, and the heading to drive at it with: so the claw holds the token turned like the warehouse. */
+function warehouse(color: TokenColor): { x: number; y: number; h: number } {
+  const box = targetOf(color).box!;
+  // (the turned ones: arriving along their short side, square to it, as along the tree's turned lines)
+  return { x: box.x, y: box.y, h: color === 'red' ? -45 : color === 'green' ? 45 : 0 };
+}
+
+/**
+ * From MEET, zone card 5 (BLUE in A, RED in B, GREEN in C): the blue token from below into the BLUE
+ * warehouse, then the red and the green token from the right (the claw turns each one by a quarter
+ * turn, so each stands turned with its warehouse).
+ */
+function tokenRoutes(): BlockNode[] {
   const r = new Route(MEET.x, MEET.y, 180);
+  const blue = warehouse('blue');
   r.grab(tokenHome('A'), 0);
-  r.put({ x: MARKS.blueDisc.circle!.cx, y: MARKS.blueDisc.circle!.cy }, 90);
+  // (backing only 10 cm: further, its back would come near the RED team cube on its square)
+  r.put(blue, blue.h, 100);
+  const red = warehouse('red');
+  // (first to the left along the tree's cross line: straight at zone B its side would brush past the RED team cube)
+  r.go(450, r.y).grab(tokenHome('B'), 270).back(100);
+  r.put(red, red.h);
+  const green = warehouse('green');
+  r.grab(tokenHome('C'), 270).back(100);
+  r.put(green, green.h);
   return r.blocks;
 }
 
@@ -128,7 +154,7 @@ const MOVE_AFTER_S = 4.2;
 
 /**
  * The whole program: along the bottom line into the Scan Station, wait for the card and read it,
- * wait for the box to be lifted, then the route of the colour that was read, then the blue token.
+ * wait for the box to be lifted, then the route of the colour that was read, then the tokens.
  */
 const start = new Route(START_POSE.x, START_POSE.y, 90).go(STATION_X, START_POSE.y);
 const WHOLE_MISSION: ProgramJson = program([
@@ -142,7 +168,7 @@ const WHOLE_MISSION: ProgramJson = program([
     wait(MOVE_AFTER_S - READ_AFTER_S),
     // (the card is gone by now: the program goes by what it read)
     ifElse(eq(v('team colour'), 'red'), teamRoute('red'), teamRoute('green')),
-    ...blueTokenRoute(),
+    ...tokenRoutes(),
   ]),
 ]);
 
@@ -152,27 +178,37 @@ test('the route: the robot stops completely inside the Scan Station, reads while
   assert.ok(MOVE_AFTER_S > BOX_LIFT_S);
 });
 
-test('real blocks, G5 and R5: out, Scan Station, the card read, box, the team cube into its circle, the gate opens, blue token onto the blue disc: 65', () => {
+test('real blocks, G5 and R5: out, Scan Station, the card read, box, the team cube from the maze into its circle, the gate opens, the three tokens into their warehouses: all 85', () => {
   for (const code of ['G5', 'R5']) {
     const team: TeamColor = code[0] === 'G' ? 'green' : 'red';
     // the program, played on the screen's engine: what it printed, and the events
     const sim = createSimulation({ game: lockerRoomGame, scenario: arrangement(code), program: WHOLE_MISSION });
     sim.start();
     const said: string[] = [];
+    const bumps: string[] = [];
     while (sim.status === 'running') {
       sim.step(100);
-      for (const e of sim.drainEvents()) if (e.type === 'log') said.push(e.text);
+      for (const e of sim.drainEvents()) {
+        if (e.type === 'log') said.push(e.text);
+        if (e.type === 'bump') bumps.push(`${e.bodyId} at ${e.time}`);
+      }
     }
     assert.deepEqual(sim.world.robot.screen.lines, [team], `${code}: the card was read`);
     assert.deepEqual(sim.vm.errors(), []);
+    assert.deepEqual(bumps, [], `${code}: the robot never pushed anything`);
     // the cube of the team colour is in its circle, the other one where it started
     const cube = sim.world.bodies.find((b) => b.id === teamCubeId(team))!;
     assert.ok(Math.hypot(cube.x - BIG_CIRCLES[team].cx, cube.y - BIG_CIRCLES[team].cy) < 1, `${code}: ${cube.x}, ${cube.y}`);
     const other = sim.world.bodies.find((b) => b.id === teamCubeId(team === 'red' ? 'green' : 'red'))!;
-    assert.deepEqual([other.x, other.y], [other.home.x, other.home.y]);
-    const blue = sim.world.bodies.find((b) => b.id === tokenId('A'))!;
-    assert.equal(blue.colorName, 'blue');
-    assert.ok(Math.hypot(blue.x - MARKS.blueDisc.circle!.cx, blue.y - MARKS.blueDisc.circle!.cy) < 1);
+    assert.deepEqual([other.x, other.y, other.angle], [other.home.x, other.home.y, other.home.angle]);
+    // each token completely inside its warehouse - the RED and the GREEN one turned with theirs
+    for (const [zone, color] of [['A', 'blue'], ['B', 'red'], ['C', 'green']] as const) {
+      const token = sim.world.bodies.find((b) => b.id === tokenId(zone))!;
+      assert.equal(token.colorName, color);
+      assert.equal(onMark(footprint(token), targetOf(color)), 'full', `${code}: the ${color} token at ${token.x}, ${token.y}, ${token.angle * DEG} degrees`);
+    }
+    const turned = sim.world.bodies.find((b) => b.id === tokenId('B'))!;
+    assert.ok(Math.abs(Math.sin(2 * (turned.angle - MARKS.redDiamond.box!.angle))) < 1e-6, 'turned with the RED warehouse (or by a quarter turn more)');
     assert.deepEqual(sim.world.walls, [], 'the gate opened');
     assert.ok(said.some((t) => t.includes(`the referee shows the ${team.toUpperCase()} card`)), said.join('\n'));
 
@@ -185,13 +221,12 @@ test('real blocks, G5 and R5: out, Scan Station, the card read, box, the team cu
     assert.equal(points(LINE_DELIVERY), 20, code);
     assert.equal(points(LINE_GATE), 5, code);
     assert.equal(points(LINE_GATE_TOUCH), 0, code);
-    assert.equal(points(tokenLineId('blue')), 10, code);
-    assert.equal(points(tokenLineId('red')), 0);
-    assert.equal(points(tokenLineId('green')), 0);
-    assert.equal(result.total, 65, code);
+    for (const color of ['red', 'green', 'blue'] as const) assert.equal(points(tokenLineId(color)), 10, `${code} ${color}`);
+    assert.equal(result.total, MAX_SCORE, code);
+    assert.equal(result.complete, true, code);
     assert.equal(result.finishReason, 'program-ended');
     assert.equal(result.scenarioCode, code);
-    assert.ok(result.time < 60, `${code}: ${result.time} s`);
+    assert.ok(result.time < 120, `${code}: ${result.time} s`);
     // the moments the referee wrote down
     const at = (id: string) => result.lines.find((l) => l.id === id)!.time!;
     assert.ok(at(LINE_LEAVE) < at(LINE_SCAN_STATION) && at(LINE_SCAN_STATION) < at(LINE_APPROVAL) && at(LINE_APPROVAL) < at(LINE_DELIVERY));

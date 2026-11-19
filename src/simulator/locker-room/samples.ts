@@ -5,8 +5,8 @@
  *   locker-to-station      starter       drive by distance: out of the Locker Room, into the Scan Station
  *   locker-follow-line     starter       follow the WHITE bottom line to the yellow frame of the Scan Station
  *   locker-read-card       starter       stop in the Scan Station, read the referee's colour card, wait until the Team Box is lifted
- *   locker-team-cube       intermediate  read the card, then bring the cube of the team colour into the big circle of that colour
- *   locker-two-tokens      intermediate  read the tokens of zones A and B and put each on the maze target of its colour
+ *   locker-team-cube       intermediate  read the card, then bring the team cube from its square in the maze into its big circle
+ *   locker-two-tokens      intermediate  read the tokens of zones A and B and put each into the warehouse of its colour
  *   locker-whole-mission   advanced      the card, the team cube, and all three tokens, on any of the 12 arrangements
  *
  * =====================================================================================
@@ -45,47 +45,71 @@
  * facing RIGHT, its middle (the middle of its wheel axle, the point it turns around) at x 77.9,
  * y 1108.1: on the middle of the bottom line. From that point the middle of the claw is 142 mm
  * ahead, the tips of the fingers 167 mm, the front of the body 105 mm, the Quad RGB sensor 85 mm,
- * the back of the body 70 mm behind.
+ * the back of the body 70 mm behind. A cube is 50 mm wide; the open claw is 64 mm wide, so each
+ * finger passes a cube with 7 mm to spare.
  *
  *   - The Locker Room (its yellow frame included) ends at x 252.8: the whole robot is out of it
  *     when its middle is past x 322.8 (24.5 cm of driving). The Scan Station (its frame included)
  *     starts at x 982.3: the whole robot is inside it with its middle between x 1052.3 and 1068.0.
  *     98.2 cm forward puts it at x 1059.9 (7.6 mm of room behind, 8.1 mm in front).
- *   - The team cubes stand turned by 45 degrees in the middle of the red rectangle at the top left
- *     (130.8, 118.5) and of the green one at the top right (1102.5, 118.9) - ./field.ts MARK_ROLES.
- *     The white diagonal lines of the "tree" above the maze point at them. A cube is 50 mm wide;
- *     the open claw is 64 mm wide, so each finger passes the cube with 7 mm to spare.
- *       GREEN: from the Scan Station up 69.0 cm, a turn of 45 degrees to the left, 18.2 cm: the
- *       robot is on the tree's right diagonal line, facing along it after a turn of 90 degrees to the
- *       right; 10 cm on puts the claw around the cube. Back 10 cm, down 64.4 cm, 16.6 cm to the left:
- *       the cube is over the middle of the big green circle (623.6, 933.2).
- *       RED: up 76.8 cm (not higher: the fingers stay 19 mm below the green cube), 70.8 cm to the
- *       left, a turn of 45 degrees to the right: the robot faces the red cube along the tree's left
- *       diagonal line; 17.1 cm on puts the claw around it. Back 40.5 cm along the same line, down to
- *       y 505.6, the height of the big red circle; a turn to the right and 44.8 cm put the cube over
- *       its middle (1107.7, 505.3).
+ *   - The team cubes stand straight in the middle of the small squares in the maze (./field.ts
+ *     MARK_ROLES, as the organiser decided): RED (621.9, 506.4), GREEN (621.9, 723.3). The big
+ *     circles: RED (1107.7, 505.3) on the right, at the height of the red cube; GREEN (623.6,
+ *     933.2) right below the green cube. Neither cube can be taken from above or below: the cubes
+ *     stand 216.8 mm apart, and with the claw around one cube the back of the robot reaches 212 mm
+ *     from it - into the other cube, whose near side is only 191.8 mm away.
+ *       GREEN: from the Scan Station back 43.8 cm along the bottom line (x 621.9, right below the
+ *       green cube), a turn to the left, and "forward to a white line": the white line at the
+ *       bottom of the maze (its lower edge at y 785.2) stops the robot with its middle at y 869.3,
+ *       the open claw around the cube (its middle 4 mm short of the cube's middle; the front of
+ *       the body 16 mm before the cube). Close; back 21 cm: the cube 1.7 mm from the middle of
+ *       the big green circle. Open; back 6 cm (the back of the robot then stays on the mat).
+ *       RED: back 19.7 cm (x 862.9), a turn to the left, "forward to a white line": the short
+ *       white line from the maze to the right (its lower edge at y 628.6) is the first line on
+ *       that way; then 20.69 cm on, to the height of the red cube; a turn to the left and 9.9 cm
+ *       put the claw around it. Close; a half turn to the right (the cube swings over the top,
+ *       far from the green cube); 20.2 cm put it 1.5 mm from the middle of the big red circle.
  *   - The tokens stand in the middle of the zone pictures on the left: zone A (130.8, 776.3), B
- *     (130.8, 611.0), C (133.6, 457.9). The maze targets: the red square (621.9, 506.4), the blue disc
- *     (618.4, 615.1), the green square (621.9, 723.3).
+ *     (130.8, 611.0), C (133.6, 457.9). Their targets are the three WAREHOUSES at the top (./field.ts
+ *     MARK_ROLES): RED (130.8, 118.5) at the top left and GREEN (1102.5, 118.9) at the top right,
+ *     both turned by 45 degrees, and BLUE (621.2, 118.5) in the middle, straight. Each is 104.76 x
+ *     62.86 mm: a cube fits completely, in a turned one only when it is turned with it (./game.ts L1).
  *       "The road" of the token programs is a straight way up and down at x 340 (34 cm from the
- *       left edge), between the zone pictures and the maze. It is not printed: the robot drives it
- *       by distance, and on it always faces up; "robot y" says where it is (cm from the top edge).
+ *       left edge), between the zone pictures and the maze. It is not printed, but it crosses
+ *       printed white lines: the three short lines that join the long line to the maze, one at
+ *       the height of each zone, and the cross line of the "tree" at the top. On the road the
+ *       robot always faces up; "robot y" says where it is (cm from the top edge).
+ *       The two-tokens example finds its place with "forward to a white line" (the line next to
+ *       zone A); the whole mission knows it from the white line of its team cube's way. The
+ *       numbers that follow such a stop (LINE_A_Y_CM, RED_WAY.up, GREEN_TO_ROAD.y, RED_TO_ROAD.y)
+ *       and the zone heights have two decimals: they are measured, so that the claw closes within
+ *       0.75 mm of the middle of every cube, on the drawing and on the picture of the mat, for a
+ *       start moved up to 1 cm up or down (the probe sees the line one tick of the simulation
+ *       earlier or later: 0.67 mm at 20 RPM; the picture's line edges lie about 0.5 mm off the
+ *       drawing's). Then the closing claw moves no cube by more than 0.32 mm.
  *       From the road, a quarter turn to the left and 6.6 cm put the claw around the token of a
- *       zone; a quarter turn to the right and 14 cm put a token in the claw over its target. While
- *       the robot turns on the road, the tips of its open claw stay 9.6 mm or more away from the
- *       tokens in the zones, and its body 7 mm or more away from the place of the gate (the closest
- *       is the turn at zone A; at x 345 it was 3.8 mm, so the road moved 5 mm to the left).
- *   - With 50 mm cubes, a token can never be COMPLETELY inside the red or the green square (41.9 mm):
- *     the red and the green token can only earn 5 points each (half points), the blue one 10. So
- *     the most a match can give in this simulator is 75 of the 85 points (./game.ts L1).
+ *       zone (zone C's token stands 2.8 mm further left: it sits a little deeper in the claw).
+ *       The robot takes the token facing left, so the claw holds it turned by a quarter turn from
+ *       the robot: square to the robot, whichever way the robot faces.
+ *       At y 328 (TOP_Y_CM 32.8) the robot is on the cross line, at the end of the white diagonal
+ *       line on the left; that line points at the RED warehouse. RED: a turn of 45 degrees to the
+ *       left and 15.4 cm put the token over its middle, turned like it. GREEN: 55.3 cm to the right
+ *       along the cross line (x 893, the end of the diagonal line on the right), a turn of 45
+ *       degrees to the left, 15.4 cm. BLUE: 28.1 cm to the right (x 621, the middle line of the
+ *       tree), a turn to the left, 6.7 cm. Every token ends within 2.8 mm of the middle of its
+ *       warehouse (it may be 6.4 mm off across the short side). After a token is down the robot
+ *       backs the same way: after 6.7 cm the open fingers turn 12 mm clear of the blue token.
+ *       While the robot turns on the road, the tips of its open claw stay 9.6 mm or more away from
+ *       the tokens in the zones, and its body 7 mm or more away from the place of the gate (the
+ *       closest is the turn at zone A; at x 345 it was 3.8 mm, so the road moved 5 mm to the left).
+ *   - The highest score, 85, can be reached: every warehouse holds a whole cube.
  *
  * The simulated robot is perfect (no wheel slip), so driving by distance is exact here. A real
  * robot drifts: it has to correct its way with the white lines - which is what the line follower
- * starts to show. Every program that drives by distance needs the robot where the simulator puts
- * it at the start. The distances are whole millimetres, so a cube is a fraction of a millimetre off
- * the middle of the claw when the claw closes: the closing claw moves it to the middle, by 0.32 mm at
- * most on the 72 matches of the tests (they allow less than 0.5 mm in the moment of gripping, and no
- * other move of a cube that is not in the claw).
+ * starts to show, and what "forward to a white line" does once on every way to a cube. A program
+ * that drives by distance needs the robot where the simulator puts it at the start: moved 1 cm up
+ * or down (the try of the line follower) every example still scores the same, because the white
+ * line stops absorb it; moved sideways or turned, the programs that carry cubes do not.
  *
  * Plain TypeScript, no DOM, no Blockly.
  */
@@ -114,6 +138,7 @@ import {
   repeatUntil,
   script,
   setVar,
+  stopMotors,
   sub,
   turn,
   v,
@@ -166,31 +191,51 @@ export const AFTER_CARD_S = 2;
 /** The try of the card starter: a shorter wait, which ends the program before the box is lifted. */
 export const TOO_SHORT_WAIT_S = 1;
 
-/** The way from the Scan Station to the green cube and into the big green circle (cm; see the table above). */
-export const GREEN_WAY = { up: 69.0, diagonal: 18.2, toCube: 10, down: 64.4, toCircle: 16.6 } as const;
-/** The way from the Scan Station to the red cube and into the big red circle (cm). */
-export const RED_WAY = { up: 76.8, left: 70.8, toCube: 17.1, back: 40.5, toCircle: 44.8 } as const;
-/** After a delivery the robot backs away this far (cm). */
-export const AWAY_FROM_CUBE_CM = 15;
+/**
+ * "forward to a white line": the speed (RPM) at which the robot drives until its sensor sees a white
+ * line across its way. Slowly, so that it stops close to where the line starts: at 20 RPM it rolls
+ * 0.67 mm in one tick of the simulation (at 40 RPM, 1.3 mm - too much for a claw that must close
+ * on the middle of a cube).
+ */
+export const TO_LINE_RPM = 20;
+
+/**
+ * The way from the Scan Station to the green cube on the green square in the maze, and into the
+ * big green circle just below it (cm; see the table above).
+ */
+export const GREEN_WAY = { back: 43.8, down: 21, away: 6 } as const;
+/**
+ * The way from the Scan Station to the red cube on the red square in the maze, and into the big red
+ * circle on the right (cm). "up" comes after the stop at the white line: measured (see the table above).
+ */
+export const RED_WAY = { back: 19.7, up: 20.69, toCube: 9.9, toCircle: 20.2, away: 15 } as const;
 
 /** The road of the token programs: 34 cm from the left edge of the mat (x 340 mm). */
 export const ROAD_X_CM = 34;
 /** From the start, this far forward (cm) brings the robot's middle onto the road. */
 export const START_TO_ROAD_CM = 26.2;
-/** Where the robot's middle is at the start: cm from the top edge (y 1108.1 mm). */
-export const START_Y_CM = 110.8;
-/** The height (cm from the top edge) of the middle of each zone picture ... */
-export const ZONE_Y_CM = { A: 77.6, B: 61.1, C: 45.8 } as const;
-/** ... and of each maze target. */
-export const TARGET_Y_CM = { red: 50.6, blue: 61.5, green: 72.3 } as const;
+/**
+ * "robot y" when the robot has stopped at the white line next to zone A, facing up on the road (cm
+ * from the top edge). Measured: with it, the claw closes on the middle of each token (see the table above).
+ */
+export const LINE_A_Y_CM = 86.99;
+/** The height (cm from the top edge) of the middle of each zone picture (to 0.1 mm: see the table above). */
+export const ZONE_Y_CM = { A: 77.63, B: 61.1, C: 45.79 } as const;
 /** From the road, facing left: this far (cm) puts the open claw around the token of a zone. */
 export const TO_TOKEN_CM = 6.6;
-/** From the road, facing right: this far (cm) puts the token in the claw over its target. */
-export const TO_TARGET_CM = 14;
-/** After the green circle: up this far (cm) - the robot then passes 14 mm above the place of the gate - and this far left to the road. */
-export const GREEN_TO_ROAD = { up: 18.3, left: 57.5, y: 75 } as const;
-/** After the red circle: this far left (cm) to the road, at the height of the red circle. */
-export const RED_TO_ROAD = { left: 47.5, y: 50.6 } as const;
+/** On the road, at this height (cm from the top edge) the robot turns towards the warehouse of the token it holds. */
+export const TOP_Y_CM = 32.8;
+/**
+ * From the road at TOP_Y_CM to each warehouse (cm). RED: a turn of 45 degrees to the left, then along
+ * the white diagonal line on the left. GREEN: right along the top, a turn of 45 degrees to the left,
+ * then along the white diagonal line on the right. BLUE: right to the middle line of the "tree", a
+ * turn to the left, then up.
+ */
+export const WAREHOUSE_WAY = { red: { diagonal: 15.4 }, green: { across: 55.3, diagonal: 15.4 }, blue: { across: 28.1, up: 6.7 } } as const;
+/** After the green circle: left to the road, along the bottom of the field; there "robot y" is this (measured). */
+export const GREEN_TO_ROAD = { left: 28.2, y: 113.89 } as const;
+/** After the red circle: backward to the road, at the height of the red circle; there "robot y" is this (measured). */
+export const RED_TO_ROAD = { back: 47.6, y: 50.65 } as const;
 
 const RED = '#ff0000';
 const GREEN = '#00ff00';
@@ -217,6 +262,9 @@ const WAIT_FOR_BOX_NOTE =
 /** On "set robot y" when the robot has come onto the road. */
 const ON_THE_ROAD_NOTE = 'Now the robot is on the road, facing up. "robot y" says where: cm from the top edge of the mat.';
 
+/** On a call of "forward to a white line". */
+const TO_THE_LINE_NOTE = 'Up to the white line next to zone A. Now the robot knows exactly where it is, even if it started a little too high or too low.';
+
 // =============================================================================================
 // My-blocks shared by several programs
 // =============================================================================================
@@ -238,47 +286,54 @@ function waitAtTheScanStation(): DefinitionNode {
   );
 }
 
-/** "bring the green cube": from the Scan Station (facing right, box lifted) to the green cube, and into the big green circle. */
-function bringTheGreenCube(): DefinitionNode {
+/**
+ * "forward to a white line": drive slowly until probe L1 sees white, then stop. Used where a white
+ * line crosses the robot's way: it puts the robot at a known place, wherever it started.
+ */
+function forwardToAWhiteLine(): DefinitionNode {
   return note(
-    define('bring the green cube', [], [
-      note(turn('left', 90), 'Face up.'),
-      note(moveCm('forward', GREEN_WAY.up), 'Up the right side of the field.'),
-      turn('left', 45),
-      note(moveCm('forward', GREEN_WAY.diagonal), 'Now the robot is on the white diagonal line on the right. It points at the green cube.'),
-      note(turn('right', 90), 'Face along the diagonal line, up to the right.'),
-      note(moveCm('forward', GREEN_WAY.toCube), AROUND_THE_CUBE_NOTE),
-      gripper('close'),
-      moveCm('backward', GREEN_WAY.toCube),
-      note(turn('right', 135), 'Face down.'),
-      note(moveCm('forward', GREEN_WAY.down), 'Down to the height of the big green circle.'),
-      note(turn('right', 90), 'Face left, at the big green circle.'),
-      note(moveCm('forward', GREEN_WAY.toCircle), 'Now the cube is over the middle of the circle.'),
-      note(gripper('open'), 'The cube stands completely inside the big green circle. Green team: +20 points, and the gate opens (+5).'),
-      note(moveCm('backward', AWAY_FROM_CUBE_CM), 'Back, away from the cube.'),
+    define('forward to a white line', [], [
+      move('forward', TO_LINE_RPM),
+      note(waitUntil(probeDetects('L1', 'line')), 'L1 is a middle probe of the sensor under the front of the robot. On this mat "detects line" means white.'),
+      stopMotors('all'),
     ]),
-    'From the Scan Station to the green cube at the top right. Take it, and put it in the middle of the big green circle.',
+    'Forward slowly until the sensor sees a white line, then stop. Then the robot is always at the same place on its way, even if it started a little off.',
   );
 }
 
-/** "bring the red cube": from the Scan Station (facing right, box lifted) to the red cube, and into the big red circle. */
+/** "bring the green cube": from the Scan Station (facing right, box lifted) to the green cube on its square, and into the big green circle. */
+function bringTheGreenCube(): DefinitionNode {
+  return note(
+    define('bring the green cube', [], [
+      note(moveCm('backward', GREEN_WAY.back), 'Back along the bottom line, until the robot is right below the green cube.'),
+      note(turn('left', 90), 'Face up, at the green cube.'),
+      note(call('forward to a white line'), 'Up to the white line at the bottom of the maze. The open claw is now around the green cube, without touching it.'),
+      gripper('close'),
+      note(moveCm('backward', GREEN_WAY.down), 'Back down with the cube: now it is over the middle of the big green circle.'),
+      note(gripper('open'), 'The cube stands completely inside the big green circle. Green team: +20 points, and the gate opens (+5).'),
+      note(moveCm('backward', GREEN_WAY.away), 'Back, away from the cube.'),
+    ]),
+    'From the Scan Station to the green cube on the green square in the maze. Take it, and put it in the middle of the big green circle, just below.',
+  );
+}
+
+/** "bring the red cube": from the Scan Station (facing right, box lifted) to the red cube on its square, and into the big red circle. */
 function bringTheRedCube(): DefinitionNode {
   return note(
     define('bring the red cube', [], [
+      note(moveCm('backward', RED_WAY.back), 'Back along the bottom line a little.'),
       note(turn('left', 90), 'Face up.'),
-      note(moveCm('forward', RED_WAY.up), 'Up the right side. Not higher: the green cube stands at the top right.'),
-      note(turn('left', 90), 'Face left.'),
-      note(moveCm('forward', RED_WAY.left), 'Along the top of the field, to the end of the white diagonal line on the left.'),
-      note(turn('right', 45), 'Face up to the left: the diagonal line points at the red cube.'),
+      note(call('forward to a white line'), 'Up to the short white line on the right of the maze.'),
+      note(moveCm('forward', RED_WAY.up), 'Up to the height of the red cube.'),
+      note(turn('left', 90), 'Face left, at the red cube.'),
       note(moveCm('forward', RED_WAY.toCube), AROUND_THE_CUBE_NOTE),
       gripper('close'),
-      note(moveCm('backward', RED_WAY.back), 'Back along the same line, down to the height of the big red circle.'),
-      note(turn('right', 135), 'Face right, at the big red circle.'),
+      note(turn('right', 180), 'Turn around with the cube: now the robot faces the big red circle.'),
       note(moveCm('forward', RED_WAY.toCircle), 'Now the cube is over the middle of the circle.'),
       note(gripper('open'), 'The cube stands completely inside the big red circle. Red team: +20 points, and the gate opens (+5).'),
-      note(moveCm('backward', AWAY_FROM_CUBE_CM), 'Back, away from the cube.'),
+      note(moveCm('backward', RED_WAY.away), 'Back, away from the cube.'),
     ]),
-    'From the Scan Station to the red cube at the top left. Take it, and put it in the middle of the big red circle.',
+    'From the Scan Station to the red cube on the red square in the maze. Take it, and put it in the middle of the big red circle, on the right.',
   );
 }
 
@@ -314,25 +369,56 @@ function takeTheToken(): DefinitionNode {
   );
 }
 
-/** "put the token on its target": the colour that was read decides the target; drive there on the road, put the token down, and back. */
-function putTheTokenOnItsTarget(): DefinitionNode {
+/**
+ * "put the token in its warehouse": up the road to TOP_Y_CM; the colour that was read decides the
+ * warehouse; drive there, put the token down, and come back onto the road, facing up.
+ */
+function putTheTokenInItsWarehouse(): DefinitionNode {
   return note(
-    define('put the token on its target', [], [
+    define('put the token in its warehouse', [], [
+      note(call('drive on the road to', TOP_Y_CM), `Up the road to the white cross line at the top: ${TOP_Y_CM} cm from the top edge.`),
       note(
         ifElse(
           eq(v('token colour'), 'red'),
-          [call('drive on the road to', TARGET_Y_CM.red)],
-          [ifElse(eq(v('token colour'), 'green'), [call('drive on the road to', TARGET_Y_CM.green)], [call('drive on the road to', TARGET_Y_CM.blue)])],
+          [
+            note(turn('left', 45), 'Face up to the left, along the white diagonal line: at the RED warehouse.'),
+            note(moveCm('forward', WAREHOUSE_WAY.red.diagonal), 'Now the token is over the middle of the RED warehouse, turned like it.'),
+            note(gripper('open'), 'The token stands completely inside the RED warehouse: +10 points.'),
+            moveCm('backward', WAREHOUSE_WAY.red.diagonal),
+            note(turn('right', 45), 'On the road again, facing up.'),
+          ],
+          [
+            ifElse(
+              eq(v('token colour'), 'green'),
+              [
+                note(turn('right', 90), 'Face right.'),
+                note(moveCm('forward', WAREHOUSE_WAY.green.across), 'Along the white cross line, to the white diagonal line on the right.'),
+                note(turn('left', 45), 'Face up to the right, along the white diagonal line: at the GREEN warehouse.'),
+                note(moveCm('forward', WAREHOUSE_WAY.green.diagonal), 'Now the token is over the middle of the GREEN warehouse, turned like it.'),
+                note(gripper('open'), 'The token stands completely inside the GREEN warehouse: +10 points.'),
+                moveCm('backward', WAREHOUSE_WAY.green.diagonal),
+                note(turn('right', 45), 'Face right.'),
+                note(moveCm('backward', WAREHOUSE_WAY.green.across), 'Backward, all the way to the road.'),
+                note(turn('left', 90), 'On the road again, facing up.'),
+              ],
+              [
+                note(turn('right', 90), 'Face right.'),
+                note(moveCm('forward', WAREHOUSE_WAY.blue.across), 'To the white line in the middle, below the BLUE warehouse.'),
+                note(turn('left', 90), 'Face up, at the BLUE warehouse.'),
+                note(moveCm('forward', WAREHOUSE_WAY.blue.up), 'Now the token is over the middle of the BLUE warehouse.'),
+                note(gripper('open'), 'The token stands completely inside the BLUE warehouse: +10 points.'),
+                moveCm('backward', WAREHOUSE_WAY.blue.up),
+                note(turn('right', 90), 'Face right.'),
+                note(moveCm('backward', WAREHOUSE_WAY.blue.across), 'Backward to the road.'),
+                note(turn('left', 90), 'On the road again, facing up.'),
+              ],
+            ),
+          ],
         ),
-        'Red square 50.6 cm, green square 72.3 cm, blue disc 61.5 cm from the top edge. Not red and not green means blue.',
+        'The warehouses are at the top: RED on the left, BLUE in the middle, GREEN on the right. Not red and not green means blue.',
       ),
-      note(turn('right', 90), 'Face right, into the maze.'),
-      note(moveCm('forward', TO_TARGET_CM), 'Now the token is over the middle of its target.'),
-      note(gripper('open'), 'On the blue disc a token fits completely: +10. On a small square only partly: +5.'),
-      note(moveCm('backward', TO_TARGET_CM), 'Back onto the road. The open fingers do not touch the token.'),
-      turn('left', 90),
     ]),
-    'The robot holds a token on the road. "token colour" decides the target. Drive there, put the token on it, and come back facing up.',
+    'The robot holds a token on the road. Up to the top. "token colour" decides the warehouse. Drive there, put the token in it, and come back to the road, facing up.',
   );
 }
 
@@ -462,16 +548,16 @@ const readCard: SampleProgram = {
 // =============================================================================================
 // 4. locker-team-cube
 // =============================================================================================
-// Measured (samples.test.ts): 55 points on all 12 arrangements (Steps 1, 2 and 3 as in the card
-// starter, Step 5 +20 and Step 6 +5; the gate opens), never a wrong delivery, the gate never
-// touched, the cube of the other colour never moved.
-//   - RED (6 arrangements): the red cube is in the big red circle at 28.04 s, 0.4 mm from its middle
-//     (67.7 mm inside its edge); the program ends after 29.10 s.
-//   - GREEN (6 arrangements): the green cube is in the big green circle at 24.98 s, 0.2 mm from its
-//     middle (69.2 mm inside its edge); the program ends after 26.04 s. (The default arrangement,
-//     G5, is a GREEN one: 55 points, 26.04 s.)
-// The closing claw moves a team cube by a fraction of a millimetre to the middle of its fingers (the
-// robot arrives up to 0.5 mm beside the cube's middle: the distances are whole millimetres).
+// Measured (samples.test.ts), on the drawing and on the picture: 55 points on all 12 arrangements
+// (Steps 1, 2 and 3 as in the card starter, Step 5 +20 and Step 6 +5; the gate opens), never a wrong
+// delivery, the gate never touched, the cube of the other colour and the tokens never moved.
+//   - RED (6 arrangements): the red cube is in the big red circle at 23.09 s, 1.5 mm from its middle;
+//     the program ends after 24.15 s.
+//   - GREEN (6 arrangements): the green cube is in the big green circle at 18.66 s, 1.7 mm from its
+//     middle; the program ends after 19.18 s. (The default arrangement, G5, is a GREEN one: 55 points,
+//     19.18 s.)
+// Started 1 cm (or less) higher or lower in the Locker Room: the same 55 points on all 12, ending
+// 0.15 s sooner or later - "forward to a white line" puts the robot back on its way.
 // The try (the two ways swapped in the "if"): the cube of the other colour goes into its own
 // circle - a wrong delivery, -10, and the gate stays closed: 20 points on all 12.
 
@@ -480,12 +566,14 @@ const teamCube: SampleProgram = {
   description:
     'The first half of the mission. The robot drives into the Scan Station, reads the colour card and waits until the Team Box is lifted. ' +
     'Then "team colour" decides the way. ' +
-    'Red: it takes the red cube at the top left and puts it into the big red circle. ' +
-    'Green: it takes the green cube at the top right and puts it into the big green circle. Then the gate opens. ' +
-    'It scores 55 points on all 12 draws, after 26 to 29 seconds. ' +
+    'Red: it takes the red cube from the red square in the maze to the big red circle. ' +
+    'Green: it takes the green cube from the green square to the big green circle. The gate opens. ' +
+    'On the way it stops at a white line: then it knows exactly where it is. ' +
+    'It scores 55 points on all 12 draws, after 19 to 24 seconds. ' +
     'Try to swap the two ways in the "if" block. What does a wrong delivery cost?',
   program: program([
     waitAtTheScanStation(),
+    forwardToAWhiteLine(),
     bringTheRedCube(),
     bringTheGreenCube(),
     script(note(whenStart(), BY_DISTANCE_NOTE), [
@@ -502,41 +590,42 @@ const teamCube: SampleProgram = {
 // =============================================================================================
 // 5. locker-two-tokens
 // =============================================================================================
-// Measured (samples.test.ts), the same on both team colours:
-//   - zone cards 1 and 3 (RED and GREEN in zones A and B): 15 points - leave the Locker Room 5, the
-//     red and the green token each partly inside its square 5; the program ends after 17.74 s
-//     (option 1) or 16.45 s (option 3);
-//   - zone cards 2, 4, 5 and 6 (BLUE in zone A or B): 20 points - 5, the blue token completely on
-//     the blue disc 10, the other token partly inside its square 5; the program ends after 15.84 to
-//     17.09 s (the default arrangement, G5 - BLUE in A, RED in B: 20 points, 16.44 s).
-// Every token is put down 4.6 mm (blue) or 1.2 mm (red, green) from the middle of its target, the
-// token of zone C and the team cubes are never touched, and neither is the closed gate (the robot
-// passes 7 mm from it when it turns at zone A).
-// The try (zone C too: "take the token at 45.8" and "put the token on its target" once more): 25
-// points on all 12, after 22.39 to 25.59 s.
+// Measured (samples.test.ts), on the drawing and on the picture, the same on both team colours:
+// 25 points on all 12 arrangements (leave the Locker Room 5; each of the two tokens completely
+// inside the warehouse of its colour, 10 + 10). How long it takes depends on the colours in zones A
+// and B: RED and BLUE (zone cards 2 and 5) 26.40 s, RED and GREEN (1 and 3) 30.16 s, GREEN and
+// BLUE (4 and 6) 34.26 s - the GREEN warehouse is the farthest from the road, the RED one the
+// nearest. (The default arrangement, G5 - BLUE in A, RED in B: 25 points, 26.40 s.) Every token
+// ends within 1.2 mm of the middle of its warehouse (1.6 mm with the start moved); the token of
+// zone C and the team cubes are never touched, and neither is the closed gate. Started 1 cm (or
+// less) higher or lower: the same points.
+// The try (zone C too: "take the token at 45.79" and "put the token in its warehouse" once more):
+// 35 points on all 12, after 40.78 s.
 
 const twoTokens: SampleProgram = {
   ...exampleCard('locker-two-tokens'),
   description:
-    'The robot leaves the Locker Room and drives to "the road": a straight way between the zone pictures and the maze. ' +
-    'It takes the token in zone A and reads its colour. It puts it on the target of that colour in the maze. Then the same with zone B. ' +
-    '"robot y" says where the robot is on the road. ' +
-    'It scores 20 points on 8 of the 12 draws and 15 on the other 4, after 16 to 18 seconds. ' +
-    'A blue token fits completely on the blue disc: 10 points. A red or green token is bigger than its square: only partly inside, 5 points. ' +
+    'The robot leaves the Locker Room (+5 points) and drives to "the road", between the zone pictures and the maze. ' +
+    'Up the road, it stops at the white line next to zone A. ' +
+    'It takes the token of zone A and reads its colour. It puts it into the warehouse of that colour, at the top. Then the same with zone B. ' +
+    'The RED and GREEN warehouses are turned: the robot drives along a white diagonal line, so the token is turned like them. ' +
+    'It scores 25 points on all 12 draws, after 26 to 34 seconds. ' +
     'It does not open the gate. In this simulator the tokens count all the same (the rules do not say). ' +
     'Try zone C too.',
   program: program([
+    forwardToAWhiteLine(),
     driveOnTheRoad(),
     takeTheToken(),
-    putTheTokenOnItsTarget(),
+    putTheTokenInItsWarehouse(),
     script(note(whenStart(), BY_DISTANCE_NOTE), [
       note(moveCm('forward', START_TO_ROAD_CM), 'Out of the Locker Room (+5 points), to the road.'),
       note(turn('left', 90), 'Face up.'),
-      note(setVar('robot y', START_Y_CM), ON_THE_ROAD_NOTE),
-      note(call('take the token at', ZONE_Y_CM.A), 'Zone A, the lowest zone picture: 77.6 cm from the top edge.'),
-      call('put the token on its target'),
-      note(call('take the token at', ZONE_Y_CM.B), 'Zone B, the middle one: 61.1 cm.'),
-      call('put the token on its target'),
+      note(call('forward to a white line'), TO_THE_LINE_NOTE),
+      note(setVar('robot y', LINE_A_Y_CM), ON_THE_ROAD_NOTE),
+      note(call('take the token at', ZONE_Y_CM.A), `Zone A, the lowest zone picture: ${ZONE_Y_CM.A} cm from the top edge.`),
+      call('put the token in its warehouse'),
+      note(call('take the token at', ZONE_Y_CM.B), `Zone B, the middle one: ${ZONE_Y_CM.B} cm.`),
+      call('put the token in its warehouse'),
     ]),
   ]),
 };
@@ -549,34 +638,33 @@ const twoTokens: SampleProgram = {
 // tokens" does with A and B. It never assumes an arrangement: the card is read in one place
 // ("wait at the Scan Station"), every token in one place ("take the token at"), and every colour
 // a block names is compared with what was read.
-// Measured (samples.test.ts): 75 points on all 12 arrangements - the most this simulator gives
-// (Steps 1, 2, 3, 5, 6 = 55; the blue token completely on the blue disc 10; the red and the green
-// token each partly inside its square 5). Never a wrong delivery, the gate never touched, nothing
-// pushed (the closing claw moves a cube by 0.32 mm at most to the middle of its fingers). Every token
-// ends 1.0 to 2.2 mm (red, green) or 2.4 to 5.5 mm (blue) from the middle of its target. The program
-// ends after 50.78 to 56.68 s (53.48 to 56.68 s for RED, 50.78 to 53.98 s for GREEN; 52.03 s on the
-// default arrangement, G5). The try (the zones in the order C, B, A) also scores 75 on all 12, after
-// 52.14 to 55.59 s; whether it is faster depends on the cards: it is faster on 5 of the 6 RED
-// arrangements (up to 3.2 s; a RED team comes onto the road at the height of zone C) and slower on
-// 5 of the 6 GREEN ones (up to 3.6 s).
+// Measured (samples.test.ts), on the drawing and on the picture: 85 points on all 12 arrangements
+// - every point there is (Steps 1, 2, 3, 5, 6 = 55; each token completely inside the warehouse of
+// its colour, 3 x 10). Never a wrong delivery, the gate never touched, nothing pushed. Every token
+// ends within 2.6 mm of the middle of its warehouse (2.8 mm with the start moved; the token of
+// zone C sits 2.8 mm deeper in the claw). The program ends after 63.69 s on the 6 RED arrangements
+// and 58.71 s on the 6 GREEN ones (the default, G5: 58.71 s): every draw has one token of each
+// colour, so the way is as long on all six zone cards. Started 1 cm (or less) higher or
+// lower: the same 85, 0.15 s sooner or later. The try (the zones in the order C, B, A) also scores
+// 85 on all 12, and is slower on all 12: 64.27 s (RED), 62.51 s (GREEN).
 
 const wholeMission: SampleProgram = {
   ...exampleCard('locker-whole-mission'),
   description:
     'The whole mission, for every draw. At the Scan Station the robot reads the card and waits until the Team Box is lifted. ' +
     'Then it brings the cube of its team colour into the big circle of that colour, and the gate opens. ' +
-    'Then it takes the tokens of zones A, B and C, one after the other. It reads the colour of each one and puts it on the target of that colour. ' +
+    'Then it takes the tokens of zones A, B and C, one after the other. It reads the colour of each one and puts it into the warehouse of that colour. ' +
     'It never guesses a colour. ' +
-    'It scores 75 points on all 12 draws, in 51 to 57 of the 150 seconds. ' +
-    'In this simulator 75 is the most there is: a token is bigger than the red and the green square. ' +
+    'It scores 85 points on all 12 draws, in 59 to 64 of the 150 seconds. 85 is the most a match can give. ' +
     'Try the zones in the order C, B, A. Is it faster?',
   program: program([
     waitAtTheScanStation(),
+    forwardToAWhiteLine(),
     bringTheRedCube(),
     bringTheGreenCube(),
     driveOnTheRoad(),
     takeTheToken(),
-    putTheTokenOnItsTarget(),
+    putTheTokenInItsWarehouse(),
     script(note(whenStart(), BY_DISTANCE_NOTE), [
       note(moveCm('forward', TO_STATION_CM), 'Into the Scan Station. The whole robot is inside it now, with the Team Box.'),
       call('wait at the Scan Station'),
@@ -585,15 +673,12 @@ const wholeMission: SampleProgram = {
           eq(v('team colour'), 'red'),
           [
             call('bring the red cube'),
-            note(turn('left', 180), 'Face left.'),
-            note(moveCm('forward', RED_TO_ROAD.left), 'To the road, at the height of the big red circle.'),
-            note(turn('right', 90), 'Face up.'),
+            note(moveCm('backward', RED_TO_ROAD.back), 'Backward to the road, at the height of the big red circle.'),
+            note(turn('left', 90), 'Face up.'),
             note(setVar('robot y', RED_TO_ROAD.y), ON_THE_ROAD_NOTE),
           ],
           [
             call('bring the green cube'),
-            note(turn('right', 90), 'Face up.'),
-            note(moveCm('forward', GREEN_TO_ROAD.up), 'Up, so that the robot does not pass over the place of the gate.'),
             note(turn('left', 90), 'Face left.'),
             note(moveCm('forward', GREEN_TO_ROAD.left), 'To the road.'),
             note(turn('right', 90), 'Face up.'),
@@ -607,15 +692,15 @@ const wholeMission: SampleProgram = {
   ]),
 };
 
-/** The three "take the token at" + "put the token on its target" of the advanced example: zone A, B, then C. */
+/** The three "take the token at" + "put the token in its warehouse" of the advanced example: zone A, B, then C. */
 function everyToken(): BlockNode[] {
   return [
-    note(call('take the token at', ZONE_Y_CM.A), 'Zone A, the lowest zone picture: 77.6 cm from the top edge.'),
-    call('put the token on its target'),
-    note(call('take the token at', ZONE_Y_CM.B), 'Zone B, the middle one: 61.1 cm.'),
-    call('put the token on its target'),
-    note(call('take the token at', ZONE_Y_CM.C), 'Zone C, the top one: 45.8 cm.'),
-    call('put the token on its target'),
+    note(call('take the token at', ZONE_Y_CM.A), `Zone A, the lowest zone picture: ${ZONE_Y_CM.A} cm from the top edge.`),
+    call('put the token in its warehouse'),
+    note(call('take the token at', ZONE_Y_CM.B), `Zone B, the middle one: ${ZONE_Y_CM.B} cm.`),
+    call('put the token in its warehouse'),
+    note(call('take the token at', ZONE_Y_CM.C), `Zone C, the top one: ${ZONE_Y_CM.C} cm.`),
+    call('put the token in its warehouse'),
   ];
 }
 

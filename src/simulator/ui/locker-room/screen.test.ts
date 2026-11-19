@@ -2,24 +2,24 @@
  * The screen parts of Locker Room without a browser: its words, the Cards panel (its logic - one
  * token of each colour, always one of the six zone cards - the code field, and the panel drawn to
  * HTML and clicked in jsdom), the lists of "Test on many draws", the window itself run on all 12
- * draws, the stage's drawing of the Team Box, the card and the turned pickup zones, the console's
+ * draws, the stage's drawing of the Team Box, the card and the turned warehouses, the console's
  * names, and the wiring of the page - the props it hands the general screen, and that the general
  * screen hands them on (and that the other three games pass none of the new ones).
  *
  * Run with:  npm run test:sim
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { test } from 'node:test';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { BatchResult } from '../../core/batch';
 import { TABLE_MARGIN } from '../../core/engine';
 import { createSimulation } from '../../core/simulation';
 import type { ProgramJson, ScoreReport, Simulation } from '../../core/types';
-import { BIG_CIRCLES, MARK_ROLES, TABLE_STRIP, ZONES, ZONE_IDS, markOutline, pickupZone, type ZoneId } from '../../locker-room/field';
+import { BIG_CIRCLES, MARK_ROLES, TABLE_STRIP, ZONES, ZONE_IDS, markOutline, pickupZone, targetOf, type ZoneId } from '../../locker-room/field';
 import {
   CARD_SHOW_S,
   CUBE_FILL,
@@ -94,6 +94,8 @@ test('words: a "draw" of two cards, in a panel called "Cards"; a "match" as the 
   assert.match(WORDS.sheetNote, /Touching the closed gate costs 10 points, once\. The total is never below 0\./);
   assert.match(WORDS.finishedHint, /^The referee says "STOP"/);
   assert.equal(WORDS.tableEdge, 'the edge of the table');
+  // the Zones button names the zones as the stage labels them: the pickup zones and the warehouses (the targets at the top)
+  assert.equal(WORDS.zonesHint, 'Colour the zones: Locker Room, Scan Station, pickup zones, big circles, zones A, B, C, the warehouses and the gate');
   // short and plain: no sentence of the game's own words is longer than 140 characters
   for (const [key, value] of Object.entries(LOCKER_ROOM_WORDS)) {
     for (const sentence of String(value).split(/(?<=[.!?])\s+/)) assert.ok(sentence.length <= 140, `${key}: ${sentence}`);
@@ -562,17 +564,23 @@ test('stage: the Team Box is drawn on the robot until the referee lifts it, the 
   assert.equal(propBox({ frame: 'mat', x: 10, y: 20, angle: 0.5, w: 3, l: 4 }, START_POSE).x, 10, 'a prop on the mat stays where it is');
 });
 
-test('stage: the cubes are drawn as cubes, the pickup zones by their turned outline, the big circles as round zones, the gate is a wall until it opens', () => {
+test('stage: the cubes are drawn as cubes, the RED and GREEN warehouses by their turned outline, the pickup squares and the big circles as they are, the gate is a wall until it opens', () => {
   assert.equal(CUBE_KIND, KIND_CUBE);
   const bodies = lockerRoomGame.createBodies(defaultScenario());
   for (const body of bodies) assert.equal(body.kind, CUBE_KIND);
   assert.deepEqual(bodies.map((body) => body.id).sort(), [teamCubeId('green'), teamCubeId('red'), ...ZONE_IDS.map(tokenId)].sort());
   const overlays = lockerRoomGame.overlays(defaultScenario());
   for (const color of ['red', 'green'] as const) {
+    // the warehouse of the colour: turned, so its outline is the zone
+    const target = overlays.find((zone) => zone.id === `target:${color}`);
+    assert.ok(target?.outline, `${color}: the turned rectangle is the zone`);
+    assert.deepEqual(target.outline, markOutline(targetOf(color)));
+    assert.equal(MARK_ROLES.target[color].endsWith('Diamond'), true, 'the warehouses of MARK_ROLES');
+    // the pickup square: not turned, its rect is the zone
     const pickup = overlays.find((zone) => zone.id === `pickup:${color}`);
-    assert.ok(pickup?.outline, `${color}: the turned rectangle is the zone`);
-    assert.deepEqual(pickup.outline, markOutline(pickupZone(color)));
-    assert.equal(MARK_ROLES.pickup[color].endsWith('Diamond'), true, 'the pickup zones of MARK_ROLES');
+    assert.equal(pickup?.outline, undefined, `${color}: a square that is not turned`);
+    assert.equal(MARK_ROLES.pickup[color].endsWith('Square'), true, 'the pickup zones of MARK_ROLES');
+    assert.ok(pickup && Math.abs(pickup.rect.x + pickup.rect.w / 2 - pickupZone(color).box!.x) < 1e-9);
     const circle = overlays.find((zone) => zone.id === `circle:${color}`);
     assert.equal(circle?.shape, 'ellipse');
     assert.deepEqual(circle?.rect, { x: BIG_CIRCLES[color].cx - BIG_CIRCLES[color].r, y: BIG_CIRCLES[color].cy - BIG_CIRCLES[color].r, w: 2 * BIG_CIRCLES[color].r, h: 2 * BIG_CIRCLES[color].r });
@@ -713,11 +721,56 @@ test('site: the category of Season 2026 has its simulator - the Simulator page l
   assert.equal(category?.name, 'Capelli Starter — Locker Room');
   assert.equal(category?.simulator?.href, '/simulator/locker-room');
   assert.equal(category?.simulator?.mat, '/simulator/locker-room/mat.webp');
-  // the rules file beside it on the category page is the older v2.3, which scores differently: the summary says which rules
-  assert.match(category?.simulator?.summary ?? '', /scored by the organiser's newest rules \(newer than the v2\.3 rules file\)\./);
-  assert.ok(category?.downloads?.some((d) => d.kind === 'rules' && /v2\.3/.test(d.href)), 'the download is v2.3');
-  assert.match(read('../../../app/simulator/locker-room/page.tsx'), /scored by the organiser’s newest rules/);
+  // the rules file beside it on the category page is the organiser's newest rules, the ones the simulator follows: the
+  // summary and the page's description say so, and nothing calls the file older (v2.3 was replaced: the next test)
+  const summary = category?.simulator?.summary ?? '';
+  assert.match(summary, /scored by the organiser's newest rules \(the rules file on this website\)\./);
+  const description = read('../../../app/simulator/locker-room/page.tsx').replace(/'\s*\+\s*'/g, '');
+  assert.match(description, /scored by the organiser’s newest rules \(the rules file on this website\)\./);
+  for (const said of [summary, description]) assert.doesNotMatch(said, /v2\.3|older|newer than/);
+  assert.deepEqual(
+    category?.downloads?.filter((d) => d.kind === 'rules'),
+    [{ label: 'Capelli Starter Locker Room Rules', href: '/downloads/capelli-starter-locker-room-rules.pdf', kind: 'rules' }],
+  );
   const card = simulatorSeasons().find((section) => section.year === 2026)?.simulators.find((simulator) => simulator.href === '/simulator/locker-room');
   assert.deepEqual(card && [card.name, card.labels, card.about], ['Capelli Starter — Locker Room', ['13–15 years', 'Season 2026'], '/season/2026/locker-room']);
   assert.ok(code(read('../../../app/simulator/page.tsx')).includes('simulatorSeasons()'));
+});
+
+test('site: the rules download is a PDF in public/, and the address of the v2.3 file it replaced is a permanent redirect to it', async () => {
+  const { seasons } = await import('../../../../content/seasons');
+  const href = seasons.find((season) => season.year === 2026)?.categories.find((c) => c.slug === 'locker-room')?.downloads?.find((d) => d.kind === 'rules')?.href;
+  assert.equal(href, '/downloads/capelli-starter-locker-room-rules.pdf');
+  const fromRoot = (file: string): string => fileURLToPath(new URL(`../../../../${file}`, import.meta.url));
+  // the file is there, at that address, and it is a PDF
+  const pdf = readFileSync(fromRoot(`public${href}`));
+  assert.equal(pdf.subarray(0, 5).toString('latin1'), '%PDF-');
+  // ... with a title and no author: a file anybody can download names nobody (README, "Rules, scoresheets and other downloads")
+  assert.match(pdf.toString('latin1'), /\/Title[<(]/);
+  assert.doesNotMatch(pdf.toString('latin1'), /\/Author[<(]/);
+  // the old file is gone: Next.js looks at the redirects before public/, so a file left there could never be opened
+  const OLD = '/downloads/capelli-starter-locker-room-rules-v2.3.pdf';
+  assert.ok(!existsSync(fromRoot(`public${OLD}`)), 'the v2.3 file is not in public/');
+  // the redirect (the real configuration, loaded by its full address as in ../site-section.test.ts)
+  const { default: config } = (await import(pathToFileURL(fromRoot('next.config.mjs')).href)) as {
+    default: { redirects: () => Promise<Array<{ source: string; destination: string; permanent: boolean }>> };
+  };
+  const redirects = await config.redirects();
+  assert.deepEqual(
+    redirects.filter((redirect) => /locker-room-rules/.test(redirect.source + redirect.destination)),
+    [{ source: OLD, destination: href, permanent: true }],
+  );
+  // and no file of the website links the old file any more: only the redirect, the README and this test name it
+  const named: string[] = [];
+  const walk = (folder: string): void => {
+    for (const entry of readdirSync(fromRoot(folder), { withFileTypes: true })) {
+      const name = `${folder}/${entry.name}`;
+      if (entry.isDirectory()) walk(name);
+      else if (/\.(?:[cm]?[jt]sx?|json|md)$/.test(entry.name) && name !== 'src/simulator/ui/locker-room/screen.test.ts') {
+        if (readFileSync(fromRoot(name), 'utf8').includes('capelli-starter-locker-room-rules-v2.3')) named.push(name);
+      }
+    }
+  };
+  for (const folder of ['src', 'content', 'scripts']) walk(folder);
+  assert.deepEqual(named, []);
 });

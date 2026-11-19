@@ -14,7 +14,8 @@
  *
  * What the stage shows beyond the other games comes from the simulation itself: the Team Box on
  * the robot and the referee's colour card (World.props), the stadium gate (World.walls, gone once
- * it opens) and the turned pickup zones (ZoneOverlay.outline) - see ../render.ts.
+ * it opens) and the two turned warehouses, the RED and the GREEN target (ZoneOverlay.outline) -
+ * see ../render.ts.
  */
 import type { ReactNode } from 'react';
 import { TABLE_STRIP } from '../../locker-room/field';

@@ -32,6 +32,15 @@ const nextConfig = {
       { source: '/training/simulator/fire-rescue', destination: '/simulator/fire-rescue', permanent: true },
       { source: '/training/simulator/fire-chief', destination: '/simulator/fire-chief', permanent: true },
       { source: '/training/simulator/warehouse-sort', destination: '/simulator/warehouse-sort', permanent: true },
+
+      // The Locker Room rules file was the organiser's v2.3 until their newer rules replaced it
+      // (README, "Locker Room"). The file now has a name without a version, so links to the old
+      // file - shared, printed, or kept by a search engine - get the current rules.
+      {
+        source: '/downloads/capelli-starter-locker-room-rules-v2.3.pdf',
+        destination: '/downloads/capelli-starter-locker-room-rules.pdf',
+        permanent: true,
+      },
     ];
   },
 };

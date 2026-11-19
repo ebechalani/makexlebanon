@@ -11,7 +11,7 @@
  */
 import { GATE_TOUCH_PENALTY } from '../../locker-room/game';
 import { defaultScenario, describeScenario, encodeScenario, SCENARIO_COUNT, ZONE_OPTION_NUMBERS } from '../../locker-room/scenario';
-import { TEAM_COLORS } from '../../locker-room/field';
+import { ROLE_WORD, TEAM_COLORS } from '../../locker-room/field';
 import type { ScreenWords } from '../screen-words';
 
 /** The draw a new visitor sees first: "G5". */
@@ -26,7 +26,8 @@ export const LOCKER_ROOM_WORDS: Partial<ScreenWords> = {
   goals: 'goals',
   // (on the closed Score sheet: "0 / 85 points · 0 of 8 done" fits a phone that is 360 wide)
   goalsShort: 'done',
-  zonesHint: 'Colour the zones: Locker Room, Scan Station, pickup zones, big circles, zones A, B, C, the maze targets and the gate',
+  // (the names of the roles are those of the one table of the marks: ../../locker-room/field.ts ROLE_WORD)
+  zonesHint: `Colour the zones: Locker Room, Scan Station, ${ROLE_WORD.pickup}s, big circles, zones A, B, C, the ${ROLE_WORD.target}s and the gate`,
   // (the rules: "The match ends when the referee says STOP")
   finishedHint: 'The referee says "STOP": the robot stops and the field is scored as it is',
   resetHint: 'Put the cubes, the tokens, the gate and the Team Box back, and the robot into the Locker Room, ready for a new start.',

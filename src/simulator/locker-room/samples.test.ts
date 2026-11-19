@@ -15,9 +15,14 @@
  * it (the programs drive in whole millimetres, so a cube is a fraction of a millimetre off the
  * middle of the claw). That is gripping, not pushing.
  *
- * The routes are worked out from ./field.ts (MARK_ROLES: where the team cubes stand, which mark is
- * the target of each token). If the organiser's answer swaps the pickup zones and the targets,
- * "the numbers in the blocks are the ones of field.ts" fails first and says which number to change.
+ * The routes are worked out from ./field.ts (MARK_ROLES, as the organiser decided: the team cubes
+ * on the small squares in the maze, the tokens into the three warehouses at the top). If that table
+ * changes, "the numbers in the blocks are the ones of field.ts" fails first and says which number
+ * to change.
+ *
+ * Three examples stop at a white line on their way ("forward to a white line"): they find their
+ * place on the mat again there. So every example is also played with the start moved 1 cm up and
+ * down (what the try of the line follower asks a student to do), and must score the same.
  */
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -40,7 +45,21 @@ import { SAMPLE_CATALOG as FIRE_RESCUE_CATALOG } from '../fire-rescue/sample-cat
 import { supportsBlock } from '../vm';
 import { program as buildProgram, script, wait, whenStart, type BlockNode } from '../vm/builder';
 import { SAMPLE_CATALOG as WAREHOUSE_SORT_CATALOG } from '../warehouse-sort/sample-catalog';
-import { BIG_CIRCLES, CUBE_SIZE, GATE_MARK, LOCKER_ROOM, MAT_SIZE, MAT_VECTOR, SCAN_STATION, ZONE_IDS, targetOf, type TeamColor, type ZoneId } from './field';
+import {
+  BIG_CIRCLES,
+  CUBE_SIZE,
+  GATE_MARK,
+  LOCKER_ROOM,
+  MAT_SIZE,
+  MAT_VECTOR,
+  SCAN_STATION,
+  WHITE_LINES,
+  YELLOW_PIECES,
+  ZONE_IDS,
+  targetOf,
+  type TeamColor,
+  type ZoneId,
+} from './field';
 import {
   BOX_LIFT_S,
   CARD_AWAY_S,
@@ -66,10 +85,10 @@ import { LOCKER_ROOM_ROBOT, START_POSE, robotReach } from './robot';
 import { EXAMPLE_LEVELS, SAMPLE_CATALOG, exampleCard } from './sample-catalog';
 import {
   AFTER_CARD_S,
-  AWAY_FROM_CUBE_CM,
   GREEN_TO_ROAD,
   GREEN_WAY,
   INTO_STATION_CM,
+  LINE_A_Y_CM,
   PAST_THE_FRAME_CM,
   RED_TO_ROAD,
   RED_WAY,
@@ -77,12 +96,11 @@ import {
   SAMPLE_PROGRAMS,
   SHORTEST_TO_STATION_CM,
   START_TO_ROAD_CM,
-  START_Y_CM,
-  TARGET_Y_CM,
   TOO_SHORT_WAIT_S,
+  TOP_Y_CM,
   TO_STATION_CM,
-  TO_TARGET_CM,
   TO_TOKEN_CM,
+  WAREHOUSE_WAY,
   ZONE_Y_CM,
   getSampleProgram,
   type SampleProgram,
@@ -209,7 +227,7 @@ function assertCardSteps(sim: Sim, what: string): void {
   assert.ok(Math.abs(lineOf(sim, LINE_APPROVAL).time! - 9.91) < 0.02, `${what}: Step 3 at ${lineOf(sim, LINE_APPROVAL).time}`);
 }
 
-/** How a token lies on the target of its own colour: 'full', 'part' or null. */
+/** How a token lies in the target (the warehouse) of its own colour: 'full', 'part' or null. */
 function onOwnTarget(sim: Sim, zone: ZoneId, color: TokenColor): 'full' | 'part' | null {
   const b = bodyOf(sim, tokenId(zone));
   return onMark({ x: b.x, y: b.y, w: b.w, l: b.l, angle: b.angle }, targetOf(color));
@@ -392,11 +410,19 @@ describe('the list of the examples', () => {
       'locker-to-station': [/It scores 15 points on every draw, after 6 seconds\./, /On the way the whole robot leaves the Locker Room: \+5 points\./],
       'locker-follow-line': [/It scores 15 points on every draw, after 7 seconds\./, /Here the lines are WHITE on a black mat\./, /Try to move the robot 1 cm up or down in the Locker Room before you press Start\./],
       'locker-read-card': [/It scores 30 points on every draw, after 10\.4 seconds\./, /The screen shows the team colour, and the LEDs light in it\./],
-      'locker-team-cube': [/It scores 55 points on all 12 draws, after 26 to 29 seconds\./],
-      'locker-two-tokens': [/It scores 20 points on 8 of the 12 draws and 15 on the other 4, after 16 to 18 seconds\./, /only partly inside, 5 points\./, /It does not open the gate\. In this simulator the tokens count all the same \(the rules do not say\)\./],
-      'locker-whole-mission': [/It scores 75 points on all 12 draws, in 51 to 57 of the 150 seconds\./, /It never guesses a colour\./, /In this simulator 75 is the most there is/],
+      'locker-team-cube': [/It scores 55 points on all 12 draws, after 19 to 24 seconds\./, /from the red square in the maze/, /it stops at a white line/],
+      'locker-two-tokens': [
+        /It scores 25 points on all 12 draws, after 26 to 34 seconds\./,
+        /it stops at the white line next to zone A\./,
+        /into the warehouse of that colour, at the top\./,
+        /The RED and GREEN warehouses are turned/,
+        /It does not open the gate\. In this simulator the tokens count all the same \(the rules do not say\)\./,
+      ],
+      'locker-whole-mission': [/It scores 85 points on all 12 draws, in 59 to 64 of the 150 seconds\./, /It never guesses a colour\./, /85 is the most a match can give\./],
     };
     for (const s of SAMPLE_PROGRAMS) for (const promise of promised[s.id]) assert.match(s.description, promise, s.id);
+    // the tokens go into "warehouses" (the organiser's word); the blue disc in the maze has no role
+    for (const s of SAMPLE_PROGRAMS) for (const text of [s.description, ...notesOf(s.program)]) assert.doesNotMatch(text, /\btargets?\b|blue disc/i, s.id);
     // the screen's word for the two cards drawn before a match is "draw" (the Cards panel, "Test on many draws"): not a second word for it
     for (const s of SAMPLE_PROGRAMS) assert.doesNotMatch(s.description, /arrangement/i, s.id);
     // no try teaches that Step 3 needs no scan (the referee of the simulator cannot see what a program reads)
@@ -533,6 +559,9 @@ describe('the blocks of the examples', () => {
     // the three that carry cubes: the gripper, the colour read at the claw, my-blocks, and a decision
     for (const id of ['locker-team-cube', 'locker-two-tokens', 'locker-whole-mission']) {
       for (const type of ['gripper_claw', 'sensing_claw_color', 'operator_equals', 'control_if_else', 'procedures_defnoreturn']) assert.ok(uses(id).has(type), `${id}: ${type}`);
+      // ... and on the way they stop at a white line ("forward to a white line"): there they find their place again
+      for (const type of ['mbot2_move_direction', 'control_wait_until', 'sensing_quadrgb_probe_detects', 'mbot2_stop']) assert.ok(uses(id).has(type), `${id}: ${type}`);
+      definitionOf(sample(id).program, 'forward to a white line');
     }
     // a starter is short; the advanced example is the longest
     const size = (id: string): number => blocksOf(sample(id).program).filter((block) => block.type !== 'math_number' && block.type !== 'text').length;
@@ -542,7 +571,7 @@ describe('the blocks of the examples', () => {
     }
   });
 
-  test('the numbers in the blocks are the ones of field.ts (and of MARK_ROLES: where the team cubes stand, which mark is a target)', () => {
+  test('the numbers in the blocks are the ones of field.ts (and of MARK_ROLES: the team cubes in the maze, the warehouses at the top)', () => {
     // a little robot that drives the moves of the blocks exactly, as the simulator does (heading in degrees, 0 = up, clockwise)
     class Walker {
       constructor(public x: number, public y: number, public h: number) {}
@@ -583,44 +612,105 @@ describe('the blocks of the examples', () => {
     // ... and from the outer edge of the Scan Station's frame INTO_STATION_CM puts the whole robot inside
     assert.ok(inStation(SCAN_STATION.x - LOCKER_ROOM_ROBOT.quadRgb.forward + INTO_STATION_CM * 10));
 
-    // ---- the green way: the claw around the green cube, facing one of its sides; then the cube over the middle of the big green circle
-    const green = new Walker(station.x, station.y, 90).turn(-90).forward(GREEN_WAY.up).turn(-45).forward(GREEN_WAY.diagonal).turn(90).forward(GREEN_WAY.toCube);
-    near(green.claw, teamCubeHome('green'), 1, 'the claw around the green cube');
-    assert.ok(facesASide(green.h, teamCubeHome('green').angle), 'it faces a side of the green cube');
-    green.forward(-GREEN_WAY.toCube).turn(135).forward(GREEN_WAY.down).turn(90).forward(GREEN_WAY.toCircle);
-    near(green.claw, { x: BIG_CIRCLES.green.cx, y: BIG_CIRCLES.green.cy }, 1, 'the green cube over the middle of the big green circle');
-    // ... and to the road, passing above the place of the gate (the robot is 130 mm wide)
-    green.forward(-AWAY_FROM_CUBE_CM).turn(90).forward(GREEN_TO_ROAD.up);
-    assert.ok(GATE_MARK.y - (green.y + LOCKER_ROOM_ROBOT.chassisWidth / 2) > 10, 'above the place of the gate');
-    green.turn(-90).forward(GREEN_TO_ROAD.left);
-    near(green, { x: ROAD_X_CM * 10, y: GREEN_TO_ROAD.y * 10 }, 1, 'on the road after the green way');
+    // ---- "forward to a white line": the robot faces up at x; the first light thing (a white line, or
+    // yellow, which is light too) that any of its four probes meets above where its sensor starts must
+    // be `line`, and that line must lie under all four probes. Gives where the robot's middle is when
+    // the sensor reaches the line's lower edge (the robot really stops up to 1.5 mm further on: the probe
+    // sees white a little inside the line, and the robot rolls).
+    const quad = LOCKER_ROOM_ROBOT.quadRgb;
+    const probeReach = Math.max(...quad.probeOffsets.map(Math.abs)) + quad.spotRadius;
+    const lights = [...Object.values(WHITE_LINES), ...Object.values(YELLOW_PIECES), GATE_MARK];
+    const stopAtLineUp = (x: number, fromY: number, line: { x: number; y: number; w: number; h: number }, what: string): number => {
+      const left = x - probeReach;
+      const right = x + probeReach;
+      assert.ok(line.x <= left && line.x + line.w >= right, `${what}: the line lies under all four probes`);
+      const sensorStart = fromY - quad.forward;
+      const lower = line.y + line.h;
+      assert.ok(lower < sensorStart, `${what}: the line is ahead of the sensor`);
+      for (const r of lights) {
+        if (r === line || r.x > right || r.x + r.w < left) continue;
+        assert.ok(r.y + r.h <= lower || r.y >= sensorStart, `${what}: another light shape lies before the line (y ${r.y.toFixed(1)})`);
+      }
+      return lower + quad.forward;
+    };
 
-    // ---- the red way: up, not so high that the fingers reach the green cube; then the claw around the red cube; then the red circle
-    const red = new Walker(station.x, station.y, 90).turn(-90).forward(RED_WAY.up);
-    const greenCubeBottom = teamCubeHome('green').y + (CUBE_SIZE / 2) * Math.SQRT2;
-    assert.ok(red.y - REACH.front - greenCubeBottom > 15, `the fingers stay ${(red.y - REACH.front - greenCubeBottom).toFixed(1)} mm below the green cube`);
-    red.turn(-90).forward(RED_WAY.left).turn(45).forward(RED_WAY.toCube);
-    near(red.claw, teamCubeHome('red'), 1, 'the claw around the red cube');
-    assert.ok(facesASide(red.h, teamCubeHome('red').angle), 'it faces a side of the red cube');
-    red.forward(-RED_WAY.back).turn(135).forward(RED_WAY.toCircle);
-    near(red.claw, { x: BIG_CIRCLES.red.cx, y: BIG_CIRCLES.red.cy }, 1, 'the red cube over the middle of the big red circle');
-    red.forward(-AWAY_FROM_CUBE_CM).turn(-180).forward(RED_TO_ROAD.left);
+    // ---- neither team cube can be taken from above or below: with the claw around one, the back of
+    // the robot reaches into the other
+    const between = Math.hypot(teamCubeHome('red').x - teamCubeHome('green').x, teamCubeHome('red').y - teamCubeHome('green').y);
+    assert.ok(GRIP + LOCKER_ROOM_ROBOT.chassisRear > between - CUBE_SIZE / 2, 'the robot is too long to stand between the two team cubes');
+
+    // ---- the green way: back under the green cube, up to the white line at the bottom of the maze (the
+    // claw is then around the cube), back down into the big green circle
+    const greenCube = teamCubeHome('green');
+    const green = new Walker(station.x, station.y, 90).forward(-GREEN_WAY.back);
+    near(green, { x: greenCube.x, y: station.y }, 0.5, 'below the green cube');
+    green.turn(-90);
+    green.y = stopAtLineUp(green.x, green.y, WHITE_LINES.mazeBottom, 'the green way');
+    near(green.claw, greenCube, 6, 'the claw around the green cube');
+    assert.ok(facesASide(green.h, greenCube.angle), 'it faces a side of the green cube');
+    assert.ok(green.y - LOCKER_ROOM_ROBOT.chassisFront - (greenCube.y + CUBE_SIZE / 2) > 10, 'the front of the body stops more than 1 cm before the green cube');
+    // (the cube rides in the claw: it moves as far as the robot)
+    near({ x: greenCube.x, y: greenCube.y + GREEN_WAY.down * 10 }, { x: BIG_CIRCLES.green.cx, y: BIG_CIRCLES.green.cy }, 2, 'the green cube over the middle of the big green circle');
+    green.forward(-GREEN_WAY.down - GREEN_WAY.away);
+    assert.ok(green.y + LOCKER_ROOM_ROBOT.chassisRear < MAT_SIZE, 'backing away, the robot stays on the mat');
+    const fingerCorner = Math.hypot(GRIP + LOCKER_ROOM_ROBOT.gripper.fingerLength / 2, LOCKER_ROOM_ROBOT.gripper.clawOpenGap / 2 + LOCKER_ROOM_ROBOT.gripper.fingerThickness);
+    assert.ok(green.y - (greenCube.y + GREEN_WAY.down * 10 + CUBE_SIZE / 2) > fingerCorner + 5, 'then the open claw turns clear of the green cube');
+    // ... and to the road: "robot y" there is the measured one (within 2 mm of this reckoning)
+    green.turn(-90).forward(GREEN_TO_ROAD.left);
+    near(green, { x: ROAD_X_CM * 10, y: GREEN_TO_ROAD.y * 10 }, 2, 'on the road after the green way');
+
+    // ---- the red way: back a little, up to the short white line on the right of the maze, on to the
+    // height of the red cube, left: the claw around it; a half turn; into the big red circle
+    const redCube = teamCubeHome('red');
+    const red = new Walker(station.x, station.y, 90).forward(-RED_WAY.back).turn(-90);
+    red.y = stopAtLineUp(red.x, red.y, WHITE_LINES.rightLink, 'the red way');
+    red.forward(RED_WAY.up);
+    assert.ok(Math.abs(red.y - redCube.y) < 1, `at the height of the red cube: ${(red.y - redCube.y).toFixed(2)} mm`);
+    red.turn(-90).forward(RED_WAY.toCube);
+    near(red.claw, redCube, 1, 'the claw around the red cube');
+    assert.ok(facesASide(red.h, redCube.angle), 'it faces a side of the red cube');
+    // the half turn: the cube in the claw swings around the robot's middle, far from the green cube
+    const swing = GRIP + (CUBE_SIZE / 2) * Math.SQRT2;
+    assert.ok(Math.hypot(greenCube.x - red.x, greenCube.y - red.y) - (CUBE_SIZE / 2) * Math.SQRT2 - swing > 40, 'the half turn passes far from the green cube');
+    red.turn(180).forward(RED_WAY.toCircle);
+    near(red.claw, { x: BIG_CIRCLES.red.cx, y: BIG_CIRCLES.red.cy }, 2, 'the red cube over the middle of the big red circle');
+    red.forward(-RED_WAY.away - RED_TO_ROAD.back);
     near(red, { x: ROAD_X_CM * 10, y: RED_TO_ROAD.y * 10 }, 1, 'on the road after the red way');
 
-    // ---- the road: from the start onto it; the zones and the targets at their heights; the claw over each
-    near(new Walker(START_POSE.x, START_POSE.y, 90).forward(START_TO_ROAD_CM), { x: ROAD_X_CM * 10, y: START_POSE.y }, 1, 'from the start onto the road');
-    assert.ok(Math.abs(START_Y_CM * 10 - START_POSE.y) < 1);
+    // ---- the road: from the start onto it, up to the white line next to zone A ("robot y" is then the
+    // measured LINE_A_Y_CM); the zones at their heights, the claw around each token
+    const road = new Walker(START_POSE.x, START_POSE.y, 90).forward(START_TO_ROAD_CM);
+    near(road, { x: ROAD_X_CM * 10, y: START_POSE.y }, 1, 'from the start onto the road');
+    const atLineA = stopAtLineUp(road.x, road.y, WHITE_LINES.linkBottom, 'the road');
+    assert.ok(Math.abs(LINE_A_Y_CM * 10 - atLineA) < 2, `at the white line next to zone A: ${atLineA.toFixed(1)} mm`);
+    // ... also when the start was moved 1 cm up or down: the sensor starts below the line all the same
+    for (const side of [-10, 10]) stopAtLineUp(road.x, road.y + side, WHITE_LINES.linkBottom, `the road, start moved ${side} mm`);
     for (const zone of ZONE_IDS) {
       const home = tokenHome(zone);
-      assert.ok(Math.abs(ZONE_Y_CM[zone] * 10 - home.y) < 1, `zone ${zone} at ${ZONE_Y_CM[zone]} cm`);
-      near(new Walker(ROAD_X_CM * 10, home.y, -90).forward(TO_TOKEN_CM).claw, home, 2, `the claw around the token of zone ${zone}`);
+      assert.ok(Math.abs(ZONE_Y_CM[zone] * 10 - home.y) < 0.1, `zone ${zone} at ${ZONE_Y_CM[zone]} cm`);
+      near(new Walker(ROAD_X_CM * 10, home.y, -90).forward(TO_TOKEN_CM).claw, home, 3, `the claw around the token of zone ${zone}`);
     }
+
+    // ---- the warehouses: from the road at TOP_Y_CM (on the tree's cross line), each way puts the middle
+    // of the claw over the middle of the warehouse, with the robot facing so that the token it holds
+    // (taken facing left: a quarter turn from the robot) is turned like the warehouse
+    const top = (): Walker => new Walker(ROAD_X_CM * 10, TOP_Y_CM * 10, 0);
+    const onCross = WHITE_LINES.crossLeft;
+    assert.ok(onCross.x < ROAD_X_CM * 10 && onCross.y < TOP_Y_CM * 10 && onCross.y + onCross.h > TOP_Y_CM * 10, 'at TOP_Y_CM the robot is on the cross line');
+    const ways: Record<'red' | 'green' | 'blue', Walker> = {
+      red: top().turn(-45).forward(WAREHOUSE_WAY.red.diagonal),
+      green: top().turn(90).forward(WAREHOUSE_WAY.green.across).turn(-45).forward(WAREHOUSE_WAY.green.diagonal),
+      blue: top().turn(90).forward(WAREHOUSE_WAY.blue.across).turn(-90).forward(WAREHOUSE_WAY.blue.up),
+    };
+    const lastLeg = { red: WAREHOUSE_WAY.red.diagonal, green: WAREHOUSE_WAY.green.diagonal, blue: WAREHOUSE_WAY.blue.up };
     for (const color of TOKEN_COLORS) {
-      const mark = targetOf(color);
-      const middle = mark.circle ? { x: mark.circle.cx, y: mark.circle.cy } : { x: mark.box!.x, y: mark.box!.y };
-      assert.ok(Math.abs(TARGET_Y_CM[color] * 10 - middle.y) < 1, `the ${color} target at ${TARGET_Y_CM[color]} cm`);
-      near(new Walker(ROAD_X_CM * 10, middle.y, 90).forward(TO_TARGET_CM).claw, middle, 4, `the ${color} token over its target`);
+      const box = targetOf(color).box!;
+      near(ways[color].claw, box, 1, `the token over the middle of the ${color} warehouse`);
+      assert.ok(facesASide(ways[color].h + 90, box.angle), `the ${color} token turned like its warehouse`);
+      // backing the same way after putting it down, the open fingers turn clear of it
+      assert.ok(GRIP + lastLeg[color] * 10 - CUBE_SIZE / 2 - fingerCorner > 10, `${color}: the open claw turns clear of the token`);
     }
+
     // turning on the road, the open claw stays 9 mm or more away from every token in a zone, and the body
     // (its corners) stays 7 mm or more away from the place of the gate
     const g = LOCKER_ROOM_ROBOT.gripper;
@@ -818,7 +908,8 @@ describe('locker-read-card: read the colour card', () => {
 describe('locker-team-cube: deliver the team cube', () => {
   const s = sample('locker-team-cube');
 
-  test('all 12 arrangements: the cube of the team colour in the big circle of that colour, the gate opens - 55 points', () => {
+  test('all 12 arrangements: the cube of the team colour from its square in the maze into the big circle of that colour, the gate opens - 55 points', () => {
+    const times: number[] = [];
     for (const scenario of ARRANGEMENTS) {
       const played = play(s.program, scenario);
       const { sim } = played;
@@ -832,17 +923,21 @@ describe('locker-team-cube: deliver the team cube', () => {
       assert.equal(pointsOf(sim, LINE_GATE), 5, what);
       assert.deepEqual(sim.world.walls, [], `${what}: the gate opened`);
       assert.deepEqual(screen(sim), [`Team: ${team}`], what);
-      // the cube is in the middle of the circle, about 68 mm inside its edge
+      // the cube near the middle of its circle (1.5 mm RED, 1.7 mm GREEN), far inside its edge
       const cube = bodyOf(sim, teamCubeId(team));
       const circle = BIG_CIRCLES[team];
-      assert.ok(Math.hypot(cube.x - circle.cx, cube.y - circle.cy) < 0.5, `${what}: the cube is ${Math.hypot(cube.x - circle.cx, cube.y - circle.cy).toFixed(2)} mm from the middle`);
+      const off = Math.hypot(cube.x - circle.cx, cube.y - circle.cy);
+      assert.ok(off < 2, `${what}: the cube is ${off.toFixed(2)} mm from the middle`);
       assertUntouched(sim, teamCubeId(otherTeam(team)), what);
       for (const zone of ZONE_IDS) assertUntouched(sim, tokenId(zone), what);
-      // RED: delivered at 28.04 s, the end at 29.10 s; GREEN: 24.98 s and 26.04 s
-      const [delivered, end] = team === 'red' ? [28.04, 29.1] : [24.98, 26.04];
+      // RED: delivered at 23.09 s, the end at 24.15 s; GREEN: 18.66 s and 19.18 s
+      const [delivered, end] = team === 'red' ? [23.09, 24.15] : [18.66, 19.18];
       assert.ok(Math.abs(lineOf(sim, LINE_DELIVERY).time! - delivered) < 0.02, `${what}: delivered at ${lineOf(sim, LINE_DELIVERY).time}`);
       assert.ok(Math.abs(sim.world.time - end) < 0.02, `${what}: ${sim.world.time} s`);
+      times.push(sim.world.time);
     }
+    // the description's "after 19 to 24 seconds"
+    assert.ok(Math.round(Math.min(...times)) === 19 && Math.round(Math.max(...times)) === 24);
   });
 
   test('the try of the description: the two ways swapped - a wrong delivery, -10, the gate stays closed: 20 points', () => {
@@ -869,9 +964,8 @@ describe('locker-team-cube: deliver the team cube', () => {
 describe('locker-two-tokens: sort two tokens', () => {
   const s = sample('locker-two-tokens');
 
-  test('all 12 arrangements: the tokens of zones A and B on the targets of their colours - 20 points on 8, 15 on 4, after 15.84 to 17.74 s', () => {
+  test('all 12 arrangements: the tokens of zones A and B completely inside the warehouses of their colours - 25 points, after 26.40 to 34.26 s', () => {
     const times: number[] = [];
-    const totals: number[] = [];
     for (const scenario of ARRANGEMENTS) {
       const played = play(s.program, scenario);
       const { sim } = played;
@@ -879,42 +973,46 @@ describe('locker-two-tokens: sort two tokens', () => {
       assertClean(played, what);
       assert.equal(sim.finishReason, 'program-ended', what);
       const tokens = tokensOf(scenario);
-      let expected = 5;
       for (const zone of ['A', 'B'] as const) {
         const color = tokens[zone];
-        // a blue token fits completely on the blue disc, a red or green one is only partly inside its small square
-        assert.equal(onOwnTarget(sim, zone, color), color === 'blue' ? 'full' : 'part', `${what}: zone ${zone}`);
-        assert.equal(pointsOf(sim, tokenLineId(color)), color === 'blue' ? 10 : 5, `${what}: ${color}`);
-        expected += color === 'blue' ? 10 : 5;
+        // every warehouse holds a whole cube; the RED and the GREEN one only a cube turned with it
+        assert.equal(onOwnTarget(sim, zone, color), 'full', `${what}: zone ${zone}`);
+        assert.equal(pointsOf(sim, tokenLineId(color)), 10, `${what}: ${color}`);
+        const box = targetOf(color).box!;
+        const token = bodyOf(sim, tokenId(zone));
+        assert.ok(Math.hypot(token.x - box.x, token.y - box.y) < 1.5, `${what}: zone ${zone} near the middle of its warehouse`);
       }
-      assert.equal(sim.score().total, expected, what);
-      assert.equal(expected, [1, 3].includes(scenario.option) ? 15 : 20, `${what}: 15 on zone cards 1 and 3, 20 on the others`);
+      assert.equal(sim.score().total, 25, what);
       assert.equal(pointsOf(sim, LINE_SCAN_STATION), 0);
+      assert.equal(pointsOf(sim, LINE_GATE), 0, `${what}: no gate bonus without a team cube`);
+      assert.deepEqual(sim.world.walls?.map((w) => w.id), [GATE_ID], `${what}: the gate stays closed`);
       assert.deepEqual(screen(sim), [`Token: ${tokens.A}`, `Token: ${tokens.B}`], what);
       assertUntouched(sim, tokenId('C'), what);
       for (const team of ['red', 'green'] as const) assertUntouched(sim, teamCubeId(team), what);
+      // how long depends on the two colours: RED and BLUE 26.40 s, RED and GREEN 30.16 s, GREEN and BLUE 34.26 s
+      const colours = new Set([tokens.A, tokens.B]);
+      const expected = !colours.has('green') ? 26.4 : !colours.has('blue') ? 30.16 : 34.26;
+      assert.ok(Math.abs(sim.world.time - expected) < 0.02, `${what}: ${sim.world.time} s`);
       times.push(sim.world.time);
-      totals.push(sim.score().total);
     }
-    assert.deepEqual([totals.filter((n) => n === 20).length, totals.filter((n) => n === 15).length], [8, 4]);
-    assert.ok(Math.abs(Math.min(...times) - 15.84) < 0.02 && Math.abs(Math.max(...times) - 17.74) < 0.02, `${Math.min(...times)} to ${Math.max(...times)} s`);
-    // the description's "after 16 to 18 seconds"
-    assert.ok(Math.round(Math.min(...times)) === 16 && Math.round(Math.max(...times)) === 18);
+    // the description's "after 26 to 34 seconds"
+    assert.ok(Math.round(Math.min(...times)) === 26 && Math.round(Math.max(...times)) === 34);
+    // the default arrangement (G5: BLUE in A, RED in B)
+    assert.ok(Math.abs(play(s.program, defaultScenario()).sim.world.time - 26.4) < 0.02);
   });
 
-  test('the try of the description: zone C too - all three tokens, 25 points on all 12 arrangements', () => {
+  test('the try of the description: zone C too - all three tokens, 35 points on all 12 arrangements', () => {
     const zoneC = withLastBlocksAgain(s.program, 2, (copies) => {
       copies[0].inputs!.ARG0.shadow!.fields!.NUM = ZONE_Y_CM.C;
     });
-    const times: number[] = [];
     for (const scenario of ARRANGEMENTS) {
       const played = play(zoneC, scenario);
       assertClean(played, label(scenario));
-      assert.equal(played.sim.score().total, 25, label(scenario));
-      for (const color of TOKEN_COLORS) assert.equal(pointsOf(played.sim, tokenLineId(color)), color === 'blue' ? 10 : 5);
-      times.push(played.sim.world.time);
+      assert.equal(played.sim.score().total, 35, label(scenario));
+      for (const color of TOKEN_COLORS) assert.equal(pointsOf(played.sim, tokenLineId(color)), 10);
+      // one token of each colour: always the same way, 40.78 s
+      assert.ok(Math.abs(played.sim.world.time - 40.78) < 0.02, `${label(scenario)}: ${played.sim.world.time} s`);
     }
-    assert.ok(Math.abs(Math.min(...times) - 22.39) < 0.02 && Math.abs(Math.max(...times) - 25.59) < 0.02, `${Math.min(...times)} to ${Math.max(...times)} s`);
   });
 });
 
@@ -939,7 +1037,7 @@ describe('locker-whole-mission: the whole Locker Room mission', () => {
     return copy;
   }
 
-  test('all 12 arrangements: 75 points - the card, the team cube, the gate, every token on the target of its colour - in 50.78 to 56.68 s', () => {
+  test('all 12 arrangements: 85 points, every point there is - the card, the team cube, the gate, every token completely inside the warehouse of its colour - in 58.71 or 63.69 s', () => {
     const times: Record<TeamColor, number[]> = { red: [], green: [] };
     for (const scenario of ARRANGEMENTS) {
       const played = play(s.program, scenario);
@@ -947,31 +1045,34 @@ describe('locker-whole-mission: the whole Locker Room mission', () => {
       const what = label(scenario);
       assertClean(played, what);
       assert.equal(sim.finishReason, 'program-ended', what);
-      assert.equal(sim.score().total, 75, what);
+      assert.equal(sim.score().total, 85, what);
+      assert.equal(sim.score().total, MAX_SCORE);
+      assert.equal(sim.score().complete, true, `${what}: the sheet says complete`);
       assertCardSteps(sim, what);
       assert.equal(pointsOf(sim, LINE_DELIVERY), 20, what);
       assert.equal(pointsOf(sim, LINE_GATE), 5, what);
       const tokens = tokensOf(scenario);
       for (const zone of ZONE_IDS) {
         const color = tokens[zone];
-        assert.equal(onOwnTarget(sim, zone, color), color === 'blue' ? 'full' : 'part', `${what}: zone ${zone}`);
-        assert.equal(pointsOf(sim, tokenLineId(color)), color === 'blue' ? 10 : 5, `${what}: ${color}`);
+        assert.equal(onOwnTarget(sim, zone, color), 'full', `${what}: zone ${zone}`);
+        assert.equal(pointsOf(sim, tokenLineId(color)), 10, `${what}: ${color}`);
+        const box = targetOf(color).box!;
+        const token = bodyOf(sim, tokenId(zone));
+        assert.ok(Math.hypot(token.x - box.x, token.y - box.y) < 3, `${what}: zone ${zone} near the middle of its warehouse`);
       }
-      // the most a match gives in this simulator: everything but the 5 + 5 a red and a green token can never get on a square smaller than a cube
-      assert.equal(sim.score().total, MAX_SCORE - 10);
       assert.deepEqual(screen(sim), [`Team: ${scenario.team}`, ...ZONE_IDS.map((zone) => `Token: ${tokens[zone]}`)], what);
       assertUntouched(sim, teamCubeId(otherTeam(scenario.team)), what);
       times[scenario.team].push(sim.world.time);
     }
-    const all = [...times.red, ...times.green];
-    const span = (list: number[]): string => `${Math.min(...list).toFixed(2)} to ${Math.max(...list).toFixed(2)}`;
-    assert.equal(span(times.red), '53.48 to 56.68');
-    assert.equal(span(times.green), '50.78 to 53.98');
-    // the description's "in 51 to 57 of the 150 seconds"
-    assert.ok(Math.round(Math.min(...all)) === 51 && Math.round(Math.max(...all)) === 57);
+    // one token of each colour on every draw: the way is as long on all six zone cards
+    for (const t of times.red) assert.ok(Math.abs(t - 63.69) < 0.02, `RED: ${t} s`);
+    for (const t of times.green) assert.ok(Math.abs(t - 58.71) < 0.02, `GREEN: ${t} s`);
+    // the description's "in 59 to 64 of the 150 seconds"
+    assert.equal(Math.round(Math.min(...times.green)), 59);
+    assert.equal(Math.round(Math.max(...times.red)), 64);
     // the default arrangement
     const usual = play(s.program, defaultScenario()).sim;
-    assert.ok(Math.abs(usual.world.time - 52.03) < 0.02, `${usual.world.time} s`);
+    assert.ok(Math.abs(usual.world.time - 58.71) < 0.02, `${usual.world.time} s`);
   });
 
   test('it never assumes an arrangement: the card and every token are read, and what was read decides', () => {
@@ -997,8 +1098,8 @@ describe('locker-whole-mission: the whole Locker Room mission', () => {
       compared.push(`${variableName(s.program, other?.block)} = ${named.shadow?.fields?.TEXT}`);
     }
     assert.deepEqual(compared.sort(), ['team colour = red', 'token colour = green', 'token colour = red']);
-    // the same blocks do what the cards say: each zone's token ends on the target of its colour on every
-    // arrangement - on the red, the green and the blue target, on different ones - and the cube of
+    // the same blocks do what the cards say: each zone's token ends in the warehouse of its colour on every
+    // arrangement - in the red, the green and the blue one, on different ones - and the cube of
     // each team colour ends in the circle of that colour
     const seen = new Map<ZoneId, Set<string>>(ZONE_IDS.map((zone) => [zone, new Set()]));
     for (const scenario of ARRANGEMENTS) {
@@ -1011,28 +1112,49 @@ describe('locker-whole-mission: the whole Locker Room mission', () => {
       }
       const cube = bodyOf(sim, teamCubeId(scenario.team));
       const circle = BIG_CIRCLES[scenario.team];
-      assert.ok(Math.hypot(cube.x - circle.cx, cube.y - circle.cy) < 1, label(scenario));
+      assert.ok(Math.hypot(cube.x - circle.cx, cube.y - circle.cy) < 2, label(scenario));
     }
-    for (const zone of ZONE_IDS) assert.deepEqual([...seen.get(zone)!].sort(), ['blue', 'green', 'red'], `zone ${zone}: all three targets`);
+    for (const zone of ZONE_IDS) assert.deepEqual([...seen.get(zone)!].sort(), ['blue', 'green', 'red'], `zone ${zone}: all three warehouses`);
   });
 
-  test('the try of the description: the zones in the order C, B, A - also 75 points on all 12; faster on most RED arrangements, slower on most GREEN ones', () => {
+  test('the try of the description: the zones in the order C, B, A - also 85 points on all 12, and slower on all 12', () => {
     assert.deepEqual(inOrder(['A', 'B', 'C']), s.program, 'the program as it is written visits A, B, C');
     const reversed = inOrder(['C', 'B', 'A']);
-    const faster: Record<TeamColor, number> = { red: 0, green: 0 };
-    const times: number[] = [];
     for (const scenario of ARRANGEMENTS) {
       const asWritten = play(s.program, scenario);
       const played = play(reversed, scenario);
       const what = `C B A ${label(scenario)}`;
       assertClean(played, what);
-      assert.equal(played.sim.score().total, 75, what);
-      if (played.sim.world.time < asWritten.sim.world.time) faster[scenario.team]++;
-      times.push(played.sim.world.time);
+      assert.equal(played.sim.score().total, 85, what);
+      // (after every token the robot drives up to the top and back down: zone A, the farthest from the top, is best taken first)
+      assert.ok(played.sim.world.time > asWritten.sim.world.time, `${what}: ${played.sim.world.time} s`);
+      assert.ok(Math.abs(played.sim.world.time - (scenario.team === 'red' ? 64.27 : 62.51)) < 0.02, `${what}: ${played.sim.world.time} s`);
     }
-    // (the cards decide: the order changes which targets come after which zones)
-    assert.deepEqual(faster, { red: 5, green: 1 });
-    assert.ok(Math.abs(Math.min(...times) - 52.14) < 0.02 && Math.abs(Math.max(...times) - 55.59) < 0.02, `${Math.min(...times)} to ${Math.max(...times)} s`);
+  });
+});
+
+// =============================================================================================
+// Every example with the start moved: what the try of the line follower asks a student to do
+// =============================================================================================
+
+describe('every example, the robot moved 1 cm (or 5 mm) up or down before Start', () => {
+  test('the same points on all 12 draws, nothing pushed - the examples that carry cubes find their place again at a white line', () => {
+    for (const side of [-10, -5, 5, 10]) {
+      const startPose = { ...START_POSE, y: START_POSE.y + side };
+      assert.ok(robotShapesAt(LOCKER_ROOM_ROBOT, startPose).every((shape) => insideRect(shape, LOCKER_ROOM)), `${side} mm: still completely inside the Locker Room`);
+      for (const s of SAMPLE_PROGRAMS) {
+        for (const scenario of ARRANGEMENTS) {
+          const usual = play(s.program, scenario).sim;
+          const moved = play(s.program, scenario, { startPose });
+          const what = `${s.id} ${label(scenario)}, start ${side} mm`;
+          assertClean(moved, what);
+          assert.equal(moved.sim.score().total, usual.score().total, what);
+          assert.equal(moved.sim.finishReason, usual.finishReason, what);
+          // (the line follower steers back onto the line; the others end 0.15 s sooner or later at most)
+          assert.ok(Math.abs(moved.sim.world.time - usual.world.time) < 0.3, `${what}: ${moved.sim.world.time} s, ${usual.world.time} s unmoved`);
+        }
+      }
+    }
   });
 });
 
@@ -1157,6 +1279,8 @@ async function loadMatPicture(): Promise<MatSampler | null> {
 
 describe('the examples on the picture of the mat', () => {
   const picture = loadMatPicture();
+  /** the examples that stop at a white line on their way */
+  const LINE_STOPPERS = ['locker-team-cube', 'locker-two-tokens', 'locker-whole-mission'];
 
   test('every example scores on the picture what it scores on the drawing, on all 12 arrangements', async (t) => {
     const mat = await picture;
@@ -1169,11 +1293,13 @@ describe('the examples on the picture of the mat', () => {
         assertClean(onPicture, what);
         assert.equal(onPicture.sim.score().total, onDrawing.sim.score().total, what);
         assert.equal(onPicture.sim.finishReason, onDrawing.sim.finishReason, what);
-        // only the line follower looks at the floor: every other example ends in exactly the same place
+        // the line follower follows the floor; the three that stop at a white line see it start one tick
+        // of the simulation sooner or later (0.67 mm at 20 RPM); the others end in exactly the same place
         const a = onPicture.sim.world.robot.pose;
         const b = onDrawing.sim.world.robot.pose;
         const apart = Math.hypot(a.x - b.x, a.y - b.y);
-        assert.ok(apart <= (s.id === 'locker-follow-line' ? 2 : 0), `${what}: ${apart.toFixed(2)} mm apart`);
+        const allowed = s.id === 'locker-follow-line' ? 2 : LINE_STOPPERS.includes(s.id) ? 1 : 0;
+        assert.ok(apart <= allowed, `${what}: ${apart.toFixed(2)} mm apart`);
       }
     }
   });

@@ -3,7 +3,7 @@
  *   - every number in its sentences is the number the code has - compared one by one with the
  *     constant that holds it; a number that is on no list here fails the test,
  *   - the points add up to the highest score the referee gives (85), and the highest score a
- *     robot can reach with these marks and this cube (75) is worked out, not written,
+ *     robot can reach with these marks and this cube (also 85 now) is worked out, not written,
  *   - what the simulator only assumes is in the second part, and the rules part does not say it,
  *   - the texts follow the one table of which mark is a pickup zone and which a target,
  *   - the sentences are short (many students read English as a second language),
@@ -16,7 +16,7 @@ import { test } from 'node:test';
 import { TABLE_MARGIN } from '../../core/engine';
 import { createSimulation } from '../../core/simulation';
 import type { Simulation } from '../../core/types';
-import { CARD, CUBE_HEIGHT, CUBE_SIZE, GATE_HEIGHT, MARKS, MAT_SIZE, TEAM_BOX, targetOf } from '../../locker-room/field';
+import { CARD, CUBE_HEIGHT, CUBE_SIZE, GATE_HEIGHT, MARKS, MARK_ROLES, MAT_SIZE, TEAM_BOX, targetOf } from '../../locker-room/field';
 import {
   BOX_LIFT_S,
   CARD_AWAY_S,
@@ -42,7 +42,21 @@ import { LOCKER_ROOM_ROBOT } from '../../locker-room/robot';
 import { TOKEN_COLORS, ZONE_OPTION_NUMBERS, defaultScenario } from '../../locker-room/scenario';
 import { moveCm, program, script, wait, whenStart } from '../../vm/builder';
 import type { RulesSection } from '../SimulatorApp';
-import { INSIDE_THE_FRAME, LOCKER_ROOM_ASSUMPTIONS, LOCKER_ROOM_RULES, LOCKER_ROOM_RULES_NOTE, REACHABLE_MAX, TOO_SMALL_TARGETS, cubeFitsInside, robotLength, robotWidth } from './rules';
+import {
+  INSIDE_THE_FRAME,
+  LOCKER_ROOM_ASSUMPTIONS,
+  LOCKER_ROOM_RULES,
+  LOCKER_ROOM_RULES_NOTE,
+  REACHABLE_MAX,
+  TARGETS_CLOSE,
+  TOO_SMALL_TARGETS,
+  TURNED_DEGREES,
+  TURNED_TARGETS,
+  cubeFitsInside,
+  markGap,
+  robotLength,
+  robotWidth,
+} from './rules';
 
 const sentences = (sections: readonly RulesSection[]): string[] => sections.flatMap((section) => [section.title, ...section.items]);
 const RULES = sentences(LOCKER_ROOM_RULES);
@@ -70,6 +84,7 @@ const KNOWN_NUMBERS: ReadonlyArray<[number, string]> = [
   [WRONG_TOKEN_PENALTY, 'WRONG_TOKEN_PENALTY'],
   [MAX_SCORE, 'MAX_SCORE'],
   [REACHABLE_MAX, 'REACHABLE_MAX'],
+  [TURNED_DEGREES, 'how far the turned warehouses are turned, in degrees'],
   [MATCH_DURATION, 'MATCH_DURATION'],
   [TOKEN_COLORS.length, 'the number of tokens'],
   [ZONE_OPTION_NUMBERS.length, 'the number of zone cards'],
@@ -137,26 +152,57 @@ test('the numbers are the referee\'s: the points, the time, the timings at the S
   assert.ok(RULES_TEXT.includes('There are no restarts. If anyone but the referee touches the robot after GO, the run counts 0. So there is no Restart button here.'));
 });
 
-test('the marks: with the published 5 cm cube the RED and the GREEN targets (4.2 cm squares) can never hold a whole token - so 75 is the most, and the window says so', () => {
-  assert.deepEqual(TOO_SMALL_TARGETS, ['red', 'green']);
-  assert.equal(REACHABLE_MAX, 75);
-  assert.ok(ASSUMED_TEXT.includes('A cube is 5 cm wide, and here the RED and the GREEN token have targets that are smaller. So they can never be completely inside: +5 at most. The most a robot can score here is 75.'));
-  assert.ok(ASSUMED_TEXT.includes('Here the team cubes start on the red rectangle at the top left and on the green rectangle at the top right.'));
-  assert.ok(ASSUMED_TEXT.includes('The tokens go to their targets: RED to the red square in the maze, GREEN to the green square in the maze, BLUE to the blue disc in the maze.'));
-  // if the organiser swaps the marks (the turned rectangles and the light-blue one as targets), every target holds a cube
-  for (const id of ['redDiamond', 'greenDiamond', 'cyanRect', 'blueDisc'] as const) assert.equal(cubeFitsInside(MARKS[id]), true, id);
+test('the marks (decided by the organiser): every warehouse holds a whole 5 cm token - so all 85 points can be reached - and the window says where everything is', () => {
+  assert.deepEqual(MARK_ROLES, { pickup: { red: 'redSquare', green: 'greenSquare' }, target: { red: 'redDiamond', green: 'greenDiamond', blue: 'cyanRect' } });
+  assert.deepEqual(TOO_SMALL_TARGETS, []);
+  assert.equal(REACHABLE_MAX, MAX_SCORE);
+  assert.equal(REACHABLE_MAX, 85);
+  // where the team cubes start and where the tokens go: in the rules part (it is decided), from the one table
+  assert.ok(RULES_TEXT.includes('The team cubes start in the pickup zones: RED on the red square in the maze, GREEN on the green square in the maze.'));
+  assert.ok(RULES_TEXT.includes('The targets of the tokens are the 3 warehouses: RED at the top left, GREEN at the top right, BLUE at the top in the middle.'));
+  assert.ok(RULES_TEXT.includes('Last, it sorts the 3 tokens (RED, GREEN, BLUE) into the warehouses of their colour.'));
+  assert.ok(RULES_TEXT.includes('The written rules say the targets are "inside the maze". The organiser has confirmed the places above.'));
+  // the open question is closed: no sentence about two readings, or about the older rules' pickup zones
+  for (const gone of [/has been asked/, /says both/, /pickup zone at the top/, /pickup zone \(top left\)/, /\b75\b/]) assert.doesNotMatch(EVERY_TEXT.join('\n'), gone, String(gone));
+  // a whole cube fits every warehouse
+  assert.ok(ASSUMED_TEXT.includes('A cube is 5 cm wide. It fits completely inside every warehouse.'));
+  assert.doesNotMatch(ASSUMED_TEXT, /\+5 at most|counts as done/);
+  for (const color of ['red', 'green', 'blue'] as const) assert.equal(cubeFitsInside(targetOf(color)), true, color);
+  // the squares (the pickup zones) would not hold one; a disc must hold the cube however it is turned
   for (const id of ['redSquare', 'greenSquare'] as const) assert.equal(cubeFitsInside(MARKS[id]), false, id);
-  // (a disc must hold the cube however it is turned: its corners on the circle)
-  assert.equal(cubeFitsInside({ id: 'blueDisc', name: '', color: 'blue', circle: { cx: 0, cy: 0, r: (CUBE_SIZE * Math.SQRT2) / 2 - 0.01 } }), false);
-  assert.equal(cubeFitsInside(targetOf('blue')), true);
+  assert.equal(cubeFitsInside({ id: 'blueDisc', name: '', place: '', color: 'blue', circle: { cx: 0, cy: 0, r: (CUBE_SIZE * Math.SQRT2) / 2 - 0.01 } }), false);
+  assert.equal(cubeFitsInside(MARKS.blueDisc), true);
+});
+
+test('the turned warehouses: the window tells how a token must stand to be completely inside - and the referee agrees', () => {
+  assert.deepEqual(TURNED_TARGETS, ['red', 'green']);
+  assert.equal(TURNED_DEGREES, 45);
+  assert.ok(ASSUMED_TEXT.includes('The RED and the GREEN warehouse are turned by 45 degrees. A token is completely inside only if it is turned the same way.'));
+  assert.ok(ASSUMED_TEXT.includes('A token that stands straight in one of them is only partly inside: +5.'));
+  assert.ok(ASSUMED_TEXT.includes('Here the claw holds a cube square to the robot. So the robot puts the token down facing along the turned white line that leads there.'));
+  // the referee: straight in the middle of the RED warehouse +5, turned with it +10
+  const sim = createSimulation({ game: lockerRoomGame, scenario: defaultScenario(), program: program([script(whenStart(), [])]) });
+  const box = MARKS.redDiamond.box!;
+  const token = sim.world.bodies.find((body) => body.id === 'token:B')!; // (G5: the RED token is in zone B)
+  assert.equal(token.colorName, 'red');
+  const points = () => sim.score().lines.find((line) => line.id === 'token:red')!.points;
+  Object.assign(token, { x: box.x, y: box.y, angle: 0 });
+  assert.equal(points(), POINTS_TOKEN_PARTLY);
+  Object.assign(token, { angle: box.angle });
+  assert.equal(points(), POINTS_TOKEN);
+  // no two warehouses are close enough for one cube to touch both: the window does not talk about that case
+  assert.equal(TARGETS_CLOSE, false);
+  assert.ok(markGap(MARKS.redDiamond, MARKS.cyanRect) > 360 && markGap(MARKS.greenDiamond, MARKS.cyanRect) > 360);
+  assert.ok(markGap(MARKS.redSquare, MARKS.blueDisc) < CUBE_SIZE, 'the squares and the disc of the earlier reading were that close');
+  assert.doesNotMatch(ASSUMED_TEXT, /even if it touches another target too/);
 });
 
 test('what the simulator only assumes is in the second part; the rules part does not say it', () => {
   assert.equal(LOCKER_ROOM_ASSUMPTIONS.title, 'What this simulator assumes');
   assert.match(LOCKER_ROOM_ASSUMPTIONS.note ?? '', /^These are not rules\./);
   const assumed: Array<[string, RegExp]> = [
-    ['which marks are pickup zones and targets', /Here the team cubes start on /],
-    ['the evidence for the other reading', /The older rules say both "pickup zone \(top left\)" and "the cube on the matching square"\. The organiser has been asked/],
+    ['how a token stands in a turned warehouse', /A token is completely inside only if it is turned the same way\./],
+    ['how the claw holds a cube', /Here the claw holds a cube square to the robot\./],
     ['the Team Box rides on the robot', /The Team Box rides on top of the robot from the start/],
     ['the Team Box is no part of the footprint', /It does not make the robot bigger on the mat, and no sensor sees it\./],
     ['the card', /The rules say "a color cube" and "the card"\. Here the referee holds a card of the team colour just in front of the claw\./],
@@ -168,22 +214,20 @@ test('what the simulator only assumes is in the second part; the rules part does
     ['reaching = the whole robot', /Step 2 counts when the whole robot is inside the Scan Station, its yellow frame included\./],
     ['the first delivery decides', /The first delivery decides Step 5\. Later deliveries change nothing\./],
     ['the scan need not come first', /The rules do not say that the robot must read the card first\. Here it does not have to\./],
-    ['a token in a big circle', /A token in a big circle, or a team cube on a maze target, counts for nothing\./],
+    ['a token in a big circle', /A token in a big circle, or a team cube in a warehouse, counts for nothing\./],
     ['partly inside another target, and not in its own = wrong', /A token that is partly inside a target of another colour, and not in its own, counts as a wrong delivery: -10\./],
-    ['partly inside its own target and another one', /A token that is partly inside its own target counts for it, even if it touches another target too\./],
     ['the scan is not checked', /The simulator cannot see if your program read the card\. Here the box is lifted after 4 seconds, read or not\./],
     ['the scan at the competition', /At the competition the robot must read the card\. The rules do not say how the referee checks it\./],
     ['the cube of the other colour in any circle', /The rules say only "Wrong color circle"\. Here the cube of the other colour in any big circle is a wrong delivery too: -10\./],
     ['the closed gate and the tokens', /Here the closed gate does not stop the robot from sorting the tokens: they count all the same\. The robot can drive around the gate\./],
-    ['the gate in the story and in v2.3', /The story of the rules sorts the tokens after the gate opens\. The older rules \(v2\.3\) let the robot enter the maze only then\./],
+    ['the gate in the story of the rules', /The story of the rules sorts the tokens after the gate opens, but Step 7 does not ask for an open gate\./],
     ['the line sensor sees yellow as line', /"Line" means a light colour: white, and also yellow \(the frames, the band, the pieces\)\./],
-    ['+5 is done on a target too small for a cube', /So on the score sheet, \+5 counts as done for those tokens\./],
     ['the gate touch once', /Touching it costs 10 points once, however often the robot touches it\./],
     ['a pushed cube is no touch', /A cube that the robot pushes against the gate is not the robot touching it\./],
     ['the size of the gate', /6 cm high\. The rules give no size\./],
     ['the cube size', /as the cube file on this website\. It is light/],
     ['the table around the mat', /The mat lies on a table\. .* stop 10 cm outside it/],
-    ['the yellow pieces and the light-blue rectangle', /have no role in the rules/],
+    ['the yellow pieces and the blue disc', /The two yellow pieces in the long line on the left, and the blue disc in the maze, have no role in the rules\./],
     ['the total never below 0', /The total is never below 0\. The rules do not say\./],
   ];
   for (const [what, sentence] of assumed) {
@@ -191,7 +235,8 @@ test('what the simulator only assumes is in the second part; the rules part does
     assert.doesNotMatch(RULES_TEXT, sentence, `${what}: not in the rules part`);
   }
   // the rules part says none of the simulator's own numbers or choices
-  for (const word of [/\b0\.5\b/, /\b2\.5\b/, /\b75\b/, /below 0/, /table/i, /yellow frame/i, /\bonce\b/, /whole robot/i, /first delivery/i, /(?<![\d.])5 cm\b/, /disc/i, /square/i, /rectangle/i]) {
+  // (the squares of the pickup zones are decided, so the rules part names them; how a token stands in a turned warehouse depends on the assumed cube)
+  for (const word of [/\b0\.5\b/, /\b2\.5\b/, /\b75\b/, /below 0/, /table/i, /yellow frame/i, /\bonce\b/, /whole robot/i, /first delivery/i, /(?<![\d.])5 cm\b/, /disc/i, /rectangle/i, /turned/i, /\b45\b/]) {
     assert.doesNotMatch(RULES_TEXT, word, String(word));
   }
   // the rules part: the rules' own points, and their 4 seconds as the rules say them
@@ -203,9 +248,14 @@ test('what the simulator only assumes is in the second part; the rules part does
   // nothing the simulator cannot do: its table stops the robot before it could back out of the Locker Room over the edge
   assert.doesNotMatch(ASSUMED_TEXT, /backwards/);
   assert.doesNotMatch(ASSUMED_TEXT, /"line" means a white line/);
-  // where the field comes from the older rules, the window says so
-  assert.ok(RULES_TEXT.includes('The older rules (v2.3) put the RED pickup zone at the top left and the GREEN pickup zone at the top right.'));
-  assert.match(LOCKER_ROOM_RULES_NOTE, /The rules file on this website is the older version 2\.3\./);
+  // the places of the field are the organiser's answer now, not the older rules'
+  assert.doesNotMatch(RULES_TEXT, /older rules \(v2\.3\) put/);
+  // the rules file on the website is these newest rules now (v2.3 was replaced): the note says so, and calls nothing older
+  assert.ok(
+    LOCKER_ROOM_RULES_NOTE.endsWith(`This simulator follows the newest rules of the organiser (${MATCH_DURATION} s). They are the rules you can download on this website.`),
+    LOCKER_ROOM_RULES_NOTE,
+  );
+  assert.doesNotMatch(LOCKER_ROOM_RULES_NOTE, /older|2\.3/);
   assert.doesNotMatch(LOCKER_ROOM_RULES_NOTE, /Starter|Advanced|Intermediate/, 'not the name of a level of the examples');
 });
 

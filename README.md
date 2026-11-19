@@ -234,6 +234,23 @@ To add a new document later: put the file in `public/downloads/`, then add an en
 category's `downloads` array with `kind` set to `rules`, `scoresheet`, `combinations`, `stl`
 or `other`.
 
+**The Capelli Starter — Locker Room rules are not fetched.** The organiser sent newer rules as a
+Word file, which replaced v2.3 (the old address redirects: "Old URLs" below).
+`capelli-starter-locker-room-rules.pdf` was made from it with LibreOffice, outside the
+repository, without changing a word:
+
+- Arial comes out as Liberation Sans (the same widths). The Word file sets three "−10 points."
+  in "Arial Unicode MS", which was not installed: a fontconfig file (`FONTCONFIG_FILE`) maps it
+  to Liberation Sans too, or they come out in another face.
+- The Word file has no title. A copy of it got only `docProps/core.xml` with the title
+  "Capelli Starter — Locker Room Mission — Official Rules", so that the PDF has one; `word/`
+  stayed byte for byte.
+- `soffice --headless --convert-to pdf`, with `HOME` set to an empty folder outside the
+  repository (LibreOffice writes its profile there). Check the result with `pdfinfo` (a title,
+  no author) and look at every page.
+
+A later version goes in the same way, under the same name, so that every link stays.
+
 ---
 
 ## The Fire Rescue simulator
@@ -1533,10 +1550,11 @@ Starter — Locker Room** (ages 13–15, mBot2). The robot is the team's helper 
 starts in the **Locker Room** (bottom left) with the **Team Box** on it, drives to the **Scan
 Station** (bottom right), where the referee holds up a **colour card** — RED or GREEN, the team
 colour of the match — and then lifts the Team Box off the robot (the coach's approval). The
-robot then takes the **cube of the team colour** from its pickup zone to the **big circle** of
-that colour, which opens the **stadium gate**, and last it sorts the **three tokens** (RED,
-GREEN, BLUE) from the zones A, B and C into the **maze targets** of their colours. A match lasts
-150 seconds. It lives at:
+robot then takes the **cube of the team colour** from its pickup zone — a small square in the
+middle of the maze — to the **big circle** of that colour, which opens the **stadium gate**, and
+last it sorts the **three tokens** (RED, GREEN, BLUE) from the zones A, B and C into the
+**warehouses** of their colours, the three targets at the top of the mat. A match lasts 150
+seconds. It lives at:
 
 ```
 https://www.makexlebanon.com/simulator/locker-room
@@ -1544,21 +1562,26 @@ https://www.makexlebanon.com/simulator/locker-room
 
 **Which rules.** The simulator follows the organiser's **latest rules** ("Starter — Locker Room
 Mission", 150 s, half points for a token that is only partly inside its target, the 4-second
-pause cancelled). **The rules file you can download on the category page is still the older
-v2.3** (`public/downloads/capelli-starter-locker-room-rules-v2.3.pdf`: it still has the
-mandatory 4-second pause, no half points and no match time). The simulator uses v2.3 only for
-what the latest rules leave out: where things are on the field. Its **Rules** window says this
-in its first line. Replace the download when the organiser publishes the new rules as a file.
+pause cancelled), and **these are also the rules file you can download on the category page**
+(`public/downloads/capelli-starter-locker-room-rules.pdf`, made from the organiser's Word file:
+"Rules, scoresheets and other downloads" above says how). They replaced the older **v2.3**,
+which still had the mandatory 4-second pause, no half points and no match time. Its old address
+`/downloads/capelli-starter-locker-room-rules-v2.3.pdf` is a permanent redirect to the new file
+(`next.config.mjs`); the v2.3 file itself is only in the git history
+(`git show 35c7d37:public/downloads/capelli-starter-locker-room-rules-v2.3.pdf > v2.3.pdf`).
+Where the pickup zones and the targets are, which neither version made clear, the organiser has
+confirmed (question 1 below). The **Rules** window says in its first line which rules it
+follows.
 
 The mat is the print file `Capelli-Starter_1235mm.idml` (an InDesign file, one page of 1235 ×
 1235 mm, black, with **white** lines). Its pictures (the Locker Room art, the coach badge, the
 zone pictures, the blue disc, the logos) are linked files that are not in the IDML: their look
-comes from the organiser's own render of the whole mat in the rules v2.3, cut out at the
-frames of the print file, and is therefore soft. The rules give no sizes and leave several
-things open; every choice the simulator had to make is in the second part of the Rules window,
-"What this simulator assumes", and in the questions below. This category is for ages 13–15, and
-many students read English as a second language: every text on the screen is short and plain —
-keep it that way.
+comes from the organiser's own render of the whole mat in the rules v2.3 (page 2; the newer
+rules have no picture of the mat), cut out at the frames of the print file, and is therefore
+soft. The rules give no sizes and leave several things open; every choice the simulator had to
+make is in the second part of the Rules window, "What this simulator assumes", and in the
+questions below. This category is for ages 13–15, and many students read English as a second
+language: every text on the screen is short and plain — keep it that way.
 
 Everything that is general works as in Fire Rescue and is described above: the blocks and their
 saving, the ruler and the enlarged stage, the examples and their codes (one set of codes for all
@@ -1594,8 +1617,8 @@ it, so their screens are as they were:
   top of the robot (drawn see-through, so that the CyberPi and its LEDs still show), and the
   colour card in front of the claw while the referee holds it, with its name ("GREEN card")
   beside it. A game without props draws nothing more.
-- **A zone of another shape** (`ZoneOverlay.outline`): the **Zones** view draws the two pickup
-  zones as the turned rectangles they are.
+- **A zone of another shape** (`ZoneOverlay.outline`): the **Zones** view draws the RED and the
+  GREEN warehouse as the turned rectangles they are.
 - **What the referee is doing right now** (`ScoreReport.now`): while the robot waits at the Scan
   Station, the status line above the stage says "The referee shows the GREEN card in front of
   the robot." (and the step before and after it) in place of the count of goals, so that a robot
@@ -1645,10 +1668,10 @@ IDML (1 pt = 1235 / 3500.787 mm); `field.test.ts` holds the print file's own num
 | Locker Room | its frame (yellow, 12 wide) included, to the edge of the mat: x 0 – 252.8, y 981.4 – 1235. Inside the frame alone there are only 236.0 mm |
 | Scan Station | frame included: x 982.3 – 1235, y 983.0 – 1235 |
 | Big circles | RED centre (1107.7, 505.3), r 103.5; GREEN centre (623.6, 933.2), r 104.8 |
-| Turned rectangles at the top (pickup zones, `MARK_ROLES`) | 104.8 × 62.9, turned 45°: red at (130.8, 118.5), green at (1102.5, 118.9) |
-| Maze targets (`MARK_ROLES`) | red square x 600.9 – 642.8, y 485.5 – 527.4 (**41.9 mm**); green square the same x, y 702.3 – 744.2; blue disc (picture) centre (618.4, 615.1), r 68.1 |
+| Warehouses at the top (the targets, `MARK_ROLES`) | three rectangles of 104.8 × 62.9: red at (130.8, 118.5) and green at (1102.5, 118.9), both turned 45°; light blue (the BLUE one) x 568.8 – 673.6, y 87.1 – 150.0, not turned. A 50 mm cube fits completely into a turned one only turned with it: straight, a cube of at most 44.4 mm would fit; centred, it may be 17.7° off |
+| Pickup zones (`MARK_ROLES`) | in the maze: red square x 600.9 – 642.8, y 485.5 – 527.4 (**41.9 mm**: the 50 mm team cube stands on it centred, straight, over its edges); green square the same x, y 702.3 – 744.2 |
 | Zones A, B, C | the part of each picture that shows, 56.0 × 57.7: A (the lowest) y 747.5, B y 582.2, C (the top) y 429.1; x 102.8 (C 105.6) |
-| Light-blue rectangle | x 568.8 – 673.6, y 87.1 – 150.0 — no role in the rules |
+| Blue disc (a picture) | centre (618.4, 615.1), r 68.1, between the two squares — no role |
 | Gate mark | dotted rectangle x 430.5 – 488.1, y 829.0 – 915.6 |
 | Gate (ASSUMPTION) | a wall with that footprint, 60 high, until it opens |
 | Cube (MEASURED, from the published STL) | **50 × 50 × 70** (not Warehouse Sort's 40 mm assumption); light |
@@ -1674,44 +1697,63 @@ pictures) as background.
 | Step 5: deliver the team-colour cube | +20 / −10 | the **first** moment a team cube stands on the mat, released, not touching the robot, completely inside one of the big circles decides it once: the team-colour cube in the circle of that colour +20, anything else −10 — also the cube of the **other** colour in **its own** circle (the rules say only "Wrong color circle"; question 18). Later deliveries change nothing. The card does not have to be read first. (Both team cubes delivered on the same 1/100 s: the team colour's cube is looked at first) |
 | Step 6: stadium gate bonus | +5 | with a correct Step 5; the gate is taken off the field at that moment |
 | Touching the gate | −10 | the robot touches the closed gate — once per match; a cube pushed against it is not the robot |
-| Step 7: each token | +10 / +5 / −10 | at the end, for a token on the mat, not held, not touching the robot: completely inside the target of its colour +10, partly inside +5, otherwise (not on its own target at all) at least partly inside a target of another colour −10. On a target too small for a whole cube (the two 41.9 mm squares), +5 is the most there is: the line says so and counts it as done, so the best possible run is "complete" |
+| Step 7: each token | +10 / +5 / −10 | at the end, for a token on the mat, not held, not touching the robot: completely inside the warehouse of its colour +10, partly inside +5, otherwise (not on its own warehouse at all) at least partly inside a warehouse of another colour −10. Every warehouse holds a whole 50 mm cube; in the turned RED and GREEN ones only a token turned with them (the claw holds a cube square to the robot, so the robot puts it down facing along the tree's turned lines). A token that is only partly inside because of its turn gets a line that says so. (On a target too small for a whole cube — none now — +5 would count as done: `cubeFitsInside` in `game.ts`) |
 
 **The closed gate does not keep the robot out of the maze** (question 17): it is a block on the
 floor that the robot can drive around (the maze has no walls), and the tokens count whether the
 gate is open or not. The latest rules give Step 7 no condition on the gate; their story sorts
-the tokens "once the gate is open", and v2.3 says "Only then may the robot enter the maze area".
+the tokens "once the gate is open", and the older v2.3 said "Only then may the robot enter the
+maze area".
 
-Highest score: 5 + 10 + 15 + 20 + 5 + 3 × 10 = **85**. With the published 50 mm cube and the
-targets of `MARK_ROLES`, the RED and the GREEN token can never be *completely* inside their
-41.9 mm squares, so **75 is the most a robot can score here**; the Rules window works this out
-from the marks and says it. The total is never below 0. The match ends at 150 s, with
+Highest score: 5 + 10 + 15 + 20 + 5 + 3 × 10 = **85**, and a robot can reach it:
+`integration.test.ts` plays a program of real blocks that scores all 85 on the draws G5 and R5
+(in 56.5 and 66.1 s). The Rules window works the reachable score out from the marks. The
+total is never below 0. The match ends at 150 s, with
 "Finished" (the referee's "STOP"), or when the program has ended and the robot stands still —
 so **a program must keep running while it waits at the Scan Station**, or the match ends before
-the box is lifted. A token in a big circle, or a team cube on a maze target, counts for nothing.
+the box is lifted. A token in a big circle, or a team cube in a warehouse, counts for nothing.
 Not simulated: a voided run, field damage, the two runs of the ranking.
 
 ### The examples, as measured
 
 Six examples in `src/simulator/locker-room/samples.ts`, measured by `samples.test.ts` on all 12
-draws, on the vector mat and on the picture the browser reads (the same points on both):
+draws, on the vector mat and on the picture the browser reads (the same points on both), and
+again with the robot moved 5 mm and 1 cm up and down in the Locker Room before Start (the same
+points). The three that carry cubes stop once on their way at a white line that crosses it (the
+my-block "forward to a white line", at 20 RPM): there they find their place on the mat again,
+whatever the start. The team cubes stand on the small squares in the maze and the tokens go into
+the warehouses at the top (question 1).
 
 | Id | Level | What it does | Points | Ends at |
 | --- | --- | --- | --- | --- |
 | `locker-to-station` | starter | drives 98.2 cm and stops inside the Scan Station (the program ends before the box can be lifted) | 15 on all 12 | 5.92 s |
 | `locker-follow-line` | starter | follows the white bottom line until a probe sees the station's yellow frame, then 16.4 cm more | 15 on all 12 | 7.01 s |
 | `locker-read-card` | starter | stops in the station, waits for the card, shows "Team: red/green" on the screen and the LEDs, waits until the box is lifted | 30 on all 12 | 10.42 s |
-| `locker-team-cube` | intermediate | the card, then the cube of the colour it read into the big circle of that colour (the gate opens) | 55 on all 12 | RED 29.10 s, GREEN 26.04 s |
-| `locker-two-tokens` | intermediate | takes the tokens of zones A and B, reads each one's colour and puts it on its target; it never opens the gate, and its text says the tokens count all the same here (question 17) | 15 or 20 | 15.8 – 17.7 s |
-| `locker-whole-mission` | advanced | the card, the team cube, then zones A, B and C | **75 on all 12** (the most there is) | 50.8 – 56.7 s |
+| `locker-team-cube` | intermediate | the card, then the cube of the colour it read from its square into the big circle of that colour (the gate opens). GREEN: back along the bottom line, up to the white line at the bottom of the maze (the claw is then around the cube), back down into the circle. RED: up to the short white line right of the maze, on to the cube's height, left to the cube, a half turn, into the circle | 55 on all 12 | RED 24.15 s, GREEN 19.18 s |
+| `locker-two-tokens` | intermediate | up "the road" (x 340 mm, not printed) to the white line next to zone A; takes the tokens of zones A and B, reads each one's colour and puts it completely into the warehouse of that colour (into the turned RED and GREEN ones along the white diagonal lines, so the token is turned with them); it never opens the gate, and its text says the tokens count all the same here (question 17) | 25 on all 12 | 26.40 s (RED and BLUE in A and B), 30.16 s (RED and GREEN), 34.26 s (GREEN and BLUE) |
+| `locker-whole-mission` | advanced | the card, the team cube, then zones A, B and C into their warehouses | **85 on all 12** (every point there is) | RED 63.69 s, GREEN 58.71 s |
 
-On the default draw G5: 15, 15, 30, 55, 20 and 75 points. The "Try" of the line follower is to
-move the robot 1 cm up or down in the Locker Room before Start (it still finds the line: 15 on
-all 12 draws). It used to be "wait 5 seconds at the end", which earns the +15 of Step 3 without
+On the default draw G5: 15, 15, 30, 55, 25 and 85 points. The "Try"s, measured too: a shorter
+drive in the first starter (97.5 cm still earns the station, 97.4 cm not); the robot moved 1 cm up
+or down before the line follower starts (15 on all 12 draws); a 1 s wait in the card starter (15:
+the box is not lifted yet); the two ways of the team cube swapped (20 on all 12: a wrong delivery,
+−10, the gate stays closed); zone C too in the token example (35 on all 12, 40.78 s); the zones in
+the order C, B, A in the advanced one (85 on all 12, but slower on all 12: 64.27 s RED, 62.51 s
+GREEN — after every token the robot goes up to the top, so zone A is best taken first). The line
+follower's try used to be "wait 5 seconds at the end", which earns the +15 of Step 3 without
 reading the card — that taught that Step 3 needs no scan (question 16); reading the card is the
-next example. No example ever pushes a cube, touches
-the gate or makes a wrong delivery. They drive by distance and will drift on a real robot. The
-three starters are open to everyone, the two intermediate ones need a member code, the advanced
-one is shown to advanced codes only (`content/simulator-codes.ts`).
+next example.
+
+No example ever pushes a cube, touches the gate or makes a wrong delivery: the closing claw moves a
+cube by 0.32 mm at most, to the middle of its fingers. The numbers that follow a white-line stop,
+and the heights of the zones, have two decimals: they are measured so that the claw closes within
+0.75 mm of the middle of each cube on the drawing and on the picture (the sensor sees a line one
+tick of the simulation sooner or later, and the picture's line edges lie about 0.5 mm off the
+drawing's). Moved sideways (5 mm) or turned (1°) at the start, the three that carry cubes push
+cubes, and the two that take tokens lose points — they drive by distance, and will drift on a
+real robot. The three starters
+are open to everyone, the two intermediate ones need a member code, the advanced one is shown to
+advanced codes only (`content/simulator-codes.ts`).
 
 ### Questions for the organiser
 
@@ -1723,28 +1765,22 @@ on `/season/2026/locker-room`) bear on several of them; they are cited below. We
 from the photos whether they show a field before a match or after one, so they settle nothing on
 their own:
 
-1. **Which marks are the pickup zones, and which are the targets?** (L1, `MARK_ROLES` in
-   `field.ts`.) The match procedure of v2.3 says "Go to RED pickup zone (top-left)", "GREEN
-   pickup zone (top-right)" and "RED → red rectangle, GREEN → green rectangle, BLUE → blue
-   target"; another sentence of v2.3 says "the cube located in the center zone on the matching
-   RED or GREEN square". The simulator follows the match procedure: team cubes on the two turned
-   rectangles at the top, tokens to the small squares and the blue disc in the maze. The
-   evidence for the other reading: the small red and green squares are cube-sized marks (41.9
-   mm, like the cube squares of the Inspire mat); the published 50 mm cube can never be
-   completely inside them (so the RED and GREEN tokens can only earn +5, and 75 is the most);
-   and the three rectangles at the top — red, light blue, green — are all 104.8 × 62.9 mm, room
-   for a whole cube. The **latest rules** (§2.6) say: "Inside the maze, there are 3 colored
-   target rectangles: RED, GREEN, and BLUE. Each colored cube must be delivered to its matching
-   color target. A Colored cube only counts if it ends FULLY inside its target" — the BLUE target
-   the simulator uses is a round picture, not a rectangle, and the rules call what goes to a
-   target a "colored cube". The photos: `event-021.webp` shows a red cube on the turned red
-   rectangle at the top left and a blue cube on the light-blue rectangle; `event-025.webp` and
-   `event-008.webp` show a red cube on the small red square in the maze and the turned red
-   rectangle empty. Swapping is a change of `MARK_ROLES` (see below).
+1. **Which marks are the pickup zones, and which are the targets? — Decided by the organiser.**
+   (L1, `MARK_ROLES` in `field.ts`.) The organiser wrote: "red and green that robot should place
+   in the circles should be placed in the squares in center, the warehouses are on the top of
+   the map". So the team cubes start on the small red and green squares in the maze, and the
+   tokens go to the three rectangles at the top — the "warehouses": RED at the top left, BLUE
+   (light blue) in the middle, GREEN at the top right; the blue disc is a picture with no role.
+   It agrees with the latest rules ("3 colored target rectangles: RED, GREEN, and BLUE", though
+   they say "inside the maze"), with the sizes (the three rectangles are 104.8 × 62.9 mm and hold
+   the 50 mm cube; a 41.9 mm square cannot) and with the photo `event-025.webp` (a red cube on
+   the small red square early in a match). It was asked because v2.3 said both "RED pickup zone
+   (top-left)" and "the cube located in the center zone on the matching RED or GREEN square". The
+   table can still be changed in `MARK_ROLES`; `game.test.ts` plays the earlier reading with it.
 2. **The two orange squares** in the corners of the Locker Room and the Scan Station: the print
    file hides them under pictures. Are they printed? Is it where the Team Box stands?
-3. **The light-blue rectangle** at the top: what is it for? (It would be the BLUE target if
-   question 1 is answered the other way.)
+3. **The light-blue rectangle** at the top: what is it for? — Answered with question 1: it is the
+   BLUE warehouse.
 4. **The two yellow pieces** in the long line on the left: do they have a role?
 5. **The timings at the Scan Station** (L3): when does the referee show the card, take it away
    and lift the Team Box? The simulator: 0.5 s, 2.5 s and 4.0 s after the robot came to rest.
@@ -1770,8 +1806,8 @@ their own:
     `event-025.webp`) show tables with a raised rim right at the edge of the mat, and the gate as
     a yellow block with an arm, on the dotted rectangle.
 14. **Can the total go below 0?** The simulator says no, as in the other games.
-15. **The first delivery decides Step 5** (L5), and a token in a big circle or a team cube on a
-    maze target counts for nothing (L6): is that right?
+15. **The first delivery decides Step 5** (L5), and a token in a big circle or a team cube in a
+    warehouse counts for nothing (L6): is that right?
 16. **How does the referee know that the robot scanned the card?** (L3.) The rules: "At the Scan
     Station, the robot scans the color card. The referee removes the card. The referee lifts the
     Team Box … +15" and "After scanning, the referee removes the cube and lifts the Team Box"
@@ -1785,21 +1821,26 @@ their own:
     inside the maze" (§1), the gate is "near the entrance to the maze" (§2.4), and "If Step 5 was
     wrong or skipped, the gate stays closed" (Step 6) — but Step 7 has no condition on the gate.
     v2.3, Phase 4: "If correct delivery was made, the referee declares the gate open. Only then
-    may the robot enter the maze area." The simulator: the tokens count whether the gate is open
-    or not, and the closed gate is a block the robot can drive around. The intermediate example
-    "Sort two tokens" never opens the gate and scores 15 or 20 (its text says so).
+    may the robot enter the maze area." With the decided layout the team cubes stand in the maze,
+    so a robot goes in before the gate can open, and the tokens go to the warehouses at the top,
+    outside it. The simulator: the tokens count whether the gate is open or not, and the closed
+    gate is a block the robot can drive around. The intermediate example "Sort two tokens" never
+    opens the gate (its text says so).
 18. **The cube of the other colour in its own circle** (L5): the rules say "Wrong color circle:
     −10". Team GREEN puts the RED cube into the RED circle: −10 (the simulator), or "not
     delivered", 0? The simulator gives −10 and the gate stays closed; the Rules window says so.
 
 ### What to change, and where
 
-- **The pickup zones and the targets** (question 1): `MARK_ROLES` in `field.ts`, for example
+- **The pickup zones and the targets** (question 1, decided): `MARK_ROLES` in `field.ts`, now
   `pickup: { red: 'redSquare', green: 'greenSquare' }` and
   `target: { red: 'redDiamond', green: 'greenDiamond', blue: 'cyanRect' }`. The cubes, the
-  referee, the Zones view and the Rules window follow by themselves (the highest reachable score
-  is worked out). The examples drive by distance to the marks of today: `samples.test.ts` fails
-  first and names the numbers in `samples.ts` to change.
+  referee, the Zones view, the score sheet and the Rules window follow it by themselves (the
+  highest reachable score, which targets are turned, and the mark with no role are worked out).
+  The examples drive by distance to the marks: `samples.test.ts` fails first and names the
+  numbers in `samples.ts` to change. The numbers after a white-line stop are measured (the
+  comment at the top of `samples.ts` says how): measure them again when a line, the picture or
+  the robot changes.
 - **The timings at the Scan Station**: `CARD_SHOW_S`, `CARD_AWAY_S`, `BOX_LIFT_S` in `game.ts`;
   the Rules window takes them from there. The examples wait 2 s after the card is gone — check
   `samples.test.ts`.
@@ -1826,7 +1867,8 @@ their own:
   picture in the browser; the tests read the vector drawing, in which a picture is one flat
   colour.
 - **The robot is perfect** — no wheel slip, no sensor noise. The intermediate and advanced
-  examples drive by distance and will drift on a real robot.
+  examples drive by distance and will drift on a real robot; their one stop at a white line
+  makes up for a start moved up or down, not for one moved sideways or turned.
 - **The Team Box hides part of the robot on the stage** (it is drawn see-through on top).
 - **No restarts, no voided run**: touching the robot is not simulated, so neither is a run that
   counts 0. The CyberPi buttons work during a match; at the competition nobody may steer the
@@ -1839,8 +1881,9 @@ their own:
 - **Cubes do not stack.** A cube put down on top of another cube slides off it, and both move by
   up to about 3 cm in one step (engine behaviour, as in Warehouse Sort).
 - **Closing the claw on a turned cube** straightens it (a cube at 45° ends square to the claw):
-  engine behaviour, as in Warehouse Sort. The team cubes stand turned by 45°: the examples
-  come at them along the tree's diagonal lines, square to them.
+  engine behaviour, as in Warehouse Sort. The team cubes stand straight on their squares; a
+  token for the turned RED or GREEN warehouse must be put down turned 45°, so the robot faces
+  along the tree's turned lines when it lets go.
 - **The referee does not check the scan** (question 16) and **the closed gate does not keep the
   robot out of the maze** (question 17): both are said in the Rules window.
 
@@ -1877,6 +1920,10 @@ existing links and search results keep working:
 | `/national-2025-1` | `/season/2025` |
 | `/categories-2024-2025-1` | `/competitions/national` |
 | `/newsletters` | `/newsletters` (kept, now a real page) |
+
+One redirect is of this site's own: the Locker Room rules v2.3,
+`/downloads/capelli-starter-locker-room-rules-v2.3.pdf`, go to the organiser's newer rules that
+replaced them, `/downloads/capelli-starter-locker-room-rules.pdf`.
 
 ---
 

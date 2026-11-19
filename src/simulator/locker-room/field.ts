@@ -23,15 +23,16 @@
  *
  *     +=========[ MakeX ]=========+    === the yellow band (a gap in the middle of the top and
  *     | <red>    [cyan]   <green> |        of the bottom edge)
- *     |   \T       _T_      T/    |    <red>, <green>  the two turned rectangles at the top
- *     |    \_______|_______/      |    T   a line with a T-end
- *     |  C  |      |       |   (RED)   (RED)  the big red circle, (GREEN) the big green one
- *     |  B  Y--+---+---+   |      |    A, B, C  the three distribution zones (pictures)
- *     |  A  |  | [r] o [g]  |  \  |    Y   the yellow pieces in the long line on the left
- *     |     Y--+--------+     \   |    [r] [g]  the small squares, o the blue disc, in the maze
- *     |     |  :gate: (GREEN)  |  |    :gate:  the dotted rectangle where the stadium gate stands
- *     | [LOCKER]--------------[SCAN]   LOCKER  the start zone, SCAN  the Scan Station
- *     +==========[      ]==========+
+ *     |   \T       _T_      T/    |    <red> [cyan] <green>  the three rectangles at the top: the
+ *     |    \_______|_______/      |        WAREHOUSES, the targets of the tokens (two of them turned)
+ *     |  C  |      |       |   (RED)   T   a line with a T-end
+ *     |  B  Y--+---+---+   |      |    (RED)  the big red circle, (GREEN) the big green one
+ *     |  A  |  | [r] o [g]  |  \  |    A, B, C  the three distribution zones (pictures)
+ *     |     Y--+--------+     \   |    Y   the yellow pieces in the long line on the left
+ *     |     |  :gate: (GREEN)  |  |    [r] [g]  the small squares in the maze: the PICKUP ZONES,
+ *     | [LOCKER]--------------[SCAN]       where the team cubes start; o the blue disc (a picture)
+ *     +==========[      ]==========+    :gate:  the dotted rectangle where the stadium gate stands
+ *                                       LOCKER  the start zone, SCAN  the Scan Station
  *
  * Plain TypeScript, no DOM.
  */
@@ -336,11 +337,14 @@ export const BIG_CIRCLES: Record<TeamColor, Circle> = {
 /** The marks on the mat that a cube can start on or be delivered to. */
 export type MarkId = 'redDiamond' | 'greenDiamond' | 'cyanRect' | 'redSquare' | 'greenSquare' | 'blueDisc';
 export type MarkColor = 'red' | 'green' | 'blue';
+export const MARK_IDS: readonly MarkId[] = ['redDiamond', 'greenDiamond', 'cyanRect', 'redSquare', 'greenSquare', 'blueDisc'];
 
 export interface Mark {
   id: MarkId;
-  /** what the mark looks like, in plain words (for texts) */
+  /** what the mark looks like and where it is, in plain words (for texts) */
   name: string;
+  /** only where it is, in plain words: "at the top left" (for texts that name the mark by its role) */
+  place: string;
   color: MarkColor;
   /** a rectangle (perhaps turned) ... */
   box?: OBB;
@@ -352,8 +356,8 @@ export interface Mark {
  * MEASURED: every coloured mark.
  *   redDiamond, greenDiamond  the red and the green rectangle at the top left and the top right:
  *                 104.76 x 62.86 mm, turned by 45 degrees (they look like diamonds)
- *   cyanRect      the light-blue rectangle at the top in the middle, the same size, not turned. The
- *                 rules give it no role (the README asks the organiser).
+ *   cyanRect      the light-blue rectangle at the top in the middle, the same size, not turned (the
+ *                 rules call it BLUE: the sensors name this sky blue "blue")
  *   redSquare, greenSquare  the small red and green squares in the maze, above and below its
  *                 middle: 41.9 mm (an outer and an inner square of the same colour)
  *   blueDisc      PICTURE: the round blue picture in the middle of the maze; it fills its frame of
@@ -361,47 +365,54 @@ export interface Mark {
  *                 68 to 69 mm, the frame cuts it at 68.13 mm)
  */
 export const MARKS: Record<MarkId, Mark> = {
-  redDiamond: { id: 'redDiamond', name: 'the red rectangle at the top left', color: 'red', box: { x: 130.82, y: 118.54, w: 62.86, l: 104.76, angle: Math.PI / 4 } },
-  greenDiamond: { id: 'greenDiamond', name: 'the green rectangle at the top right', color: 'green', box: { x: 1102.45, y: 118.91, w: 62.86, l: 104.76, angle: -Math.PI / 4 } },
-  cyanRect: { id: 'cyanRect', name: 'the light-blue rectangle at the top', color: 'blue', box: { x: 621.17, y: 118.54, w: 104.76, l: 62.86, angle: 0 } },
-  redSquare: { id: 'redSquare', name: 'the red square in the maze', color: 'red', box: { x: 621.88, y: 506.43, w: 41.9, l: 41.9, angle: 0 } },
-  greenSquare: { id: 'greenSquare', name: 'the green square in the maze', color: 'green', box: { x: 621.88, y: 723.25, w: 41.9, l: 41.9, angle: 0 } },
-  blueDisc: { id: 'blueDisc', name: 'the blue disc in the maze', color: 'blue', circle: { cx: 618.43, cy: 615.14, r: 68.13 } },
+  redDiamond: { id: 'redDiamond', name: 'the red rectangle at the top left', place: 'at the top left', color: 'red', box: { x: 130.82, y: 118.54, w: 62.86, l: 104.76, angle: Math.PI / 4 } },
+  greenDiamond: { id: 'greenDiamond', name: 'the green rectangle at the top right', place: 'at the top right', color: 'green', box: { x: 1102.45, y: 118.91, w: 62.86, l: 104.76, angle: -Math.PI / 4 } },
+  cyanRect: { id: 'cyanRect', name: 'the light-blue rectangle at the top', place: 'at the top in the middle', color: 'blue', box: { x: 621.17, y: 118.54, w: 104.76, l: 62.86, angle: 0 } },
+  redSquare: { id: 'redSquare', name: 'the red square in the maze', place: 'in the maze', color: 'red', box: { x: 621.88, y: 506.43, w: 41.9, l: 41.9, angle: 0 } },
+  greenSquare: { id: 'greenSquare', name: 'the green square in the maze', place: 'in the maze', color: 'green', box: { x: 621.88, y: 723.25, w: 41.9, l: 41.9, angle: 0 } },
+  blueDisc: { id: 'blueDisc', name: 'the blue disc in the maze', place: 'in the middle of the maze', color: 'blue', circle: { cx: 618.43, cy: 615.14, r: 68.13 } },
 };
 
 /**
  * THE ONE TABLE OF THE QUESTION "WHICH MARK IS WHAT" - everything else (where the cubes start,
- * which mark the referee judges, the screen's highlights) reads it from here.
+ * which mark the referee judges, the screen's highlights, the texts) reads it from here.
  *
  *   pickup   where the cube of each team colour stands at the start (rules §3.1 "which pickup zone
  *            to visit", §5 Step 5 "go to the RED pickup zone, get the RED cube")
- *   target   the maze colour target of each token colour (rules §2.6, §5 Step 7)
+ *   target   where the token of each colour goes (rules §2.6, §5 Step 7) - the organiser calls the
+ *            targets "warehouses" (ROLE_WORD)
  *
- * ASSUMPTION, the first question for the organiser: the rules v2.3 say both "Go to RED pickup zone
- * (top-left)" / "GREEN pickup zone (top-right)" and "the cube located in the center zone on the
- * matching RED or GREEN square". The simulator follows the first (the match procedure): the team
- * cubes start on the two turned rectangles at the top; the tokens go to the small squares and the
- * blue disc in the maze. Evidence for the other reading: the small squares are cube-sized marks (a
- * 41.9 mm square, like the orange squares a cube stands on in Warehouse Sort), and the published
- * cube (50 mm, CUBE_SIZE) can never be COMPLETELY inside a 41.9 mm square - so with this table a
- * red or a green token can only ever be "partly inside" (+5, never +10). The three rectangles at
- * the top (red, light blue, green) are all 104.76 x 62.86 mm: a cube fits completely into each.
- * To swap, change the marks named here, for example
- *   pickup: { red: 'redSquare', green: 'greenSquare' },
- *   target: { red: 'redDiamond', green: 'greenDiamond', blue: 'cyanRect' }.
+ * DECIDED BY THE ORGANISER. This was the first question: the older rules v2.3 said both "RED
+ * pickup zone (top-left)" and "the cube located in the center zone on the matching RED or GREEN
+ * square". The organiser wrote: "red and green that robot should place in the circles should be
+ * placed in the squares in center, the warehouses are on the top of the map". So the team cubes
+ * start on the two small squares in the maze, and the tokens go to the three rectangles at the top
+ * (red at the top left, light blue - the BLUE one - in the middle, green at the top right). The
+ * blue disc has no role: it is a picture. The rest agrees: the rules call the targets "3 colored
+ * target rectangles: RED, GREEN, and BLUE"; the three rectangles are of one size (104.76 x 62.86
+ * mm) that holds the 50 mm cube (CUBE_SIZE), which a 41.9 mm square cannot; and the event photo
+ * public/gallery/2026/locker-room/event-025.webp shows a red cube on the small red square early in
+ * a match. The table can still be changed here: game.test.ts plays the earlier reading (team cubes
+ * at the top, tokens to the squares and the disc) with it, and the referee and the screen follow.
  */
 export const MARK_ROLES: {
   readonly pickup: Readonly<Record<TeamColor, MarkId>>;
   readonly target: Readonly<Record<MarkColor, MarkId>>;
 } = {
-  pickup: { red: 'redDiamond', green: 'greenDiamond' },
-  target: { red: 'redSquare', green: 'greenSquare', blue: 'blueDisc' },
+  pickup: { red: 'redSquare', green: 'greenSquare' },
+  target: { red: 'redDiamond', green: 'greenDiamond', blue: 'cyanRect' },
 };
+
+/** The words for the two roles in texts: the rules' "pickup zone", and the organiser's "warehouse" for a target. */
+export const ROLE_WORD = { pickup: 'pickup zone', target: 'warehouse' } as const;
 
 /** The pickup zone of a team colour (MARK_ROLES). */
 export const pickupZone = (color: TeamColor): Mark => MARKS[MARK_ROLES.pickup[color]];
-/** The maze target of a token colour (MARK_ROLES). */
+/** The target - the warehouse - of a token colour (MARK_ROLES). */
 export const targetOf = (color: MarkColor): Mark => MARKS[MARK_ROLES.target[color]];
+/** The marks that are neither a pickup zone nor a target (with the decided table: the blue disc). */
+export const marksWithoutRole = (): Mark[] =>
+  MARK_IDS.filter((id) => !Object.values(MARK_ROLES.pickup).includes(id) && !Object.values(MARK_ROLES.target).includes(id)).map((id) => MARKS[id]);
 
 // =============================================================================================
 // The distribution zones A, B, C (rules §2.5)

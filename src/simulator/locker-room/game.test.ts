@@ -13,7 +13,7 @@ import { obbCorners, type OBB } from '../core/geometry';
 import { robotShapesAt } from '../core/robot';
 import { drive, forever, scripted, sleep, type Script } from '../core/test-helpers';
 import type { Body, Pose, RefereeCall, ScoreContext, ScoreLine, ScoreReport } from '../core/types';
-import { BIG_CIRCLES, CARD, GATE_MARK, LOCKER_ROOM, MARKS, MARK_ROLES, SCAN_STATION, TEAM_BOX, ZONES, type MarkId, type TeamColor, type ZoneId } from './field';
+import { BIG_CIRCLES, CARD, CUBE_SIZE, GATE_MARK, LOCKER_ROOM, MARKS, MARK_ROLES, SCAN_STATION, TEAM_BOX, ZONES, targetOf, type MarkId, type TeamColor, type ZoneId } from './field';
 import {
   BOX_LIFT_S,
   CARD_AWAY_S,
@@ -45,6 +45,9 @@ import {
   WRONG_TOKEN_PENALTY,
   cardProp,
   clock,
+  cubeFitsInside,
+  cubeFitsTurned,
+  footprint,
   isInsideScanStation,
   isOutsideLockerRoom,
   lockerRoomGame,
@@ -582,112 +585,153 @@ test('Gate: -10 the first time the robot touches the closed gate - once, however
 });
 
 // =============================================================================================
-// Step 7: the tokens
+// Step 7: the tokens, into the warehouses at the top (MARK_ROLES)
 // =============================================================================================
 
-test('Step 7: the blue token completely inside the blue disc +10; partly inside +5; held or touching the robot at the end: 0', () => {
+/** The box of a mark, and a point `forward` mm along it and `right` mm across it from its middle. */
+const markBox = (id: MarkId) => MARKS[id].box as OBB;
+const along = (box: OBB, forward: number, right: number) => ({
+  x: box.x + forward * Math.sin(box.angle) + right * Math.cos(box.angle),
+  y: box.y - forward * Math.cos(box.angle) + right * Math.sin(box.angle),
+});
+const DEG = Math.PI / 180;
+
+test('Step 7: the blue token completely inside the BLUE warehouse +10 (it has 6.43 mm of play up and down); partly +5; held or touching the robot at the end: 0', () => {
   const b = bench(arrangement('G5')); // BLUE in A, RED in B, GREEN in C
   b.robotAt(AWAY);
-  const disc = MARKS.blueDisc.circle!;
+  const box = markBox('cyanRect');
   const blue = tokenId('A');
-  // fully: its corners up to 68.13 mm from the middle: the cube's middle up to 32.77 mm away
-  const reach = disc.r - 25 * Math.SQRT2;
-  b.place(blue, disc.cx + reach / Math.SQRT2, disc.cy + reach / Math.SQRT2);
+  // fully: straight, its middle up to (62.86 - 50) / 2 = 6.43 mm from the middle of the warehouse
+  b.place(blue, box.x, box.y + 6.43);
   b.tick();
   let line = b.line(tokenLineId('blue'));
-  assert.deepEqual([line.points, line.ok, line.detail], [POINTS_TOKEN, true, 'completely inside the blue disc in the maze']);
-  // 1 mm further: partly
-  b.place(blue, disc.cx + (reach + 1) / Math.SQRT2, disc.cy + (reach + 1) / Math.SQRT2);
-  b.tick();
+  assert.deepEqual([line.points, line.ok, line.detail], [POINTS_TOKEN, true, 'completely inside the BLUE warehouse at the top in the middle']);
+  b.place(blue, box.x + 27.38, box.y - 6.43);
+  assert.equal(b.line(tokenLineId('blue')).points, POINTS_TOKEN, 'and 27.38 mm to each side');
+  // 0.01 mm further: partly
+  b.place(blue, box.x, box.y + 6.44);
   line = b.line(tokenLineId('blue'));
-  assert.deepEqual([line.points, line.ok, line.detail], [POINTS_TOKEN_PARTLY, false, 'only partly inside the blue disc in the maze: half points']);
-  // its edge only touching the disc: nothing
-  b.place(blue, disc.cx + disc.r + 25, disc.cy);
-  b.tick();
-  assert.equal(b.line(tokenLineId('blue')).points, 0);
-  // held over the disc at the end
-  b.place(blue, disc.cx, disc.cy);
-  b.robotAt({ x: disc.cx, y: disc.cy + ROBOT.gripper.gripForward, heading: 0 });
-  b.hold(blue, 10);
+  assert.deepEqual([line.points, line.ok, line.detail], [POINTS_TOKEN_PARTLY, false, 'only partly inside the BLUE warehouse at the top in the middle: half points']);
+  // turned by 45 degrees a cube is 70.7 mm across: it never fits, and the line says why
+  b.place(blue, box.x, box.y, 45 * DEG);
+  line = b.line(tokenLineId('blue'));
+  assert.deepEqual([line.points, line.ok, line.detail], [POINTS_TOKEN_PARTLY, false, 'only partly inside the BLUE warehouse at the top in the middle: half points - turned like this, it cannot be completely inside']);
+  // its edge only touching the warehouse: nothing
+  b.place(blue, box.x, box.y + box.l / 2 + 25);
   b.end();
   line = b.line(tokenLineId('blue'));
-  assert.deepEqual([line.points, line.detail], [0, 'the robot still held it - put it down in the blue disc in the maze']);
-  // let go, but the claw still touches it at the end
+  assert.deepEqual([line.points, line.detail], [0, 'not in a warehouse']);
+  // held over the warehouse at the end
   const c = bench(arrangement('G5'));
-  c.place(blue, disc.cx, disc.cy);
-  c.robotAt({ x: disc.cx, y: disc.cy + ROBOT.gripper.gripForward, heading: 0 });
-  c.world.robot.gripper.gap = 50;
+  c.place(blue, box.x, box.y);
+  c.robotAt({ x: box.x, y: box.y + ROBOT.gripper.gripForward, heading: 0 });
+  c.hold(blue, 10);
   c.end();
   line = c.line(tokenLineId('blue'));
+  assert.deepEqual([line.points, line.detail], [0, 'the robot still held it - put it down in the BLUE warehouse at the top in the middle']);
+  // let go, but the claw still touches it at the end
+  const d = bench(arrangement('G5'));
+  d.place(blue, box.x, box.y);
+  d.robotAt({ x: box.x, y: box.y + ROBOT.gripper.gripForward, heading: 0 });
+  d.world.robot.gripper.gap = 50;
+  d.end();
+  line = d.line(tokenLineId('blue'));
   assert.deepEqual([line.points, line.detail], [0, 'touching the robot']);
 });
 
-test('Step 7: the red and green tokens on their 41.9 mm squares can only be PARTLY inside (the cube is 50 mm): +5', () => {
-  const b = bench(arrangement('G5'));
+test('Step 7: the RED and GREEN warehouses are turned by 45 degrees - a token is completely inside only when it is turned with them (+10); straight: +5', () => {
+  const b = bench(arrangement('G5')); // BLUE in A, RED in B, GREEN in C
   b.robotAt(AWAY);
-  const red = MARKS.redSquare.box as OBB;
-  const green = MARKS.greenSquare.box as OBB;
-  b.place(tokenId('B'), red.x, red.y); // the red token, centred on its square
-  b.place(tokenId('C'), green.x, green.y);
-  b.tick();
-  for (const color of ['red', 'green'] as const) {
-    const line = b.line(tokenLineId(color));
-    // (+5 is the most a token can get on these squares: the line counts it as done and says why)
-    assert.deepEqual([line.points, line.ok], [POINTS_TOKEN_PARTLY, true], color);
-    assert.equal(line.detail, `partly inside the ${color} square in the maze: 5 points, the most here (a cube is bigger than this target)`);
+  for (const [color, zone, id] of [['red', 'B', 'redDiamond'], ['green', 'C', 'greenDiamond']] as const) {
+    const box = markBox(id);
+    assert.equal(Math.abs(box.angle), 45 * DEG, id);
+    const token = tokenId(zone);
+    const where = color === 'red' ? 'at the top left' : 'at the top right';
+    // turned with it: +10, and a quarter turn more is the same for a square cube
+    for (const angle of [box.angle, box.angle + 90 * DEG, box.angle - 90 * DEG]) {
+      b.place(token, box.x, box.y, angle);
+      const line = b.line(tokenLineId(color));
+      assert.deepEqual([line.points, line.ok, line.detail], [POINTS_TOKEN, true, `completely inside the ${color.toUpperCase()} warehouse ${where}`], `${color} at ${angle}`);
+    }
+    // straight, in the middle of it: only partly inside - and the line says why
+    b.place(token, box.x, box.y, 0);
+    let line = b.line(tokenLineId(color));
+    assert.deepEqual(
+      [line.points, line.ok, line.detail],
+      [POINTS_TOKEN_PARTLY, false, `only partly inside the ${color.toUpperCase()} warehouse ${where}: half points - turned like this, it cannot be completely inside`],
+    );
+    // the play of a cube turned with it: 6.43 mm across the warehouse, 27.38 mm along it - exactly
+    for (const [forward, right, full] of [
+      [0, 6.43, true],
+      [0, -6.43, true],
+      [0, 6.44, false],
+      [27.38, 0, true],
+      [-27.38, 6.43, true],
+      [27.39, 0, false],
+    ] as const) {
+      const p = along(box, forward, right);
+      b.place(token, p.x, p.y, box.angle);
+      line = b.line(tokenLineId(color));
+      assert.equal(line.points, full ? POINTS_TOKEN : POINTS_TOKEN_PARTLY, `${color}: ${forward} along, ${right} across`);
+      if (!full) assert.equal(line.detail, `only partly inside the ${color.toUpperCase()} warehouse ${where}: half points`, 'it could fit: no word about its turn');
+    }
+    // in the middle, a cube may be turned up to 17.7 degrees off the warehouse
+    b.place(token, box.x, box.y, box.angle + 17.7 * DEG);
+    assert.equal(b.line(tokenLineId(color)).points, POINTS_TOKEN, `${color}: 17.7 degrees off`);
+    b.place(token, box.x, box.y, box.angle - 17.8 * DEG);
+    assert.equal(b.line(tokenLineId(color)).points, POINTS_TOKEN_PARTLY, `${color}: 17.8 degrees off`);
+    // the referee's test itself (onMark): a straight square fits only up to 62.86 / sqrt 2 = 44.45 mm
+    const straight = (size: number) => onMark({ x: box.x, y: box.y, w: size, l: size, angle: 0 }, MARKS[id]);
+    assert.deepEqual([straight(44.44), straight(44.46), straight(50)], ['full', 'part', 'part'], id);
   }
-  // on the blue disc a whole cube fits: there partly inside is half points, not done
-  b.place(tokenId('A'), MARKS.blueDisc.circle!.cx + MARKS.blueDisc.circle!.r, MARKS.blueDisc.circle!.cy);
-  b.tick();
-  const blue = b.line(tokenLineId('blue'));
-  assert.deepEqual([blue.points, blue.ok, blue.detail], [POINTS_TOKEN_PARTLY, false, 'only partly inside the blue disc in the maze: half points']);
-  // onMark itself: a smaller cube would be completely inside
-  assert.equal(onMark({ x: red.x, y: red.y, w: 40, l: 40, angle: 0 }, MARKS.redSquare), 'full');
-  assert.equal(onMark({ x: red.x, y: red.y, w: 50, l: 50, angle: 0 }, MARKS.redSquare), 'part');
-  assert.equal(onMark({ x: red.x + 45.95, y: red.y, w: 50, l: 50, angle: 0 }, MARKS.redSquare), null, 'edges touching only');
-  assert.equal(onMark({ x: red.x + 45.9, y: red.y, w: 50, l: 50, angle: 0 }, MARKS.redSquare), 'part');
+  // the same numbers as the referee's: how a cube may stand in a target
+  const red = MARKS.redDiamond;
+  assert.deepEqual([cubeFitsTurned(red, 45 * DEG), cubeFitsTurned(red, -45 * DEG), cubeFitsTurned(red, 0), cubeFitsTurned(red, 0, 44.44)], [true, true, false, true]);
+  assert.deepEqual([cubeFitsTurned(MARKS.cyanRect, 0), cubeFitsTurned(MARKS.cyanRect, 45 * DEG), cubeFitsTurned(MARKS.cyanRect, 17.7 * DEG), cubeFitsTurned(MARKS.cyanRect, 17.8 * DEG)], [true, false, true, false]);
+  assert.equal(cubeFitsTurned(MARKS.blueDisc, 0.3), true, 'a disc does not care how the cube is turned');
+  for (const color of ['red', 'green', 'blue'] as const) assert.equal(cubeFitsInside(targetOf(color)), true, `${color}: every warehouse holds a whole cube`);
 });
 
-test('Step 7: a token partly inside a target of ANOTHER colour: -10 (wrong); its own target wins when it touches both', () => {
-  const b = bench(arrangement('G5'));
+test('Step 7: a token partly inside a warehouse of ANOTHER colour: -10 (wrong)', () => {
+  const b = bench(arrangement('G5')); // BLUE in A, RED in B, GREEN in C
   b.robotAt(AWAY);
-  const red = MARKS.redSquare.box as OBB;
-  // the green token: a corner on the red square
-  b.place(tokenId('C'), red.x + 45, red.y + 45);
-  b.tick();
+  const red = markBox('redDiamond');
+  // the green token: a corner on the red warehouse
+  const corner = along(red, 0, red.w / 2 + 20);
+  b.place(tokenId('C'), corner.x, corner.y, red.angle);
   let line = b.line(tokenLineId('green'));
-  assert.deepEqual([line.points, line.detail], [-WRONG_TOKEN_PENALTY, 'in the red square in the maze - wrong target, -10']);
-  // the blue token completely in the blue disc and the red token on the disc too: red is wrong
-  const disc = MARKS.blueDisc.circle!;
-  b.place(tokenId('B'), disc.cx, disc.cy);
-  b.tick();
-  line = b.line(tokenLineId('red'));
-  assert.equal(line.points, -WRONG_TOKEN_PENALTY);
-  // a token that lies on its own square and on the disc counts for its own (part) - not as wrong
-  const between = (MARKS.redSquare.box as OBB).y + 40;
-  b.place(tokenId('B'), red.x, between);
-  b.tick();
-  assert.ok(onMark({ x: red.x, y: between, w: 50, l: 50, angle: 0 }, MARKS.blueDisc) !== null);
-  assert.equal(b.line(tokenLineId('red')).points, POINTS_TOKEN_PARTLY);
+  assert.deepEqual([line.points, line.ok, line.detail], [-WRONG_TOKEN_PENALTY, false, 'in the RED warehouse at the top left - wrong warehouse, -10']);
+  // the blue token completely in the green warehouse: wrong too
+  const green = markBox('greenDiamond');
+  b.place(tokenId('A'), green.x, green.y, green.angle);
+  line = b.line(tokenLineId('blue'));
+  assert.deepEqual([line.points, line.detail], [-WRONG_TOKEN_PENALTY, 'in the GREEN warehouse at the top right - wrong warehouse, -10']);
+  // 0.01 mm clear of the red warehouse: nothing
+  const clear = along(red, 0, red.w / 2 + 25.01);
+  b.place(tokenId('C'), clear.x, clear.y, red.angle);
+  assert.equal(b.line(tokenLineId('green')).points, 0);
+  // (a token can never touch two warehouses: they lie at least 369.6 mm apart - the rule that its
+  // own target wins then is played with the earlier table of marks, below)
 });
 
-test('Step 7: a team cube on a maze target counts for nothing (L6); tokens where they started: 0', () => {
+test('Step 7: a team cube in a warehouse counts for nothing (L6); tokens where they started: 0', () => {
   const b = bench(arrangement('R1'));
   b.robotAt(AWAY);
-  b.place(teamCubeId('red'), (MARKS.redSquare.box as OBB).x, (MARKS.redSquare.box as OBB).y);
-  b.place(teamCubeId('green'), MARKS.blueDisc.circle!.cx, MARKS.blueDisc.circle!.cy);
+  b.place(teamCubeId('red'), markBox('redDiamond').x, markBox('redDiamond').y, markBox('redDiamond').angle);
+  b.place(teamCubeId('green'), markBox('cyanRect').x, markBox('cyanRect').y);
   b.tick();
   for (const color of ['red', 'green', 'blue'] as const) assert.equal(b.line(tokenLineId(color)).points, 0, color);
   assert.equal(b.score().total, POINTS_LEAVE, 'only Step 1 (the robot is out of the Locker Room)');
+  assert.equal(b.line(tokenLineId('red')).detail, 'not yet - put it in the RED warehouse at the top left');
   b.end();
-  assert.equal(b.line(tokenLineId('red')).detail, 'not in a target');
+  assert.equal(b.line(tokenLineId('red')).detail, 'not in a warehouse');
 });
 
 // =============================================================================================
 // The whole sheet
 // =============================================================================================
 
-test('the sheet: 85 at most (5 + 10 + 15 + 20 + 5 + 3 x 10); with this table of marks 75 is the most a robot can get', () => {
+test('the sheet: 85 at most (5 + 10 + 15 + 20 + 5 + 3 x 10) - and with the decided marks a robot can get all 85: the run is complete', () => {
   assert.equal(MAX_SCORE, 85);
   assert.equal(MATCH_DURATION, 150);
   const b = bench(arrangement('G5'));
@@ -695,7 +739,7 @@ test('the sheet: 85 at most (5 + 10 + 15 + 20 + 5 + 3 x 10); with this table of 
   assert.equal(report.max, 85);
   assert.equal(report.lines.reduce((sum, l) => sum + l.max, 0), 85);
   assert.deepEqual(report.lines.map((l) => l.id), [LINE_LEAVE, LINE_SCAN_STATION, LINE_APPROVAL, LINE_DELIVERY, LINE_GATE, LINE_GATE_TOUCH, tokenLineId('red'), tokenLineId('green'), tokenLineId('blue')]);
-  // everything that can be done: out, station, box, the green cube, the tokens on their targets
+  // everything that can be done: out, station, box, the green cube, the tokens in their warehouses
   b.robotAt(START_POSE);
   b.begin();
   b.robotAt(facingRightWithRearAt(LOCKER_ROOM.x + LOCKER_ROOM.w + 10));
@@ -703,16 +747,20 @@ test('the sheet: 85 at most (5 + 10 + 15 + 20 + 5 + 3 x 10); with this table of 
   approve(b);
   b.robotAt(AWAY);
   b.place(teamCubeId('green'), circleMiddle('green').x, circleMiddle('green').y);
-  b.place(tokenId('A'), MARKS.blueDisc.circle!.cx, MARKS.blueDisc.circle!.cy);
-  b.place(tokenId('B'), (MARKS.redSquare.box as OBB).x, (MARKS.redSquare.box as OBB).y);
-  b.place(tokenId('C'), (MARKS.greenSquare.box as OBB).x, (MARKS.greenSquare.box as OBB).y);
+  b.place(tokenId('A'), markBox('cyanRect').x, markBox('cyanRect').y);
+  b.place(tokenId('B'), markBox('redDiamond').x, markBox('redDiamond').y, markBox('redDiamond').angle);
+  b.place(tokenId('C'), markBox('greenDiamond').x, markBox('greenDiamond').y, markBox('greenDiamond').angle);
   b.tick();
   b.end();
   const final = b.score();
-  assert.equal(final.total, 5 + 10 + 15 + 20 + 5 + 10 + 5 + 5);
-  // (75: the most a robot can do with these marks - every line done, so the run is complete)
-  assert.equal(final.complete, true, 'the red and the green token can only be partly inside: +5 is done there');
+  assert.equal(final.total, MAX_SCORE);
+  assert.equal(final.complete, true);
   assert.ok(final.lines.every((l) => l.ok));
+  // the same tokens partly inside: half points, and not done (a whole cube fits every warehouse)
+  b.place(tokenId('B'), markBox('redDiamond').x, markBox('redDiamond').y, 0);
+  const partly = b.score();
+  assert.equal(partly.total, MAX_SCORE - (POINTS_TOKEN - POINTS_TOKEN_PARTLY));
+  assert.equal(partly.complete, false);
 });
 
 test('the sheet: the total is never below 0 (L9)', () => {
@@ -720,7 +768,7 @@ test('the sheet: the total is never below 0 (L9)', () => {
   b.robotAt(AWAY);
   b.place(teamCubeId('green'), circleMiddle('red').x, circleMiddle('red').y); // -10
   b.tick();
-  b.place(tokenId('C'), (MARKS.redSquare.box as OBB).x, (MARKS.redSquare.box as OBB).y); // the green token on red: -10
+  b.place(tokenId('C'), markBox('redDiamond').x, markBox('redDiamond').y, markBox('redDiamond').angle); // the green token on red: -10
   const front = ROBOT.gripper.gripForward + ROBOT.gripper.fingerLength / 2;
   b.robotAt({ x: GATE_MARK.x - front, y: GATE_WALL.y, heading: RIGHT }); // -10
   b.tick();
@@ -753,7 +801,7 @@ test('clock: match time as the referee writes it', () => {
 // The game: bodies, walls, zones, no restarts
 // =============================================================================================
 
-test('the field at the start: the team cubes on their pickup zones, a token in the middle of each zone picture, the gate closed', () => {
+test('the field at the start: the team cubes straight in the middle of their pickup squares, a token in the middle of each zone picture, the gate closed', () => {
   for (const code of ['R1', 'G5', 'R6']) {
     const s = arrangement(code);
     const bodies = lockerRoomGame.createBodies(s);
@@ -769,9 +817,16 @@ test('the field at the start: the team cubes on their pickup zones, a token in t
       assert.equal(cube.colorName, color);
       const home = teamCubeHome(color);
       assert.deepEqual([cube.x, cube.y, cube.angle], [home.x, home.y, home.angle]);
-      // completely inside its turned rectangle, turned with it
-      assert.equal(onMark({ x: cube.x, y: cube.y, w: 50, l: 50, angle: cube.angle }, MARKS[color === 'red' ? 'redDiamond' : 'greenDiamond']), 'full');
+      // centred on its small square in the maze, not turned (the 50 mm cube stands over its 41.9 mm edges)
+      const square = markBox(color === 'red' ? 'redSquare' : 'greenSquare');
+      assert.deepEqual([cube.x, cube.y, cube.angle], [square.x, square.y, 0]);
+      assert.equal(onMark(footprint(cube), MARKS[color === 'red' ? 'redSquare' : 'greenSquare']), 'part');
+      // and on no target: nothing touches a warehouse at the start
+      for (const target of ['redDiamond', 'greenDiamond', 'cyanRect'] as const) assert.equal(onMark(footprint(cube), MARKS[target]), null);
     }
+    // the two team cubes and the blue disc between them do not meet
+    const [red, green] = bodies;
+    assert.ok(green.y - red.y - CUBE_SIZE > 150);
     for (const zone of ['A', 'B', 'C'] as ZoneId[]) {
       const token = bodies.find((b) => b.id === tokenId(zone))!;
       assert.deepEqual([token.x, token.y], [tokenHome(zone).x, tokenHome(zone).y]);
@@ -790,51 +845,101 @@ test('the field at the start: the team cubes on their pickup zones, a token in t
   assert.deepEqual([box.frame, box.x, box.w, box.l, box.z, box.h, box.colorName], ['robot', TEAM_BOX.forward, 90, 110, ROBOT.chassisHeight, 80, undefined]);
 });
 
-test('the zones of the screen: the Locker Room, the Scan Station, the turned pickup zones by their outline, the circles, the zones, the targets, the gate', () => {
+test('the zones of the screen: the Locker Room, the Scan Station, the pickup squares, the circles, the zones, the warehouses (the turned ones by their outline), the gate', () => {
   const zones = lockerRoomGame.overlays(arrangement('G5'));
   assert.deepEqual(zones.map((z) => z.id), ['start', 'scan', 'pickup:red', 'circle:red', 'pickup:green', 'circle:green', 'zone:A', 'zone:B', 'zone:C', 'target:red', 'target:green', 'target:blue', 'gate']);
   const of = (id: string) => zones.find((z) => z.id === id)!;
   assert.equal(of('pickup:green').label, 'Green pickup zone (your team)');
   assert.equal(of('pickup:red').label, 'Red pickup zone');
-  assert.equal(of('pickup:red').outline?.length, 4);
-  assert.equal(of('target:red').outline, undefined, 'a square that is not turned: its rect');
-  assert.equal(of('target:blue').shape, 'ellipse');
+  assert.deepEqual([of('target:red').label, of('target:green').label, of('target:blue').label], ['Red warehouse', 'Green warehouse', 'Blue warehouse']);
+  // the pickup squares are not turned: their rect is the zone
+  for (const color of ['red', 'green'] as const) {
+    const square = markBox(color === 'red' ? 'redSquare' : 'greenSquare');
+    assert.equal(of(`pickup:${color}`).outline, undefined, color);
+    near(of(`pickup:${color}`).rect.w, 41.9, 1e-9);
+    near(of(`pickup:${color}`).rect.x + of(`pickup:${color}`).rect.w / 2, square.x, 1e-9);
+  }
+  // the RED and the GREEN warehouse by their turned outline, the BLUE one by its rect
+  for (const [color, id] of [['red', 'redDiamond'], ['green', 'greenDiamond']] as const) {
+    assert.deepEqual(of(`target:${color}`).outline, obbCorners(markBox(id)), color);
+    assert.equal(of(`target:${color}`).kind, 'delivery');
+  }
+  assert.equal(of('target:blue').outline, undefined);
+  assert.equal(of('target:blue').shape, undefined);
+  near(of('target:blue').rect.w, 104.76, 1e-9);
+  // the blue disc has no role: no zone of its own
+  assert.ok(!zones.some((z) => Math.abs(z.rect.x + z.rect.w / 2 - MARKS.blueDisc.circle!.cx) < 1 && Math.abs(z.rect.y + z.rect.h / 2 - MARKS.blueDisc.circle!.cy) < 1));
   assert.equal(of('circle:green').shape, 'ellipse');
   assert.equal(of('zone:A').label, 'Zone A: BLUE');
   assert.equal(of('start').rect, LOCKER_ROOM);
 });
 
-test('the one table of the marks (MARK_ROLES): swapping it moves the team cubes and the targets, nothing else to change', () => {
-  // the other reading of the rules v2.3: the team cubes start on the small squares in the maze, the
-  // tokens go to the three rectangles at the top (red, light blue, green)
+test('the one table of the marks (MARK_ROLES): the earlier reading still works when it is written there - cubes, zones, referee', () => {
+  // the earlier reading of the rules v2.3: the team cubes on the two turned rectangles at the top,
+  // the tokens to the small squares and the blue disc in the maze
   const roles = MARK_ROLES as { pickup: Record<TeamColor, MarkId>; target: Record<'red' | 'green' | 'blue', MarkId> };
   const before = { pickup: { ...roles.pickup }, target: { ...roles.target } };
   try {
-    roles.pickup = { red: 'redSquare', green: 'greenSquare' };
-    roles.target = { red: 'redDiamond', green: 'greenDiamond', blue: 'cyanRect' };
+    roles.pickup = { red: 'redDiamond', green: 'greenDiamond' };
+    roles.target = { red: 'redSquare', green: 'greenSquare', blue: 'blueDisc' };
+    // the team cubes start in the middle of the turned rectangles, turned with them, completely inside
     const bodies = lockerRoomGame.createBodies(arrangement('R2'));
-    const red = bodies.find((x) => x.id === teamCubeId('red'))!;
-    assert.deepEqual([red.x, red.y, red.angle], [(MARKS.redSquare.box as OBB).x, (MARKS.redSquare.box as OBB).y, 0]);
+    for (const [color, id] of [['red', 'redDiamond'], ['green', 'greenDiamond']] as const) {
+      const cube = bodies.find((x) => x.id === teamCubeId(color))!;
+      assert.deepEqual([cube.x, cube.y, cube.angle], [markBox(id).x, markBox(id).y, markBox(id).angle]);
+      assert.equal(onMark(footprint(cube), MARKS[id]), 'full');
+    }
+    // the zones follow: the turned pickup zones by their outline, the disc as an ellipse
     const zones = lockerRoomGame.overlays(arrangement('R2'));
-    near(zones.find((z) => z.id === 'target:blue')!.rect.w, 104.76, 1e-9);
-    assert.equal(zones.find((z) => z.id === 'target:red')!.outline?.length, 4);
-    // now a token CAN be completely inside its target: the red one turned with its rectangle, the blue one as it is
+    assert.equal(zones.find((z) => z.id === 'pickup:red')!.outline?.length, 4);
+    assert.equal(zones.find((z) => z.id === 'target:red')!.outline, undefined);
+    assert.equal(zones.find((z) => z.id === 'target:blue')!.shape, 'ellipse');
+    // the referee follows: a 50 mm token is never completely inside a 41.9 mm square - there +5 is
+    // the most, and the line counts it as done and says why; the disc holds a whole cube
     const b = bench(arrangement('R2')); // RED in A, BLUE in B, GREEN in C
     b.robotAt(AWAY);
-    const diamond = MARKS.redDiamond.box as OBB;
-    b.place(tokenId('A'), diamond.x, diamond.y, diamond.angle);
-    b.place(tokenId('B'), (MARKS.cyanRect.box as OBB).x, (MARKS.cyanRect.box as OBB).y);
-    b.place(tokenId('C'), MARKS.blueDisc.circle!.cx, MARKS.blueDisc.circle!.cy);
-    b.tick();
-    assert.equal(b.line(tokenLineId('red')).points, POINTS_TOKEN);
-    assert.equal(b.line(tokenLineId('blue')).points, POINTS_TOKEN);
-    assert.equal(b.line(tokenLineId('green')).points, 0, 'the blue disc is no target any more');
-    assert.equal(b.line(tokenLineId('red')).detail, 'completely inside the red rectangle at the top left');
+    b.place(tokenId('A'), markBox('redSquare').x, markBox('redSquare').y);
+    b.place(tokenId('C'), markBox('greenSquare').x, markBox('greenSquare').y);
+    b.place(tokenId('B'), MARKS.blueDisc.circle!.cx, MARKS.blueDisc.circle!.cy);
+    let red = b.line(tokenLineId('red'));
+    assert.deepEqual([red.points, red.ok, red.detail], [POINTS_TOKEN_PARTLY, true, 'partly inside the RED warehouse in the maze: 5 points, the most here (a cube is bigger than this target)']);
+    assert.deepEqual([b.line(tokenLineId('green')).points, b.line(tokenLineId('green')).ok], [POINTS_TOKEN_PARTLY, true]);
+    assert.deepEqual([b.line(tokenLineId('blue')).points, b.line(tokenLineId('blue')).detail], [POINTS_TOKEN, 'completely inside the BLUE warehouse in the middle of the maze']);
+    // a token in a turned rectangle at the top counts for nothing now
+    b.place(tokenId('C'), markBox('greenDiamond').x, markBox('greenDiamond').y, markBox('greenDiamond').angle);
+    assert.equal(b.line(tokenLineId('green')).points, 0);
+    // L8: the red square and the disc are only 19.6 mm apart - a red token on both counts for its
+    // own square (+5), a red token on the disc alone is a wrong delivery (-10)
+    const square = markBox('redSquare');
+    b.place(tokenId('B'), markBox('cyanRect').x, markBox('cyanRect').y); // (the blue token out of the way)
+    b.place(tokenId('A'), square.x, square.y + 40);
+    assert.ok(onMark({ x: square.x, y: square.y + 40, w: 50, l: 50, angle: 0 }, MARKS.blueDisc) !== null);
+    assert.equal(b.line(tokenLineId('red')).points, POINTS_TOKEN_PARTLY);
+    b.place(tokenId('A'), MARKS.blueDisc.circle!.cx, MARKS.blueDisc.circle!.cy);
+    red = b.line(tokenLineId('red'));
+    assert.deepEqual([red.points, red.detail], [-WRONG_TOKEN_PENALTY, 'in the BLUE warehouse in the middle of the maze - wrong warehouse, -10']);
+    // with every line done, the most a robot could get there is 75 - and that run is "complete"
+    const c = bench(arrangement('R2'));
+    c.robotAt(START_POSE);
+    c.begin();
+    c.robotAt(facingRightWithRearAt(LOCKER_ROOM.x + LOCKER_ROOM.w + 10));
+    c.tick();
+    approve(c);
+    c.robotAt(AWAY);
+    c.place(teamCubeId('red'), circleMiddle('red').x, circleMiddle('red').y);
+    c.place(tokenId('A'), markBox('redSquare').x, markBox('redSquare').y);
+    c.place(tokenId('B'), MARKS.blueDisc.circle!.cx, MARKS.blueDisc.circle!.cy);
+    c.place(tokenId('C'), markBox('greenSquare').x, markBox('greenSquare').y);
+    c.tick();
+    c.end();
+    assert.deepEqual([c.score().total, c.score().complete], [75, true]);
   } finally {
     roles.pickup = before.pickup;
     roles.target = before.target;
   }
-  assert.equal(lockerRoomGame.createBodies(arrangement('R2')).find((x) => x.id === teamCubeId('red'))!.x, (MARKS.redDiamond.box as OBB).x);
+  // and back: the decided table
+  const red = lockerRoomGame.createBodies(arrangement('R2')).find((x) => x.id === teamCubeId('red'))!;
+  assert.deepEqual([red.x, red.y, red.angle], [markBox('redSquare').x, markBox('redSquare').y, 0]);
 });
 
 // =============================================================================================
