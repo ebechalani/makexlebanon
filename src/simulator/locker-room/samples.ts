@@ -55,9 +55,12 @@
  *   - The team cubes stand straight in the middle of the small squares in the maze (./field.ts
  *     MARK_ROLES, as the organiser decided): RED (621.9, 506.4), GREEN (621.9, 723.3). The big
  *     circles: RED (1107.7, 505.3) on the right, at the height of the red cube; GREEN (623.6,
- *     933.2) right below the green cube. Neither cube can be taken from above or below: the cubes
- *     stand 216.8 mm apart, and with the claw around one cube the back of the robot reaches 212 mm
- *     from it - into the other cube, whose near side is only 191.8 mm away.
+ *     933.2) right below the green cube. Neither cube can be taken from between them (the red one
+ *     from below, the green one from above): the cubes stand 216.8 mm apart, and with the claw
+ *     around one cube the back of the robot reaches 212 mm from it - into the other cube, whose near
+ *     side is only 191.8 mm away. From the other three sides each can be taken (samples.test.ts
+ *     tries all four): the green way takes the green cube from below, the red way the red cube
+ *     from the right.
  *       GREEN: from the Scan Station back 43.8 cm along the bottom line (x 621.9, right below the
  *       green cube), a turn to the left, and "forward to a white line": the white line at the
  *       bottom of the maze (its lower edge at y 785.2) stops the robot with its middle at y 869.3,
@@ -73,7 +76,8 @@
  *     (130.8, 611.0), C (133.6, 457.9). Their targets are the three WAREHOUSES at the top (./field.ts
  *     MARK_ROLES): RED (130.8, 118.5) at the top left and GREEN (1102.5, 118.9) at the top right,
  *     both turned by 45 degrees, and BLUE (621.2, 118.5) in the middle, straight. Each is 104.76 x
- *     62.86 mm: a cube fits completely, in a turned one only when it is turned with it (./game.ts L1).
+ *     62.86 mm: a cube fits completely, in a turned one only when it is turned with it, to within
+ *     17.7 degrees (./game.ts L1, turnRoom).
  *       "The road" of the token programs is a straight way up and down at x 340 (34 cm from the
  *       left edge), between the zone pictures and the maze. It is not printed, but it crosses
  *       printed white lines: the three short lines that join the long line to the maze, one at
@@ -107,9 +111,26 @@
  * The simulated robot is perfect (no wheel slip), so driving by distance is exact here. A real
  * robot drifts: it has to correct its way with the white lines - which is what the line follower
  * starts to show, and what "forward to a white line" does once on every way to a cube. A program
- * that drives by distance needs the robot where the simulator puts it at the start: moved 1 cm up
- * or down (the try of the line follower) every example still scores the same, because the white
- * line stops absorb it; moved sideways or turned, the programs that carry cubes do not.
+ * that drives by distance needs the robot where the simulator puts it at the start.
+ *
+ * WHAT A WHITE-LINE STOP MAKES UP FOR, AND WHAT NOT (measured on all 12 draws; samples.test.ts
+ * holds both halves). Every such stop is driven facing up the mat, so it tells the robot only how
+ * far UP it is:
+ *   - a start moved up or down in the Locker Room (the try of the line follower) is made up for:
+ *     1 cm either way, every example scores the same;
+ *   - a start that is turned, or moved to the left or right (along the bottom line), is NOT: the
+ *     robot is then at an angle to its way or beside it, and the stop does not see that. Tried in
+ *     steps of 0.1 degree and 0.5 mm on the drawing of the mat, an example keeps its points on all
+ *     12 draws only for a start
+ *                                 turned by                          moved by
+ *       "Deliver the team cube"   1.2 degrees left to 1.1 right      anything inside the Locker Room (7.5 mm)
+ *       "Sort two tokens"         0.6 degrees left to 0.4 right      4 mm left to 3 mm right
+ *       the whole mission         0.2 degrees left to 0.3 right      2.5 mm left to 3 mm right
+ *     Turned 1 degree to the right, the whole mission scores 55 on the RED draws and 75 to 80 on
+ *     the GREEN ones; moved 5 mm to the right, 80 on all 12.
+ * The screen turns the robot in steps of 1 degree and moves it in steps of 5 mm (1 mm with Shift),
+ * so a student can try all of this. No text may promise more than the first line: the note on
+ * "forward to a white line" says both halves.
  *
  * Plain TypeScript, no DOM, no Blockly.
  */
@@ -262,8 +283,8 @@ const WAIT_FOR_BOX_NOTE =
 /** On "set robot y" when the robot has come onto the road. */
 const ON_THE_ROAD_NOTE = 'Now the robot is on the road, facing up. "robot y" says where: cm from the top edge of the mat.';
 
-/** On a call of "forward to a white line". */
-const TO_THE_LINE_NOTE = 'Up to the white line next to zone A. Now the robot knows exactly where it is, even if it started a little too high or too low.';
+/** On a call of "forward to a white line". (Only how far up: the stop does not see a robot that is turned or beside the road.) */
+const TO_THE_LINE_NOTE = 'Up to the white line next to zone A. Now the robot knows how far up the road it is, even if it started a little too high or too low.';
 
 // =============================================================================================
 // My-blocks shared by several programs
@@ -288,7 +309,9 @@ function waitAtTheScanStation(): DefinitionNode {
 
 /**
  * "forward to a white line": drive slowly until probe L1 sees white, then stop. Used where a white
- * line crosses the robot's way: it puts the robot at a known place, wherever it started.
+ * line crosses the robot's way: the robot then knows how far it has come along that way - which
+ * makes up for a start moved up or down, not for a robot that is turned or beside its way (the
+ * table at the top of this file has the measured numbers). The note says both.
  */
 function forwardToAWhiteLine(): DefinitionNode {
   return note(
@@ -297,7 +320,8 @@ function forwardToAWhiteLine(): DefinitionNode {
       note(waitUntil(probeDetects('L1', 'line')), 'L1 is a middle probe of the sensor under the front of the robot. On this mat "detects line" means white.'),
       stopMotors('all'),
     ]),
-    'Forward slowly until the sensor sees a white line, then stop. Then the robot is always at the same place on its way, even if it started a little off.',
+    'Forward slowly until the sensor sees a white line, then stop. Now the robot knows how far up it is, even if it started a little too high or too low. ' +
+      'This does not help if it started turned, or too far left or right.',
   );
 }
 
@@ -557,7 +581,9 @@ const readCard: SampleProgram = {
 //     middle; the program ends after 19.18 s. (The default arrangement, G5, is a GREEN one: 55 points,
 //     19.18 s.)
 // Started 1 cm (or less) higher or lower in the Locker Room: the same 55 points on all 12, ending
-// 0.15 s sooner or later - "forward to a white line" puts the robot back on its way.
+// 0.15 s sooner or later - "forward to a white line" tells the robot how far up it has come. (A
+// turned start is not made up for: from 1.2 degrees to the right, or 1.3 to the left, the GREEN
+// draws score 30 - the claw pushes the green cube, so nothing is delivered.)
 // The try (the two ways swapped in the "if"): the cube of the other colour goes into its own
 // circle - a wrong delivery, -10, and the gate stays closed: 20 points on all 12.
 
@@ -568,7 +594,7 @@ const teamCube: SampleProgram = {
     'Then "team colour" decides the way. ' +
     'Red: it takes the red cube from the red square in the maze to the big red circle. ' +
     'Green: it takes the green cube from the green square to the big green circle. The gate opens. ' +
-    'On the way it stops at a white line: then it knows exactly where it is. ' +
+    'On the way up it stops at a white line: then it knows how far up it is. ' +
     'It scores 55 points on all 12 draws, after 19 to 24 seconds. ' +
     'Try to swap the two ways in the "if" block. What does a wrong delivery cost?',
   program: program([
@@ -600,7 +626,10 @@ const teamCube: SampleProgram = {
 // zone C and the team cubes are never touched, and neither is the closed gate. Started 1 cm (or
 // less) higher or lower: the same points.
 // The try (zone C too: "take the token at 45.79" and "put the token in its warehouse" once more):
-// 35 points on all 12, after 40.78 s.
+// 35 points on all 12, after 40.78 s. The text gives the 45.79: the zones are not evenly spaced
+// (A to B 16.53 cm, B to C 15.31 cm), and the guess a student makes from the two numbers in the
+// blocks - 44.57, the same step again - misses the token: 25 points, "not in a warehouse" (any
+// number from 45 to 46.5 scores the 35).
 
 const twoTokens: SampleProgram = {
   ...exampleCard('locker-two-tokens'),
@@ -611,7 +640,7 @@ const twoTokens: SampleProgram = {
     'The RED and GREEN warehouses are turned: the robot drives along a white diagonal line, so the token is turned like them. ' +
     'It scores 25 points on all 12 draws, after 26 to 34 seconds. ' +
     'It does not open the gate. In this simulator the tokens count all the same (the rules do not say). ' +
-    'Try zone C too.',
+    `Try zone C too: it is ${ZONE_Y_CM.C} cm from the top edge.`,
   program: program([
     forwardToAWhiteLine(),
     driveOnTheRoad(),

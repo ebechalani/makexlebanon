@@ -53,6 +53,7 @@ import { DRAW_BATCH_PRESETS, DRAW_TIE_BREAK, compareDrawRuns, drawSummaryLabel, 
 import { readCardsCode } from './cards-code';
 import { CardsEditor } from './CardsEditor';
 import { COLOR_WORD, ZONES_TOP_DOWN, ZONE_PLACE, changeOption, changeTeam, changeZone, optionInWords, optionOf } from './cards-panel';
+import { LOCKER_ROOM_RULES_LINK } from './rules';
 import { DEFAULT_DRAW_CODE, LOCKER_ROOM_START_ZONE, LOCKER_ROOM_WORDS } from './words';
 
 const WORDS = screenWords(LOCKER_ROOM_WORDS);
@@ -638,6 +639,7 @@ test('page: the Locker Room screen hands the general screen its game, robot, exa
     /\sexamples=\{EXAMPLES\}\s/,
     /\srules=\{LOCKER_ROOM_RULES\}\s/,
     /\srulesNote=\{LOCKER_ROOM_RULES_NOTE\}\s/,
+    /\srulesNoteLink=\{LOCKER_ROOM_RULES_LINK\}\s/,
     /\srulesExtra=\{LOCKER_ROOM_ASSUMPTIONS\}\s/,
     /\swords=\{LOCKER_ROOM_WORDS\}\s/,
     /\sinitialStartPose=\{START_POSE\}\s/,
@@ -664,7 +666,13 @@ test('page: the Locker Room screen hands the general screen its game, robot, exa
   // ... and the other three games pass none of it: their screens are as they were
   for (const other of ['../fire-rescue/FireRescueSimulator.tsx', '../fire-chief/FireChiefSimulator.tsx', '../warehouse-sort/WarehouseSortSimulator.tsx']) {
     assert.ok(!read(other).includes('restartButton'), other);
+    assert.ok(!read(other).includes('rulesNoteLink'), other);
   }
+  // the note of the Rules window says the rules can be downloaded "on this website:" - the general screen puts the link
+  // right after that sentence, inside the same note, and only when a game hands it one
+  const note = app.slice(app.indexOf('{props.rulesNote && ('), app.indexOf('{props.rules.map('));
+  assert.match(note, /\{props\.rulesNote\}\s+(?:\{\}\s+)?\{props\.rulesNoteLink && \(\s+<>\s+\{' '\}\s+<Link href=\{props\.rulesNoteLink\.href\} [^>]*>\s+\{props\.rulesNoteLink\.label\}\s+<\/Link>\s+<\/>\s+\)\}\s+<\/p>/);
+  assert.equal(app.split('rulesNoteLink').length - 1, 4, 'the prop, and the one place that draws it');
   // the start pose is the game's, and the game allows no restart
   assert.deepEqual(START_POSE, lockerRoomGame.defaultStartPose);
   assert.deepEqual(lockerRoomGame.restartRules, { maxRestarts: 0 });
@@ -728,10 +736,33 @@ test('site: the category of Season 2026 has its simulator - the Simulator page l
   const description = read('../../../app/simulator/locker-room/page.tsx').replace(/'\s*\+\s*'/g, '');
   assert.match(description, /scored by the organiser’s newest rules \(the rules file on this website\)\./);
   for (const said of [summary, description]) assert.doesNotMatch(said, /v2\.3|older|newer than/);
+  const rules = category?.downloads?.filter((d) => d.kind === 'rules') ?? [];
   assert.deepEqual(
-    category?.downloads?.filter((d) => d.kind === 'rules'),
+    rules.map(({ label, href, kind }) => ({ label, href, kind })),
     [{ label: 'Capelli Starter Locker Room Rules', href: '/downloads/capelli-starter-locker-room-rules.pdf', kind: 'rules' }],
   );
+  // The file is the organiser's own text, and it still puts the targets "inside the maze" and names no place for the
+  // pickup zones. Somebody who reads only the file would look for the targets in the maze - so the page says, right
+  // under the link, what the organiser confirmed. It is what the simulator plays (the one table of the marks):
+  assert.deepEqual(MARK_ROLES, { pickup: { red: 'redSquare', green: 'greenSquare' }, target: { red: 'redDiamond', green: 'greenDiamond', blue: 'cyanRect' } });
+  assert.equal(
+    rules[0].note,
+    'These rules say the targets are “inside the maze”. The organiser has since confirmed where things are: ' +
+      'the red and the green team cube start on the small red and green squares in the maze, and the three tokens ' +
+      'go to the “warehouses” — the three rectangles at the top of the mat.',
+  );
+  for (const color of ['red', 'green'] as const) assert.match(pickupZone(color).name, /^the (red|green) square in the maze$/, color);
+  for (const color of TOKEN_COLORS) assert.match(targetOf(color).name, /rectangle at the top/, color);
+  // ... no other download of the website has a note, and the category page draws one only where there is one, tied to its link
+  const notes = seasons.flatMap((season) => season.categories.flatMap((c) => (c.downloads ?? []).filter((d) => d.note !== undefined).map((d) => d.href)));
+  assert.deepEqual(notes, ['/downloads/capelli-starter-locker-room-rules.pdf']);
+  const categoryPage = code(read('../../../app/season/[year]/[category]/page.tsx'));
+  assert.match(categoryPage, /const noteId = item\.note \? `download-note-\$\{group\.kind\}-\$\{index\}` : undefined;/);
+  assert.match(categoryPage, /aria-describedby=\{noteId\}/);
+  assert.match(categoryPage, /\{item\.note \? \(\s+<p id=\{noteId\} [^>]*>\s+\{item\.note\}\s+<\/p>\s+\) : null\}/);
+  // The Rules window of the simulator sends its reader to this page for the file (./rules.ts): it is this category's page
+  const season2026 = seasons.find((season) => season.year === 2026);
+  assert.equal(LOCKER_ROOM_RULES_LINK.href, `/season/${season2026?.slug}/${category?.slug}`);
   const card = simulatorSeasons().find((section) => section.year === 2026)?.simulators.find((simulator) => simulator.href === '/simulator/locker-room');
   assert.deepEqual(card && [card.name, card.labels, card.about], ['Capelli Starter — Locker Room', ['13–15 years', 'Season 2026'], '/season/2026/locker-room']);
   assert.ok(code(read('../../../app/simulator/page.tsx')).includes('simulatorSeasons()'));

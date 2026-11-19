@@ -256,7 +256,10 @@ function Champions() {
 
       <ul className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {champions.map((champion) => (
-          <li key={champion.key + champion.name}>
+          // (min-w-0: on a phone the list is one column that is as wide as its widest card wants to be,
+          // and a card with a long name on one line wanted 448 px - wider than the screen. With it the
+          // card keeps to the column, and the long line is cut with "..." as it is meant to be.)
+          <li key={champion.key + champion.name} className="min-w-0">
             <Link
               href={`/season/2026/${champion.slug}#photos`}
               className="group flex h-full items-center gap-4 rounded-card bg-white p-4 ring-1 ring-slate-200 transition-colors hover:bg-brand-50 hover:ring-brand-300"

@@ -25,12 +25,13 @@
  *     | <red>    [cyan]   <green> |        of the bottom edge)
  *     |   \T       _T_      T/    |    <red> [cyan] <green>  the three rectangles at the top: the
  *     |    \_______|_______/      |        WAREHOUSES, the targets of the tokens (two of them turned)
- *     |  C  |      |       |   (RED)   T   a line with a T-end
- *     |  B  Y--+---+---+   |      |    (RED)  the big red circle, (GREEN) the big green one
- *     |  A  |  | [r] o [g]  |  \  |    A, B, C  the three distribution zones (pictures)
- *     |     Y--+--------+     \   |    Y   the yellow pieces in the long line on the left
- *     |     |  :gate: (GREEN)  |  |    [r] [g]  the small squares in the maze: the PICKUP ZONES,
- *     | [LOCKER]--------------[SCAN]       where the team cubes start; o the blue disc (a picture)
+ *     |  C  +---+--+--+           |    T   a line with a T-end
+ *     |     Y   | [r] |    (RED)  |    (RED)  the big red circle, (GREEN) the big green one
+ *     |  B  +---+  o  +---\       |    A, B, C  the three distribution zones (pictures)
+ *     |     Y   | [g] |    \      |    Y   the yellow pieces in the long line on the left
+ *     |  A  +---+-----+     \     |    [r] [g]  the small squares in the maze, one above the other:
+ *     |  :gate: (GREEN)       |   |        the PICKUP ZONES, where the team cubes start - [r] above
+ *     | [LOCKER]-------------[SCAN]        the blue disc o (a picture with no role), [g] below it
  *     +==========[      ]==========+    :gate:  the dotted rectangle where the stadium gate stands
  *                                       LOCKER  the start zone, SCAN  the Scan Station
  *

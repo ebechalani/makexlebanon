@@ -117,17 +117,28 @@ export default async function CategoryPage({ params }: Params) {
                     {group.heading}
                   </h3>
                   <ul className="mt-4 space-y-2">
-                    {items.map((item) => (
-                      <li key={item.href}>
-                        <a
-                          href={item.href}
-                          className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-ink-800 ring-1 ring-slate-200 transition-colors hover:bg-brand-50 hover:text-brand-700 hover:ring-brand-300"
-                        >
-                          <DownloadIcon />
-                          <span className="flex-1">{item.label}</span>
-                        </a>
-                      </li>
-                    ))}
+                    {items.map((item, index) => {
+                      // A download can carry a note (content/seasons.ts): what a reader of the
+                      // file must know and the file does not say. It is read out with the link.
+                      const noteId = item.note ? `download-note-${group.kind}-${index}` : undefined;
+                      return (
+                        <li key={item.href}>
+                          <a
+                            href={item.href}
+                            aria-describedby={noteId}
+                            className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-ink-800 ring-1 ring-slate-200 transition-colors hover:bg-brand-50 hover:text-brand-700 hover:ring-brand-300"
+                          >
+                            <DownloadIcon />
+                            <span className="flex-1">{item.label}</span>
+                          </a>
+                          {item.note ? (
+                            <p id={noteId} className="mt-2 px-4 text-sm leading-relaxed text-ink-600 text-pretty">
+                              {item.note}
+                            </p>
+                          ) : null}
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               );

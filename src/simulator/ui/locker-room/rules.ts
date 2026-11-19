@@ -57,6 +57,7 @@ import {
   WRONG_DELIVERY_PENALTY,
   WRONG_TOKEN_PENALTY,
   cubeFitsInside,
+  turnRoom,
 } from '../../locker-room/game';
 import { LOCKER_ROOM_ROBOT, robotReach } from '../../locker-room/robot';
 import { TOKEN_COLORS, ZONE_OPTION_NUMBERS, type TokenColor } from '../../locker-room/scenario';
@@ -90,6 +91,16 @@ export const TURNED_TARGETS: readonly TokenColor[] = TOKEN_COLORS.filter((color)
 /** How far those targets are turned, in whole degrees, as a sentence says it (45). */
 export const TURNED_DEGREES = TURNED_TARGETS.length > 0 ? Math.round(Math.abs(((targetOf(TURNED_TARGETS[0]).box as OBB).angle * 180) / Math.PI)) : 0;
 
+/**
+ * How far off the turn of its warehouse a token may stand and still be completely inside, in whole
+ * degrees as a sentence says it: the smallest of the warehouses' (../../locker-room/game.ts
+ * turnRoom), rounded DOWN, so that the window never promises a turn the referee refuses (17: the
+ * referee's edge is at 17.7 degrees, for a token in the middle of its warehouse).
+ */
+export const TURN_ROOM_DEGREES = Math.floor((Math.min(...TOKEN_COLORS.map((color) => turnRoom(targetOf(color)))) * 180) / Math.PI + 1e-9);
+/** The token colours whose target is not turned (with the decided marks: BLUE, the warehouse at the top in the middle). */
+export const STRAIGHT_TARGETS: readonly TokenColor[] = TOKEN_COLORS.filter((color) => !TURNED_TARGETS.includes(color));
+
 /** The shortest distance between the outlines of two marks that do not overlap (mm). */
 export function markGap(a: Mark, b: Mark): number {
   const pa = markOutline(a);
@@ -114,10 +125,21 @@ const tokensWord = (colors: readonly TokenColor[], noun = 'token'): string =>
  * The sentence under the heading of the rules window. (The rules file on the category page is
  * these newest rules since they replaced v2.3: content/seasons.ts. No name of the category here:
  * "Starter" is also the name of a level of the examples - ./rules.test.ts.)
+ *
+ * It ends with a colon: the window puts LOCKER_ROOM_RULES_LINK right after it. "On this website"
+ * alone did not say where, and the simulator's page has no other way to the file.
  */
 export const LOCKER_ROOM_RULES_NOTE =
   `MakeX Lebanon, Season 2026, ages 13 to 15. This simulator follows the newest rules of the organiser (${MATCH_DURATION} s). ` +
-  'They are the rules you can download on this website.';
+  'You can download them on this website:';
+
+/**
+ * Where the rules file can be downloaded: the page of this category, which lists it under "Rules
+ * and downloads" (content/seasons.ts; ./screen.test.ts checks that this is that page and that the
+ * file is on it). A link to the page, not to the file: the page also says what the organiser
+ * confirmed after the rules were written, and a later version of the file keeps the link.
+ */
+export const LOCKER_ROOM_RULES_LINK = { label: 'the Locker Room page of Season 2026', href: '/season/2026/locker-room' } as const;
 
 export const LOCKER_ROOM_RULES: RulesSection[] = [
   {
@@ -148,7 +170,8 @@ export const LOCKER_ROOM_RULES: RulesSection[] = [
   {
     title: 'Before the match',
     items: [
-      'The referee draws two cards: the Team Colour card (RED or GREEN) and the Zone Assignment card.',
+      // (the rules: "Two random cards are drawn" - they do not say by whom)
+      'Two cards are drawn: the Team Colour card (RED or GREEN) and the Zone Assignment card.',
       `The Zone Assignment card is one of ${ZONE_OPTION_NUMBERS.length} options. It says which token stands in zone A, B and C.`,
       'Here the Cards panel shows the two cards, and you can change them.',
       'The robot starts completely inside the Locker Room, with the Team Box. It holds no cube.',
@@ -161,7 +184,8 @@ export const LOCKER_ROOM_RULES: RulesSection[] = [
       'It ends when the time is up, or when the referee says "STOP". Here the "Finished" button is that "STOP".',
       'Here the match also ends when your program has ended and the robot stands still.',
       'Then the referee looks at the field as it is.',
-      'There are no restarts. If anyone but the referee touches the robot after GO, the run counts 0. So there is no Restart button here.',
+      // (the rules never name a restart: they only void a run that somebody touched, §8.3 - so the window does not make "no restarts" a rule)
+      'The rules say nothing about restarts. If anyone but the referee touches the robot after GO, the run counts 0. So there is no Restart button here.',
     ],
   },
   {
@@ -206,12 +230,20 @@ export const LOCKER_ROOM_ASSUMPTIONS: RulesPart = {
           ? `A cube is ${cm(CUBE_SIZE)} cm wide, and here ${tokensWord(TOO_SMALL_TARGETS)} ${TOO_SMALL_TARGETS.length === 1 ? 'has a target' : 'have targets'} that ${TOO_SMALL_TARGETS.length === 1 ? 'is' : 'are'} smaller. So ${TOO_SMALL_TARGETS.length === 1 ? 'it' : 'they'} can never be completely inside: +${POINTS_TOKEN_PARTLY} at most. The most a robot can score here is ${REACHABLE_MAX}.`
           : `A cube is ${cm(CUBE_SIZE)} cm wide. It fits completely inside every ${ROLE_WORD.target}.`,
         ...(TOO_SMALL_TARGETS.length > 0 ? [`So on the score sheet, +${POINTS_TOKEN_PARTLY} counts as done for ${TOO_SMALL_TARGETS.length === 1 ? 'that token' : 'those tokens'}.`] : []),
-        // (how a cube must stand in a turned target: ../../locker-room/game.ts cubeFitsTurned)
+        // (how a cube must stand in a turned target: ../../locker-room/game.ts cubeFitsTurned, turnRoom. Not "the same
+        // way": the referee gives +10 to a token that is up to 17.7 degrees off, and the window must not be stricter)
         ...(TURNED_TARGETS.length > 0
           ? [
-              `${tokensWord(TURNED_TARGETS, ROLE_WORD.target).replace(/^t/, 'T')} ${TURNED_TARGETS.length === 1 ? 'is' : 'are'} turned by ${TURNED_DEGREES} degrees. A token is completely inside only if it is turned the same way.`,
+              `${tokensWord(TURNED_TARGETS, ROLE_WORD.target).replace(/^t/, 'T')} ${TURNED_TARGETS.length === 1 ? 'is' : 'are'} turned by ${TURNED_DEGREES} degrees. A token is completely inside only if it is turned almost the same way.`,
+              `"Almost": in the middle of the ${ROLE_WORD.target}, the token may be about ${TURN_ROOM_DEGREES} degrees off, not more.`,
               `A token that stands straight in one of them is only partly inside: +${POINTS_TOKEN_PARTLY}.`,
               'Here the claw holds a cube square to the robot. So the robot puts the token down facing along the turned white line that leads there.',
+            ]
+          : []),
+        // (the same room to turn in a target that is not turned)
+        ...(STRAIGHT_TARGETS.length > 0 && TURN_ROOM_DEGREES < 45
+          ? [
+              `${tokensWord(STRAIGHT_TARGETS, ROLE_WORD.target).replace(/^t/, 'T')} ${STRAIGHT_TARGETS.length === 1 ? 'is' : 'are'} not turned. There a token must stand almost straight: about ${TURN_ROOM_DEGREES} degrees off, not more.`,
             ]
           : []),
       ],

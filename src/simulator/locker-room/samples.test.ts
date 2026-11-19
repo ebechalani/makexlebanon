@@ -20,9 +20,11 @@
  * changes, "the numbers in the blocks are the ones of field.ts" fails first and says which number
  * to change.
  *
- * Three examples stop at a white line on their way ("forward to a white line"): they find their
- * place on the mat again there. So every example is also played with the start moved 1 cm up and
- * down (what the try of the line follower asks a student to do), and must score the same.
+ * Three examples stop at a white line on their way ("forward to a white line"): there they learn
+ * how far up the mat they are - and no more. So every example is also played with the start moved
+ * 1 cm up and down (what the try of the line follower asks a student to do), and must score the
+ * same; and the three are played with the start turned, and moved to the left and right, where the
+ * stop does not help and points are lost - so that no text of an example says it would.
  */
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -43,7 +45,7 @@ import type { BlockJson, MatSampler, Pose, ProgramJson, ScoreLine, SimEvent, Sim
 import { SAMPLE_CATALOG as FIRE_CHIEF_CATALOG } from '../fire-chief/sample-catalog';
 import { SAMPLE_CATALOG as FIRE_RESCUE_CATALOG } from '../fire-rescue/sample-catalog';
 import { supportsBlock } from '../vm';
-import { program as buildProgram, script, wait, whenStart, type BlockNode } from '../vm/builder';
+import { gripper, moveCm, program as buildProgram, script, wait, whenStart, type BlockNode } from '../vm/builder';
 import { SAMPLE_CATALOG as WAREHOUSE_SORT_CATALOG } from '../warehouse-sort/sample-catalog';
 import {
   BIG_CIRCLES,
@@ -53,6 +55,7 @@ import {
   MAT_SIZE,
   MAT_VECTOR,
   SCAN_STATION,
+  TEAM_COLORS,
   WHITE_LINES,
   YELLOW_PIECES,
   ZONE_IDS,
@@ -410,19 +413,44 @@ describe('the list of the examples', () => {
       'locker-to-station': [/It scores 15 points on every draw, after 6 seconds\./, /On the way the whole robot leaves the Locker Room: \+5 points\./],
       'locker-follow-line': [/It scores 15 points on every draw, after 7 seconds\./, /Here the lines are WHITE on a black mat\./, /Try to move the robot 1 cm up or down in the Locker Room before you press Start\./],
       'locker-read-card': [/It scores 30 points on every draw, after 10\.4 seconds\./, /The screen shows the team colour, and the LEDs light in it\./],
-      'locker-team-cube': [/It scores 55 points on all 12 draws, after 19 to 24 seconds\./, /from the red square in the maze/, /it stops at a white line/],
+      'locker-team-cube': [
+        /It scores 55 points on all 12 draws, after 19 to 24 seconds\./,
+        /from the red square in the maze/,
+        /On the way up it stops at a white line: then it knows how far up it is\./,
+      ],
       'locker-two-tokens': [
         /It scores 25 points on all 12 draws, after 26 to 34 seconds\./,
         /it stops at the white line next to zone A\./,
         /into the warehouse of that colour, at the top\./,
         /The RED and GREEN warehouses are turned/,
         /It does not open the gate\. In this simulator the tokens count all the same \(the rules do not say\)\./,
+        // (the try gives the number it needs: "the try of the description: zone C too" below plays it)
+        /Try zone C too: it is 45\.79 cm from the top edge\.$/,
       ],
       'locker-whole-mission': [/It scores 85 points on all 12 draws, in 59 to 64 of the 150 seconds\./, /It never guesses a colour\./, /85 is the most a match can give\./],
     };
     for (const s of SAMPLE_PROGRAMS) for (const promise of promised[s.id]) assert.match(s.description, promise, s.id);
     // the tokens go into "warehouses" (the organiser's word); the blue disc in the maze has no role
     for (const s of SAMPLE_PROGRAMS) for (const text of [s.description, ...notesOf(s.program)]) assert.doesNotMatch(text, /\btargets?\b|blue disc/i, s.id);
+    // A stop at a white line tells the robot how far up the mat it is, and no more: it makes up for a start moved up or
+    // down, not for one that is turned or moved to the left or right ("what a stop at a white line does not make up
+    // for" below measures it). So no text says the robot then knows "exactly where it is", or that a start "a little
+    // off" does not matter - and the note on the my-block, which all three examples that carry cubes show, says both halves.
+    for (const s of SAMPLE_PROGRAMS) {
+      for (const text of [s.description, ...notesOf(s.program)]) {
+        assert.doesNotMatch(text, /exactly where|a little off|always at the same place|whatever the start|wherever it started|any start/i, s.id);
+      }
+    }
+    for (const id of ['locker-team-cube', 'locker-two-tokens', 'locker-whole-mission']) {
+      const said = (definitionOf(sample(id).program, 'forward to a white line').icons as { comment?: { text?: string } } | undefined)?.comment?.text ?? '';
+      assert.equal(
+        said,
+        'Forward slowly until the sensor sees a white line, then stop. Now the robot knows how far up it is, even if it started a little too high or too low. ' +
+          'This does not help if it started turned, or too far left or right.',
+        id,
+      );
+    }
+    assert.ok(notesOf(sample('locker-two-tokens').program).includes('Up to the white line next to zone A. Now the robot knows how far up the road it is, even if it started a little too high or too low.'));
     // the screen's word for the two cards drawn before a match is "draw" (the Cards panel, "Test on many draws"): not a second word for it
     for (const s of SAMPLE_PROGRAMS) assert.doesNotMatch(s.description, /arrangement/i, s.id);
     // no try teaches that Step 3 needs no scan (the referee of the simulator cannot see what a program reads)
@@ -634,8 +662,9 @@ describe('the blocks of the examples', () => {
       return lower + quad.forward;
     };
 
-    // ---- neither team cube can be taken from above or below: with the claw around one, the back of
-    // the robot reaches into the other
+    // ---- neither team cube can be taken from BETWEEN the two (the red one from below, the green one
+    // from above): with the claw around one, the back of the robot reaches into the other. From its
+    // other three sides each can be taken - "each team cube can be taken ..." below tries all four.
     const between = Math.hypot(teamCubeHome('red').x - teamCubeHome('green').x, teamCubeHome('red').y - teamCubeHome('green').y);
     assert.ok(GRIP + LOCKER_ROOM_ROBOT.chassisRear > between - CUBE_SIZE / 2, 'the robot is too long to stand between the two team cubes');
 
@@ -955,6 +984,52 @@ describe('locker-team-cube: deliver the team cube', () => {
       assert.deepEqual(played.sim.world.walls?.map((w) => w.id), [GATE_ID], `${what}: the gate stays closed`);
     }
   });
+
+  test('each team cube can be taken from three sides - not from between the two cubes, where the back of the robot stands in the other one', () => {
+    // The robot stands with its open claw around the cube (the middle of the claw on the middle of the
+    // cube), closes it, and backs 10 cm with the cube. Which way it faces says which side it came from.
+    const take = buildProgram([script(whenStart(), [gripper('close'), wait(0.5), moveCm('backward', 10), wait(0.2)])]);
+    const sides: Array<[string, number]> = [
+      ['from below', 0],
+      ['from the left', 90],
+      ['from above', 180],
+      ['from the right', 270],
+    ];
+    const clean: string[] = [];
+    for (const team of TEAM_COLORS) {
+      const home = teamCubeHome(team);
+      const other = teamCubeId(otherTeam(team));
+      for (const [side, degrees] of sides) {
+        const heading = (degrees * Math.PI) / 180;
+        // (heading 0 is up the mat, clockwise: the claw is GRIP mm ahead of the robot's middle)
+        const startPose = { x: home.x - Math.sin(heading) * GRIP, y: home.y + Math.cos(heading) * GRIP, heading };
+        const played = play(take, ARRANGEMENTS.find((scenario) => scenario.team === team)!, { startPose });
+        const what = `the ${team} cube ${side}`;
+        const cube = bodyOf(played.sim, teamCubeId(team));
+        assert.equal(played.sim.world.robot.gripper.holding, cube.id, `${what}: gripped`);
+        const bumps = played.events.filter((e) => e.type === 'bump').length;
+        if (played.pushed.length === 0 && bumps === 0) {
+          assert.ok(Math.abs(Math.hypot(cube.x - home.x, cube.y - home.y) - 100) < 0.5, `${what}: the cube came along 10 cm`);
+          assertUntouched(played.sim, other, what);
+          clean.push(what);
+        } else {
+          // the other team cube is in the way: the back of the robot stands in it, and pushes it along
+          assert.ok(played.pushed.some((push) => push.startsWith(`${other} `)), `${what}: ${played.pushed.slice(0, 3).join(', ')}`);
+          assert.ok(Math.hypot(bodyOf(played.sim, other).x - teamCubeHome(otherTeam(team)).x, bodyOf(played.sim, other).y - teamCubeHome(otherTeam(team)).y) > 10, `${what}: the other cube was moved`);
+        }
+      }
+    }
+    assert.deepEqual(clean, [
+      'the red cube from the left',
+      'the red cube from above',
+      'the red cube from the right',
+      'the green cube from below',
+      'the green cube from the left',
+      'the green cube from the right',
+    ]);
+    // (the examples come from outside: the green way from below, facing up, and the red way from the right, facing
+    // left - "the numbers in the blocks are the ones of field.ts" walks both)
+  });
 });
 
 // =============================================================================================
@@ -1001,10 +1076,25 @@ describe('locker-two-tokens: sort two tokens', () => {
     assert.ok(Math.abs(play(s.program, defaultScenario()).sim.world.time - 26.4) < 0.02);
   });
 
-  test('the try of the description: zone C too - all three tokens, 35 points on all 12 arrangements', () => {
-    const zoneC = withLastBlocksAgain(s.program, 2, (copies) => {
-      copies[0].inputs!.ARG0.shadow!.fields!.NUM = ZONE_Y_CM.C;
-    });
+  test('the try of the description: zone C too, with the number the text gives - all three tokens, 35 points on all 12 arrangements', () => {
+    // The try needs a number for zone C, and the example's blocks only show the ones of zones A and B. The text gives it:
+    const told = /Try zone C too: it is (\d+(?:\.\d+)?) cm from the top edge\.$/.exec(s.description);
+    assert.ok(told, s.description);
+    assert.equal(Number(told[1]), ZONE_Y_CM.C);
+    const withZoneC = (y: number): ProgramJson =>
+      withLastBlocksAgain(s.program, 2, (copies) => {
+        copies[0].inputs!.ARG0.shadow!.fields!.NUM = y;
+      });
+    // ... because it cannot be guessed from the two that are shown: the zones are not evenly spaced (A to B 16.53 cm,
+    // B to C 15.31 cm), and the same step again (44.57) drives past the token - no error, no points, "not in a warehouse"
+    const guess = Math.round((2 * ZONE_Y_CM.B - ZONE_Y_CM.A) * 100) / 100;
+    assert.equal(guess, 44.57);
+    for (const scenario of ARRANGEMENTS) {
+      const missed = play(withZoneC(guess), scenario).sim;
+      assert.equal(missed.score().total, 25, `${label(scenario)}: the guess ${guess}`);
+      assert.equal(pointsOf(missed, tokenLineId(tokensOf(scenario).C)), 0, label(scenario));
+    }
+    const zoneC = withZoneC(Number(told[1]));
     for (const scenario of ARRANGEMENTS) {
       const played = play(zoneC, scenario);
       assertClean(played, label(scenario));
@@ -1153,6 +1243,66 @@ describe('every example, the robot moved 1 cm (or 5 mm) up or down before Start'
           // (the line follower steers back onto the line; the others end 0.15 s sooner or later at most)
           assert.ok(Math.abs(moved.sim.world.time - usual.world.time) < 0.3, `${what}: ${moved.sim.world.time} s, ${usual.world.time} s unmoved`);
         }
+      }
+    }
+  });
+});
+
+// =============================================================================================
+// ... and what a stop at a white line does NOT make up for
+// =============================================================================================
+
+describe('what a stop at a white line does not make up for: a start that is turned, or moved to the left or right', () => {
+  const DEG = Math.PI / 180;
+  /** The points on all 12 draws from this start (the same match as play(), without the tick-by-tick watching). */
+  const totals = (blocks: ProgramJson, startPose: Pose): number[] =>
+    ARRANGEMENTS.map((scenario) => runMatch({ game: lockerRoomGame, scenario, program: blocks, startPose, seed: 1 }).total);
+  const turned = (degrees: number): Pose => ({ ...START_POSE, heading: START_POSE.heading + degrees * DEG });
+  const moved = (mm: number): Pose => ({ ...START_POSE, x: START_POSE.x + mm });
+  const inside = (pose: Pose): boolean => robotShapesAt(LOCKER_ROOM_ROBOT, pose).every((shape) => insideRect(shape, LOCKER_ROOM));
+
+  test('what a student can do before Start - turn the robot 1 degree, move it 5 mm to the left or right - costs the advanced example points on every draw', () => {
+    const s = sample('locker-whole-mission');
+    assert.deepEqual(totals(s.program, START_POSE), ARRANGEMENTS.map(() => 85));
+    const starts: Array<[string, Pose]> = [
+      ['turned 1 degree to the right', turned(1)],
+      ['turned 1 degree to the left', turned(-1)],
+      ['moved 5 mm to the right', moved(5)],
+      ['moved 5 mm to the left', moved(-5)],
+    ];
+    for (const [what, startPose] of starts) {
+      assert.ok(inside(startPose), `${what}: still completely inside the Locker Room`);
+      const points = totals(s.program, startPose);
+      assert.ok(points.every((p) => p < 85), `${what}: ${points.join(' ')}`);
+    }
+    // (as the comment at the top of samples.ts says: 55 on the RED draws and 75 to 80 on the GREEN ones; 80 on all 12)
+    assert.deepEqual(totals(s.program, turned(1)), [55, 55, 55, 55, 55, 55, 75, 75, 75, 75, 80, 80]);
+    assert.deepEqual(totals(s.program, moved(5)), ARRANGEMENTS.map(() => 80));
+  });
+
+  test('how little is enough: the turns and the moves between which each example that carries cubes keeps its points on all 12 draws', () => {
+    // Tried in steps of 0.1 degree and 0.5 mm (negative: to the left). Inside these ends every draw scores as from the
+    // usual start; one step outside, at least one draw scores less. The table at the top of samples.ts and the README
+    // say these numbers - and the texts of the examples promise none of this ("every description says ..." above).
+    const holds: Record<string, { points: number; turn: [number, number]; move: [number, number] }> = {
+      'locker-team-cube': { points: 55, turn: [-1.2, 1.1], move: [-7.5, 7.5] },
+      'locker-two-tokens': { points: 25, turn: [-0.6, 0.4], move: [-4, 3] },
+      'locker-whole-mission': { points: 85, turn: [-0.2, 0.3], move: [-2.5, 3] },
+    };
+    for (const [id, { points, turn, move }] of Object.entries(holds)) {
+      const blocks = sample(id).program;
+      const same = (startPose: Pose): boolean => totals(blocks, startPose).every((p) => p === points);
+      for (const end of turn) {
+        const beyond = Math.round((end + Math.sign(end) * 0.1) * 10) / 10;
+        assert.ok(same(turned(end)), `${id}: turned ${end} degrees it still scores ${points} on all 12`);
+        assert.ok(!same(turned(beyond)), `${id}: turned ${beyond} degrees it scores less on a draw`);
+      }
+      for (const end of move) {
+        const beyond = end + Math.sign(end) * 0.5;
+        assert.ok(inside(moved(end)) && same(moved(end)), `${id}: moved ${end} mm it still scores ${points} on all 12`);
+        // (the first one holds for every move that leaves the robot inside the Locker Room: 7.9 mm of room each way)
+        if (inside(moved(beyond))) assert.ok(!same(moved(beyond)), `${id}: moved ${beyond} mm it scores less on a draw`);
+        else assert.equal(id, 'locker-team-cube');
       }
     }
   });

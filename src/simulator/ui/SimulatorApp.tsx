@@ -26,6 +26,7 @@
  * The screen is a page of the website: it starts under the site's header and fills the rest of
  * the window (its frame is in ./page-frame.ts, the sizes that follow from it in ./simulator.css).
  */
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { DEG } from '../core/geometry';
 import type { GripperVariantId } from '../blocks/gripper-original';
@@ -106,6 +107,12 @@ export interface SimulatorAppProps<S> {
   rules: RulesSection[];
   /** one sentence under the heading of the rules, e.g. that they are a draft (left out: no sentence) */
   rulesNote?: string;
+  /**
+   * A link to a page of this website at the end of that sentence - where the rules file can be
+   * downloaded, when the sentence names it (Locker Room). Left out: no link, and the sentence is
+   * drawn exactly as it always was. Without `rulesNote` it is not shown.
+   */
+  rulesNoteLink?: { label: string; href: string };
   /** a second part under the rules, with its own heading (left out: the window ends with the rules) */
   rulesExtra?: RulesPart;
   /**
@@ -729,7 +736,20 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
             >
               {/* (a window with two parts has real headings: see rulesSection) */}
               <RulesTitle className={rulesTitleLook}>{props.title}: the rules in short</RulesTitle>
-              {props.rulesNote && <p className="mt-1 rounded-md bg-amber-100 px-2 py-1 text-xs font-semibold leading-snug text-amber-900">{props.rulesNote}</p>}
+              {props.rulesNote && (
+                <p className="mt-1 rounded-md bg-amber-100 px-2 py-1 text-xs font-semibold leading-snug text-amber-900">
+                  {props.rulesNote}
+                  {/* (where the sentence sends the reader: underlined, so that it reads as a link inside the coloured note) */}
+                  {props.rulesNoteLink && (
+                    <>
+                      {' '}
+                      <Link href={props.rulesNoteLink.href} className="rounded-sm underline underline-offset-2 hover:text-amber-950" data-rules-note-link>
+                        {props.rulesNoteLink.label}
+                      </Link>
+                    </>
+                  )}
+                </p>
+              )}
               {props.rules.map((section) => rulesSection(section, twoPartRules))}
               {/* what is not a rule gets its own heading, clearly apart from the rules above it */}
               {props.rulesExtra && (

@@ -36,7 +36,10 @@ import {
   PROP_TEAM_BOX,
   WRONG_DELIVERY_PENALTY,
   WRONG_TOKEN_PENALTY,
+  cubeFitsTurned,
   lockerRoomGame,
+  onMark,
+  turnRoom,
 } from '../../locker-room/game';
 import { LOCKER_ROOM_ROBOT } from '../../locker-room/robot';
 import { TOKEN_COLORS, ZONE_OPTION_NUMBERS, defaultScenario } from '../../locker-room/scenario';
@@ -46,12 +49,15 @@ import {
   INSIDE_THE_FRAME,
   LOCKER_ROOM_ASSUMPTIONS,
   LOCKER_ROOM_RULES,
+  LOCKER_ROOM_RULES_LINK,
   LOCKER_ROOM_RULES_NOTE,
   REACHABLE_MAX,
+  STRAIGHT_TARGETS,
   TARGETS_CLOSE,
   TOO_SMALL_TARGETS,
   TURNED_DEGREES,
   TURNED_TARGETS,
+  TURN_ROOM_DEGREES,
   cubeFitsInside,
   markGap,
   robotLength,
@@ -63,7 +69,7 @@ const RULES = sentences(LOCKER_ROOM_RULES);
 const ASSUMED = sentences(LOCKER_ROOM_ASSUMPTIONS.sections);
 const RULES_TEXT = RULES.join('\n');
 const ASSUMED_TEXT = ASSUMED.join('\n');
-const EVERY_TEXT = [LOCKER_ROOM_RULES_NOTE, LOCKER_ROOM_ASSUMPTIONS.title, LOCKER_ROOM_ASSUMPTIONS.note ?? '', ...RULES, ...ASSUMED];
+const EVERY_TEXT = [LOCKER_ROOM_RULES_NOTE, LOCKER_ROOM_RULES_LINK.label, LOCKER_ROOM_ASSUMPTIONS.title, LOCKER_ROOM_ASSUMPTIONS.note ?? '', ...RULES, ...ASSUMED];
 
 const cm = (mm: number): number => Math.round(mm) / 10;
 
@@ -85,6 +91,7 @@ const KNOWN_NUMBERS: ReadonlyArray<[number, string]> = [
   [MAX_SCORE, 'MAX_SCORE'],
   [REACHABLE_MAX, 'REACHABLE_MAX'],
   [TURNED_DEGREES, 'how far the turned warehouses are turned, in degrees'],
+  [TURN_ROOM_DEGREES, 'how far off the turn of its warehouse a token may stand and still be completely inside, in whole degrees'],
   [MATCH_DURATION, 'MATCH_DURATION'],
   [TOKEN_COLORS.length, 'the number of tokens'],
   [ZONE_OPTION_NUMBERS.length, 'the number of zone cards'],
@@ -147,9 +154,15 @@ test('the numbers are the referee\'s: the points, the time, the timings at the S
   // the referee's own sheet gives the same highest score
   const sim = createSimulation({ game: lockerRoomGame, scenario: defaultScenario(), program: program([script(whenStart(), [])]) });
   assert.equal(sim.score().max, MAX_SCORE);
-  // no restarts: the game allows none, the window says why there is no button
+  // no restarts: the game allows none, the window says why there is no button - and says what the rules really say:
+  // they never name a restart, they only void a run that somebody touched (§8.3). "There are no restarts" would be a
+  // rule of the window's own making, in the part that is headed as the rules.
   assert.deepEqual(lockerRoomGame.restartRules, { maxRestarts: 0 });
-  assert.ok(RULES_TEXT.includes('There are no restarts. If anyone but the referee touches the robot after GO, the run counts 0. So there is no Restart button here.'));
+  assert.ok(RULES_TEXT.includes('The rules say nothing about restarts. If anyone but the referee touches the robot after GO, the run counts 0. So there is no Restart button here.'));
+  assert.doesNotMatch(EVERY_TEXT.join('\n'), /There are no restarts|no restarts are allowed|may not restart/i);
+  // ... and they do not say who draws the two cards ("Two random cards are drawn"): neither does the window
+  assert.ok(RULES_TEXT.includes('Two cards are drawn: the Team Colour card (RED or GREEN) and the Zone Assignment card.'));
+  assert.doesNotMatch(EVERY_TEXT.join('\n'), /referee draws/i);
 });
 
 test('the marks (decided by the organiser): every warehouse holds a whole 5 cm token - so all 85 points can be reached - and the window says where everything is', () => {
@@ -177,8 +190,41 @@ test('the marks (decided by the organiser): every warehouse holds a whole 5 cm t
 test('the turned warehouses: the window tells how a token must stand to be completely inside - and the referee agrees', () => {
   assert.deepEqual(TURNED_TARGETS, ['red', 'green']);
   assert.equal(TURNED_DEGREES, 45);
-  assert.ok(ASSUMED_TEXT.includes('The RED and the GREEN warehouse are turned by 45 degrees. A token is completely inside only if it is turned the same way.'));
+  assert.ok(ASSUMED_TEXT.includes('The RED and the GREEN warehouse are turned by 45 degrees. A token is completely inside only if it is turned almost the same way.'));
+  assert.ok(ASSUMED_TEXT.includes('"Almost": in the middle of the warehouse, the token may be about 17 degrees off, not more.'));
   assert.ok(ASSUMED_TEXT.includes('A token that stands straight in one of them is only partly inside: +5.'));
+  assert.deepEqual(STRAIGHT_TARGETS, ['blue']);
+  assert.ok(ASSUMED_TEXT.includes('The BLUE warehouse is not turned. There a token must stand almost straight: about 17 degrees off, not more.'));
+  // not "the same way": the referee gives +10 to a token that is off by less than 17.74 degrees, and the window must not be
+  // stricter than the referee. The number of the sentences is the referee's edge, rounded down - tried on the referee's own
+  // test, in every warehouse, to both sides: that many degrees off is still completely inside, one degree more is not.
+  assert.equal(TURN_ROOM_DEGREES, 17);
+  const DEG = Math.PI / 180;
+  for (const color of TOKEN_COLORS) {
+    const mark = targetOf(color);
+    const target = mark.box!;
+    const edge = turnRoom(mark) / DEG;
+    assert.ok(Math.abs(edge - 17.74) < 0.005, `${color}: the edge is at ${edge} degrees`);
+    assert.ok(TURN_ROOM_DEGREES <= edge && edge < TURN_ROOM_DEGREES + 1, `${color}: ${TURN_ROOM_DEGREES} is that edge in whole degrees, rounded down`);
+    const centred = (off: number) => onMark({ x: target.x, y: target.y, w: CUBE_SIZE, l: CUBE_SIZE, angle: target.angle + off * DEG }, mark);
+    for (const side of [1, -1]) {
+      assert.equal(centred(side * 10), 'full', `${color}: 10 degrees off is completely inside - "the same way" was too strict`);
+      assert.equal(centred(side * TURN_ROOM_DEGREES), 'full', `${color}: ${side * TURN_ROOM_DEGREES} degrees off`);
+      assert.equal(centred(side * (edge - 0.01)), 'full', `${color}: just inside the edge`);
+      assert.equal(centred(side * (edge + 0.01)), 'part', `${color}: just past the edge`);
+      assert.equal(centred(side * (TURN_ROOM_DEGREES + 1)), 'part', `${color}: ${side * (TURN_ROOM_DEGREES + 1)} degrees off`);
+      // (the score sheet's "turned like this, it cannot be completely inside" asks the same question)
+      assert.deepEqual([cubeFitsTurned(mark, target.angle + side * (edge - 0.01) * DEG), cubeFitsTurned(mark, target.angle + side * (edge + 0.01) * DEG)], [true, false], color);
+    }
+    // "in the middle": at the edge of the turn there is no room across the warehouse - 1 mm beside the middle it is only partly inside
+    const across = { x: Math.cos(target.angle), y: Math.sin(target.angle) };
+    const short = target.w <= target.l ? across : { x: -across.y, y: across.x };
+    assert.equal(onMark({ x: target.x + short.x, y: target.y + short.y, w: CUBE_SIZE, l: CUBE_SIZE, angle: target.angle + (edge - 0.01) * DEG }, mark), 'part', `${color}: beside the middle`);
+  }
+  // a mark that holds no whole cube has no room to turn; one that holds the cube's diagonal, or a disc that holds the cube, any turn
+  assert.equal(turnRoom(MARKS.redSquare), 0);
+  assert.equal(turnRoom(MARKS.blueDisc), Math.PI / 4);
+  assert.equal(turnRoom({ ...MARKS.cyanRect, box: { ...MARKS.cyanRect.box!, w: 80, l: 80 } }), Math.PI / 4);
   assert.ok(ASSUMED_TEXT.includes('Here the claw holds a cube square to the robot. So the robot puts the token down facing along the turned white line that leads there.'));
   // the referee: straight in the middle of the RED warehouse +5, turned with it +10
   const sim = createSimulation({ game: lockerRoomGame, scenario: defaultScenario(), program: program([script(whenStart(), [])]) });
@@ -201,7 +247,8 @@ test('what the simulator only assumes is in the second part; the rules part does
   assert.equal(LOCKER_ROOM_ASSUMPTIONS.title, 'What this simulator assumes');
   assert.match(LOCKER_ROOM_ASSUMPTIONS.note ?? '', /^These are not rules\./);
   const assumed: Array<[string, RegExp]> = [
-    ['how a token stands in a turned warehouse', /A token is completely inside only if it is turned the same way\./],
+    ['how a token stands in a turned warehouse', /A token is completely inside only if it is turned almost the same way\./],
+    ['how far "almost" is', /the token may be about 17 degrees off, not more\./],
     ['how the claw holds a cube', /Here the claw holds a cube square to the robot\./],
     ['the Team Box rides on the robot', /The Team Box rides on top of the robot from the start/],
     ['the Team Box is no part of the footprint', /It does not make the robot bigger on the mat, and no sensor sees it\./],
@@ -252,11 +299,16 @@ test('what the simulator only assumes is in the second part; the rules part does
   assert.doesNotMatch(RULES_TEXT, /older rules \(v2\.3\) put/);
   // the rules file on the website is these newest rules now (v2.3 was replaced): the note says so, and calls nothing older
   assert.ok(
-    LOCKER_ROOM_RULES_NOTE.endsWith(`This simulator follows the newest rules of the organiser (${MATCH_DURATION} s). They are the rules you can download on this website.`),
+    LOCKER_ROOM_RULES_NOTE.endsWith(`This simulator follows the newest rules of the organiser (${MATCH_DURATION} s). You can download them on this website:`),
     LOCKER_ROOM_RULES_NOTE,
   );
-  assert.doesNotMatch(LOCKER_ROOM_RULES_NOTE, /older|2\.3/);
-  assert.doesNotMatch(LOCKER_ROOM_RULES_NOTE, /Starter|Advanced|Intermediate/, 'not the name of a level of the examples');
+  // ... and it says WHERE on this website: it ends with a colon, and the link that follows it names the page and goes there
+  // (that this page is the one with the rules file: ./screen.test.ts)
+  assert.deepEqual(LOCKER_ROOM_RULES_LINK, { label: 'the Locker Room page of Season 2026', href: '/season/2026/locker-room' });
+  for (const said of [LOCKER_ROOM_RULES_NOTE, LOCKER_ROOM_RULES_LINK.label]) {
+    assert.doesNotMatch(said, /older|2\.3/);
+    assert.doesNotMatch(said, /Starter|Advanced|Intermediate/, 'not the name of a level of the examples');
+  }
 });
 
 test('short sentences: no sentence is longer than 140 characters, no bullet longer than 230', () => {

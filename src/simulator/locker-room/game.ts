@@ -42,11 +42,12 @@
  *       ONE table: MARK_ROLES (./field.ts), with the evidence. The 50 mm cube fits completely into
  *       each of these 104.76 x 62.86 mm rectangles - into the two turned ones only when it is
  *       turned with them: standing straight, a cube of at most 44.4 mm (62.86 / sqrt 2) would fit,
- *       and centred it may be turned up to 17.7 degrees off. onMark() is exact: "completely" =
- *       every corner of the cube inside the rectangle, "partly" = the separating-axis test. On a
- *       target too small for a whole cube (none with this table; a 41.9 mm square would be) the
- *       line counts "partly inside" as done and says why, so that the best run is always
- *       "complete".                                         cubeFitsInside(), cubeFitsTurned()
+ *       and centred it may be turned up to 17.7 degrees off (turnRoom(); the same in the BLUE one,
+ *       which is not turned). onMark() is exact: "completely" = every corner of the cube inside
+ *       the rectangle, "partly" = the separating-axis test. On a target too small for a whole cube
+ *       (none with this table; a 41.9 mm square would be) the line counts "partly inside" as done
+ *       and says why, so that the best run is always "complete".
+ *                                                 cubeFitsInside(), cubeFitsTurned(), turnRoom()
  *   L2. "Drives out of the locker room": the WHOLE robot outside it (frame included).  isOutside()
  *   L3. Step 3: when does the referee show the card, take it away, lift the box? 0.5 s, 2.5 s and
  *       4.0 s after the robot came to rest (no wheel turning) completely inside the Scan Station
@@ -412,6 +413,23 @@ export function cubeFitsTurned(mark: Mark, angle: number, cube = CUBE_SIZE): boo
   if (box === undefined) return false;
   const t = angle - box.angle;
   return cube * (Math.abs(Math.cos(t)) + Math.abs(Math.sin(t))) <= Math.min(box.w, box.l) + 1e-6;
+}
+
+/**
+ * How far (radians) a cube may be turned off the sides of a mark and still stand COMPLETELY inside
+ * it, at the best place (in the middle across the shorter side): the largest t for which
+ * cubeFitsTurned() says yes, cube x (cos t + sin t) = the shorter side. For the 50 mm cube in the
+ * 62.86 mm wide warehouses that is 17.74 degrees - so "turned the same way" is too strict a word for
+ * what the referee asks, and the Rules window says "almost", with this number. A quarter of a turn
+ * (any turn, for a square) when the mark holds the cube's diagonal, or is a disc that holds the
+ * cube; 0 for a mark that holds no whole cube.
+ */
+export function turnRoom(mark: Mark, cube = CUBE_SIZE): number {
+  if (!cubeFitsInside(mark, cube)) return 0;
+  if (mark.circle) return Math.PI / 4;
+  const shorter = Math.min((mark.box as OBB).w, (mark.box as OBB).l);
+  // (cos t + sin t = sqrt 2 x sin(t + 45 degrees))
+  return Math.asin(Math.min(1, shorter / (cube * Math.SQRT2))) - Math.PI / 4;
 }
 
 /** The cube is held by the gripper. */
