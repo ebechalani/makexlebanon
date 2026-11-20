@@ -9,27 +9,61 @@ import { FIRE_CADET, frontReach, gridBound, spot, squareRect, ticks } from './nu
 
 const f = FIRE_CADET;
 
+/** The sizes the limits read: FIRE_CADET's, or other sizes the organiser might send. */
+type Sizes = Pick<typeof FIRE_CADET, 'TURNING_POINT_TO_FRONT' | 'STICK_LENGTH' | 'ITEM_BASE' | 'STICK_GAP' | 'GRID_PITCH'>;
+
+/**
+ * The limits of the sizes (design 0.3; README "What breaks at other sizes"): each limit that `s`
+ * breaks, with why. Sticks longer than the item are no limit: an obstacle stands between the
+ * sticks, so an item pushed into it is what touches it (game.test.ts plays it with items of 26 and
+ * 30 mm).
+ */
+function brokenLimits(s: Sizes): string[] {
+  const reach = s.TURNING_POINT_TO_FRONT + s.STICK_LENGTH;
+  const broken: string[] = [];
+  if (!(reach <= s.GRID_PITCH / 2)) {
+    broken.push(
+      `the front of the robot with its sticks (${reach} mm) must reach at most half a square (${s.GRID_PITCH / 2} mm): ` +
+        'otherwise the robot does not fit inside one square, so there is no legal start and no return bonus (sticks of 33 mm and more)',
+    );
+  }
+  if (!(s.STICK_LENGTH > s.ITEM_BASE / 2)) {
+    broken.push(
+      `a stick (${s.STICK_LENGTH} mm) must reach past the middle of an item (${s.ITEM_BASE / 2} mm ahead of the body): ` +
+        'otherwise the item is not held in a turn (sticks of 20 mm and less; an item base of twice the stick length and more)',
+    );
+  }
+  if (!(s.ITEM_BASE <= s.STICK_GAP)) broken.push(`an item (${s.ITEM_BASE} mm) must fit between the sticks (${s.STICK_GAP} mm apart)`);
+  return broken;
+}
+
 test('the limits of the sizes (design 0.3): if the organiser sends real sizes that break one, this says which', () => {
-  assert.ok(
-    frontReach() <= f.GRID_PITCH / 2,
-    `the front of the robot with its sticks (${frontReach()} mm) must reach at most half a square (${f.GRID_PITCH / 2} mm): ` +
-      'otherwise the robot does not fit inside one square, so there is no legal start and no return bonus (sticks of 33 mm and more)',
-  );
-  assert.ok(
-    f.STICK_LENGTH > f.ITEM_BASE / 2,
-    `a stick (${f.STICK_LENGTH} mm) must reach past the middle of an item (${f.ITEM_BASE / 2} mm ahead of the body): ` +
-      'otherwise the item is not held in a turn (sticks of 20 mm and less; an item base of twice the stick length and more)',
-  );
-  assert.ok(
-    f.ITEM_BASE <= f.STICK_GAP,
-    `an item (${f.ITEM_BASE} mm) must fit between the sticks (${f.STICK_GAP} mm apart)`,
-  );
-  assert.ok(
-    f.STICK_LENGTH < f.ITEM_BASE,
-    `a stick (${f.STICK_LENGTH} mm) must be shorter than an item (${f.ITEM_BASE} mm): otherwise an item pushed against an ` +
-      'obstacle would also be the sticks touching it (the same 1 point, D5, but the referee would call it the robot\'s touch)',
-  );
+  assert.deepEqual(brokenLimits(f), []);
+  assert.equal(frontReach(), f.TURNING_POINT_TO_FRONT + f.STICK_LENGTH);
   assert.equal(frontReach(), 87);
+});
+
+test('the limits refuse only the sizes of the "Breaks" column: sizes that work pass, sticks longer than the item among them', () => {
+  const at = (part: Partial<Sizes>): string[] => brokenLimits({ ...f, ...part });
+  // the "Works" column of the README, at its ends
+  for (const part of [{ STICK_LENGTH: 21 }, { STICK_LENGTH: 32 }, { ITEM_BASE: 59 }, { STICK_GAP: f.ITEM_BASE }]) {
+    assert.deepEqual(at(part), [], JSON.stringify(part));
+  }
+  // sticks as long as the item, or longer, work: the referee names the item that touches an
+  // obstacle, not the robot (game.test.ts, "D5, sticks longer than the item")
+  for (const ITEM_BASE of [20, 26, 29.5, 30]) {
+    assert.deepEqual(at({ ITEM_BASE }), [], `an item of ${ITEM_BASE} mm with sticks of ${f.STICK_LENGTH} mm`);
+  }
+  // the "Breaks" column, just past the ends: each breaks one limit, the one that says why
+  const breaks = (part: Partial<Sizes>, why: RegExp): void => {
+    const broken = at(part);
+    assert.equal(broken.length, 1, `${JSON.stringify(part)}: ${broken.join(' / ')}`);
+    assert.match(broken[0], why);
+  };
+  breaks({ STICK_LENGTH: 20 }, /not held in a turn/);
+  breaks({ STICK_LENGTH: 33 }, /does not fit inside one square/);
+  breaks({ ITEM_BASE: 60 }, /not held in a turn/);
+  breaks({ STICK_GAP: f.ITEM_BASE - 1 }, /must fit between the sticks/);
 });
 
 test('the numbers worked out from others', () => {

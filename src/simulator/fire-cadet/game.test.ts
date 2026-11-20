@@ -10,7 +10,9 @@
  * 5 and 8 no longer score 25.
  */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { RESTORE_CLEARANCE } from '../core/engine';
 import { obbTouches, type OBB } from '../core/geometry';
 import { robotShapesAt } from '../core/robot';
@@ -22,7 +24,7 @@ import { FIRE_CADET, spot, squareRect } from './numbers';
 import { playFireCadet } from './play';
 import { MTINY_ROBOT, START_POSE } from './robot';
 import { OBSTACLE_KINDS, OBSTACLE_WORDS, PRACTICE_MAPS, type FireCadetScenario, type ItemName } from './scenario';
-import { parkedMap, sq, watchMatch } from './test-helpers';
+import { parkedMap, sq, watchMatch, withSizes, type WatchedMatch } from './test-helpers';
 
 const program = (text: string) => cardRowProgram(cardsFromText(text));
 const lineOf = (lines: readonly ScoreLine[], id: string): ScoreLine => lines.find((l) => l.id === id) as ScoreLine;
@@ -685,6 +687,81 @@ test('D5, an item pushed against an obstacle: -1; the obstacle is lifted, and ba
   assert.deepEqual(through.stops[3], [624.764, 446.764, 0]);
   assert.deepEqual([lineOf(through.sim.score().lines, 'obstacles').points, lineOf(through.sim.score().lines, 'obstacles').ok], [-1, false]);
   assert.equal(lineOf(through.sim.score().lines, 'obstacles').detail, 'Touched: the Road Closed sign.');
+});
+
+test('D5, sticks longer than the item: a 40 mm obstacle stands between the sticks, so an item pushed into it is what touches it, and the referee names the item; only an obstacle 90 mm wide or more meets longer sticks first', () => {
+  // the Injured Person on D6, the Road Closed sign on D3: F5 pushes the person head-on into the sign.
+  // The sticks stay 30 mm; an item of 26 mm makes them 4 mm longer than the item, one of 30 mm as long
+  const map = ROAD_CLOSED_ON('D3', { person: sq('D6') });
+  const person = itemId('person');
+  const sign = obstacleId('road-closed');
+  const itemSaid = 'The Injured Person touched the Road Closed sign: -1. On the real map, go round it.';
+  const robotSaid = 'The robot touched the Road Closed sign: -1. The referee puts it back.';
+  const touches = (w: WatchedMatch): [number, string][] => w.said.filter(([, t]) => / touched /.test(t));
+  const signBack = (w: WatchedMatch): boolean => w.back.some(([, id, x, y, a]) => id === sign && x === spot(sq('D3')).x && y === spot(sq('D3')).y && a === 0);
+  /** F5 with these bases; and, until the sign is first lifted, how far the tips of the sticks got past its near side, and how near a stick then came to it sideways */
+  const play = (sizes: Record<string, number>): { w: WatchedMatch; past: number; beside: number } => {
+    let lifted = false;
+    let past = -Infinity;
+    let beside = Infinity;
+    const w = watchMatch(program('F5'), map, {
+      game: withSizes(sizes),
+      onTick: (sim) => {
+        const b = sim.world.bodies.find((x) => x.id === sign);
+        if (b === undefined) lifted = true;
+        if (b === undefined || lifted) return;
+        const pose = sim.world.robot.pose;
+        assert.equal(pose.heading, 0, 'straight up the map: the boxes below are lined up with the map');
+        for (const stick of robotShapesAt(MTINY_ROBOT, pose).slice(1)) {
+          const along = (stick.l + b.l) / 2 - Math.abs(stick.y - b.y);
+          past = Math.max(past, along);
+          if (along > 0) beside = Math.min(beside, Math.abs(stick.x - b.x) - (stick.w + b.w) / 2);
+        }
+      },
+    });
+    return { w, past: r3(past), beside: r3(beside) };
+  };
+  // the sign of 40 mm: whatever the length of the item, the item touches it, and the sticks pass
+  // beside it, (90.5 - 40) / 2 = 25.25 mm away on each side
+  assert.equal((FIRE_CADET.STICK_GAP - FIRE_CADET.OBSTACLE_BASE) / 2, 25.25);
+  let tips26 = NaN;
+  for (const [base, time, past, beside] of [
+    [26, 6.68, 3.379, 25.25],
+    [30, 6.64, -1.707, Infinity],
+    [FIRE_CADET.ITEM_BASE, 6.57, -10.607, Infinity],
+  ] as const) {
+    const { w, past: p, beside: s } = play({ [person]: base });
+    if (base === 26) tips26 = p;
+    assert.deepEqual(touches(w), [[time, itemSaid]], `an item of ${base} mm`);
+    assert.deepEqual([p, s], [past, beside], `an item of ${base} mm: the tips of the sticks past the near side of the sign, and how far beside it`);
+    assert.equal(lineOf(w.sim.score().lines, 'obstacles').points, -1);
+    assert.ok(signBack(w) && w.stops.every(onASquare));
+  }
+  // a sign wider than the gap between the sticks, less the touching distance (90.5 - 2 x 0.5 = 89.5
+  // mm): the tips of sticks longer than the item meet it before the item does, and the referee says
+  // so - the robot did touch it. The same -1 (D5)
+  for (const [signBase, itemBase, time, said, past, beside] of [
+    [89, 26, 6.48, itemSaid, 2.45, 0.75], // (the tips pass it 0.75 mm away: not touching)
+    [90, 26, 6.45, robotSaid, -0.864, Infinity],
+    [100, 26, 6.41, robotSaid, -0.95, Infinity],
+    [100, FIRE_CADET.ITEM_BASE, 6.33, itemSaid, -11.121, Infinity],
+  ] as const) {
+    const { w, past: p, beside: s } = play({ [person]: itemBase, [sign]: signBase });
+    assert.deepEqual(touches(w), [[time, said]], `a sign of ${signBase} mm, an item of ${itemBase} mm`);
+    assert.deepEqual([p, s], [past, beside], `a sign of ${signBase} mm, an item of ${itemBase} mm: the tips of the sticks`);
+    assert.equal(lineOf(w.sim.score().lines, 'obstacles').points, -1);
+    assert.ok(w.stops.every(onASquare));
+  }
+  // the README says what was measured here - and no longer that longer sticks would touch the obstacle
+  const readme = readFileSync(fileURLToPath(new URL('../../../README.md', import.meta.url)), 'utf8').replace(/\s+/g, ' ');
+  for (const part of [
+    `A ${FIRE_CADET.OBSTACLE_BASE} mm obstacle stands between the sticks (${FIRE_CADET.STICK_GAP} mm apart), ${(FIRE_CADET.STICK_GAP - FIRE_CADET.OBSTACLE_BASE) / 2} mm from each`,
+    `items of 26 mm (the tips of the sticks get ${tips26.toFixed(1)} mm past the front of the obstacle, beside it) and 30 mm`,
+    'Only an obstacle 90 mm wide or more is met by the tips of longer sticks before the item',
+  ]) {
+    assert.ok(readme.includes(part), part);
+  }
+  assert.doesNotMatch(readme, /would also be the sticks touching it|sticks shorter than an item/);
 });
 
 test('D5, the robot touches an obstacle and later pushes an item into it (and the other way round): -1 in all', () => {

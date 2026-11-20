@@ -7,11 +7,13 @@
  *   parkedMap(part)             a map for single experiments: everything parked far from the action
  *   watchMatch(...)             a whole match tick by tick, with what the referee said, when each
  *                               element left the field and came back, and where the robot stopped
+ *   withSizes(sizes)            the game with other bases for some items and obstacles (what would
+ *                               change if the organiser sent other sizes), for watchMatch
  */
 import { createSimulation } from '../core/simulation';
-import type { Body, Pose, ProgramJson, Simulation } from '../core/types';
+import type { Body, Game, Pose, ProgramJson, Simulation } from '../core/types';
 import { PLACES, WATER_SQUARES, sameSquare } from './field';
-import { fireCadetGame } from './game';
+import { createBodies, fireCadetGame } from './game';
 import { FIRE_CADET, type Square } from './numbers';
 import { FIRE_PLACES, parseSquare, targetSquare, type FireCadetScenario } from './scenario';
 
@@ -105,13 +107,32 @@ export interface WatchedMatch {
   tableEdge: boolean;
 }
 
+/**
+ * The game with other bases (mm across, square) for the elements named: `{ 'item:person': 26 }`.
+ * Everything else - the robot, its sticks, the referee - stays as it is. (The engine and the
+ * referee read the size of a body from the body itself; for the sizes game.test.ts uses, this gave
+ * the same sentences at the same times as the same base written in numbers.ts.)
+ */
+export function withSizes(sizes: Readonly<Record<string, number>>): Game<FireCadetScenario> {
+  return {
+    ...fireCadetGame,
+    createBodies: (s) => createBodies(s).map((b) => (sizes[b.id] === undefined ? b : { ...b, w: sizes[b.id], l: sizes[b.id] })),
+  };
+}
+
 /** Play a whole match tick by tick and watch it (Junior; for the panel, drive the simulation yourself). */
 export function watchMatch(
   program: ProgramJson,
   scenario: FireCadetScenario,
-  options: { startPose?: Pose; onTick?: (sim: Simulation<FireCadetScenario>) => void; maxSeconds?: number } = {},
+  options: {
+    startPose?: Pose;
+    onTick?: (sim: Simulation<FireCadetScenario>) => void;
+    maxSeconds?: number;
+    /** another game than Fire Cadet as it is (withSizes) */
+    game?: Game<FireCadetScenario>;
+  } = {},
 ): WatchedMatch {
-  const sim = createSimulation({ game: fireCadetGame, scenario, program, startPose: options.startPose });
+  const sim = createSimulation({ game: options.game ?? fireCadetGame, scenario, program, startPose: options.startPose });
   sim.start();
   const watched: WatchedMatch = { sim, said: [], gone: [], back: [], stops: [], tableEdge: false };
   const edge = FIRE_CADET.MAT + FIRE_CADET.TABLE_MARGIN - 0.01;
