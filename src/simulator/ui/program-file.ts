@@ -5,7 +5,7 @@
  * Plain TypeScript (no DOM, no Blockly), so it can be unit-tested under Node.
  */
 import { getBlockDef, getCategory, type CategoryId } from '../blocks/catalog';
-import { paletteCategories } from '../blocks/palettes';
+import { paletteCategories, versionOf } from '../blocks/palettes';
 import type { BlockJson, ProgramJson } from '../core/types';
 import { blockRole } from '../vm';
 import { isRecord } from './storage';
@@ -193,15 +193,43 @@ export function gameNameFromId(gameId: string): string {
 }
 
 /**
+ * The games whose name is not what their id tells. Fire Rescue Senior kept the id of the Fire
+ * Rescue game of before the split, 'fire-rescue' (so that the work saved on the Fire Rescue page
+ * is found again on the Senior page), and the website has no page called "Fire Rescue" any more.
+ * A file saved on that page before the split is named after the Senior page too: it is the same
+ * game, and its old address leads there.
+ */
+const GAME_NAMES: Readonly<Record<string, string>> = {
+  'fire-rescue': 'Fire Rescue Senior',
+};
+
+/** The name of a game as its page shows it in the title row: "Fire Rescue Senior", "Fire Rescue Junior", "Fire Chief". */
+export function gameName(gameId: string): string {
+  return Object.prototype.hasOwnProperty.call(GAME_NAMES, gameId) ? GAME_NAMES[gameId] : gameNameFromId(gameId);
+}
+
+/**
+ * The game a program of this game is a program of: the game itself - or, for another version of
+ * a game (../blocks/palettes.ts: GAME_VERSIONS), that game. Fire Rescue Junior and Fire Rescue
+ * Senior ('fire-rescue') are one game for a program: the same robot, the same field, the same
+ * blocks.
+ */
+export function programGameOf(gameId: string): string {
+  return versionOf(gameId) ?? gameId;
+}
+
+/**
  * What to tell the student about a program that was just opened, when it comes from another
  * game or holds blocks this game does not have. Null when there is nothing to say.
  *
  * `fileGame` is the game written in the file (null for a bare Blockly file), `gameId` the game
- * on the screen.
+ * on the screen. A file of another version of the same game (Fire Rescue Junior and Senior:
+ * programGameOf) is no file of another game: nothing is said about where it was saved.
  */
 export function otherGameNote(program: ProgramJson, fileGame: string | null, gameId: string): string | null {
   const foreign = foreignBlocks(program, gameId);
-  const from = fileGame !== null && fileGame !== gameId && gameNameFromId(fileGame) !== '' ? `This program was saved in the ${gameNameFromId(fileGame)} simulator. ` : '';
+  const fromOtherGame = fileGame !== null && programGameOf(fileGame) !== programGameOf(gameId);
+  const from = fromOtherGame && gameName(fileGame) !== '' ? `This program was saved in the ${gameName(fileGame)} simulator. ` : '';
   if (foreign.count === 0) return from === '' ? null : `${from}All its blocks work here too.`;
   const one = foreign.count === 1;
   return (

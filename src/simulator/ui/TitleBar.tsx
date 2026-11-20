@@ -17,12 +17,12 @@ const PARENT_PAGES: Array<{ label: string; href: string }> = [
 ];
 
 export interface TitleBarProps {
-  /** short name of the category, e.g. "Fire Rescue" */
+  /** short name of the category, e.g. "Fire Rescue Senior" */
   title: string;
   /**
    * true: on a phone a title that is too long for its line goes on over a second line instead of
-   * being cut off ("Warehouse Sort sim..." on a 360 px phone). Left out: cut off with "...", as
-   * it always was - the titles of Fire Rescue and Fire Chief fit a 360 px phone.
+   * being cut off ("Warehouse Sort sim..." on a 360 px phone; Fire Rescue Junior and Senior too).
+   * Left out: cut off with "...", as it always was - the title of Fire Chief fits a 360 px phone.
    */
   wrapOnPhone?: boolean;
   /** the robot the simulator plays with, after the title ("mBot2" when left out; Fire Cadet: "mTiny") */

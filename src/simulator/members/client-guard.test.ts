@@ -642,6 +642,10 @@ describe('the examples stay on the server', () => {
       'src/simulator/ui/ExamplesDialog.tsx',
       'src/simulator/ui/fire-rescue/FireRescueSimulator.tsx',
       'src/simulator/ui/fire-rescue/FireRescueLoader.tsx',
+      // Fire Rescue Junior: the Fire Rescue game with only the buckets drawn - a screen, a loader and a panel of its own
+      'src/simulator/ui/fire-rescue-junior/FireRescueJuniorSimulator.tsx',
+      'src/simulator/ui/fire-rescue-junior/FireRescueJuniorLoader.tsx',
+      'src/simulator/ui/fire-rescue-junior/CombinationEditor.tsx',
       'src/simulator/ui/fire-chief/FireChiefSimulator.tsx',
       'src/simulator/ui/fire-chief/FireChiefLoader.tsx',
       'src/simulator/ui/fire-chief/MazeEditor.tsx',
@@ -667,7 +671,8 @@ describe('the examples stay on the server', () => {
     }
     // the page of every game reaches its screen (through a dynamic import), and the screen reaches what asks the server
     for (const [page, loader, simulator, own] of [
-      ['src/app/simulator/fire-rescue/page.tsx', 'src/simulator/ui/fire-rescue/FireRescueLoader.tsx', 'src/simulator/ui/fire-rescue/FireRescueSimulator.tsx', 'src/simulator/fire-rescue/game.ts'],
+      ['src/app/simulator/fire-rescue-senior/page.tsx', 'src/simulator/ui/fire-rescue/FireRescueLoader.tsx', 'src/simulator/ui/fire-rescue/FireRescueSimulator.tsx', 'src/simulator/fire-rescue/game.ts'],
+      ['src/app/simulator/fire-rescue-junior/page.tsx', 'src/simulator/ui/fire-rescue-junior/FireRescueJuniorLoader.tsx', 'src/simulator/ui/fire-rescue-junior/FireRescueJuniorSimulator.tsx', 'src/simulator/fire-rescue-junior/game.ts'],
       ['src/app/simulator/fire-chief/page.tsx', 'src/simulator/ui/fire-chief/FireChiefLoader.tsx', 'src/simulator/ui/fire-chief/FireChiefSimulator.tsx', 'src/simulator/fire-chief/game.ts'],
       ['src/app/simulator/warehouse-sort/page.tsx', 'src/simulator/ui/warehouse-sort/WarehouseSortLoader.tsx', 'src/simulator/ui/warehouse-sort/WarehouseSortSimulator.tsx', 'src/simulator/warehouse-sort/game.ts'],
       ['src/app/simulator/locker-room/page.tsx', 'src/simulator/ui/locker-room/LockerRoomLoader.tsx', 'src/simulator/ui/locker-room/LockerRoomSimulator.tsx', 'src/simulator/locker-room/game.ts'],
@@ -705,6 +710,20 @@ describe('the examples stay on the server', () => {
     const chiefScreen = reachableFrom(graph, 'src/simulator/ui/fire-chief/FireChiefSimulator.tsx');
     for (const file of ['src/simulator/ui/fire-chief/words.ts', 'src/simulator/ui/fire-chief/rules.ts', 'src/simulator/ui/fire-chief/MazeEditor.tsx', 'src/simulator/ui/fire-chief/maze-words.ts']) {
       assert.ok(chiefScreen.has(file), `the Fire Chief screen -> ${file}`);
+    }
+    // ... and so has the Fire Rescue Junior screen: its words, its rules window, its panel, its codes and its test lists,
+    // and the Fire Rescue game it plays
+    const juniorScreen = reachableFrom(graph, 'src/simulator/ui/fire-rescue-junior/FireRescueJuniorSimulator.tsx');
+    for (const file of [
+      'src/simulator/ui/fire-rescue-junior/words.ts',
+      'src/simulator/ui/fire-rescue-junior/rules.ts',
+      'src/simulator/ui/fire-rescue-junior/CombinationEditor.tsx',
+      'src/simulator/ui/fire-rescue-junior/junior-code.ts',
+      'src/simulator/ui/fire-rescue-junior/junior-batch.ts',
+      'src/simulator/fire-rescue-junior/scenario.ts',
+      'src/simulator/fire-rescue/game.ts',
+    ]) {
+      assert.ok(juniorScreen.has(file), `the Fire Rescue Junior screen -> ${file}`);
     }
     // ... and so has the Warehouse Sort screen: its words, its rules window, its Cube colours panel and its test lists
     const sortScreen = reachableFrom(graph, 'src/simulator/ui/warehouse-sort/WarehouseSortSimulator.tsx');

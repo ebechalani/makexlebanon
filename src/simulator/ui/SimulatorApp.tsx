@@ -4,8 +4,9 @@
  * The simulator screen: block workspace on the left, stage with its controls and panels on the
  * right (stacked on narrow screens). It works for any Game; what is special about one category
  * (its examples, rules, combination editor, a few words) is passed in as props - see
- * ./fire-rescue/FireRescueSimulator.tsx, ./fire-chief/FireChiefSimulator.tsx,
- * ./warehouse-sort/WarehouseSortSimulator.tsx and ./locker-room/LockerRoomSimulator.tsx.
+ * ./fire-rescue/FireRescueSimulator.tsx (Fire Rescue Senior), ./fire-rescue-junior/FireRescueJuniorSimulator.tsx,
+ * ./fire-chief/FireChiefSimulator.tsx, ./warehouse-sort/WarehouseSortSimulator.tsx and
+ * ./locker-room/LockerRoomSimulator.tsx.
  * Fire Cadet has a screen of its own: ./fire-cadet/FireCadetSimulator.tsx.
  *
  * Everything else the screen asks the game, the robot and the simulation:
@@ -87,7 +88,7 @@ export interface RulesPart {
 export interface SimulatorAppProps<S> {
   game: Game<S>;
   robotConfig: RobotConfig;
-  /** short name of the category for the header, e.g. "Fire Rescue" */
+  /** short name of the category for the header, e.g. "Fire Rescue Senior" */
   title: string;
   /** true: on a phone a title too long for its line wraps instead of being cut off (see TitleBarProps.wrapOnPhone) */
   titleWrapsOnPhone?: boolean;
@@ -148,6 +149,15 @@ export interface SimulatorAppProps<S> {
    * it does and when it is off.
    */
   restartButton?: boolean;
+  /**
+   * What to tell a student who finds the workspace empty, for a category whose students may look
+   * here for blocks they made on another page (Fire Rescue Junior: where the blocks of the Fire
+   * Rescue page are - ./fire-rescue-junior/earlier-blocks.ts). Called once, when the screen is
+   * made; null: nothing to tell. The sentence is said once, as a message at the bottom of the
+   * screen, when the editor is ready - and only if the workspace then holds no block but the
+   * yellow start block. Left out: nothing is said.
+   */
+  emptyWorkspaceNote?: () => string | null;
   /** the category's own editor for a combination */
   renderCombinationEditor: (scenario: S, onChange: (next: S) => void) => ReactNode;
   /**
@@ -287,6 +297,8 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
   const hasGripperBlocks = useMemo(() => paletteCategories(game.id).includes('gripper'), [game.id]);
 
   const [saved] = useState(() => readSettings(game, robotConfig, props.initialStartPose, props.readCode));
+  // (read once: it may look at what the browser keeps, and it must not change while the student works)
+  const [emptyWorkspaceNote] = useState(() => props.emptyWorkspaceNote?.() ?? null);
   const [scenario, setScenario] = useState<S>(saved.scenario);
   const [view, setView] = useState<StageOptions>(saved.view);
   const [open, setOpen] = useState<Record<SectionId, boolean>>(saved.open);
@@ -370,6 +382,14 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
   }, []);
   // what the editor has to tell about the blocks it kept from the last visit (long enough to be read)
   const onSavedNote = useCallback((text: string) => say(text, 'info', 12000), [say]);
+  // what the category tells a student who finds the workspace empty (props.emptyWorkspaceNote): once, when the
+  // editor is ready, and only if the workspace holds no block but the start block (three sentences: long enough to be read)
+  const emptyNoteSaid = useRef(false);
+  useEffect(() => {
+    if (!editorReady || emptyNoteSaid.current) return;
+    emptyNoteSaid.current = true;
+    if (emptyWorkspaceNote && editorStatus.blocks <= 1) say(emptyWorkspaceNote, 'info', 20000);
+  }, [editorReady, editorStatus.blocks, emptyWorkspaceNote, say]);
   useEffect(
     () => () => {
       if (noticeTimer.current) clearTimeout(noticeTimer.current);

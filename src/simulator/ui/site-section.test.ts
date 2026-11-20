@@ -16,6 +16,8 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import ts from 'typescript';
 import {
+  getCategory,
+  getSeason,
   missionSimulators,
   seasons,
   simulatorSeasons,
@@ -25,6 +27,8 @@ import {
   type Season,
 } from '../../../content/seasons';
 import { nav, simulatorMenu, site } from '../../../content/site';
+import { fireRescueGame } from '../fire-rescue/game';
+import { GAME_OF_AN_UNNAMED_ANSWER } from './member-unlock';
 import { TitleBar } from './TitleBar';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
@@ -65,7 +69,8 @@ test('menu: the dropdown of "Simulator" is the Simulator page, then each simulat
     { label: 'Locker Room — Season 2026', href: '/simulator/locker-room' },
     { label: 'Warehouse Sort — Season 2026', href: '/simulator/warehouse-sort' },
     { label: 'Fire Cadet — Season 2027', href: '/simulator/fire-cadet' },
-    { label: 'Fire Rescue — Season 2027', href: '/simulator/fire-rescue' },
+    { label: 'Fire Rescue Junior — Season 2027', href: '/simulator/fire-rescue-junior' },
+    { label: 'Fire Rescue Senior — Season 2027', href: '/simulator/fire-rescue-senior' },
     { label: 'Fire Chief — Season 2027', href: '/simulator/fire-chief' },
   ]);
   // the same simulators as the cards of /simulator, in the same order
@@ -98,7 +103,8 @@ test('menu: a simulator added to a season appears in the dropdown by itself, in 
     { label: 'Locker Room — Season 2026', href: '/simulator/locker-room' },
     { label: 'Warehouse Sort — Season 2026', href: '/simulator/warehouse-sort' },
     { label: 'Fire Cadet — Season 2027', href: '/simulator/fire-cadet' },
-    { label: 'Fire Rescue — Season 2027', href: '/simulator/fire-rescue' },
+    { label: 'Fire Rescue Junior — Season 2027', href: '/simulator/fire-rescue-junior' },
+    { label: 'Fire Rescue Senior — Season 2027', href: '/simulator/fire-rescue-senior' },
     { label: 'Fire Chief — Season 2027', href: '/simulator/fire-chief' },
     { label: 'Later Mission — Season 2027', href: '/simulator/later' },
   ]);
@@ -286,10 +292,20 @@ test('menu on a computer: a line picked in a dropdown lets go of the focus, so t
   }
 });
 
-test('pages: every simulator is /simulator/<game>, with its page folder, its address in the page, and its mat picture in public/simulator/<game>/', async () => {
+/**
+ * The two Fire Rescue categories play the Fire Rescue field: their cards show the picture the
+ * Fire Rescue game itself shows, in public/simulator/fire-rescue/ (the folder of the page of
+ * before the split, whose address now leads to Senior). No copy of it lies next to their pages.
+ */
+const SHARED_MAT: Readonly<Record<string, string>> = {
+  '/simulator/fire-rescue-junior': '/simulator/fire-rescue/mat.webp',
+  '/simulator/fire-rescue-senior': '/simulator/fire-rescue/mat.webp',
+};
+
+test('pages: every simulator is /simulator/<game>, with its page folder, its address in the page, and its mat picture in public/simulator/<game>/ (Fire Rescue Junior and Senior: the one of Fire Rescue)', async () => {
   assert.deepEqual(
     SIMULATOR_HREFS.map((simulator) => simulator.href).sort(),
-    ['/simulator/fire-cadet', '/simulator/fire-chief', '/simulator/fire-rescue', '/simulator/locker-room', '/simulator/warehouse-sort'],
+    ['/simulator/fire-cadet', '/simulator/fire-chief', '/simulator/fire-rescue-junior', '/simulator/fire-rescue-senior', '/simulator/locker-room', '/simulator/warehouse-sort'],
   );
   for (const { href, mat } of SIMULATOR_HREFS) {
     const game = /^\/simulator\/([a-z0-9-]+)$/.exec(href)?.[1];
@@ -300,28 +316,34 @@ test('pages: every simulator is /simulator/<game>, with its page folder, its add
     const { metadata } = (await import(`../../app/simulator/${game}/page`)) as { metadata: { alternates?: { canonical?: string }; openGraph?: { url?: string } } };
     assert.equal(metadata.alternates?.canonical, href, page);
     assert.equal(metadata.openGraph?.url, href, page);
-    // the picture keeps its address next to the page: a file in public/simulator/<game>/, and no file where the page is
-    assert.equal(mat, `/simulator/${game}/mat.webp`);
+    // the picture keeps its address next to the page of its game: a file in public/simulator/<game>/, and no
+    // file where the page is. The two Fire Rescue categories share the one of the Fire Rescue game (SHARED_MAT).
+    assert.equal(mat, SHARED_MAT[href] ?? `/simulator/${game}/mat.webp`);
     assert.ok(statSync(fromRoot(`public${mat}`)).isFile(), mat);
-    assert.ok(statSync(fromRoot(`public/simulator/${game}`)).isDirectory(), `public/simulator/${game} is a folder, not a file that would hide the page`);
+    if (SHARED_MAT[href]) assert.ok(!existsSync(fromRoot(`public/simulator/${game}`)), `nothing in public/ at the address of ${href}`);
+    else assert.ok(statSync(fromRoot(`public/simulator/${game}`)).isDirectory(), `public/simulator/${game} is a folder, not a file that would hide the page`);
   }
+  // (the shared picture is the one the Fire Rescue game shows on its stage)
+  assert.equal(fireRescueGame.mat.imageUrl, '/simulator/fire-rescue/mat.webp');
   // one page and the pages of the games, nothing else: no page per season
   const folders = readdirSync(fromRoot('src/app/simulator'), { withFileTypes: true });
   assert.deepEqual(
     folders.map((entry) => (entry.isDirectory() ? `${entry.name}/` : entry.name)).sort(),
-    ['fire-cadet/', 'fire-chief/', 'fire-rescue/', 'locker-room/', 'page.tsx', 'warehouse-sort/'],
+    ['fire-cadet/', 'fire-chief/', 'fire-rescue-junior/', 'fire-rescue-senior/', 'locker-room/', 'page.tsx', 'warehouse-sort/'],
   );
   assert.ok(!existsSync(fromRoot('src/app/training/simulator')), 'the old folder is gone');
+  assert.ok(!existsSync(fromRoot('src/app/simulator/fire-rescue')), 'the page of before the split is gone: its address is a redirect');
 });
 
-test('Simulator page: Season 2026 (Locker Room, Warehouse Sort), then Season 2027 (Fire Cadet, Fire Rescue, Fire Chief)', () => {
+test('Simulator page: six simulators - Season 2026 (Locker Room, Warehouse Sort), then Season 2027 (Fire Cadet, Fire Rescue Junior, Fire Rescue Senior, Fire Chief)', () => {
   assert.deepEqual(
     simulatorSeasons().map((section) => [section.year, section.simulators.map((simulator) => simulator.name)]),
     [
       [2026, ['Capelli Starter — Locker Room', 'Warehouse Sort']],
-      [2027, ['Fire Cadet', 'Fire Rescue', 'Fire Chief']],
+      [2027, ['Fire Cadet', 'Fire Rescue Junior', 'Fire Rescue Senior', 'Fire Chief']],
     ],
   );
+  assert.equal(simulatorSeasons().flatMap((section) => section.simulators).length, 6);
   const [season2026, season2027] = simulatorSeasons();
   // (the category first, with its age group, its season and its "About" link; then the mission of the local event)
   assert.deepEqual(season2026.simulators.map((card) => [card.href, card.labels, card.about]), [
@@ -331,7 +353,8 @@ test('Simulator page: Season 2026 (Locker Room, Warehouse Sort), then Season 202
   // (Fire Cadet first: the first category of Season 2027 in content/seasons.ts)
   assert.deepEqual(season2027.simulators.map((card) => [card.href, card.labels, card.about]), [
     ['/simulator/fire-cadet', ['4–7 years', 'Season 2027'], '/season/2027/fire-cadet'],
-    ['/simulator/fire-rescue', ['11–13 years', 'Season 2027'], '/season/2027/fire-rescue'],
+    ['/simulator/fire-rescue-junior', ['10–12 years', 'Season 2027'], '/season/2027/fire-rescue-junior'],
+    ['/simulator/fire-rescue-senior', ['13–15 years', 'Season 2027'], '/season/2027/fire-rescue-senior'],
     ['/simulator/fire-chief', ['14–17 years', 'Season 2027'], '/season/2027/fire-chief'],
   ]);
 });
@@ -376,7 +399,7 @@ test('Simulator page: a simulator added to a season appears in its part by itsel
     [
       [2025, ['/simulator/new']],
       [2026, ['/simulator/locker-room', '/simulator/warehouse-sort']],
-      [2027, ['/simulator/fire-cadet', '/simulator/fire-rescue', '/simulator/fire-chief', '/simulator/later']],
+      [2027, ['/simulator/fire-cadet', '/simulator/fire-rescue-junior', '/simulator/fire-rescue-senior', '/simulator/fire-chief', '/simulator/later']],
     ],
   );
   // no simulator at all: no part at all
@@ -393,7 +416,10 @@ test('Simulator page: each card is one link (picture, name, sentences) that name
   // the page is about every simulator, so it names both robots, not only the mBot2
   assert.equal(metadata.title, 'Robot simulators');
   assert.match(metadata.description ?? '', /^Program a Makeblock mBot2 with mBlock-style blocks, or lay mTiny coding cards, /);
-  assert.match(metadata.description ?? '', /the 2027 categories Fire Cadet \(mTiny, ages 4–7\), Fire Rescue \(ages 11–13\) and Fire Chief \(ages 14–17\)\./);
+  assert.match(
+    metadata.description ?? '',
+    /the 2027 categories Fire Cadet \(mTiny, ages 4–7\), Fire Rescue Junior \(ages 10–12\), Fire Rescue Senior \(ages 13–15\) and Fire Chief \(ages 14–17\)\./,
+  );
   const html = renderToStaticMarkup(createElement(SimulatorPage));
   assert.ok(html.includes('mBot2 · mTiny · In the browser'), 'the eyebrow');
   assert.ok(html.includes('Build a program with blocks for the mBot2, or a row of coding cards for the mTiny, and watch the robot run it'), 'the lead');
@@ -438,9 +464,10 @@ test('title row of a game: Home / Simulator, not Training', () => {
   // after the title, the robot: the mBot2 when the screen names none, else the one it names
   assert.match(html, /<h1[^>]*>Fire Rescue simulator <span[^>]*>· mBot2<\/span><\/h1>/);
   assert.match(renderToStaticMarkup(createElement(TitleBar, { title: 'Fire Cadet', robot: 'mTiny' })), /<h1[^>]*>Fire Cadet simulator <span[^>]*>· mTiny<\/span><\/h1>/);
-  // the five games show the same row: the four mBot2 games hand only their title to it, Fire Cadet its title and its robot
+  // the six simulators show the same row: the five mBot2 ones hand only their title to it, Fire Cadet its title and its robot
   const loaders: Array<[loader: string, title: string, robot: string | null]> = [
-    ['fire-rescue/FireRescueLoader.tsx', 'Fire Rescue', null],
+    ['fire-rescue-junior/FireRescueJuniorLoader.tsx', 'Fire Rescue Junior', null],
+    ['fire-rescue/FireRescueLoader.tsx', 'Fire Rescue Senior', null],
     ['fire-chief/FireChiefLoader.tsx', 'Fire Chief', null],
     ['warehouse-sort/WarehouseSortLoader.tsx', 'Warehouse Sort', null],
     ['locker-room/LockerRoomLoader.tsx', 'Locker Room', null],
@@ -456,25 +483,59 @@ test('title row of a game: Home / Simulator, not Training', () => {
   }
 });
 
-test('old addresses: exactly the four under Training, each a permanent redirect to its new address', async () => {
-  // (the real configuration, loaded by its full address: next.config.mjs is outside the folders
-  // whose imports the guard of the examples follows - src/, content/, scripts/ - see client-guard.test.ts)
+/** The redirects of the real configuration (loaded by its full address: next.config.mjs is outside the folders
+ * whose imports the guard of the examples follows - src/, content/, scripts/ - see client-guard.test.ts). */
+async function realRedirects(): Promise<Array<{ source: string; destination: string; permanent: boolean }>> {
   const { default: config } = (await import(pathToFileURL(fromRoot('next.config.mjs')).href)) as {
     default: { redirects: () => Promise<Array<{ source: string; destination: string; permanent: boolean }>> };
   };
-  const redirects = await config.redirects();
+  return config.redirects();
+}
+
+test('old addresses: exactly the four under Training, each a permanent redirect to its new address (Fire Rescue: straight to Fire Rescue Senior)', async () => {
+  const redirects = await realRedirects();
   assert.deepEqual(
     redirects.filter((redirect) => redirect.source.startsWith(OLD)),
     [
       { source: '/training/simulator', destination: '/simulator', permanent: true },
-      { source: '/training/simulator/fire-rescue', destination: '/simulator/fire-rescue', permanent: true },
+      { source: '/training/simulator/fire-rescue', destination: '/simulator/fire-rescue-senior', permanent: true },
       { source: '/training/simulator/fire-chief', destination: '/simulator/fire-chief', permanent: true },
       { source: '/training/simulator/warehouse-sort', destination: '/simulator/warehouse-sort', permanent: true },
     ],
   );
-  // (no other redirect touches the new section; the old ones of the website are still there)
-  assert.ok(!redirects.some((redirect) => redirect.source.startsWith('/simulator')));
+  // (no other redirect touches the new section but the one of the Fire Rescue page of before the split;
+  // the old ones of the website are still there)
+  assert.deepEqual(
+    redirects.filter((redirect) => redirect.source.startsWith('/simulator')),
+    [{ source: '/simulator/fire-rescue', destination: '/simulator/fire-rescue-senior', permanent: true }],
+  );
   assert.ok(redirects.some((redirect) => redirect.source === '/training-&-hints' && redirect.destination === '/training'));
+});
+
+test('Fire Rescue split: the old simulator page leads to Fire Rescue Senior - the same game - and the old category page to the season page, each in one step', async () => {
+  const redirects = await realRedirects();
+  assert.deepEqual(
+    redirects.filter((redirect) => /fire-rescue/.test(redirect.source + redirect.destination)),
+    [
+      { source: '/training/simulator/fire-rescue', destination: '/simulator/fire-rescue-senior', permanent: true },
+      { source: '/simulator/fire-rescue', destination: '/simulator/fire-rescue-senior', permanent: true },
+      { source: '/season/2027/fire-rescue', destination: '/season/2027', permanent: true },
+    ],
+  );
+  // no chain: no redirect leads to the address of another one
+  const sources = new Set(redirects.map((redirect) => redirect.source));
+  for (const redirect of redirects) assert.ok(!sources.has(redirect.destination), `${redirect.source} -> ${redirect.destination} -> ...`);
+  // what they lead to is there, and what they come from is gone (a redirect never hides a page)
+  assert.ok(existsSync(fromRoot('src/app/simulator/fire-rescue-senior/page.tsx')));
+  assert.ok(getSeason('2027'));
+  assert.ok(!existsSync(fromRoot('src/app/simulator/fire-rescue')));
+  assert.equal(getCategory('2027', 'fire-rescue'), undefined);
+  // Fire Rescue Senior is the game of the old page: the same Game, under the same id - the blocks and the
+  // settings a student saved there are found again (the browser keeps them under the name of the game)
+  const senior = readFileSync(fromRoot('src/simulator/ui/fire-rescue/FireRescueSimulator.tsx'), 'utf8');
+  assert.match(senior, /\sgame=\{fireRescueGame\}\s/);
+  assert.equal(fireRescueGame.id, 'fire-rescue');
+  assert.match(readFileSync(fromRoot('src/app/simulator/fire-rescue-senior/page.tsx'), 'utf8'), /import \{ FireRescueLoader \} from '@\/simulator\/ui\/fire-rescue\/FireRescueLoader';/);
 });
 
 test('sitemap: the new addresses, none of the old ones', async () => {
@@ -503,7 +564,7 @@ test('Training page: the card names the seasons and the simulators of the Simula
   assert.equal(
     card?.summary,
     'Program the robot with blocks (mBot2) or coding cards (mTiny) and watch it play on the competition mat: ' +
-      'Capelli Starter — Locker Room and Warehouse Sort (Season 2026), Fire Cadet, Fire Rescue and Fire Chief (Season 2027). ' +
+      'Capelli Starter — Locker Room and Warehouse Sort (Season 2026), Fire Cadet, Fire Rescue Junior, Fire Rescue Senior and Fire Chief (Season 2027). ' +
       'Works in the browser, no robot needed.',
   );
   // a simulator added later is named on the card too, in its season
@@ -511,11 +572,14 @@ test('Training page: the card names the seasons and the simulators of the Simula
     ...missionSimulators,
     { name: 'Later Mission', season: 2027, label: 'Level', event: 'Local event', href: '/simulator/later', summary: 'Two sentences.' },
   ];
-  assert.match(simulatorTrack(simulatorSeasons(seasons, missions)).summary, /: Capelli Starter — Locker Room and Warehouse Sort \(Season 2026\), Fire Cadet, Fire Rescue, Fire Chief and Later Mission \(Season 2027\)\. /);
+  assert.match(
+    simulatorTrack(simulatorSeasons(seasons, missions)).summary,
+    /: Capelli Starter — Locker Room and Warehouse Sort \(Season 2026\), Fire Cadet, Fire Rescue Junior, Fire Rescue Senior, Fire Chief and Later Mission \(Season 2027\)\. /,
+  );
   // one season only: "Season", not "Seasons"
   const only2027 = simulatorTrack(simulatorSeasons(seasons.filter((season) => season.year !== 2026), []));
   assert.equal(only2027.ageRange, 'Season 2027');
-  assert.match(only2027.summary, /: Fire Cadet, Fire Rescue and Fire Chief \(Season 2027\)\. /);
+  assert.match(only2027.summary, /: Fire Cadet, Fire Rescue Junior, Fire Rescue Senior and Fire Chief \(Season 2027\)\. /);
 });
 
 test('a page opened from a link of a scrolled page starts at its top, not under the sticky header', () => {
@@ -559,4 +623,156 @@ test('no source file names an old address, except the redirects (next.config.mjs
   };
   walk('');
   assert.deepEqual(found, []);
+});
+
+test('no source file links the Fire Rescue addresses of before the split, except the redirects (next.config.mjs), this test and the README', () => {
+  const thisFile = path.relative(REPO_ROOT, fileURLToPath(import.meta.url));
+  const TEXT = /\.(?:[cm]?[jt]sx?|json|css|html?|svg|txt|xml|md)$/;
+  // (the folder of the pictures, public/simulator/fire-rescue/, keeps its name: the Fire Rescue game shows them;
+  // and the folder of the game's code, src/simulator/fire-rescue, is no address)
+  const OLD_PAGES = [/(?<!src)\/simulator\/fire-rescue(?![\w/-])/, /\/season\/2027\/fire-rescue(?![\w-])/];
+  const found: string[] = [];
+  const walk = (relative: string): void => {
+    for (const entry of readdirSync(fromRoot(relative), { withFileTypes: true })) {
+      const name = relative ? `${relative}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) {
+        if (relative || ['src', 'content', 'scripts', 'public'].includes(entry.name)) walk(name);
+      } else if (TEXT.test(entry.name) && name !== 'next.config.mjs' && name !== thisFile && name !== 'package-lock.json' && name !== 'README.md') {
+        const text = readFileSync(fromRoot(name), 'utf8');
+        if (OLD_PAGES.some((old) => old.test(text))) found.push(name);
+      }
+    }
+  };
+  walk('');
+  assert.deepEqual(found, []);
+});
+
+// =============================================================================================
+// Fire Rescue Junior and Fire Rescue Senior on the website
+// =============================================================================================
+
+test('Season 2027: Fire Rescue Junior (10–12) and Fire Rescue Senior (13–15) where Fire Rescue stood; Fire Fighter and Fire Chief keep their ages', () => {
+  const season2027 = getSeason('2027');
+  assert.ok(season2027);
+  assert.deepEqual(
+    season2027.categories.map((category) => [category.slug, category.name, category.ageRange, category.platform]),
+    [
+      ['fire-cadet', 'Fire Cadet', '4–7 years', 'mTiny'],
+      ['fire-fighter', 'Fire Fighter', '8–10 years', 'mBot2'],
+      ['fire-rescue-junior', 'Fire Rescue Junior', '10–12 years', 'mBot2'],
+      ['fire-rescue-senior', 'Fire Rescue Senior', '13–15 years', 'mBot2'],
+      ['fire-chief', 'Fire Chief', '14–17 years', 'mBot2'],
+    ],
+  );
+  const junior = getCategory('2027', 'fire-rescue-junior');
+  const senior = getCategory('2027', 'fire-rescue-senior');
+  assert.ok(junior && senior);
+  // the teasers say what is drawn, and nothing more certain than that
+  assert.equal(junior.summary, 'Only the water buckets are drawn. Everything else stands where the rule book shows it.');
+  assert.match(senior.summary, /^Everything is drawn: the buckets, the people and where they stand\. /);
+  // each has its own simulator card, on its own page, with the picture of the Fire Rescue mat
+  assert.deepEqual([junior.simulator?.href, junior.simulator?.mat], ['/simulator/fire-rescue-junior', '/simulator/fire-rescue/mat.webp']);
+  assert.deepEqual([senior.simulator?.href, senior.simulator?.mat], ['/simulator/fire-rescue-senior', '/simulator/fire-rescue/mat.webp']);
+  assert.match(junior.simulator?.summary ?? '', /the four buckets in any of the 24 ways the referee could draw them, and everything else where the rule book shows it/);
+  assert.match(senior.simulator?.summary ?? '', /on any of the 9,216 starting combinations the referee could draw/);
+  for (const category of [junior, senior]) assert.equal(category.simulator?.menuName, undefined, 'the name is short enough for the menu');
+  // the introduction no longer counts four categories
+  assert.ok(!/four ways/i.test(season2027.intro), season2027.intro);
+  assert.match(season2027.intro, /five ways to answer the call/);
+  assert.equal(season2027.categories.length, 5);
+  // the source marks the words that are not the organiser's
+  const source = readFileSync(fromRoot('content/seasons.ts'), 'utf8');
+  const block = source.slice(source.indexOf("slug: 'fire-fighter'"), source.indexOf("slug: 'fire-chief'"));
+  assert.match(block, /TO CONFIRM WITH THE ORGANISER/);
+  assert.match(source.slice(source.indexOf('intro:'), source.indexOf("'The alarm sounds in 2027.")), /TO CONFIRM WITH THE ORGANISER/);
+});
+
+test('category pages: /season/2027/fire-rescue-junior and -senior exist, with their ages, and open their own simulator', async () => {
+  const { default: CategoryPage, generateStaticParams, generateMetadata } = (await import('../../app/season/[year]/[category]/page')) as {
+    default: (props: { params: Promise<{ year: string; category: string }> }) => Promise<Parameters<typeof renderToStaticMarkup>[0]>;
+    generateStaticParams: () => Array<{ year: string; category: string }>;
+    generateMetadata: (props: { params: Promise<{ year: string; category: string }> }) => Promise<{ title?: string; description?: string }>;
+  };
+  const params = generateStaticParams().filter((param) => param.year === '2027').map((param) => param.category);
+  assert.deepEqual(params, ['fire-cadet', 'fire-fighter', 'fire-rescue-junior', 'fire-rescue-senior', 'fire-chief']);
+  for (const [slug, name, ages, href] of [
+    ['fire-rescue-junior', 'Fire Rescue Junior', '10–12', '/simulator/fire-rescue-junior'],
+    ['fire-rescue-senior', 'Fire Rescue Senior', '13–15', '/simulator/fire-rescue-senior'],
+  ]) {
+    const props = { params: Promise.resolve({ year: '2027', category: slug }) };
+    const metadata = await generateMetadata(props);
+    assert.equal(metadata.title, `${name} — 2027`);
+    const html = renderToStaticMarkup(await CategoryPage(props));
+    assert.match(html, new RegExp(`<h1[^>]*>${name}</h1>`));
+    assert.ok(html.includes(`Ages ${ages}`), `${slug}: its ages`);
+    assert.ok(html.includes(`Try the ${name} simulator`), slug);
+    assert.match(html, new RegExp(`<a[^>]*href="${href}"[^>]*>Open the simulator</a>`), `${slug}: the button opens its own simulator`);
+    // (and not the other one's, nor the old address)
+    const other = href.endsWith('junior') ? '/simulator/fire-rescue-senior' : '/simulator/fire-rescue-junior';
+    assert.ok(!html.includes(`href="${other}"`), `${slug}: not ${other}`);
+    assert.ok(!/href="\/simulator\/fire-rescue"/.test(html));
+  }
+});
+
+test('season page /season/2027: five categories with their ages, both Fire Rescue categories marked "Online simulator" - announced, not "ran"', async () => {
+  const { default: SeasonPage } = (await import('../../app/season/[year]/page')) as {
+    default: (props: { params: Promise<{ year: string }> }) => Promise<Parameters<typeof renderToStaticMarkup>[0]>;
+  };
+  const html = renderToStaticMarkup(await SeasonPage({ params: Promise.resolve({ year: '2027' }) }));
+  const cards = [...html.matchAll(/<a[^>]*href="\/season\/2027\/([a-z-]+)"[^>]*>([^]*?)<\/a>/g)].map((match) => ({ slug: match[1], text: match[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() }));
+  assert.deepEqual(cards.map((card) => card.slug), ['fire-cadet', 'fire-fighter', 'fire-rescue-junior', 'fire-rescue-senior', 'fire-chief']);
+  const card = (slug: string): string => cards.find((c) => c.slug === slug)?.text ?? '';
+  assert.match(card('fire-rescue-junior'), /^10–12 years mBot2 Online simulator Fire Rescue Junior Only the water buckets are drawn\./);
+  assert.match(card('fire-rescue-senior'), /^13–15 years mBot2 Online simulator Fire Rescue Senior Everything is drawn/);
+  assert.match(card('fire-fighter'), /^8–10 years mBot2 Fire Fighter/);
+  assert.match(card('fire-chief'), /^14–17 years mBot2 Online simulator Fire Chief/);
+  assert.ok(html.includes('five ways to answer the call'));
+  assert.ok(!/four ways/i.test(html));
+  // the season has not happened yet: its five categories are announced - they did not "run"
+  assert.equal(getSeason('2027')?.status, 'upcoming');
+  assert.ok(html.includes('5 categories are announced for the 2027 season. Open a category to find out more.'), 'the line under "Competition categories"');
+  assert.ok(!/categories ran in/.test(html));
+  // a season that has happened keeps its sentence
+  const past = renderToStaticMarkup(await SeasonPage({ params: Promise.resolve({ year: '2026' }) }));
+  assert.equal(getSeason('2026')?.status, 'completed');
+  assert.ok(past.includes(`${getSeason('2026')?.categories.length} categories ran in the 2026 season. Open a category for its rules, resources and photos.`));
+});
+
+test('home page: the Season 2027 block counts five ways, lists both Fire Rescue categories, and gives each its own simulator link', () => {
+  const page = readFileSync(fromRoot('src/app/page.tsx'), 'utf8');
+  assert.match(page, /One city\. One alarm\. Five ways to answer the call\./);
+  assert.ok(!/Four ways/i.test(page));
+  // a picture for each of the five categories (a category without one would get the fire)
+  const emoji = /const TEASER_EMOJI: Record<string, string> = \{([^}]*)\};/.exec(page)?.[1] ?? '';
+  assert.deepEqual([...emoji.matchAll(/'([a-z-]+)':/g)].map((match) => match[1]), getSeason('2027')?.categories.map((category) => category.slug));
+  // the cards come from the season data, each with "Try the simulator" to category.simulator.href
+  assert.match(page, /\{upcomingSeason\.categories\.map\(\(category\) => \(/);
+  assert.match(page, /href=\{category\.simulator\.href\}/);
+  // five cards: three and two on a laptop, one row on a wide screen
+  assert.match(page, /<ul className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">/);
+});
+
+test('README: the note on an answer without a name speaks of the two Fire Rescue pages, which both ask for the game of such an answer', () => {
+  const readme = readFileSync(fromRoot('README.md'), 'utf8').replace(/\s+/g, ' ');
+  assert.ok(
+    readme.includes("(An answer without a name counts as Fire Rescue's, so the two Fire Rescue pages, Junior and Senior, go on working with such a server: both ask for `'fire-rescue'`.)"),
+    'the note',
+  );
+  assert.ok(!readme.includes('so the Fire Rescue page goes on working'), 'not one page');
+  // and so it is: an answer without a name is about 'fire-rescue', and both pages ask for that game
+  assert.equal(GAME_OF_AN_UNNAMED_ANSWER, 'fire-rescue');
+  for (const screen of ['src/simulator/ui/fire-rescue/FireRescueSimulator.tsx', 'src/simulator/ui/fire-rescue-junior/FireRescueJuniorSimulator.tsx']) {
+    assert.match(readFileSync(fromRoot(screen), 'utf8'), /unlockUrl: '\/api\/simulator\/unlock',\s+game: 'fire-rescue',/, screen);
+  }
+});
+
+test('sitemap: both new simulator pages and both new category pages; neither old address', async () => {
+  const { default: sitemap } = (await import('../../app/sitemap')) as { default: () => Array<{ url: string }> };
+  const urls = sitemap().map((entry) => entry.url.slice(site.url.length));
+  for (const href of ['/simulator/fire-rescue-junior', '/simulator/fire-rescue-senior', '/season/2027/fire-rescue-junior', '/season/2027/fire-rescue-senior']) {
+    assert.ok(urls.includes(href), href);
+  }
+  assert.ok(!urls.includes('/simulator/fire-rescue'));
+  assert.ok(!urls.includes('/season/2027/fire-rescue'));
+  assert.equal(urls.length, new Set(urls).size, 'no address twice');
 });

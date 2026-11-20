@@ -1,9 +1,13 @@
 'use client';
 
 /**
- * The simulator for the MakeX "Fire Rescue" category: the general simulator screen
- * (../SimulatorApp) filled in with this category's game, robot, examples, rules and
- * combination editor.
+ * The simulator for the MakeX "Fire Rescue Senior" category (ages 13-15): the general simulator
+ * screen (../SimulatorApp) filled in with this category's game, robot, examples, rules and
+ * combination editor. In Fire Rescue Senior the referee draws everything: the buckets, where each
+ * person stands and which colour it is (9216 combinations). This is the game of the Fire Rescue
+ * page from before the category was split, unchanged, under its old id 'fire-rescue'. Fire Rescue
+ * Junior (ages 10-12), where only the buckets are drawn, has a screen of its own:
+ * ../fire-rescue-junior/FireRescueJuniorSimulator.tsx.
  *
  * Nothing about the examples is here - no program, no description, not even a title: only the
  * address on this website that hands them out (/api/simulator/unlock). The server decides for
@@ -62,7 +66,9 @@ export default function FireRescueSimulator() {
     <SimulatorApp
       game={fireRescueGame}
       robotConfig={DEFAULT_ROBOT_CONFIG}
-      title="Fire Rescue"
+      title="Fire Rescue Senior"
+      // ("Fire Rescue Senior simulator" is longer than a phone has room for: two lines there, not cut off)
+      titleWrapsOnPhone
       startZoneName="Fire Station"
       examples={EXAMPLES}
       rules={FIRE_RESCUE_RULES}

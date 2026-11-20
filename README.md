@@ -25,7 +25,7 @@ Other commands:
 | `npm run dev` | Local preview with live reload |
 | `npm run build` | Production build — run this before deploying |
 | `npm run typecheck` | Checks for mistakes without building |
-| `npm run test:sim` | Runs the simulator's own tests — see "The Fire Rescue simulator" below |
+| `npm run test:sim` | Runs the simulator's own tests — see "The Fire Rescue simulators" below |
 
 > **Known dev-only quirk:** the browser-tab icon and the social share image are generated
 > images. They render correctly in `npm run build` and on Vercel, but return a 500 in
@@ -255,34 +255,120 @@ A later version goes in the same way, under the same name, so that every link st
 
 ---
 
-## The Fire Rescue simulator
+## The Fire Rescue simulators: Fire Rescue Junior and Fire Rescue Senior
 
-A browser simulator of the Makeblock mBot2 for the 2027 **Fire Rescue** category (ages 11–13).
-The student builds a program with mBlock-style blocks and watches the robot run it on the
-competition mat, on any starting combination the referee could draw, scored by the category
-rules. It lives at:
+A browser simulator of the Makeblock mBot2 for the 2027 **Fire Rescue** categories. The student
+builds a program with mBlock-style blocks and watches the robot run it on the competition mat,
+on any starting combination the referee could draw, scored by the category rules.
+
+**Fire Rescue is two categories.** The organiser split the 2027 category Fire Rescue (it was
+11–13 years) into two: "a category 10-12 yo where the water buckets will be randomised position
+everything else at its place. 13-15 yo everything is randomized." So there are two pages, on the
+same field, with the same robot, referee and examples:
+
+| Category | Ages | What the referee draws | Combinations | Page |
+| --- | --- | --- | --- | --- |
+| **Fire Rescue Junior** | 10–12 | only which bucket stands on which water tower W1–W4; every person stands where the rule book shows it (square 1, the person of each building in its colour) | 24 | `/simulator/fire-rescue-junior` |
+| **Fire Rescue Senior** | 13–15 | everything: the buckets, the square of each person and its colour | 9,216 | `/simulator/fire-rescue-senior` |
 
 ```
-https://www.makexlebanon.com/simulator/fire-rescue
+https://www.makexlebanon.com/simulator/fire-rescue-junior
+https://www.makexlebanon.com/simulator/fire-rescue-senior
 ```
 
-The same simulator has a second game, **Fire Chief** (the maze, ages 14–17), a third,
-**Warehouse Sort** (the beginner mission of the MakeX Lebanon Inspire category, local event), and
-a fourth, **Locker Room** (Season 2026): see "The Fire Chief simulator", "The Warehouse Sort
-simulator" and "The Locker Room simulator" further down. A fifth simulator, **Fire Cadet**, is for
-another robot, the mTiny, and has a screen of its own: see "The Fire Cadet simulator".
-`/simulator` lists the simulators by season — see "The Simulator page" there. Nothing is installed, and the
+(Fire Fighter, 8–10, and Fire Chief, 14–17, keep their ages: the overlaps with Junior and Senior
+stay, as the organiser said.)
+
+**Fire Rescue Senior is the Fire Rescue simulator of before the split**, unchanged: the same game
+(`src/simulator/fire-rescue/game.ts`, Game id `'fire-rescue'`), the same 9,216 combinations and
+codes, the same rules text. Only its title row says "Fire Rescue Senior simulator · mBot2". Because
+the Game id stays `'fire-rescue'`, the blocks and settings a student saved on the old page, and the
+program files saved there, are found again on the Senior page. The old address
+`/simulator/fire-rescue` is a permanent redirect to `/simulator/fire-rescue-senior` (a shared link
+or a bookmark keeps the game it had), `/training/simulator/fire-rescue` goes straight there too,
+and the old category page `/season/2027/fire-rescue` goes to `/season/2027`, which lists both new
+categories (see "Old URLs").
+
+**Fire Rescue Junior is the same game with a smaller draw** (`src/simulator/fire-rescue-junior/`):
+
+- `game.ts` — `fireRescueJuniorGame` is `fireRescueGame` with its own id `'fire-rescue-junior'`
+  and its own combinations. The field, the robot, the start zone, the clock, the referee and the
+  score sheet are the very same functions: nothing of `src/simulator/fire-rescue/` changed.
+- `scenario.ts` — the 24 Junior combinations: the four buckets on W1–W4 in every order, the
+  people always those of `defaultScenario()` (the rule book: everybody in square 1, red at A, blue
+  at B, yellow at C, green at D). The random draw, the list of all 24 and the code reader only
+  ever give one of these 24.
+- **Its code is four letters**, the bucket colours on W1 W2 W3 W4: `RGBY` is the rule book. It is
+  not a Senior code (`RGBY-A1R-B1B-C1Y-D1G`). The Junior page refuses every Senior code in plain
+  words — also one whose people stand as in the rule book (then it says which four letters to type)
+  — and every number, with the sentence it gives any text that is no code ("… is not a Fire
+  Rescue Junior code."): the Senior page reads numbers too, but never shows one, so a student
+  could not know one as a Senior code. Four letters with a colour more than once say how many
+  times it is there ("red is there three times")
+  (`src/simulator/ui/fire-rescue-junior/junior-code.ts`).
+- Its **Combination** panel offers only the buckets; the people are listed, without buttons
+  (`src/simulator/ui/fire-rescue-junior/CombinationEditor.tsx`). Its **Test on many
+  combinations** window plays all 24, or the one on the stage — no random lists
+  (`junior-batch.ts`). Its **Rules** window says what is drawn and that everything else stands
+  where the rule book shows it; the rest of the rules is Senior's, word for word (`rules.ts`).
+- Its Game id keeps its saved blocks and settings apart from Senior's (`mbot2-sim:fire-rescue-junior:…`
+  in the browser). It shows the block palette of Fire Rescue (`GAME_VERSIONS` in
+  `src/simulator/blocks/palettes.ts`), and a program file saved in one of the two opens in the
+  other without "This program was saved in the … simulator" (`programGameOf` in
+  `src/simulator/ui/program-file.ts`). A Junior file opened in another game says "saved in the
+  Fire Rescue Junior simulator", a Senior file "saved in the Fire Rescue Senior simulator" (the
+  name of its page, `gameName` in `program-file.ts`: the id `'fire-rescue'` alone would give
+  "Fire Rescue"). A file saved on the Fire Rescue page before the split says "Fire Rescue
+  Senior" too: it is the same game, and the old address leads to the Senior page.
+- **Blocks made on the Fire Rescue page are on the Senior page**, under the id `'fire-rescue'`;
+  Junior starts with its own, empty workspace. So that a student who used the Fire Rescue page
+  (then for ages 11–13) and now opens Junior does not think them lost, Junior says, in a message
+  at the bottom of the screen (20 seconds), "Did you make blocks on the Fire Rescue page before?
+  They are on the Fire Rescue Senior page now. To use them here, press Save there, then Open
+  here." It says so each time it opens with no block but the yellow start block, and only when
+  this browser keeps Fire Rescue blocks (`earlier-blocks.ts`: it reads Senior's saved blocks and
+  never changes them). Not in the note "Build your program here" in the workspace: on a phone
+  that note has no room for three more sentences — they would lie on Blockly's zoom buttons.
+- **The examples are the Fire Rescue examples, behind the same lock:** both pages ask
+  `/api/simulator/unlock` for the game `'fire-rescue'`. `content/simulator-codes.ts` and the
+  examples did not change. On the 24 Junior draws they score (measured headless, the test
+  `src/simulator/fire-rescue-junior/game.test.ts` pins it):
+
+  | Example | Points on the 24 Junior draws |
+  | --- | --- |
+  | `hello`, `line-follow`, `gripper-demo` | 0 on all 24 (as their texts say) |
+  | `one-bucket` | 20 on the 6 draws with the red bucket on W1, 0 on the other 18 |
+  | `smart-bucket` | 20 on all 24 |
+  | `one-person` | 20 on all 24 — the red person always waits in A1 in Junior |
+  | `full-mission` | 180 on `RGBY` only; 80 to 120 on the 23 others (on average 100.8 over all 24) |
+
+  Three descriptions were written for a draw that moves the people, and say more than is true in
+  Junior (they were not changed): `one-person` says it scores "ONLY when the red person waits in
+  A1 … with another combination the square is empty" — in Junior it scores on every draw;
+  `smart-bucket` says "for every one of the 9216 combinations" — Junior has 24; `one-bucket` says
+  that with another combination "the robot runs into the person" — in Junior the person never
+  moves, only the bucket can be the wrong one.
+
+Both cards show the picture of the Fire Rescue mat, the one the game itself shows:
+`public/simulator/fire-rescue/mat.webp` (no copy of it next to the new pages).
+
+The same simulator has more games: **Fire Chief** (the maze, ages 14–17), **Warehouse Sort**
+(the beginner mission of the MakeX Lebanon Inspire category, local event) and **Locker Room**
+(Season 2026): see "The Fire Chief simulator", "The Warehouse Sort simulator" and "The Locker
+Room simulator" further down. One more simulator, **Fire Cadet**, is for another robot, the mTiny,
+and has a screen of its own: see "The Fire Cadet simulator". `/simulator` lists the six
+simulators by season — see "The Simulator page" there. Nothing is installed, and the
 student's blocks are saved in their own browser — they are never sent anywhere. The one thing
 the simulator asks the website's server for is the ready-made examples: the server decides,
 visitor by visitor, which of them to show and to open. See "Member codes for the simulator
 examples" below.
 
-Visitors reach it from the Simulator page (the **Simulator** item of the menu, whose
-dropdown also opens each simulator directly), the Fire Rescue category page and the Season
-2027 block on the homepage; the Season 2027 page
-marks the category with an "Online simulator" label. All of that comes from the `simulator` entry on
-the Fire Rescue category in `content/seasons.ts`. Remove that entry and the links disappear; the simulator page itself
-stays.
+Visitors reach each page from the Simulator page (the **Simulator** item of the menu, whose
+dropdown also opens each simulator directly: "Fire Rescue Junior — Season 2027", "Fire Rescue
+Senior — Season 2027"), its category page and the Season 2027 block on the homepage; the Season
+2027 page marks both categories with an "Online simulator" label. All of that comes from the
+`simulator` entry on each of the two categories in `content/seasons.ts`. Remove an entry and its
+links disappear; the simulator page itself stays.
 
 The older, simpler simulator inside the Smart Logistics lessons
 (`/training/interactive/smart-logistics`) is separate and shares nothing with this one except
@@ -337,12 +423,14 @@ pointer (how close a click must be to a point, what counts as a click) are in
 | `src/simulator/core/` | The physics: the robot, its motors and sensors, collisions, the match clock |
 | `src/simulator/vm/` | The interpreter that runs a block program, one block at a time |
 | `src/simulator/blocks/` | The block language: every block, its colour and its place in the palette |
-| `src/simulator/fire-rescue/` | Everything specific to this category: the mat, the combinations, the referee, the example programs |
+| `src/simulator/fire-rescue/` | Everything specific to Fire Rescue (the Senior game): the mat, the combinations, the referee, the example programs |
+| `src/simulator/fire-rescue-junior/` | Fire Rescue Junior: the same game with its own id and only the 24 bucket draws |
 | `src/simulator/members/` | The codes (member codes and advanced codes): what a code looks like, its fingerprint, and the check the server makes |
 | `src/app/api/simulator/unlock/` | The address on the website that checks a code and hands out the examples a visitor may see |
 | `src/simulator/ui/` | What you see: the screen, its buttons and panels, the drawing of the mat, and its stylesheet (`simulator.css`) |
-| `src/app/simulator/fire-rescue/` | The page itself: its address, title and description |
-| `public/simulator/fire-rescue/` | The two pictures of the mat: `mat.webp` is the one shown, `mat-sensor.webp` is the one the line sensor reads |
+| `src/app/simulator/fire-rescue-junior/`, `src/app/simulator/fire-rescue-senior/` | The two pages: their addresses, titles and descriptions |
+| `src/simulator/ui/fire-rescue/`, `src/simulator/ui/fire-rescue-junior/` | The screen parts of Senior and of Junior (rules, combination editor; Junior also its words, codes and test lists) |
+| `public/simulator/fire-rescue/` | The two pictures of the mat, for both pages: `mat.webp` is the one shown, `mat-sensor.webp` is the one the line sensor reads |
 | `public/blockly-media/` | Blockly's own small pictures, shared with the Smart Logistics lessons |
 
 ### What to change, and where
@@ -355,19 +443,22 @@ pointer (how close a click must be to a point, what counts as a click) are in
 | What the **Examples** window says about member codes (the hint under the field, "That code did not open the examples", …) | `src/simulator/ui/examples-words.ts` |
 | The measurements of the mat (zones, lines, tower squares, sizes of the elements) | `src/simulator/fire-rescue/field.ts` |
 | The scoring (points, bonus, penalties, what counts as delivered) | `src/simulator/fire-rescue/game.ts` |
-| The short rules behind the **Rules** button | `src/simulator/ui/fire-rescue/rules.ts` |
+| The short rules behind the **Rules** button | `src/simulator/ui/fire-rescue/rules.ts` (Senior, and every section after "The field" for both); `src/simulator/ui/fire-rescue-junior/rules.ts` (Junior's "The field") |
+| What Fire Rescue Junior draws, and its codes | `src/simulator/fire-rescue-junior/scenario.ts`; the sentences for a refused code: `src/simulator/ui/fire-rescue-junior/junior-code.ts` |
+| The words of the Junior screen ("24 combinations are possible: only the buckets …") | `src/simulator/ui/fire-rescue-junior/words.ts` |
 | What the ruler says ("32.5 cm, then 90° right, …", "Click the mat to set the first point"), and how close a click must be to a point of the ruler (`RULER_REACH`) | `src/simulator/ui/ruler.ts` |
 | The measurements of the robot | `src/simulator/core/robot.ts` |
-| The text on the cards that lead to the simulator | `content/seasons.ts` |
+| The text on the cards that lead to the simulators, the names and the ages of the two categories | `content/seasons.ts` |
 
 The scoring file and the short rules are two separate things: the first one decides the points,
 the second is only the summary students read. Change both when a rule changes.
 
 ### Member codes for the simulator examples
 
-The simulators have five games: **Fire Rescue**, **Fire Chief** (the maze), **Warehouse
-Sort** (Inspire, beginner) and **Locker Room** (Capelli Starter, Season 2026) for the mBot2, and
-**Fire Cadet** (Season 2027, ages 4–7) for the mTiny. Each has its own **Examples** window with
+The simulators have five games with examples: **Fire Rescue** (both pages, Fire Rescue Junior
+and Fire Rescue Senior, show the same examples: both ask for the game `'fire-rescue'`), **Fire
+Chief** (the maze), **Warehouse Sort** (Inspire, beginner) and **Locker Room** (Capelli Starter,
+Season 2026) for the mBot2, and **Fire Cadet** (Season 2027, ages 4–7) for the mTiny. Each has its own **Examples** window with
 ready-made programs (in Fire Cadet: rows of coding cards): seven in Fire Rescue, six in Fire
 Chief, six in Warehouse Sort, six in Locker Room, six in Fire Cadet. In every game the examples
 are in three groups, and there are two kinds of codes:
@@ -612,13 +703,13 @@ The honest limits:
 npm run test:sim
 ```
 
-It runs about fifteen hundred checks (1,566 in November 2026, with Fire Cadet); among them,
+It runs about sixteen hundred checks (1,607 in November 2026, with Fire Rescue Junior and Senior); among them,
 every example program of every game is played on the real engine with the real referee and its
 score is compared, and every practice map of Fire Cadet is proved. They also check
 `content/simulator-codes.ts` (a misspelt example id, an example that is on both lists, a
 damaged line, a code that is on both lists of codes) and that nothing about an example —
 not even a title — can slip back into what every visitor's browser downloads. It takes
-around a minute and a half (81 s measured) and must end with `fail 0`. If it does not, do not deploy — a failing
+around a minute and a half (68 to 81 s measured) and must end with `fail 0`. If it does not, do not deploy — a failing
 test means a program would now score differently, a block would behave differently, or an
 example would be shown to somebody who should not see it.
 
@@ -740,8 +831,8 @@ with "Powered by …", the header height.
 
 The simulators have a section of their own on the website: **Simulator** in the menu, between
 Training and Videos, leads to `/simulator`. It is one page (`src/app/simulator/page.tsx`, titled
-"Robot simulators") that lists the five simulators of two robots — Locker Room and Warehouse Sort
-(Season 2026), Fire Cadet, Fire Rescue and Fire Chief (Season 2027); Fire Cadet is played with the
+"Robot simulators") that lists the six simulators of two robots — Locker Room and Warehouse Sort
+(Season 2026), Fire Cadet, Fire Rescue Junior, Fire Rescue Senior and Fire Chief (Season 2027); Fire Cadet is played with the
 mTiny, the others with the mBot2 — with one part per season — "Season 2026", then "Season 2027" —
 and in each part one card per simulator: the picture of its mat, its two labels (age group and season, or for a mission
 without an age group its category and level, and its event), its name and two sentences. The
@@ -772,7 +863,7 @@ keeps one card that leads to `/simulator` (`simulatorTrack()` in `trainingTracks
 "Robot simulators": its badge and its sentence name the seasons and the simulators, worked out
 from `simulatorSeasons()` too, so a simulator added later is named there by itself. The page and
 the card name both robots ("blocks (mBot2) or coding cards (mTiny)"); the page of each game names
-its own robot in its title row ("Fire Cadet simulator · mTiny", "Fire Rescue simulator · mBot2").
+its own robot in its title row ("Fire Cadet simulator · mTiny", "Fire Rescue Senior simulator · mBot2").
 
 The **Simulator** item of the menu has a dropdown, built by `simulatorMenu()` in
 `content/site.ts` from the same `simulatorSeasons()`: "All simulators" (this page), then one
@@ -790,7 +881,9 @@ The simulators used to be under Training: `/training/simulator` and
 (`next.config.mjs`), so old links and bookmarks keep working, and the blocks a student saved
 stay: the browser keeps them under the name of the game, not under the address of the page.
 The pictures of the mats and the Blockly media stay where they were, in `public/simulator/<game>/`
-and `public/blockly-media/`: a file there keeps its address next to the page of its game.
+and `public/blockly-media/`: a file there keeps its address next to the page of its game. The
+two Fire Rescue pages share the pictures of the Fire Rescue game, in `public/simulator/fire-rescue/`:
+there is no copy of them next to `/simulator/fire-rescue-junior` or `/simulator/fire-rescue-senior`.
 
 ### How the game is put together
 
@@ -1200,16 +1293,18 @@ Use only blocks of the Fire Chief palette — blocks that exist in real mBlock. 
 Described in full in "Member codes for the simulator examples" above. In short:
 
 - **One address, five games.** Every simulator asks `/api/simulator/unlock`, and each says which
-  game it is. The answer holds the cards and the programs of that game only, and says the name
+  game it is (Fire Rescue Junior and Senior both say `'fire-rescue'`: they show the same
+  examples). The answer holds the cards and the programs of that game only, and says the name
   of the game back. A page takes an answer only when it is about its own game: should a tab
   stay open while the website is put back to a state from before Fire Chief, that older server
   answers every question with the examples of Fire Rescue — the Fire Chief page then shows
   "could not be reached" instead of the cards of the other game. (An answer without a name
-  counts as Fire Rescue's, so the Fire Rescue page goes on working with such a server.) The
-  same happens after a rollback to the first release of Fire Chief, whose server answered
-  rightly but did not say the name back: a Fire Chief tab that is still open then shows no
-  examples and says "the website could not be reached", although it was. Loading the page
-  again cures it, and so does putting the newer server back.
+  counts as Fire Rescue's, so the two Fire Rescue pages, Junior and Senior, go on working with
+  such a server: both ask for `'fire-rescue'`.) The same happens after a rollback to the first
+  release of Fire Chief, whose server answered rightly but did not say the name back: a Fire
+  Chief tab that is still open then shows no examples and says "the website could not be
+  reached", although it was. Loading the page again cures it, and so does putting the newer
+  server back.
 - **One set of codes.** A member code opens the member examples of every game, an advanced
   code shows every example of every game. There is nothing to make or to hand out for Fire
   Chief, Warehouse Sort, Locker Room or Fire Cadet.
@@ -2587,6 +2682,27 @@ One redirect is of this site's own: the Locker Room rules v2.3,
 `/downloads/capelli-starter-locker-room-rules-v2.3.pdf`, go to the organiser's newer rules that
 replaced them, `/downloads/capelli-starter-locker-room-rules.pdf`.
 
+When Fire Rescue was split into Fire Rescue Junior and Fire Rescue Senior, three more came (see
+"The Fire Rescue simulators"):
+
+| Old path | New path |
+| --- | --- |
+| `/simulator/fire-rescue` | `/simulator/fire-rescue-senior` (the same game, with everything drawn) |
+| `/training/simulator/fire-rescue` | `/simulator/fire-rescue-senior` (straight there, no chain of two redirects) |
+| `/season/2027/fire-rescue` | `/season/2027` (it lists both new categories) |
+
+An old address written with a slash at the end takes one step more: `/simulator/fire-rescue/`
+goes to `/simulator/fire-rescue` and then to `/simulator/fire-rescue-senior` (and
+`/season/2027/fire-rescue/` likewise). The first step is Next.js's own permanent redirect, which
+takes the slash off every address of the site and is checked before the redirects of
+`next.config.mjs` (`node_modules/next/dist/lib/load-custom-routes.js` puts it first), so no
+redirect of ours can make it one step. Only switching that rule off for the whole site
+(`skipTrailingSlashRedirect`) could, and this site does not do that. Browsers and search engines
+follow both steps, and the query string is kept. It was always so for the other old addresses
+too (`/training/simulator/fire-rescue/`, `/national/`).
+
+The other simulator pages under `/training/simulator` are described in "The Simulator page".
+
 ---
 
 ## Migration coverage
@@ -2646,6 +2762,24 @@ These are marked with `TODO` or `NOTE` comments in `content/seasons.ts`:
   the robot the simulator plays this category with — it is to be confirmed like the rest. Ask
   the organiser, then replace them (`summary`, `platform`, and `intro` of the 2027 season)
   with the organiser's words — or put the old ones back.
+- **The Fire Rescue Junior and Senior texts — to confirm.** The organiser gave the names, the
+  ages and what is drawn. The two teasers in `content/seasons.ts` are not their words: Junior "Only
+  the water buckets are drawn. Everything else stands where the rule book shows it."; Senior
+  "Everything is drawn: the buckets, the people and where they stand." followed by the old Fire
+  Rescue teaser "Nothing goes as planned. Sense the situation, decide, adapt.". The 2027
+  introduction now says "five ways to answer the call" (it said "four ways", one per category),
+  and the homepage block "Five ways to answer the call". Ask the organiser, then replace them.
+  Two questions came up in review, to ask at the same time:
+  1. **"The rule book".** Junior's teaser says "Everything else stands where the rule book shows
+     it", on the homepage right under "Missions, fields and rules will be revealed soon", and the
+     category pages link no rules file. Our assumption (the simulator plays it, and its Rules
+     window says it): "everything else at its place" means where the Fire Rescue rules the
+     simulator follows draw it — every person in square 1 of its building, red at A, blue at B,
+     yellow at C, green at D. Is that the 2027 arrangement, and may the page name the rule book
+     before it is published — or should the teaser say it without naming it?
+  2. **"Drawn".** Both teasers say what is "drawn" (by lot, by the referee). A student who reads
+     English as a second language may read "drawn with a pencil". The organiser's own word was
+     "randomised". Which word should the teasers use?
 - **Training tracks** — four of the seven are marked `coming-soon`. Write the content, then
   change `status` to `available` and add an `href` in `content/seasons.ts`. (A track can also
   set `cta` to change the wording of its link — the simulator's card says "Open the simulator"
@@ -2663,7 +2797,7 @@ content/            All editable text and data
 public/
   gallery/          Competition photos, by year and category
   downloads/        Rules, scoresheets, STL archives
-  simulator/        Pictures of the five mats, for the simulators
+  simulator/        Pictures of the five mats, for the simulators (Fire Rescue Junior and Senior share one)
 scripts/
   fetch-legacy-assets.mjs
   generate-simulator-codes.mjs   Makes new member codes for the simulator
@@ -2671,5 +2805,5 @@ src/
   app/              Pages and routing
   components/       Header, Footer, Gallery, shared UI
   lib/gallery.ts    Reads the photo folders
-  simulator/        The simulators: Fire Rescue, Fire Chief, Warehouse Sort, Locker Room (mBot2) and Fire Cadet (mTiny) (see their sections above)
+  simulator/        The simulators: Fire Rescue Junior and Senior, Fire Chief, Warehouse Sort, Locker Room (mBot2) and Fire Cadet (mTiny) (see their sections above)
 ```
