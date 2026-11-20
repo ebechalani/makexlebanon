@@ -2099,9 +2099,17 @@ caught from any side ends 77 mm ahead of the turning point; 48 moves end on the 
 | Item base, if the referee looked only when the robot has stopped | up to 32 mm | 33 mm sticks out of the far side of the target by 1 mm; 40 mm by 8 mm; 50 mm by 18 mm | 57 + base must be at most 89 mm. Counted "at the first moment" (as here), every base works |
 | Free width between the sticks | 40 mm and more for a 40 mm item | under the item's width | the item must fit between them |
 | Obstacle base | up to 150 mm | 152 mm and more: a robot that turns in the next square touches it | the tips of the sticks sweep a circle of 102 mm |
-| Sticks longer than the item | — | an item pushed against an obstacle would also be the sticks touching it: the same −1 (D5), but the referee would call it the robot's touch | with 30 mm sticks and 40 mm items, 10 mm are left |
 
-`numbers.test.ts` holds these limits: if real sizes break one, it says which.
+**Sticks longer than the item** break nothing. A 40 mm obstacle stands between the sticks (90.5 mm
+apart), 25.25 mm from each, so an item pushed into it is what touches it, and the referee names
+the item (−1, D5). Measured with 30 mm sticks and items of 26 mm (the tips of the sticks get 3.4 mm
+past the front of the obstacle, beside it) and 30 mm. Only an obstacle 90 mm wide or more is met by
+the tips of longer sticks before the item: the referee then says that the robot touched it, which
+is true, and it is the same −1.
+
+`numbers.test.ts` holds the limits of the stick length, the item base and the free width: if real
+sizes break one, it says which, and sizes of the "Works" column pass. `game.test.ts` plays sticks
+longer than the item. No test holds the obstacle base row (the design measured it).
 
 ### The cards and the panel
 
@@ -2431,9 +2439,9 @@ Most important first. Each says what the simulator does now.
    sticks (length beyond the front of the robot, thickness, how far apart, how high). *Now: 4 × 4
    cm bases, sticks 3 cm long and 0.8 cm thick on the two front corners (A5).* What works in the
    simulator ("The robot and the two sticks" above): sticks 2.1 to 3.2 cm long; an item base under
-   twice the stick length and narrower than the gap between the sticks; sticks shorter than an
-   item. Will an item really stay between the sticks when the robot turns? Please try it with a
-   real mTiny: the simulator assumes it does (N3).
+   twice the stick length and narrower than the gap between the sticks. Will an item really stay
+   between the sticks when the robot turns? Please try it with a real mTiny: the simulator assumes
+   it does (N3).
 5. **The time of a card.** How long does one move, one turn, and the pause between two cards take
    on a real mTiny? A short video or a stopwatch would do. *Now: 1.6 s, 1.3 s and 0.4 s (A2). With
    these, every practice map can be done inside 120 s; the hardest needs 101.1 s.*
