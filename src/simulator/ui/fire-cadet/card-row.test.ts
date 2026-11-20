@@ -19,6 +19,7 @@ import {
   clearRow,
   moveCard,
   pageScrollToShow,
+  pageScrollToShowUnderBlock,
   redo,
   removeCard,
   replaceRow,
@@ -204,4 +205,26 @@ test('GO on a phone: how far the page scrolls so that the row stands between the
   assert.equal(pageScrollToShow({ top: 600, bottom: 1200 }, band), 600 - (460 + gap));
   // the gap is the one named
   assert.equal(pageScrollToShow({ top: 400, bottom: 480 }, band, 0), -60);
+});
+
+test('the first screen of a phone: the title row and the mode switch are scrolled away, so that the row and the box (or the panel) stand above the bar', () => {
+  // 390 x 844, as measured in Chromium: the map block at 232-646 (it sticks at 65, under the site
+  // header), the row, its buttons and the box at 658-918, the bar at 756 - the box was under the bar
+  const block = { top: 232, bottom: 646 };
+  const by = pageScrollToShowUnderBlock({ top: 658, bottom: 918 }, block, 65, 756);
+  assert.equal(by, 167 + 3, 'first until the block sticks (167 px), then just far enough');
+  // after it: the block at 65-479, the work area at 488-748, between them and the bar, with the gap
+  assert.ok(658 - by >= 646 - 167 + ROW_IN_VIEW_GAP && 918 - by <= 756 - ROW_IN_VIEW_GAP);
+  // Mini at 390 x 844: the panel at 633-909 and its line to 933; Turn left, Turn right and Backward were under the bar.
+  // Panel and line are taller than the band: their top under the block - the four cards then stand above the bar
+  const panel = pageScrollToShowUnderBlock({ top: 633, bottom: 933 }, { top: 232, bottom: 623 }, 65, 756);
+  assert.equal(panel, 167 + 2);
+  assert.ok(909 - panel <= 756 - ROW_IN_VIEW_GAP && 633 - panel >= 623 - 167 + ROW_IN_VIEW_GAP, String(panel));
+  // a block that sticks already: as pageScrollToShow
+  const band = { top: 460, bottom: 756 };
+  for (const row of [{ top: 470, bottom: 550 }, { top: 200, bottom: 280 }, { top: 760, bottom: 840 }]) {
+    assert.equal(pageScrollToShowUnderBlock(row, { top: 65, bottom: 460 }, 65, 756), pageScrollToShow(row, band));
+  }
+  // in view already on the first screen (a tall window): the page stays, the title row and the mode switch too
+  assert.equal(pageScrollToShowUnderBlock({ top: 700, bottom: 900 }, { top: 150, bottom: 690 }, 81, 1100), 0);
 });

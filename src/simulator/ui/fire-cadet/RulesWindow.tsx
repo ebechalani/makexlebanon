@@ -5,10 +5,16 @@
  * parts - the organiser's rules in short, then "What this simulator assumes", clearly apart. The
  * texts are in ./rules.ts; a sentence about an item, the Fire or an obstacle has its small picture
  * in front. Both parts have real headings, so a screen reader can find each section.
+ *
+ * The text is much taller than the window, and the window has one button (Close): so the text
+ * itself can take the keyboard (tabIndex 0, and it has it when the window opens). Then the arrow
+ * keys, Page Down, Space and End scroll it, not the page behind - a teacher with only a keyboard
+ * can read both parts. The window's Tab key goes between Close and the text (../widgets.tsx).
  */
+import { useEffect, useRef } from 'react';
 import { Modal } from '../widgets';
 import { Picture } from './pictures';
-import { CADET_ASSUMPTIONS, CADET_RULES, type CadetRulesPart } from './rules';
+import { CADET_ASSUMPTIONS, CADET_RULES, CADET_RULES_TEXT_LABEL, type CadetRulesPart } from './rules';
 
 function Part({ part, first }: { part: CadetRulesPart; first: boolean }) {
   return (
@@ -43,9 +49,21 @@ function Part({ part, first }: { part: CadetRulesPart; first: boolean }) {
 }
 
 export function RulesWindow({ onClose }: { onClose: () => void }) {
+  const textRef = useRef<HTMLDivElement>(null);
+  // (after the window's own effect, which puts the keyboard on the window: this one runs after it)
+  useEffect(() => {
+    textRef.current?.focus({ preventScroll: true });
+  }, []);
   return (
     <Modal title={CADET_RULES.title} onClose={onClose} widthClass="max-w-2xl" align="top">
-      <div data-rules-window>
+      <div
+        ref={textRef}
+        data-rules-window
+        tabIndex={0}
+        role="document"
+        aria-label={CADET_RULES_TEXT_LABEL}
+        className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-4"
+      >
         <Part part={CADET_RULES} first />
         <Part part={CADET_ASSUMPTIONS} first={false} />
       </div>

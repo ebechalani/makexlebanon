@@ -11,7 +11,7 @@ import { test } from 'node:test';
 import { parseSquare, placeProblem, PRACTICE_MAPS, MAP_THINGS, readMapCode, scenarioProblems, type FireCadetScenario } from '../../fire-cadet/scenario';
 import { findRowForAllPoints } from '../../fire-cadet/solver';
 import { SOLVER_PAUSE_MS, boardSquares, editorCode, isLit, liftThing, moveFocus, openEditor, tapSquare, type EditorState } from './map-editor';
-import { solverLine } from './words';
+import { editorRefusal, solverLine } from './words';
 
 const sq = (name: string) => {
   const square = parseSquare(name);
@@ -39,8 +39,8 @@ test('every refused tap says why, with the words of design 7.8, and changes noth
     ['road-closed', 'D7', 'Nothing can stand where the robot starts.'],
     ['cat', 'D4', 'The Cat cannot start in the Safe Zone.'],
     ['person', 'A5', 'The Injured Person cannot start in the Hospital.'],
-    ['road-closed', 'G3', 'An obstacle stands on a road, not on a marked place.'],
-    ['broken-vehicle', 'D1', 'An obstacle stands on a road, not on a marked place.'],
+    ['road-closed', 'G3', 'An obstacle cannot stand on a marked place.'],
+    ['broken-vehicle', 'D1', 'An obstacle cannot stand on a marked place.'],
     ['cat', 'C5', 'This square is taken.'],
   ];
   for (const [thing, square, words] of cases) {
@@ -139,4 +139,21 @@ test('the solver\'s line: "found" with its moves and seconds, or "found no row" 
   assert.deepEqual(scenarioProblems(shut), []);
   assert.equal(solverLine(findRowForAllPoints(shut)), 'This simulator found no row for all 25 points inside 120 seconds.');
   for (const line of [solverLine(findRowForAllPoints(P1)), solverLine({ found: false })]) assert.doesNotMatch(line, /possible/i);
+});
+
+test('an obstacle may stand on a square with no road (N12 checks only the marked places), and no refusal says otherwise', () => {
+  // A2 has no road at all (the map report: grass), the pond is A7/B7: the editor puts the Fallen Tree there
+  for (const name of ['A2', 'B7']) {
+    const after = tapSquare(lift(openEditor(PRACTICE_MAPS[0]), 'fallen-tree'), sq(name));
+    assert.equal(after.refusal, null, name);
+    assert.equal(after.scenario.obstacles[1].col, sq(name).col, name);
+  }
+  // so no sentence of the editor or of a code that does not read tells a teacher that obstacles are kept on roads
+  const refusals = (['fire-place', 'water-square', 'start-square', 'own-target', 'obstacle-marked', 'taken'] as const).flatMap((problem) =>
+    MAP_THINGS.map((thing) => editorRefusal(problem, thing)),
+  );
+  const marked = readMapCode('S-A6-D5-C5-C7-G3-F5-F7');
+  assert.ok(!marked.ok);
+  assert.equal(marked.problem, 'An obstacle cannot stand on G3: that is the House, a marked place.');
+  for (const sentence of [...refusals, marked.problem]) assert.doesNotMatch(sentence, /\broads?\b/i, sentence);
 });

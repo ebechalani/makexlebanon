@@ -612,7 +612,7 @@ The honest limits:
 npm run test:sim
 ```
 
-It runs about fifteen hundred checks (1,548 in November 2026, with Fire Cadet); among them,
+It runs about fifteen hundred checks (1,561 in November 2026, with Fire Cadet); among them,
 every example program of every game is played on the real engine with the real referee and its
 score is compared, and every practice map of Fire Cadet is proved. They also check
 `content/simulator-codes.ts` (a misspelt example id, an example that is on both lists, a
@@ -1989,7 +1989,10 @@ the match timer continues." So in this simulator **as soon as anything touches a
 robot, or an item the robot pushes against it — **the referee lifts it off the map at once**, and
 puts it back on its own square, unturned, as soon as nothing is nearer to its base than 5 mm. Only
 the robot's own touch costs a point: 1 point once for each obstacle, 3 at most. An item that
-touches an obstacle costs nothing. So the robot never gets stuck on an obstacle and is never
+touches an obstacle costs nothing here — but the rules forbid pushing an obstacle away to use the
+blocked road, so the referee then says "The Cat touched the Road Closed sign. On the real map, go
+round it." (never "no points lost"), and the score sheet's obstacle line becomes a note that names
+the obstacle. So the robot never gets stuck on an obstacle and is never
 pushed off the squares by one: it goes on with its row from where it is, on the squares. (The
 design had fixed blocks instead, with the robot stuck 7.7 cm off the squares for the rest of the
 match after a single hit; that cost a child far more than the 1 point of the rules. Question 3
@@ -2116,8 +2119,9 @@ A number card must stand right after an arrow card, and an arrow takes one numbe
 the row refuses anything else and says why in a few words ("Put an arrow card first.", "One
 number card for each arrow.", "A number card comes after an arrow."). Removing an arrow removes
 its number card; moving it moves its number card with it. A row holds **70 cards** at most ("The
-row is full: 70 cards."): the shortest card is a turn, and a 71st card could never run inside 120
-s (worked out from the times, so it changes with them). During a match the row is locked; the
+row is full: 70 cards."): the shortest card is a turn, and a 71st card could never be finished
+inside 120 s — 70 turns end at 118.6 s, so a 71st would start at 119.0 s and be cut off by the
+clock (worked out from the times, so it changes with them). During a match the row is locked; the
 running card has a white ring. The match clock starts when the row starts, and the match ends
 when the whole row has run (that time counts), at 120 s or at STOP.
 
@@ -2154,7 +2158,11 @@ below 0. The four items can be done in any order. Edge cases, in short:
   own square once nothing is within 5 mm of its place. Driven into head-on, the robot touches it
   0.88 s into the card and goes on to the end of the card, on its square line. Touched again later:
   "The robot touched the Road Closed sign again. The referee puts it back." and no second point.
-  An item pushed against it lifts it too, at no cost. An item left on an obstacle's place keeps it
+  An item pushed against it lifts it too, at no cost here (D1) — but not called clean: the referee
+  says "The Equipment touched the Road Closed sign. On the real map, go round it.", the sheet's
+  obstacle line is a note ("The robot touched no obstacle. An item touched the Road Closed sign. On
+  the real map, go round the obstacles."), and the score strip marks that obstacle with an amber
+  "!". An item left on an obstacle's place keeps it
   off the map until the place is free. An obstacle that moved while nothing touched it was turned
   along by the sticks: that counts as the robot's touch.
 - **An item in a wrong marked place** brings nothing and costs nothing; it stays on the map. The
@@ -2166,7 +2174,9 @@ below 0. The four items can be done in any order. Edge cases, in short:
   Equipment goes home into D7: the robot must leave, catch it and drive in behind it.
 - **The return bonus** needs the robot to have left D7 first: Forward, Backward scores 5;
   turning on the spot scores nothing. It is looked at once, when the match ends: STOP 0.6 s
-  before the robot is home gives no bonus.
+  before the robot is home gives no bonus. During the match it is never shown as earned, nor added
+  to the points: a robot that is home says "The robot is in the Fire Station now. The bonus counts
+  when the match ends." (it may still drive out again).
 - **Leaving the map** costs nothing: the robot stops with the tips of its sticks 100 mm outside
   (the edge of the table) and the referee says "The robot left the map." once. An item partly off
   the map is in no target; nobody puts it back.
@@ -2183,22 +2193,36 @@ Mini", because the two are ranked apart.
 
 One column on a phone or a tablet: the map block sticks to the top of the window (with the clock,
 the points and the banner), the bar with the round button sticks to the bottom, and the row, its
-buttons and the card box scroll between them. From 1024 px wide: two columns, the map on the left,
-the row and the cards on the right. Measured in Chromium, in a build:
+buttons and the card box scroll between them. On the first screen the title row and the mode
+switch stand above the map block and push the row and the box under the bar, so when the screen
+opens the page scrolls them away once (only when the work area is not in view, and only down), and
+GO brings the row (Junior) or the panel (Mini) into view the same way. The banner under the map is
+as wide as the screen, not only as the map, and has three lines at most. In a window under 560 px
+high — a phone held sideways — the map block does not stick (it and the bar would cover the whole
+window): the page scrolls as one, and every card and arrow can be reached. From 1024 px wide: two
+columns, the map on the left, the row and the cards on the right. Measured in Chromium, in a build,
+after that first scroll:
 
 | Window | Side of the map | Mat | Room under the banner | Row, buttons and box |
 | --- | --- | --- | --- | --- |
-| 390 × 844 | 366 px | 316 px | 275 px | 260 px: fits |
-| 390 × 664 (a phone with its browser bars shown) | 201 px | 173 px | 260 px | fits exactly |
-| 360 × 640 | 200 px | 172 px | 237 px | a short scroll |
-| 768 × 1024 | 545 px | 470 px | 260 px | 192 px: fits |
+| 390 × 844 | 366 px | 316 px | 277 px | 260 px: fits |
+| 390 × 664 (a phone with its browser bars shown) | 201 px | 173 px | 262 px | all but the last 8 px of the box |
+| 360 × 640 | 200 px | 172 px | 239 px | a short scroll |
+| 768 × 1024 | 545 px | 470 px | 262 px | 192 px: fits |
 
 On the classroom screen the map is 399 px at 1024 × 768 (the right column fits with no scroll),
-531 px at 1440 × 900 and 711 px at 1920 × 1080. In Mini the panel and its line fit under the
-banner on the three phones. Every control is 48 px or more (the panel cards are 64 px under 700 px
-of height, 56 px under 660 px); the squares of the own-map editor are 53.4 px at 390 px wide and
-49.1 px at 360. The only smaller targets are the breadcrumb links Home and Simulator of the shared
-title row. The browser remembers the row, the map, the mode, the speed and which sections are open
+531 px at 1440 × 900 and 711 px at 1920 × 1080. Where the left column is narrow (up to about
+1280 × 800) the banner takes the whole line over the map and the clock and the points lie on the
+map's top edge, as on a phone; the eight map buttons stand in one line only where the picker itself
+is 426 px wide, else in two lines of four (map 8 was cut off at 1024 × 768, 1366 × 768 and 1280 ×
+720). The first GO of a visit closes the Map section, so that the score sheet stays in view in the
+short column under the map. In Mini the four arrows of the panel are in view under the banner on
+the three phones (the line under the panel may need a short scroll). Every control is 48 px or more
+(the panel cards are 64 px under 700 px of height, 56 px under 660 px), and on this page the
+breadcrumb links Home and Simulator of the shared title row too; the squares of the own-map editor
+are 53.4 px at 390 px wide and 49.1 px at 360. A refusal's bubble lets taps through to the buttons
+under it. The Rules window's text takes the keyboard when it opens, so the arrow keys, Page Down,
+Space and End scroll it. The banner reads a refusal out again when it comes twice. The browser remembers the row, the map, the mode, the speed and which sections are open
 (`mbot2-sim:fire-cadet:…`).
 
 ### The practice maps
@@ -2206,7 +2230,8 @@ title row. The browser remembers the row, the map, the mode, the speed and which
 There is **no official list** of field combinations yet (the organiser). So the simulator has
 eight **practice maps of this simulator** — never called official on the screen — from the easiest
 (P1) to the hardest (P8), and "My own map", where a teacher can place the Fire, the four items and
-the three obstacles to copy any combination. "Surprise" gives one of the eight.
+the three obstacles to copy any combination. "Surprise" gives one of the eight — never the one on
+the stage.
 
 | Map | Code | Fire | Water | Cat | Injured Person | Equipment | Road Closed, Fallen Tree, Broken Vehicle | Cards | Moves (turns) | Time | Without the obstacles |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -2219,12 +2244,18 @@ the three obstacles to copy any combination. "Surprise" gives one of the eight.
 | P7 | `H-A7-F6-B2-B4-D5-C4-D3` | House | A7 | F6 | B2 | B4 | D5, C4, D3 | 40 | 51 (13) | 97.7 s | 88.6 s |
 | P8 | `F-B6-G6-E3-F2-D5-D3-G4` | Factory | B6 | G6 | E3 | F2 | D5, D3, G4 | 41 | 53 (15) | 101.1 s | 92.6 s |
 
-"Cards", "Moves" and "Time" are those of the shortest row for all 25 points that the solver finds.
+"Cards", "Moves" and "Time" are those of the proof row of each map in `practice.test.ts`: a
+shortest row for all 25 points, as the solver finds it (on map 6 the solver itself lays the same 47
+moves and 90.3 s in 34 cards; the proof row puts them in 33).
 Each map is **proved in the engine** by `practice.test.ts`: its row scores 25 at exactly that time,
 the robot stands on a square after every card, the referee never says "wrong place", and no
 obstacle is touched. Every obstacle stands on a road square; every Fire place and every Water
 square is used twice; on map 6 the Equipment starts in the Water / Equipment Area. On maps 1 to 3
-the obstacles stand beside the ways; from map 4 on they force a way round. In a code the first
+the obstacles stand beside the ways; from map 4 on they stand on the shortest ways, and the proof
+rows go round them. ("Without the obstacles" is the time with no obstacle on the map. On maps 4,
+5 and 8 a row that pushes items through the obstacles scores all 25 points in exactly that time
+here, because an item's touch costs nothing (D1); the referee tells the child to go round on the
+real map, and question 3 asks the organiser.) In a code the first
 letter is the Fire (S School, F Factory, H House, B Bakery), then the squares of the Water, the
 Cat, the Injured Person, the Equipment and the three obstacles; capitals, blanks and hyphens do
 not matter, and a practice map always gets its short code (`P3`).
@@ -2235,12 +2266,13 @@ Map 8 leaves 18.9 s. If the real card times are slower (all times more than 120 
 **My own map** keeps these rules at every tap: one thing per square; the Water on one of its four
 squares; the Cat, the Injured Person and the Equipment on any other square except their own target
 and D7 (a marked place is allowed: the rules put them "at a rescue location"); the three obstacles
-on squares without a dashed frame ("on the roads"); always all four items and all three obstacles.
+on squares without a dashed frame (the editor does not check that the square has a road: grass and
+the pond are allowed; question 8); always all four items and all three obstacles.
 That allows 71,983,941,120 maps. The editor says, a moment after every tap, whether this simulator
 **finds** a row for all 25 points inside 120 s ("found", never "possible": the solver never backs
-away from an item). Measured on 3,000 random own maps (seed 2027): 18 have no row; 2,925 have one
-inside 120 s (shortest 51.5 s, middle 92.0 s, nine in ten under 108.6 s, longest 140.5 s; 21 to 60
-cards, middle 36). Every one of those 2,925 rows scored 25 in the engine at exactly its time, with
+away from an item). Measured on 3,000 random own maps (seed 2027): 18 have no row; 57 have one
+only over 120 s; 2,925 have one inside 120 s (shortest 51.5 s, middle 92.0 s, nine in ten under
+107.4 s, longest 120.0 s; 21 to 54 cards, middle 36). Every one of those 2,925 rows scored 25 in the engine at exactly its time, with
 the referee of D1 (two of them end at exactly 120.00 s, where the clock ends the match on the same
 tick); `solver.test.ts` plays the first 300 again on every run.
 
@@ -2306,7 +2338,7 @@ obstacles. The question to the organiser that would settle each is in brackets.
 | A4 | Mini: the four arrow cards of the yellow panel; one tap is one whole move; no joystick. (Q2) |
 | A5 | The items and the obstacles stand on 4 × 4 cm bases; the sticks are 3 cm long and 0.8 cm thick, on the two front corners. (Q4) |
 | A6 | A target is its square, to the middle of the black lines (to the edge at the edge of the map); an item counts at the first moment its whole base is inside. (Q10) |
-| A7 | Touching an obstacle costs 1 point once for each obstacle, 3 at most. (A7 also said the obstacles are fixed and the robot stays stuck: replaced by D1.) (Q3) |
+| A7 | Touching an obstacle costs 1 point once for each obstacle, 3 at most; the robot is not put back to the start. (A7 also said the obstacles are fixed and the robot stays stuck: replaced by D1.) (Q3, Q3a, Q3c) |
 | A8 | The return bonus: the whole robot, sticks included, completely inside D7 when the match ends, and only if it was completely outside D7 before. (Q11) |
 | A9 | The total is never below 0. (Q17) |
 | A10 | Junior: the match ends when the row has run (that time is recorded), at 120 s or at STOP. Mini: at 120 s or at STOP. (Q14) |
@@ -2332,7 +2364,7 @@ obstacles. The question to the organiser that would settle each is in brackets.
 | N12 | My own map: one thing per square; the Water on its four squares; the other items anywhere but their own target and D7; the obstacles on squares without a dashed frame; always three obstacles, one of each kind. (Q8, Q18) |
 | N13 | The match time on the score sheet is the time the match ended. |
 | N14 | An example is tied to its practice map by the word `field` in its program. |
-| N15 | "Surprise" gives one of the eight practice maps (a random own map need not be playable). |
+| N15 | "Surprise" gives one of the eight practice maps, never the one on the stage (a random own map need not be playable). |
 | N16 | On a small screen an item or obstacle is drawn at least 22 px across, with its true base under it. |
 | N17 | Replaced by D1. (It said: after a hit, the row goes on from where the robot is stuck.) |
 | N18 | The own-map editor says whether this simulator finds a row for 25 points inside 120 s; it never shows the row. |
@@ -2342,7 +2374,7 @@ obstacles. The question to the organiser that would settle each is in brackets.
 | N22 | The banner shows the referee's newest sentence for 3 s. |
 | N23 | Dropped with D1. (It said: a robot pressed against a fixed obstacle cannot turn round it. With D1 nothing fixed is left that a turning robot can be pressed against but the edge of the table, which that rule never covered: measured.) |
 | N24 | The referee says that an item is in a wrong marked place only when the item has moved and has come to rest there, or at the end of the match. |
-| D1 | As soon as anything touches an obstacle the referee lifts it, and puts it back on its own square, unturned, once nothing is nearer to its base than 5 mm; only the robot's touch costs a point. (Q3) |
+| D1 | As soon as anything touches an obstacle the referee lifts it, and puts it back on its own square, unturned, once nothing is nearer to its base than 5 mm; only the robot's touch costs a point. An item's touch costs nothing, but the referee says to go round on the real map and the sheet notes it. (Q3, Q3b) |
 
 ### Questions for the organiser
 
@@ -2363,14 +2395,27 @@ Most important first. Each says what the simulator does now.
    returns a moved obstacle to its place while the clock runs (l.183). Are the obstacles loose or
    fixed to the map? When does the referee put a moved one back: at once, or once the robot has
    gone? What happens to a robot that pushes an obstacle away and drives on along the blocked
-   road? *Now (D1): as soon as anything touches an obstacle the referee lifts it off the map, and
+   road? And three more:
+   (a) **Is the −1 once for each obstacle, or for every touch?** The rules say both "If the robot
+   touches an obstacle: −1 point" (l.179-181) and "Each obstacle touched: −1 point" (l.243-245).
+   (b) **An item against an obstacle.** If the robot pushes a rescue item into an obstacle and the
+   obstacle moves, is that a touch (−1), or "pushing an obstacle away to use the blocked road"?
+   What does the referee do then: put the obstacle back, stop the run, take points? (On practice
+   maps 4, 5 and 8 a row that does this is quicker than the way round, and with equal points the
+   shorter time ranks higher.)
+   (c) **Back to the start?** Your mTiny rules of last season said "Touching a cone makes the team
+   lose 1 point and the Judge resets the mTiny to its starting position while the timer is
+   running." Does anything like that apply in 2027?
+   *Now (D1): as soon as anything touches an obstacle the referee lifts it off the map, and
    puts it back on its own square as soon as nothing is within 5 mm of its place; −1 once for each
-   obstacle the robot itself touched; an item pushed against an obstacle costs nothing. So the
-   robot is never stuck and goes on with its row, on the squares. While an obstacle is off the
-   map, the robot — or an item it pushes — could pass through its square: the simulator does not
-   check the blocked road, and the Rules window tells children to drive around the obstacles. If
-   real obstacles are fixed to the map, a real robot that hits one stays stuck there, and we would
-   change this.*
+   obstacle the robot itself touched (a); an item pushed against an obstacle costs nothing (b), but
+   the referee says "The Cat touched the Road Closed sign. On the real map, go round it." and the
+   score sheet's obstacle line becomes a note that names it, never "No obstacle touched"; the robot
+   is not put back to the start (c). So the robot is never stuck and goes on with its row, on the
+   squares. While an obstacle is off the map, the robot — or an item it pushes — could pass through
+   its square: the simulator does not check the blocked road, and the Rules window tells children
+   to drive around the obstacles. If real obstacles are fixed to the map, a real robot that hits
+   one stays stuck there, and we would change this.*
 4. **The real sizes**: the base of the 4 items and of the 3 obstacles, their height, and the two
    sticks (length beyond the front of the robot, thickness, how far apart, how high). *Now: 4 × 4
    cm bases, sticks 3 cm long and 0.8 cm thick on the two front corners (A5).* What works in the
@@ -2395,7 +2440,8 @@ Most important first. Each says what the simulator does now.
    marked place (a House, the School, the top Fire Station), and do the obstacles always stand on
    roads? *Now: 8 practice maps of this simulator, never called official, and "My own map": items
    on any square but their own target and the start square, obstacles on squares without a dashed
-   frame (A14, N12).*
+   frame — the editor does not check that the square has a road, so grass and the pond are
+   allowed, and its refusal says only "An obstacle cannot stand on a marked place." (A14, N12).*
 9. **Where the Water starts.** The rules list what a combination shows (l.108-114), and the Water
    is not on that list. Does the Water always start on the same spot? Which one? And may the
    Equipment also start in the Water / Equipment Area, as its name says? *Now: the Water on any of
@@ -2463,8 +2509,11 @@ Most important first. Each says what the simulator does now.
   the line it was pushed on: a robot that passes on the next line misses it.
 - **The blocked road is not checked** (D1, question 3): while an obstacle is off the map, the
   robot can drive through its square, and a robot that pushes an item against an obstacle lifts it
-  at no cost and can then push on through. The rules forbid using a blocked road; the Rules window
-  says "drive around the obstacles". An obstacle goes back only once its place is free: an item
+  at no cost and can then push on through — on practice maps 4, 5 and 8 that even scores all 25
+  points sooner than the way round. The rules forbid using a blocked road: the Rules window says
+  "drive around the obstacles", the referee says "On the real map, go round it." each time an item
+  touches an obstacle, and the score sheet and the score strip mark that obstacle; the points do
+  not change until the organiser answers question 3. An obstacle goes back only once its place is free: an item
   left on it keeps it off the map.
 - **The edge of the table**: a robot or an item that leaves the map stops at the table, 100 mm
   outside, and is then off the squares for the rest of the match. A robot that turns while pressed

@@ -146,7 +146,8 @@ export function withThing(s: FireCadetScenario, thing: MapThing, sq: Square): Fi
  *   'start-square'     nothing stands on D7: the robot starts there
  *   'own-target'       an item does not start on its own target (the Cat not on D4, the Injured
  *                      Person not on A5)
- *   'obstacle-marked'  an obstacle stands on a road, not on a square with a dashed frame
+ *   'obstacle-marked'  an obstacle does not stand on a square with a dashed frame (a marked place);
+ *                      whether its square has a road is not checked (N12, README question 8)
  *   'taken'            one thing per square
  * The own-map editor says each in its own words; reading a code says them with the square named.
  */
@@ -201,7 +202,8 @@ const PROBLEM_WORDS = {
   },
   obstacleMarked: (sq: Square): string => {
     const place = placeAt(sq) as PlaceName;
-    return `An obstacle cannot stand on ${squareName(sq)}: that is ${PLACE_WORDS[place]}. Obstacles stand on roads.`;
+    // (what is checked, and no more: a square with no road - grass, the pond - is not refused, N12)
+    return `An obstacle cannot stand on ${squareName(sq)}: that is ${PLACE_WORDS[place]}, a marked place.`;
   },
   twoThings: (sq: Square): string => `Two things are on ${squareName(sq)}. One square takes one thing.`,
 };
@@ -308,6 +310,18 @@ export const defaultScenario = (): FireCadetScenario => PRACTICE_MAPS[0];
 export function randomScenario(rng: () => number): FireCadetScenario {
   const k = Math.min(PRACTICE_MAPS.length - 1, Math.max(0, Math.floor(rng() * PRACTICE_MAPS.length)));
   return PRACTICE_MAPS[k];
+}
+
+/**
+ * The "Surprise" button of the screen: one of the practice maps by chance, but never the one on
+ * the stage (else one press in eight would seem to do nothing but put everything back). From an
+ * own map, any of the eight.
+ */
+export function surpriseMap(rng: () => number, current: FireCadetScenario): FireCadetScenario {
+  const n = practiceMapNumber(current);
+  const others = PRACTICE_MAPS.filter((_, k) => k + 1 !== n);
+  const k = Math.min(others.length - 1, Math.max(0, Math.floor(rng() * others.length)));
+  return others[k];
 }
 
 // =============================================================================================

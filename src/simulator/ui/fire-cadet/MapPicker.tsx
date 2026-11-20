@@ -5,7 +5,8 @@
  * panel has 36 px buttons and every button here is at least 48 x 48 px:
  *
  *   - eight buttons "1" to "8" for the practice maps (a radio group; the one on the stage is filled),
- *     "My own map" (opens the editor), "Surprise" (one of the eight by chance: N15) and "Map 1";
+ *     "My own map" (opens the editor), "Surprise" (one of the eight by chance, never the one on the
+ *     stage: N15) and "Map 1";
  *   - for the teacher: the code of the map on the stage with a Copy button, and a field to type a
  *     code ("Enter a code", "Use"); a code that does not read gives the game's one sentence;
  *   - the note: practice maps of this simulator, not official ones.
@@ -13,7 +14,7 @@
  * During a match the maps cannot be changed: a new map puts everything back to the start.
  */
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
-import { PRACTICE_MAPS, practiceMapNumber, randomScenario, type FireCadetScenario } from '../../fire-cadet/scenario';
+import { PRACTICE_MAPS, practiceMapNumber, surpriseMap, type FireCadetScenario } from '../../fire-cadet/scenario';
 import { CopyIcon } from '../icons';
 import { mapCode, readTypedCode } from './map-code';
 import { radioKeys } from './MatchBar';
@@ -74,7 +75,7 @@ export function MapPicker({ scenario, onScenario, onOwnMap, locked }: MapPickerP
   };
 
   return (
-    <div className="flex flex-col gap-3" data-map-picker>
+    <div className="cadet-map-picker flex flex-col gap-3" data-map-picker>
       <div
         role="radiogroup"
         aria-label={words.practiceGroup}
@@ -110,7 +111,7 @@ export function MapPicker({ scenario, onScenario, onOwnMap, locked }: MapPickerP
           </svg>
           {words.own}
         </button>
-        <button type="button" className={BIG_BUTTON} onClick={() => onScenario(randomScenario(Math.random))} disabled={locked}>
+        <button type="button" className={BIG_BUTTON} onClick={() => onScenario(surpriseMap(Math.random, scenario))} disabled={locked}>
           {words.surprise}
         </button>
         <button type="button" className={BIG_BUTTON} onClick={() => choose(1)} disabled={locked}>

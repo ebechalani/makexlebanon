@@ -61,7 +61,9 @@ import { describe, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
+import { cardsToText } from '../fire-cadet/cards';
 import { EXAMPLE_LEVELS as CADET_LEVELS, SAMPLE_CATALOG as CADET_CATALOG } from '../fire-cadet/sample-catalog';
+import { SAMPLE_PROGRAMS as CADET_PROGRAMS } from '../fire-cadet/samples';
 import { EXAMPLE_LEVELS as CHIEF_LEVELS, SAMPLE_CATALOG as CHIEF_CATALOG } from '../fire-chief/sample-catalog';
 import { EXAMPLE_LEVELS as RESCUE_LEVELS, SAMPLE_CATALOG as RESCUE_CATALOG } from '../fire-rescue/sample-catalog';
 import { EXAMPLE_LEVELS as LOCKER_LEVELS, SAMPLE_CATALOG as LOCKER_CATALOG } from '../locker-room/sample-catalog';
@@ -172,12 +174,36 @@ function descriptionMarkers(examples: ReadonlyArray<{ description: string }>): R
   return markers;
 }
 
+/**
+ * What gives the PROGRAM of a Fire Cadet example away: its row of cards. A row is the whole
+ * program - a child can lay it without its title or its words - and it is a plain list of card
+ * names, written without the program builder, so nothing else would find it. For every example
+ * that is not open to everyone (not a starter), its row as a list of card names in any quotes and
+ * with any commas or blanks between them (JSON with " or ', a list joined with ", " or " "), and in
+ * the short notation of the cards ("F3 B L F3 ...", cards.ts cardsToText). Taken from the examples
+ * themselves, so a new example is looked for without being listed here.
+ */
+function cadetRowMarkers(): RegExp[] {
+  const escape = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const open = new Set(CADET_CATALOG.filter((card) => card.level === 'starter').map((card) => card.id));
+  const markers: RegExp[] = [];
+  for (const sample of CADET_PROGRAMS) {
+    if (open.has(sample.id)) continue;
+    const cards = sample.program.cards;
+    markers.push(new RegExp(`(?<![\\w-])${cards.map(escape).join(`['"\`]?[\\s,]*['"\`]?`)}(?![\\w-])`, 'i'));
+    markers.push(new RegExp(`(?<![\\w-])${cardsToText(cards).split(' ').map(escape).join('\\s+')}(?![\\w-])`, 'i'));
+  }
+  return markers;
+}
+
 /** The titles and ids of the real examples, of every game. */
 const TITLE_MARKERS = exampleMarkers(SAMPLE_CATALOG);
 /** The sentences of the descriptions of the real examples, of every game. */
 const DESCRIPTION_MARKERS = descriptionMarkers(ALL_GAMES.flatMap((game) => game.examples));
+/** The rows of the Fire Cadet examples that are not open to everyone. */
+const ROW_MARKERS = cadetRowMarkers();
 /** Everything that gives a real example away when it is written in a file. */
-const REAL_MARKERS = [...TITLE_MARKERS, ...DESCRIPTION_MARKERS];
+const REAL_MARKERS = [...TITLE_MARKERS, ...DESCRIPTION_MARKERS, ...ROW_MARKERS];
 
 const SOURCE_FILE = /\.(?:ts|tsx|mts|cts|js|jsx|mjs|cjs)$/;
 const TEST_FILE = /\.test\.[a-z]+$/;
@@ -773,7 +799,32 @@ describe('the examples stay on the server', () => {
       assert.ok(REAL_MARKERS.some((marker) => marker.test(`about: '${first}'`)), `${example.id}: ${first}`);
       assert.ok(REAL_MARKERS.some((marker) => marker.test(first.toUpperCase().replace(/ /g, '\n  '))), `${example.id}, in capitals and over many lines`);
     }
-    assert.equal(REAL_MARKERS.length, TITLE_MARKERS.length + DESCRIPTION_MARKERS.length);
+    assert.equal(REAL_MARKERS.length, TITLE_MARKERS.length + DESCRIPTION_MARKERS.length + ROW_MARKERS.length);
+    // ... and for the row of every Fire Cadet example that is not open to everyone (in a card game the row is the whole program)
+    const locked = CADET_CATALOG.filter((card) => card.level !== 'starter');
+    assert.equal(locked.length, 3);
+    assert.equal(ROW_MARKERS.length, 2 * locked.length, 'two ways of writing each locked row');
+    for (const card of locked) {
+      const cards = (CADET_PROGRAMS.find((sample) => sample.id === card.id) as (typeof CADET_PROGRAMS)[number]).program.cards;
+      const writings = [
+        `export const PROBE_ROW = { format: 'mtiny-cards', version: 1, cards: [${cards.map((c) => `'${c}'`).join(',')}], field: 'P1' };`,
+        JSON.stringify({ cards }),
+        `cards: [\n  ${cards.map((c) => `'${c}'`).join(',\n  ')}\n]`,
+        cards.join(', '),
+        cards.join(' '),
+        `const row = '${cardsToText(cards)}';`,
+        cardsToText(cards).replace(/ /g, '\n'),
+      ];
+      for (const writing of writings) assert.ok(REAL_MARKERS.some((marker) => marker.test(writing)), `${card.id}: ${writing}`);
+    }
+    // the rows that are open to everyone, and rows that only begin like a locked one, are not looked for
+    for (const card of CADET_CATALOG.filter((c) => c.level === 'starter')) {
+      const cards = (CADET_PROGRAMS.find((sample) => sample.id === card.id) as (typeof CADET_PROGRAMS)[number]).program.cards;
+      for (const harmless of [JSON.stringify(cards), cardsToText(cards)]) assert.ok(!REAL_MARKERS.some((marker) => marker.test(harmless)), harmless);
+    }
+    for (const harmless of ["['forward', 'x3', 'left']", 'F3 B L', "['forward','backward','left','right']", 'Forward, x3']) {
+      assert.ok(!REAL_MARKERS.some((marker) => marker.test(harmless)), harmless);
+    }
     for (const card of SAMPLE_CATALOG) {
       assert.ok(REAL_MARKERS.some((marker) => marker.test(`title: '${card.title}'`)), card.title);
       assert.ok(REAL_MARKERS.some((marker) => marker.test(card.title.toUpperCase())), `${card.title}, in capitals`);

@@ -200,3 +200,18 @@ export function pageScrollToShow(row: Band, band: Band, gap: number = ROW_IN_VIE
   if (row.bottom > bottom) return Math.min(row.bottom - bottom, row.top - top);
   return 0;
 }
+
+/**
+ * The same when the map block may not stick yet. On the first screen of a phone the title row and
+ * the mode switch stand above the map block, and push the work area under the bar of the round
+ * button (390 x 844: the whole card box). The page first scrolls them away, until the block sticks
+ * (its top at `stuckAt`, its CSS top), and then as pageScrollToShow says - so the row and the box,
+ * or Mini's panel, stand under the block and above the bar (`barTop`). A block that sticks already
+ * needs nothing first: then this is pageScrollToShow. What is in view already stays as it is.
+ */
+export function pageScrollToShowUnderBlock(target: Band, block: Band, stuckAt: number, barTop: number, gap: number = ROW_IN_VIEW_GAP): number {
+  // (in view as it stands: nothing scrolls, not even the title row away)
+  if (pageScrollToShow(target, { top: block.bottom, bottom: barTop }, gap) === 0) return 0;
+  const toStick = Math.max(0, block.top - stuckAt);
+  return toStick + pageScrollToShow({ top: target.top - toStick, bottom: target.bottom - toStick }, { top: block.bottom - toStick, bottom: barTop }, gap);
+}

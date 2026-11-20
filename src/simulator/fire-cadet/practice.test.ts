@@ -175,3 +175,21 @@ test('practice, not official: a practice map is described as "Practice map n", a
     }
   }
 });
+
+test('the README\'s table of the practice maps gives the cards, moves, turns and times of the proof rows above, and says so', () => {
+  const readme = readFileSync(fileURLToPath(new URL('../../../README.md', import.meta.url)), 'utf8');
+  TABLE.forEach((row, n) => {
+    const line = readme.split('\n').find((l) => l.startsWith(`| P${n + 1} | \`${row.code}\` |`));
+    assert.ok(line, `P${n + 1}`);
+    const cells = line.split('|').map((c) => c.trim());
+    // ... | Cards | Moves (turns) | Time | Without the obstacles |
+    assert.deepEqual(cells.slice(-5, -1), [String(row.cards), `${row.moves} (${row.turns})`, `${row.seconds.toFixed(1)} s`, `${row.free.toFixed(1)} s`], `P${n + 1}`);
+    assert.equal(cardsFromText(row.row).length, row.cards, `P${n + 1}: the proof row has that many cards`);
+  });
+  // the Cards column is the proof row's: the solver itself may put the same moves in another number of cards (map 6: 34)
+  assert.match(readme, /"Cards", "Moves" and "Time" are those of the proof row of each map in `practice\.test\.ts`/);
+  const six = solve(PRACTICE_MAPS[5]);
+  assert.ok(six);
+  assert.deepEqual([six.moves.length, six.seconds], [TABLE[5].moves, TABLE[5].seconds]);
+  if (six.cards.length !== TABLE[5].cards) assert.match(readme, new RegExp(`on map 6 the solver itself lays the same ${TABLE[5].moves}\\s+moves and ${TABLE[5].seconds} s in ${six.cards.length} cards`));
+});

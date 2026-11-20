@@ -152,7 +152,8 @@ test('a whole Mini match through createSimulation: taps on the panel, the clock 
   sim.start();
   tapAll(sim, ['up', 'up', 'up', 'down', 'down', 'down']);
   assert.equal(sim.status, 'running', 'the panel does not end the match');
-  assert.equal(sim.score().total, 10);
+  // home again, but the return bonus is looked at once, when the match ends (A8): the Cat's 5 only
+  assert.equal(sim.score().total, 5);
   sim.step(20_000);
   assert.equal(sim.finishReason, 'time');
   assert.equal(sim.world.time, FIRE_CADET.MATCH_SECONDS);

@@ -19,6 +19,7 @@ import {
   placeProblem,
   practiceMapNumber,
   randomScenario,
+  surpriseMap,
   readMapCode,
   scenarioProblems,
   squareName,
@@ -68,6 +69,28 @@ test('the default map is practice map 1; "Surprise" gives each of the eight prac
   assert.equal(randomScenario(() => 0.999999), PRACTICE_MAPS[7]);
 });
 
+test('the Surprise button never gives the map that is on the stage: each of the other seven, and from an own map any of the eight', () => {
+  const rng = makeRng(2027);
+  PRACTICE_MAPS.forEach((current, k) => {
+    const seen = new Set<string>();
+    for (let i = 0; i < 300; i++) {
+      const s = surpriseMap(rng, current);
+      assert.ok(PRACTICE_MAPS.includes(s));
+      assert.notEqual(s, current, `map ${k + 1}: Surprise gave the same map`);
+      seen.add(encodeScenario(s));
+    }
+    assert.equal(seen.size, 7, `map ${k + 1}`);
+  });
+  // the same map read from its long code is that practice map
+  assert.notEqual(surpriseMap(() => 0, P1), P1);
+  assert.equal(surpriseMap(() => 0, P1), PRACTICE_MAPS[1]);
+  assert.equal(surpriseMap(() => 0.999999, PRACTICE_MAPS[7]), PRACTICE_MAPS[6]);
+  const own: FireCadetScenario = { ...P1, obstacles: [P1.obstacles[0], P1.obstacles[1], { col: 6, row: 1 }] };
+  const fromOwn = new Set<string>();
+  for (let i = 0; i < 400; i++) fromOwn.add(encodeScenario(surpriseMap(rng, own)));
+  assert.equal(fromOwn.size, 8);
+});
+
 test('every map has exactly one code: P1 ... P8, or the long code; decoding gives the map back', () => {
   PRACTICE_MAPS.forEach((s, n) => {
     assert.equal(encodeScenario(s), `P${n + 1}`);
@@ -111,9 +134,9 @@ test('every refusal of design 5.2 gives its one sentence', () => {
   assert.equal(problem('S-A6-D5-C5-C7-D7-F5-F7'), 'Nothing can stand on D7: the robot starts there.');
   assert.equal(problem('S-A6-D4-C5-C7-E3-F5-F7'), 'The Cat cannot start on D4: that is the Safe Zone, where it must go.');
   assert.equal(problem('S-A6-D5-A5-C7-E3-F5-F7'), 'The Injured Person cannot start on A5: that is the Hospital, where it must go.');
-  assert.equal(problem('S-A6-D5-C5-C7-G3-F5-F7'), 'An obstacle cannot stand on G3: that is the House. Obstacles stand on roads.');
-  assert.equal(problem('S-A6-D5-C5-C7-D1-F5-F7'), 'An obstacle cannot stand on D1: that is the top Fire Station. Obstacles stand on roads.');
-  assert.equal(problem('S-A6-D5-C5-C7-E3-A1-F7'), 'An obstacle cannot stand on A1: that is the School. Obstacles stand on roads.');
+  assert.equal(problem('S-A6-D5-C5-C7-G3-F5-F7'), 'An obstacle cannot stand on G3: that is the House, a marked place.');
+  assert.equal(problem('S-A6-D5-C5-C7-D1-F5-F7'), 'An obstacle cannot stand on D1: that is the top Fire Station, a marked place.');
+  assert.equal(problem('S-A6-D5-C5-C7-E3-A1-F7'), 'An obstacle cannot stand on A1: that is the School, a marked place.');
   assert.equal(problem('S-A6-D5-D5-C7-E3-F5-F7'), 'Two things are on D5. One square takes one thing.');
   assert.equal(problem('S-A6-D5-C5-C7-E3-E3-F7'), 'Two things are on E3. One square takes one thing.');
   assert.equal(problem('S-A6-A6-C5-C7-E3-F5-F7'), 'Two things are on A6. One square takes one thing.');
@@ -137,7 +160,7 @@ test('scenarioProblems: every problem of a map, one sentence each; nothing throw
     'The Water starts on A6, B6, A7 or B7.',
     'Nothing can stand on D7: the robot starts there.',
     'The Cat cannot start on D4: that is the Safe Zone, where it must go.',
-    'An obstacle cannot stand on G3: that is the House. Obstacles stand on roads.',
+    'An obstacle cannot stand on G3: that is the House, a marked place.',
   ]);
   assert.deepEqual(scenarioProblems({ ...P1, fire: 'hospital' } as unknown as FireCadetScenario), [
     'The Fire can be at the School, the Factory, the House or the Bakery.',

@@ -47,6 +47,7 @@ import { MatchClock, MatchPoints, ModeSwitch, SpeedButtons } from './MatchBar';
 import { FLAME_MM, HINT_MM, PICTURE_OF_KIND, cadetPainters, paintElement, tokenSize } from './paint';
 import { PlanningClock } from './PlanningClock';
 import { planningIdle } from './planning-clock';
+import { CADET_RULES_TEXT_LABEL } from './rules';
 import { RulesWindow } from './RulesWindow';
 import { ScoreStrip } from './ScoreStrip';
 import { CADET_WORDS, solverLine } from './words';
@@ -334,7 +335,7 @@ test('names: the panel, the round button, the clock, the points, the speed, the 
   assert.match(text(clock), /^Planning time 0:00 Start$/);
   assert.deepEqual(labels(clock), ['Planning time: 0:00']);
   // the banner: one sentence, read out politely
-  assert.match(draw(createElement(Banner, { sentence: 'Map 3.', tone: 'calm' })), /^<p role="status" aria-live="polite"[^>]*><span class="line-clamp-2">Map 3\.<\/span><\/p>$/);
+  assert.match(draw(createElement(Banner, { sentence: 'Map 3.', tone: 'calm' })), /^<p role="status" aria-live="polite"[^>]*><span class="cadet-banner-text">Map 3\.<\/span><\/p>$/);
 });
 
 test('names: the score strip says each picture in words, from the referee\'s own sheet', () => {
@@ -569,8 +570,13 @@ test('the map picker in a document: a practice map, Surprise, a typed code - a c
     assert.ok(found, words);
     return found;
   };
-  await act(async () => button('Surprise').click());
-  assert.ok(PRACTICE_MAPS.includes(chosen.pop() as FireCadetScenario), 'Surprise: one of the eight');
+  // Surprise: one of the eight, never the one on the stage (map 1 here)
+  for (let i = 0; i < 24; i++) {
+    await act(async () => button('Surprise').click());
+    const surprise = chosen.pop() as FireCadetScenario;
+    assert.ok(PRACTICE_MAPS.includes(surprise), 'Surprise: one of the eight');
+    assert.notEqual(surprise, P1, 'Surprise: not the map on the stage');
+  }
   await act(async () => button('Map 1').click());
   assert.equal(chosen.pop(), P1);
   await act(async () => button('My own map').click());
@@ -590,7 +596,7 @@ test('the map picker in a document: a practice map, Surprise, a typed code - a c
   await type('p9');
   assert.equal(textOf(document.querySelector('[role="alert"]')), 'There are 8 practice maps: P1 to P8.');
   await type('h b7 c5 e3 d6 c2 e2 d4');
-  assert.match(textOf(document.querySelector('[role="alert"]')), /^An obstacle cannot stand on D4: that is the Safe Zone\./);
+  assert.equal(textOf(document.querySelector('[role="alert"]')), 'An obstacle cannot stand on D4: that is the Safe Zone, a marked place.');
   // capitals, blanks and hyphens do not matter
   await type('s a6 d5 c5 c7 e3 f5 f7');
   assert.equal(document.querySelector('[role="alert"]'), null);
@@ -642,7 +648,7 @@ test('the own-map editor in a document: lift a thing, the lit squares, a refused
   // an obstacle on a marked place: refused
   await act(async () => $('[data-thing="fallen-tree"]').click());
   await act(async () => $('[data-square="G3"]').click());
-  assert.equal(textOf(document.querySelector('[data-editor-refusal]')), 'An obstacle stands on a road, not on a marked place.');
+  assert.equal(textOf(document.querySelector('[data-editor-refusal]')), 'An obstacle cannot stand on a marked place.');
   // "Use this map": the map as it stands now
   await act(async () => $('[data-use-map]').click());
   assert.equal(used.length, 1);
@@ -796,4 +802,96 @@ test('the screen: its own parts, not the general block screen; the stage as desi
   assert.match(screen, /export const TAP_TICKS = 3;/);
   // every card name has a picture and a word
   for (const card of CARD_NAMES) assert.ok(CADET_WORDS.row.add(card).length > 4);
+});
+
+// =============================================================================================
+// What the review found on real screens (phones, a phone held sideways, classroom laptops)
+// =============================================================================================
+
+test('the layout of the review: a refusal bubble lets taps through, a short window does not stick the map block, the map buttons follow their own width, the banner is as wide as the screen', () => {
+  const css = read('fire-cadet.css');
+  const rule = (selector: string, from = 0): string => {
+    const at = css.indexOf(`${selector} {`, from);
+    assert.ok(at >= 0, selector);
+    return css.slice(at, css.indexOf('}', at));
+  };
+  // the bubble stands over Redo, Move and Remove on a phone: a tap goes through it to the button
+  assert.match(rule('.cadet-bubble'), /pointer-events: none;/);
+  // a phone held sideways (844 x 390): the map block and the bar would cover the whole window, so the block does not stick
+  const short = css.indexOf('@media (max-height: 34.999rem) and (max-width: 63.999rem)');
+  assert.ok(short >= 0);
+  assert.match(rule('.cadet-stage-block', short), /position: static;/);
+  assert.match(rule('.cadet-stage-block'), /position: sticky;/);
+  // the eight map buttons: one line only where the picker itself has 8 x 48 + 7 x 6 = 426 px, not where the window has
+  assert.doesNotMatch(css, /@media \(min-width: 26\.25rem\)/);
+  assert.match(css, /\.cadet-map-picker \{\s*container-type: inline-size;\s*\}/);
+  assert.match(css, /@container \(min-width: 426px\) \{\s*\.cadet-maps \{\s*grid-template-columns: repeat\(8, 48px\);/);
+  assert.equal(8 * 48 + 7 * 6, 426);
+  assert.ok(read('MapPicker.tsx').includes('className="cadet-map-picker flex flex-col gap-3" data-map-picker'));
+  // the banner: as wide as the screen under the map on a phone (not as the map: 200 px on a small phone), three lines at most there, two in the classroom
+  assert.match(rule('.cadet-stage-block'), /grid-template-columns: minmax\(0, 1fr\) var\(--cadet-side\) minmax\(0, 1fr\);\s*grid-template-areas:\s*'\. map \.'\s*'banner banner banner';/);
+  assert.match(rule('.cadet-banner-text'), /-webkit-line-clamp: 3;/);
+  assert.match(css, /\.cadet-banner-text \{\s*-webkit-line-clamp: 2;\s*line-clamp: 2;\s*\}/);
+  // ... and on a narrow classroom column the banner takes the whole line over the map, the clock and the points lie on the map
+  assert.match(css, /@container cadet-block \(max-width: 507\.98px\) \{\s*\.cadet-clock,\s*\.cadet-points \{\s*grid-area: map;[\s\S]*?\.cadet-banner \{\s*grid-column: 1 \/ -1;/);
+  // the two links of the shared title row are 48 x 48 px on this screen
+  assert.match(css, /\.cadet-app nav\[aria-label='Breadcrumb'\] a \{[^}]*min-width: 48px;\s*min-height: 48px;/);
+});
+
+test('the wiring of the review: the work area is brought into view when the screen opens and at GO in both ways to play; the first GO on a classroom screen closes the Map section', () => {
+  const screen = read('FireCadetSimulator.tsx');
+  assert.match(screen, /useEffect\(\(\) => \{\s*const frame = window\.requestAnimationFrame\(\(\) => showInView\(workRef\.current\?\.firstElementChild, 'auto', true\)\);/);
+  assert.match(screen, /if \(mode === 'cards'\) showRow\(\);\s*else showPanel\(\);/);
+  assert.match(screen, /const showPanel = \(\) => showInView\(workRef\.current\?\.querySelector\('\[data-panel-block\]'\), 'smooth'\);/);
+  assert.match(screen, /if \(style\.position !== 'sticky'\) return;/);
+  assert.ok(draw(createElement(DirectionPanel, { live: false, current: null, waiting: null, onTap: nothing })).includes('data-panel-block'));
+  assert.match(screen, /if \(!mapClosedForMatch\.current && matches\(CLASSROOM_SCREEN\)\) \{\s*mapClosedForMatch\.current = true;\s*setOpen\(\(o\) => \(o\.map \? \{ \.\.\.o, map: false \} : o\)\);/);
+  // Surprise is never the map on the stage (../../fire-cadet/scenario.ts surpriseMap)
+  assert.match(read('MapPicker.tsx'), /onScenario\(surpriseMap\(Math\.random, scenario\)\)/);
+  // the banner is told each time it says something anew
+  assert.match(screen, /<Banner sentence=\{banner\} tone=\{tone\} announce=\{announce\} \/>/);
+});
+
+test('the banner in a document: the same refusal twice is put in anew, so that a screen reader reads it again', async (t) => {
+  if (!withDom()) {
+    t.skip('jsdom is not installed');
+    return;
+  }
+  const { act } = await import('react');
+  const { createRoot } = await import('react-dom/client');
+  const root = createRoot($('#root'));
+  const sentence = ROW_PROBLEM_WORDS['number-twice'];
+  await act(async () => root.render(createElement(Banner, { sentence, tone: 'refused', announce: 1 })));
+  const first = $('[data-banner] span');
+  assert.equal(textOf(first), sentence);
+  // the same sentence, the same count: the same piece of text stays (nothing new to read)
+  await act(async () => root.render(createElement(Banner, { sentence, tone: 'refused', announce: 1 })));
+  assert.equal($('[data-banner] span'), first);
+  // the same sentence said again: a new piece of text in the live region
+  await act(async () => root.render(createElement(Banner, { sentence, tone: 'refused', announce: 2 })));
+  const second = $('[data-banner] span');
+  assert.notEqual(second, first);
+  assert.equal(textOf(second), sentence);
+  assert.equal($('[data-banner]').getAttribute('role'), 'status');
+  await act(async () => root.unmount());
+});
+
+test('the Rules window in a document: its text takes the keyboard when it opens, so that the keys scroll it; Tab goes between Close and the text', async (t) => {
+  if (!withDom()) {
+    t.skip('jsdom is not installed');
+    return;
+  }
+  const { act } = await import('react');
+  const { createRoot } = await import('react-dom/client');
+  const root = createRoot($('#root'));
+  await act(async () => root.render(createElement(RulesWindow, { onClose: nothing })));
+  const text = $('[data-rules-window]');
+  assert.equal(text.getAttribute('tabindex'), '0');
+  assert.equal(text.getAttribute('aria-label'), CADET_RULES_TEXT_LABEL);
+  assert.equal(document.activeElement, text, 'the text has the keyboard when the window opens');
+  // the shared window keeps Tab inside: its controls are Close and the text
+  const { FOCUSABLE } = await import('../widgets');
+  const stops = [...$('[role="dialog"]').querySelectorAll(FOCUSABLE)].map((el) => el.getAttribute('aria-label'));
+  assert.deepEqual(stops, ['Close', CADET_RULES_TEXT_LABEL]);
+  await act(async () => root.unmount());
 });

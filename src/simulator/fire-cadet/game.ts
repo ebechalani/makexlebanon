@@ -18,6 +18,11 @@
  *       it was completely outside D7 before (A8).
  *   -1  each obstacle the ROBOT (its body or a stick) touched, once for each obstacle, so -3 at
  *       most (rules l.179-181, l.243-245; A7).
+ *    0  an obstacle that only an ITEM the robot pushes touched: D1 says it costs nothing. But the
+ *       rules say the robot "may not push an obstacle away and use the blocked road" (l.100,
+ *       l.185), and here a lifted obstacle opens its square. So the referee never says "no points
+ *       lost" for it: it says "On the real map, go round it.", and the sheet's obstacle line is a
+ *       note that names it (question 3 of the README asks the organiser).
  *   The total is never below 0 (A9). Highest score: 4 x 5 + 5 = 25 (rules l.254).
  *
  * THE OBSTACLES (lead decision D1, which replaces A7's fixed blocks, N17 and N23 of the design).
@@ -172,9 +177,12 @@ export const REFEREE_WORDS = {
   robotTouched: (kind: ObstacleKind): string => `The robot touched ${OBSTACLE_WORDS[kind]}: -${FIRE_CADET.POINTS_OBSTACLE}. The referee puts it back.`,
   /** the robot touched an obstacle it had touched before: no point more (D1) */
   robotTouchedAgain: (kind: ObstacleKind): string => `The robot touched ${OBSTACLE_WORDS[kind]} again. The referee puts it back.`,
-  /** an item the robot pushes touched an obstacle (D1) */
-  itemTouched: (item: ItemName, kind: ObstacleKind): string =>
-    `The ${ITEM_WORDS[item]} touched ${OBSTACLE_WORDS[kind]}: no points lost. The referee puts it back.`,
+  /**
+   * an item the robot pushes touched an obstacle (D1: it costs nothing here). It does not say "no
+   * points lost": on the real map a robot may not push an obstacle away to use the blocked road
+   * (rules l.100, l.185), and whether a referee counts it is not known (README, question 3).
+   */
+  itemTouched: (item: ItemName, kind: ObstacleKind): string => `The ${ITEM_WORDS[item]} touched ${OBSTACLE_WORDS[kind]}. On the real map, go round it.`,
   /** an item at rest in a marked place that is not its own (N24); also the line's detail */
   wrongPlace: (item: ItemName, place: PlaceName, fire: string): string => `The ${ITEM_WORDS[item]} is in ${PLACE_WORDS[place]}. ${BELONGS[item](fire)}`,
   leftMap: 'The robot left the map.',
@@ -204,17 +212,25 @@ export const REFEREE_WORDS = {
   offMap: (item: ItemName, fire: string): string => `The ${ITEM_WORDS[item]} is off the map. ${BELONGS[item](fire)}`,
   // ---- the score sheet: the return bonus
   home: 'The whole robot is inside the Fire Station.',
+  /** during the match: the bonus is looked at once, when the match ends (A8, design E9) */
+  homeNow: 'The robot is in the Fire Station now. The bonus counts when the match ends.',
   neverLeft: 'The robot has not left the Fire Station yet. Here the bonus needs it to leave first.',
   partlyHome: 'A part of the robot is outside the Fire Station.',
   notHome: 'The robot is not in the Fire Station.',
   // ---- the score sheet: the obstacles
   noObstacle: 'No obstacle touched.',
-  touched: (kinds: readonly ObstacleKind[]): string => {
-    const names = kinds.map((kind) => OBSTACLE_WORDS[kind]);
-    const list = names.length <= 1 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
-    return `Touched: ${list}.`;
-  },
+  touched: (kinds: readonly ObstacleKind[]): string => `Touched: ${obstacleList(kinds)}.`,
+  /** obstacles that only an item touched (no point here, D1 - but not allowed on the real map) */
+  pushed: (kinds: readonly ObstacleKind[]): string => `An item touched ${obstacleList(kinds)}. On the real map, go round the obstacles.`,
+  /** ... when the robot itself touched none */
+  robotNone: 'The robot touched no obstacle.',
 };
+
+/** "the Road Closed sign", "the Road Closed sign and the Fallen Tree" ... */
+function obstacleList(kinds: readonly ObstacleKind[]): string {
+  const names = kinds.map((kind) => OBSTACLE_WORDS[kind]);
+  return names.length <= 1 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
 
 // =============================================================================================
 // The referee
@@ -224,13 +240,22 @@ export const REFEREE_WORDS = {
 export interface FireCadetScoreReport extends ScoreReport {
   /** the obstacles the robot touched, in the order of OBSTACLE_KINDS */
   obstaclesTouched: ObstacleKind[];
+  /** the obstacles that only an item touched (the robot did not), in the order of OBSTACLE_KINDS: no point here (D1), but not allowed on the real map */
+  obstaclesPushed: ObstacleKind[];
 }
 
 /** The obstacles the robot touched, read from any score report of this game ([] for another report). */
 export function obstaclesTouched(report: ScoreReport): ObstacleKind[] {
-  const list = (report as Partial<FireCadetScoreReport>).obstaclesTouched;
-  return Array.isArray(list) ? list.filter((kind): kind is ObstacleKind => (OBSTACLE_KINDS as readonly string[]).includes(kind)) : [];
+  return obstacleListOf((report as Partial<FireCadetScoreReport>).obstaclesTouched);
 }
+
+/** The obstacles that only an item touched, read from any score report of this game ([] for another report). */
+export function obstaclesPushed(report: ScoreReport): ObstacleKind[] {
+  return obstacleListOf((report as Partial<FireCadetScoreReport>).obstaclesPushed);
+}
+
+const obstacleListOf = (list: unknown): ObstacleKind[] =>
+  Array.isArray(list) ? list.filter((kind): kind is ObstacleKind => (OBSTACLE_KINDS as readonly string[]).includes(kind)) : [];
 
 const boxOf = (b: Body): OBB => ({ x: b.x, y: b.y, w: b.w, l: b.l, angle: b.angle });
 const START_RECT: Rect = squareRect(START_SQUARE);
@@ -256,6 +281,8 @@ export function createReferee(s: FireCadetScenario): Referee<FireCadetScenario> 
   const delivered: Partial<Record<ItemName, number>> = {};
   /** the obstacles the robot touched (-1 each, once) */
   const touched = new Set<ObstacleKind>();
+  /** the obstacles an item the robot pushes touched (no point: D1) */
+  const pushed = new Set<ObstacleKind>();
   /** the obstacles the referee has lifted and not yet put back */
   const lifted = new Set<ObstacleKind>();
   /** when the referee last said something about each obstacle */
@@ -299,23 +326,36 @@ export function createReferee(s: FireCadetScenario): Referee<FireCadetScenario> 
 
   const returnLine = (ctx: ScoreContext<FireCadetScenario>): ScoreLine => {
     const label = REFEREE_WORDS.label.return;
-    const earned = over ? homeAtEnd : leftStation && allInside(ctx);
-    if (earned) return { id: 'return', label, points: FIRE_CADET.POINTS_RETURN, max: FIRE_CADET.POINTS_RETURN, ok: true, detail: REFEREE_WORDS.home };
+    // (looked at once, when the match ends (A8): a robot that is home during the match may still
+    // drive out again, so the bonus is not given - nor added to the live total - before the end)
+    if (over && homeAtEnd) return { id: 'return', label, points: FIRE_CADET.POINTS_RETURN, max: FIRE_CADET.POINTS_RETURN, ok: true, detail: REFEREE_WORDS.home };
     let detail: string = REFEREE_WORDS.notHome;
     if (!leftStation) detail = REFEREE_WORDS.neverLeft;
+    else if (!over && allInside(ctx)) detail = REFEREE_WORDS.homeNow;
     else if (ctx.robotShapes.some((shape) => obbTouchesRect(shape, START_RECT))) detail = REFEREE_WORDS.partlyHome;
     return { id: 'return', label, points: 0, max: FIRE_CADET.POINTS_RETURN, ok: false, detail };
   };
 
+  /** the obstacles that only an item touched */
+  const onlyPushed = (): ObstacleKind[] => OBSTACLE_KINDS.filter((kind) => pushed.has(kind) && !touched.has(kind));
+
   const obstacleLine = (): ScoreLine => {
     const kinds = OBSTACLE_KINDS.filter((kind) => touched.has(kind));
+    const byItems = onlyPushed();
+    const sentences: string[] = [];
+    if (kinds.length > 0) sentences.push(REFEREE_WORDS.touched(kinds));
+    else if (byItems.length > 0) sentences.push(REFEREE_WORDS.robotNone);
+    else sentences.push(REFEREE_WORDS.noObstacle);
+    if (byItems.length > 0) sentences.push(REFEREE_WORDS.pushed(byItems));
     return {
       id: 'obstacles',
       label: REFEREE_WORDS.label.obstacles,
       points: kinds.length === 0 ? 0 : -FIRE_CADET.POINTS_OBSTACLE * kinds.length,
       max: 0,
-      ok: kinds.length === 0,
-      detail: kinds.length === 0 ? REFEREE_WORDS.noObstacle : REFEREE_WORDS.touched(kinds),
+      // (an obstacle that only an item touched costs nothing here, but it is not "nothing wrong":
+      // the line is then a note for the team to read - ../ui/ScoreSheet.tsx lineMark)
+      ok: kinds.length === 0 && byItems.length === 0,
+      detail: sentences.join(' '),
     };
   };
 
@@ -389,6 +429,7 @@ export function createReferee(s: FireCadetScenario): Referee<FireCadetScenario> 
         // (moved with nothing touching it: the sticks turned it along - the robot moved it)
         const robotsDoing = byRobot || (byItem === undefined && moved(b));
         if (!robotsDoing && byItem === undefined) continue;
+        if (!robotsDoing) pushed.add(kind);
         if (robotsDoing && !touched.has(kind)) {
           touched.add(kind);
           say(REFEREE_WORDS.robotTouched(kind));
@@ -451,6 +492,7 @@ export function createReferee(s: FireCadetScenario): Referee<FireCadetScenario> 
         lines,
         complete: lines.every((line) => line.id === 'obstacles' || line.ok),
         obstaclesTouched: OBSTACLE_KINDS.filter((kind) => touched.has(kind)),
+        obstaclesPushed: onlyPushed(),
       };
       if (over) report.time = endTime;
       else if (message !== null && ctx.world.time - message.time < FIRE_CADET.MESSAGE_SECONDS - 1e-9) report.now = message.text;

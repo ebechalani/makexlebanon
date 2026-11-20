@@ -274,7 +274,10 @@ export const CADET_WORDS = {
     notYet: (name: string): string => `${name}: not yet`,
     touched: (name: string): string => `${name}: touched, ${FIRE_CADET.POINTS_OBSTACLE} point less`,
     notTouched: (name: string): string => `${name}: not touched`,
+    /** only an item touched it: no point here (lead decision D1), but on the real map the road stays closed */
+    pushed: (name: string): string => `${name}: touched by an item. Not allowed on the real map`,
     minus: `-${FIRE_CADET.POINTS_OBSTACLE}`,
+    pushedMark: '!',
   },
 };
 
@@ -314,7 +317,8 @@ export function editorRefusal(problem: PlaceProblem, thing: MapThing): string {
     case 'own-target':
       return thing === 'cat' ? `The Cat cannot start in ${PLACE_WORDS.safeZone}.` : `The ${ITEM_WORDS[thing as ItemName]} cannot start in ${PLACE_WORDS.hospital}.`;
     case 'obstacle-marked':
-      return 'An obstacle stands on a road, not on a marked place.';
+      // (what is checked, and no more: a square with no road - grass, the pond - is not refused, N12)
+      return 'An obstacle cannot stand on a marked place.';
     case 'taken':
       return 'This square is taken.';
   }

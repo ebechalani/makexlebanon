@@ -45,7 +45,7 @@ import { useSimulation } from '../useSimulation';
 import { Section } from '../widgets';
 import { NOTE_SECONDS, REFUSAL_SECONDS, bannerSentence, stillShown, type TimedText } from './banner';
 import { Banner } from './Banner';
-import { pageScrollToShow, replaceRow, rowOf, type RowState } from './card-row';
+import { pageScrollToShowUnderBlock, replaceRow, rowOf, type RowState } from './card-row';
 import { CardRow } from './CardRow';
 import { DirectionPanel } from './DirectionPanel';
 import { GoButton, goFace } from './GoButton';
@@ -173,6 +173,8 @@ export default function FireCadetSimulator() {
   const [refusals, setRefusals] = useState(0);
   const [note, setNote] = useState<TimedText | null>(null);
   const [said, setSaid] = useState('');
+  /** counted up each time the banner says something anew, so that a screen reader reads it again (./Banner.tsx) */
+  const [announce, setAnnounce] = useState(0);
   const [, redraw] = useState(0);
 
   const [planning, setPlanning] = useState<PlanningState>(planningIdle);
@@ -235,10 +237,14 @@ export default function FireCadetSimulator() {
     const timer = window.setTimeout(() => redraw((n) => n + 1), wait + 20);
     return () => window.clearTimeout(timer);
   }, [refusal, note]);
-  const showNote = useCallback((text: string) => setNote({ text, until: Date.now() + NOTE_SECONDS * 1000 }), []);
+  const showNote = useCallback((text: string) => {
+    setNote({ text, until: Date.now() + NOTE_SECONDS * 1000 });
+    setAnnounce((n) => n + 1);
+  }, []);
   const showRefusal = useCallback((problem: RowProblem) => {
     setRefusal({ text: CADET_WORDS.refusals[problem], until: Date.now() + REFUSAL_SECONDS * 1000 });
     setRefusals((n) => n + 1);
+    setAnnounce((n) => n + 1);
     setNote(null);
   }, []);
 
@@ -318,20 +324,38 @@ export default function FireCadetSimulator() {
 
   // ---- the round button
   const { start, declareFinished, reset } = sim;
-  // On a phone, GO also brings the row into view under the map block, so that the child sees which
-  // card runs (the row itself keeps the running card in view). Not on the classroom screen: there
-  // the row has a column of its own, and the page does not scroll.
+  // On a phone the work area - the row, its buttons and the box, or Mini's panel - must stand between
+  // the map block, which sticks at the top, and the bar of the round button, which sticks at the
+  // bottom. On the first screen the title row and the mode switch push it under the bar (at 390 x 844
+  // the whole box was hidden): so the page scrolls them away once when the screen opens, and GO
+  // brings the row (Junior) or the panel (Mini) into view, so that the child sees which card runs or
+  // which arrows to tap (the row itself keeps the running card in view). Not on the classroom
+  // screen: there the work area has a column of its own, and the page does not scroll. Not when the
+  // map block does not stick (a phone held sideways: fire-cadet.css).
   const blockRef = useRef<HTMLDivElement>(null);
   const workRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
-  const showRow = () => {
-    const list = workRef.current?.querySelector('[role="listbox"]');
+  const showInView = useCallback((target: Element | null | undefined, behavior: ScrollBehavior, onlyDown = false) => {
     const block = blockRef.current;
     const bar = barRef.current;
-    if (!list || !block || !bar || matches(CLASSROOM_SCREEN)) return;
-    const by = pageScrollToShow(list.getBoundingClientRect(), { top: block.getBoundingClientRect().bottom, bottom: bar.getBoundingClientRect().top });
-    if (by !== 0) window.scrollBy({ top: by, behavior: matches(REDUCED_MOTION) ? 'auto' : 'smooth' });
-  };
+    if (!target || !block || !bar || matches(CLASSROOM_SCREEN)) return;
+    const style = window.getComputedStyle(block);
+    if (style.position !== 'sticky') return;
+    const by = pageScrollToShowUnderBlock(target.getBoundingClientRect(), block.getBoundingClientRect(), Number.parseFloat(style.top) || 0, bar.getBoundingClientRect().top);
+    if (by > 0 || (by < 0 && !onlyDown)) window.scrollBy({ top: by, behavior: matches(REDUCED_MOTION) ? 'auto' : behavior });
+  }, []);
+  const showRow = () => showInView(workRef.current?.querySelector('[role="listbox"]'), 'smooth');
+  const showPanel = () => showInView(workRef.current?.querySelector('[data-panel-block]'), 'smooth');
+  // once, when the screen opens: the row and the box (or the panel) under the map block, above the bar
+  // (only ever down: a page the browser brings back further down, after a reload, stays where it is)
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => showInView(workRef.current?.firstElementChild, 'auto', true));
+    return () => window.cancelAnimationFrame(frame);
+  }, [showInView]);
+  // The classroom screen: the Map section is open at a first visit (design 7.8), and under the map it
+  // fills the short left column, so after a match the score sheet is out of view. The maps cannot be
+  // changed during a match anyway: the first GO of a visit closes the section (it can be opened again).
+  const mapClosedForMatch = useRef(false);
   const freshMatch = () => {
     holds.current.clear();
     setLastRan(-1);
@@ -351,6 +375,11 @@ export default function FireCadetSimulator() {
       freshMatch();
       start();
       if (mode === 'cards') showRow();
+      else showPanel();
+      if (!mapClosedForMatch.current && matches(CLASSROOM_SCREEN)) {
+        mapClosedForMatch.current = true;
+        setOpen((o) => (o.map ? { ...o, map: false } : o));
+      }
     } else if (face === 'stop') {
       declareFinished();
     } else {
@@ -437,7 +466,7 @@ export default function FireCadetSimulator() {
 
         <div ref={blockRef} className="cadet-stage-block">
           <MatchClock timeLeft={snapshot.timeLeft} className="cadet-clock" />
-          <Banner sentence={banner} tone={tone} />
+          <Banner sentence={banner} tone={tone} announce={announce} />
           <MatchPoints total={snapshot.score.total} max={snapshot.score.max} className="cadet-points" />
           <div ref={stageRef} className="cadet-stage">
             <StageCanvas

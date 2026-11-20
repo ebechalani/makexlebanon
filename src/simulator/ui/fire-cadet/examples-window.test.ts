@@ -340,6 +340,8 @@ test('the screen in a document: the Examples window as a visitor, with a member 
   const at = (el: Element, top: number, bottom: number) =>
     Object.defineProperty(el, 'getBoundingClientRect', { configurable: true, value: () => ({ top, bottom, left: 0, right: 390, width: 390, height: bottom - top, x: 0, y: top }) });
   at($('.cadet-stage-block'), 64, 460);
+  // (the stylesheet makes the block stick under the site header; a document without it is told so here)
+  Object.assign($('.cadet-stage-block').style, { position: 'sticky', top: '64px' });
   at($('.cadet-bar'), 756, 844);
   at($('[role="listbox"]'), 200, 280);
   // during a match the button is locked (as the row, the map and the way to play); after STOP it is free again
@@ -361,6 +363,13 @@ test('the screen in a document: the Examples window as a visitor, with a member 
   await click($('[aria-label="Stop: the match ends now and the points count"]'));
   dom.screen.classroom = false;
   assert.equal(dom.scrolls.length, 1, 'no other scroll of the page');
+  // the first GO on the classroom screen closed the Map section (the review: under the map it filled the short left
+  // column, and the score sheet was out of view after the match); it opens again with its head
+  const mapHead = [...document.querySelectorAll<HTMLButtonElement>('section > h2 > button[aria-expanded]')].find((b) => textOf(b).startsWith(CADET_WORDS.map.title));
+  assert.ok(mapHead);
+  assert.equal(mapHead.getAttribute('aria-expanded'), 'false', 'the Map section is closed after the first GO of the classroom screen');
+  await click(mapHead);
+  assert.equal(mapHead.getAttribute('aria-expanded'), 'true');
   // loading after a match puts the field back to the start, as a new map does
   await click(examplesButton);
   const there = byLevel('starter').find((example) => fieldOf(example.program) === 'P1');

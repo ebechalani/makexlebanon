@@ -181,7 +181,7 @@ test('7.15 and 7.8: the Map section, its note, and the own-map editor with its s
     ['start-square', 'cat', 'Nothing can stand where the robot starts.'],
     ['own-target', 'cat', 'The Cat cannot start in the Safe Zone.'],
     ['own-target', 'person', 'The Injured Person cannot start in the Hospital.'],
-    ['obstacle-marked', 'fallen-tree', 'An obstacle stands on a road, not on a marked place.'],
+    ['obstacle-marked', 'fallen-tree', 'An obstacle cannot stand on a marked place.'],
     ['taken', 'equipment', 'This square is taken.'],
   ];
   for (const [problem, thing, sentence] of refusals) assert.equal(editorRefusal(problem, thing), sentence, problem);
@@ -236,8 +236,8 @@ function refereeSentences(): string[] {
     for (const kind of OBSTACLE_KINDS) out.push(REFEREE_WORDS.itemTouched(item, kind));
   }
   for (const kind of OBSTACLE_KINDS) out.push(REFEREE_WORDS.robotTouched(kind), REFEREE_WORDS.robotTouchedAgain(kind));
-  out.push(REFEREE_WORDS.leftMap, REFEREE_WORDS.home, REFEREE_WORDS.neverLeft, REFEREE_WORDS.partlyHome, REFEREE_WORDS.notHome, REFEREE_WORDS.noObstacle);
-  out.push(...Object.values(REFEREE_WORDS.label), REFEREE_WORDS.touched([...OBSTACLE_KINDS]));
+  out.push(REFEREE_WORDS.leftMap, REFEREE_WORDS.home, REFEREE_WORDS.homeNow, REFEREE_WORDS.neverLeft, REFEREE_WORDS.partlyHome, REFEREE_WORDS.notHome, REFEREE_WORDS.noObstacle);
+  out.push(...Object.values(REFEREE_WORDS.label), REFEREE_WORDS.touched([...OBSTACLE_KINDS]), REFEREE_WORDS.pushed([...OBSTACLE_KINDS]), REFEREE_WORDS.robotNone);
   return out;
 }
 
@@ -276,6 +276,12 @@ test('the score strip says what the referee wrote: its pictures are the sheet\'s
   const sign = stripState(sheet).find((p) => p.id === 'road-closed');
   assert.deepEqual([sign?.on, sign?.label], [true, 'Road Closed: touched, 1 point less']);
   assert.equal(CADET_WORDS.score.minus, '-1');
+  // the Equipment pushed into the Road Closed sign (D1: no point): not "not touched" - the strip says an item touched it
+  const pushed = run(mapOf('S-A6-B3-C5-D5-D3-F5-F7'), 'F4');
+  assert.equal(pushed.score().lines.find((line) => line.id === 'obstacles')?.points, 0);
+  const pushedSign = stripState(pushed.score()).find((p) => p.id === 'road-closed');
+  assert.deepEqual([pushedSign?.on, pushedSign?.pushed, pushedSign?.label], [false, true, 'Road Closed: touched by an item. Not allowed on the real map']);
+  assert.ok(stripState(pushed.score()).filter((p) => p.id !== 'road-closed').every((p) => !p.pushed));
   // the strip's name of an obstacle is the referee's, without "the" and "sign"
   for (const kind of OBSTACLE_KINDS) assert.ok(OBSTACLE_WORDS[kind].includes(THING_WORDS[kind]), kind);
   assert.equal(STRIP_WORDS.return, 'Robot home');

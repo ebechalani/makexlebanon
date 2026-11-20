@@ -231,3 +231,26 @@ test('"Here an obstacle always stands in the middle of its square" (on the latti
     });
   }
 });
+
+test('part 1, Mini and Junior, says what the rules say: the cards are kept when the planning time ends (l.154), not at the start; nobody helps (l.195-201); each round may use another map (l.259)', () => {
+  const both = CADET_RULES.sections.find((s) => s.title === 'Mini and Junior');
+  assert.ok(both);
+  assert.ok(both.items.includes('When the planning time ends, the cards cannot be changed. Then the row is started.'), both.items.join(' | '));
+  for (const item of itemsOf(CADET_RULES)) assert.doesNotMatch(item, /after the start of the row you cannot change the cards/i, item);
+  assert.ok(both.items.includes('In Junior, nobody drives the robot after the start: it runs by itself.'));
+  assert.ok(both.items.includes('After GO, only the referee touches the robot. Nobody moves an item or an obstacle by hand.'));
+  assert.ok(both.items.includes('Coaches may not give directions or help with the cards.'));
+  assert.ok(itemsOf(CADET_RULES).includes(`You play ${ROUNDS} rounds, perhaps on another map each time. Your best score counts. Mini and Junior are ranked apart.`));
+});
+
+test('part 2 never calls an item pushed against an obstacle allowed, and a 71st card is one that could not be finished', () => {
+  const part2 = itemsOf(CADET_ASSUMPTIONS);
+  const item = part2.find((s) => /pushes against an obstacle/.test(s));
+  assert.ok(item);
+  assert.match(item, /^Here .* costs no point: the rules do not say\. But on the real map the robot may not open a blocked road that way\.$/);
+  assert.ok(part2.some((s) => /or an item it pushes - could go through its square here\. On the real map that is not allowed/.test(s)));
+  const cards = part2.find((s) => /cards at most/.test(s));
+  assert.ok(cards);
+  assert.match(cards, /more could not all be done in/);
+  assert.doesNotMatch(cards, /could not run/);
+});

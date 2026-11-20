@@ -15,7 +15,7 @@ import { robotShapesAt } from '../core/robot';
 import type { Body, Pose, ScoreContext, ScoreLine, World } from '../core/types';
 import { cardRowProgram, cardsFromText, panelProgram } from './cards';
 import { createSimulation } from '../core/simulation';
-import { REFEREE_WORDS, createBodies, createReferee, fireCadetGame, itemId, obstacleId, obstaclesTouched } from './game';
+import { REFEREE_WORDS, createBodies, createReferee, fireCadetGame, itemId, obstacleId, obstaclesPushed, obstaclesTouched } from './game';
 import { FIRE_CADET, spot, squareRect } from './numbers';
 import { playFireCadet } from './play';
 import { MTINY_ROBOT, START_POSE } from './robot';
@@ -278,12 +278,38 @@ test('the return bonus: the four states of the line', () => {
   field.pose = at('D7', Math.PI);
   field.later();
   look();
-  assert.deepEqual([lineOf(sheet().lines, 'return').points, lineOf(sheet().lines, 'return').detail], [5, 'The whole robot is inside the Fire Station.']);
+  // home during the match: not yet - the bonus is looked at once, when the match ends (A8), and the
+  // robot may still drive out again, so it is not shown as earned nor added to the live total
+  assert.deepEqual([lineOf(sheet().lines, 'return').points, lineOf(sheet().lines, 'return').ok, lineOf(sheet().lines, 'return').detail], [
+    0,
+    false,
+    'The robot is in the Fire Station now. The bonus counts when the match ends.',
+  ]);
+  assert.equal(sheet().total, 0);
   // at the end it is judged once and for all
   ref.finished?.(field.ctx(), 'program-ended');
+  assert.deepEqual([lineOf(sheet().lines, 'return').points, lineOf(sheet().lines, 'return').detail], [5, 'The whole robot is inside the Fire Station.']);
   field.pose = at('D5');
   assert.equal(lineOf(sheet().lines, 'return').points, 5);
   assert.equal(sheet().time, field.time);
+});
+
+test('the return bonus is never shown during the match: Forward, Backward, Forward - the live total stays 0 (it went 0, 5, 0 before)', () => {
+  const sim = createSimulation({ game: fireCadetGame, scenario: parkedMap(), program: program('F B F') });
+  sim.start();
+  const totals = new Set<number>();
+  let homeNow = false;
+  while (sim.status === 'running') {
+    sim.step(1);
+    const live = sim.score();
+    totals.add(live.total);
+    if (lineOf(live.lines, 'return').detail === REFEREE_WORDS.homeNow) homeNow = true;
+  }
+  assert.deepEqual([...totals], [0]);
+  assert.ok(homeNow, 'while it stood in D7 the line said it is home now');
+  assert.equal(lineOf(sim.score().lines, 'return').points, 0);
+  // Forward, Backward: home when the row ends - 5 at the end, and only then
+  assert.equal(playFireCadet(program('F B'), parkedMap()).total, 5);
 });
 
 test('the obstacles (D1): -1 for each obstacle the robot touched, once; the words of the sheet; the total never below 0', () => {
@@ -343,10 +369,19 @@ test('the obstacles (D1): an item that touches one costs nothing, and the obstac
   const p = spot(sq('E3'));
   field.later().put(itemId('cat'), p.x, p.y + FIRE_CADET.OBSTACLE_BASE);
   const call = look();
-  assert.deepEqual(call?.say, ['The Cat touched the Road Closed sign: no points lost. The referee puts it back.']);
+  // (not "no points lost": on the real map a robot may not push an obstacle away to use its road, rules l.100, l.185)
+  assert.deepEqual(call?.say, ['The Cat touched the Road Closed sign. On the real map, go round it.']);
   assert.deepEqual(call?.removeBodies, [obstacleId('road-closed')]);
-  assert.equal(lineOf(sheet().lines, 'obstacles').points, 0);
+  // no point (D1), but the sheet does not say "No obstacle touched": the line is a note that names it
+  const line = lineOf(sheet().lines, 'obstacles');
+  assert.deepEqual([line.points, line.ok, line.detail], [
+    0,
+    false,
+    'The robot touched no obstacle. An item touched the Road Closed sign. On the real map, go round the obstacles.',
+  ]);
   assert.deepEqual(obstaclesTouched(sheet()), []);
+  assert.deepEqual(obstaclesPushed(sheet()), ['road-closed']);
+  assert.equal(sheet().total, 0);
 });
 
 test('the obstacles (D1): one that moved with nothing touching it was turned by the sticks - the robot moved it', () => {
@@ -592,7 +627,7 @@ test('D1, with a stick: the robot 40 mm off its line hits the sign with its righ
 test('D1, an item pushed against an obstacle: no point lost; the obstacle is lifted, and back once the robot and the item have passed', () => {
   const map = ROAD_CLOSED_ON('D3', { equipment: sq('D5') });
   const f5 = watchMatch(program('F5'), map);
-  assert.deepEqual(f5.said, [[6.57, 'The Equipment touched the Road Closed sign: no points lost. The referee puts it back.']]);
+  assert.deepEqual(f5.said, [[6.57, 'The Equipment touched the Road Closed sign. On the real map, go round it.']]);
   assert.deepEqual(f5.back, [[8.73, obstacleId('road-closed'), spot(sq('D3')).x, spot(sq('D3')).y, 0]]);
   assert.ok(f5.stops.every(onASquare));
   assert.equal(lineOf(f5.sim.score().lines, 'obstacles').points, 0);
@@ -605,6 +640,32 @@ test('D1, an item pushed against an obstacle: no point lost; the obstacle is lif
   assert.deepEqual(through.stops[3], [624.764, 446.764, 0]);
   assert.equal(through.sim.score().total, 0);
   assert.equal(lineOf(through.sim.score().lines, 'obstacles').points, 0);
+  // ... but the referee never calls that clean: the line is a note naming the sign, and the report lists it
+  assert.equal(lineOf(through.sim.score().lines, 'obstacles').ok, false);
+  assert.deepEqual(obstaclesPushed(through.sim.score()), ['road-closed']);
+});
+
+test('D1 and the blocked road: a row that pushes items through the obstacles of practice map 4 is not called clean', () => {
+  // the reviewers' row: it scores 25 in 74.3 s (the proof row, which goes round, takes 80.0 s),
+  // because three items the robot pushes lift three obstacles and open their squares
+  const watched = watchMatch(program('L F3 R F5 F R F2 R F4 R F2 R F2 R F3 R F R B L F3 R F'), PRACTICE_MAPS[3]);
+  const sheet = watched.sim.score();
+  assert.equal(sheet.total, 25, 'D1: an item touching an obstacle costs nothing');
+  const said = watched.said.map(([, text]) => text);
+  assert.ok(said.length > 0);
+  for (const text of said) assert.doesNotMatch(text, /no points? lost/i, text);
+  assert.ok(said.includes('The Injured Person touched the Road Closed sign. On the real map, go round it.'), said.join(' | '));
+  const line = lineOf(sheet.lines, 'obstacles');
+  assert.equal(line.ok, false, 'not "No obstacle touched"');
+  assert.notEqual(line.detail, REFEREE_WORDS.noObstacle);
+  assert.match(line.detail ?? '', /^The robot touched no obstacle\. An item touched .+\. On the real map, go round the obstacles\.$/);
+  assert.deepEqual(obstaclesPushed(sheet), [...OBSTACLE_KINDS]);
+  assert.deepEqual(obstaclesTouched(sheet), []);
+  // the proof row of the same map goes round: nothing is pushed, the line is clean
+  const proof = watchMatch(program('L F3 R F5 F B2 R F L F R F2 R F2 B R F3 L F3 L F4 L2 F L F'), PRACTICE_MAPS[3]);
+  assert.equal(proof.sim.score().total, 25);
+  assert.deepEqual([lineOf(proof.sim.score().lines, 'obstacles').ok, lineOf(proof.sim.score().lines, 'obstacles').detail], [true, REFEREE_WORDS.noObstacle]);
+  assert.deepEqual(obstaclesPushed(proof.sim.score()), []);
 });
 
 test('D1, all three obstacles in a column: -3 at most, and the total stays at 0', () => {

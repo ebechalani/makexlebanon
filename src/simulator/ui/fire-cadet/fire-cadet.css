@@ -53,9 +53,23 @@
 .cadet-app section > h2 > button[aria-expanded] {
   min-height: 48px;
 }
+/* ... and the two links of the shared title row, Home and Simulator (../TitleBar.tsx): 48 x 48 px here, as every
+   other control of this screen (from 640 px wide the title row is 48 px high anyway; on a phone their line grows) */
+.cadet-app nav[aria-label='Breadcrumb'] a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  min-height: 48px;
+}
 .cadet-app [role='dialog'] button[aria-label='Close'] {
   width: 48px;
   height: 48px;
+}
+/* a window's text that has been scrolled to its end does not go on to scroll the page behind it (the Rules window is
+   read with the keys: ./RulesWindow.tsx) */
+.cadet-app [role='dialog'] > .overflow-y-auto {
+  overscroll-behavior: contain;
 }
 /* ... and so do the controls of the shared Examples window (../ExamplesDialog.tsx): the code field, its buttons, and "Load this example" */
 .cadet-app [data-member-panel] button,
@@ -66,6 +80,7 @@
 }
 
 /* ---------------------------------------------------------------- phone: one column */
+/* (the map block is the container of the banner line: on a narrow classroom column the banner takes the whole line, below) */
 .cadet-screen {
   display: flex;
   flex-direction: column;
@@ -81,12 +96,21 @@
   padding: 2px 12px;
   background: var(--color-slate-100, #f1f5f9);
   display: grid;
-  justify-content: center;
-  grid-template-columns: var(--cadet-side);
+  /* the map in the middle; the banner under it as wide as the screen, not only as the map: on a small phone the map is
+     200 px wide, and a sentence of the referee would need more than two lines of that */
+  grid-template-columns: minmax(0, 1fr) var(--cadet-side) minmax(0, 1fr);
   grid-template-areas:
-    'map'
-    'banner';
+    '. map .'
+    'banner banner banner';
   row-gap: 2px;
+  container: cadet-block / inline-size;
+}
+/* a phone held sideways (or any window this short): the map block does not stick, or it and the bar would cover the
+   whole window and leave no room for the row, the box or the panel (measured: 844 x 390, 740 x 360, 667 x 375) */
+@media (max-height: 34.999rem) and (max-width: 63.999rem) {
+  .cadet-stage-block {
+    position: static;
+  }
 }
 
 .cadet-stage {
@@ -124,6 +148,15 @@
   display: flex;
   align-items: center;
   min-height: var(--cadet-banner);
+}
+/* the sentence: three lines at most on a phone (two are enough for nearly all, now that the banner is as wide as the
+   screen), two on the classroom screen; a longer one is cut with "..." */
+.cadet-banner-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
 }
 
 .cadet-work,
@@ -252,6 +285,8 @@
   white-space: nowrap;
   box-shadow: 0 6px 16px rgb(15 23 42 / 0.3);
   animation: cadet-shake 0.4s;
+  /* it only tells: a tap on it goes to the button under it (on a phone it stands over Redo, Move and Remove) */
+  pointer-events: none;
 }
 .cadet-bubble::after {
   content: '';
@@ -346,12 +381,17 @@
 }
 
 /* ---------------------------------------------------------------- the map picker */
+/* eight buttons in one line need 8 x 48 + 7 x 6 = 426 px of the picker's own width, not of the window's: the left
+   column of a classroom screen is narrower than that at 1024 x 768, 1366 x 768 and 1280 x 720 */
+.cadet-map-picker {
+  container-type: inline-size;
+}
 .cadet-maps {
   display: grid;
   grid-template-columns: repeat(4, 48px);
   gap: 6px;
 }
-@media (min-width: 26.25rem) {
+@container (min-width: 426px) {
   .cadet-maps {
     grid-template-columns: repeat(8, 48px);
   }
@@ -504,6 +544,10 @@
     height: 40px;
     align-self: center;
   }
+  .cadet-banner-text {
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
   .cadet-stage {
     justify-self: center;
   }
@@ -562,6 +606,22 @@
   }
   .cadet-box {
     grid-template-columns: repeat(8, minmax(0, 96px));
+  }
+}
+
+/* a narrow map block - a phone, or the left column of a classroom screen under about 1440 x 900: the clock and the points
+   lie on the strip of table at the top edge of the map (as on a phone), and the banner takes the whole line over the
+   map. Between the clock and the points it would be only 190 to 235 px wide there, and a sentence of the referee
+   needs three lines of that. */
+@container cadet-block (max-width: 507.98px) {
+  .cadet-clock,
+  .cadet-points {
+    grid-area: map;
+    align-self: start;
+    margin: 3px 6px;
+  }
+  .cadet-banner {
+    grid-column: 1 / -1;
   }
 }
 

@@ -336,3 +336,18 @@ test('cardRowProgram: the program format of design 4.1', () => {
   assert.deepEqual(panelProgram(), { format: 'mtiny-panel', version: 1 });
   assert.deepEqual(readCards(cardRowProgram(cards, 'P1')), cards);
 });
+
+test('the 71st card: it would start at 119.0 s and be cut off by the clock - it could never be finished (the words of the README and numbers.ts)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { fileURLToPath } = await import('node:url');
+  const seventy = Array.from({ length: FIRE_CADET.MAX_ROW_CARDS }, (): CardName => 'left');
+  assert.equal(rowSeconds(seventy), 118.6);
+  // the 71st turn starts after the rest that follows the 70th: 118.6 + 0.4 = 119.0 s, and needs 1.3 s more than is left
+  assert.ok(Math.abs(rowSeconds(seventy) + FIRE_CADET.REST_SECONDS - 119) < 1e-9);
+  assert.ok(119 + FIRE_CADET.TURN_SECONDS > FIRE_CADET.MATCH_SECONDS);
+  const readme = readFileSync(fileURLToPath(new URL('../../../README.md', import.meta.url)), 'utf8').replace(/\s+/g, ' ');
+  assert.ok(readme.includes('a 71st card could never be finished inside 120 s — 70 turns end at 118.6 s, so a 71st would start at 119.0 s and be cut off by the clock'));
+  assert.ok(!/71st card could never run/.test(readme));
+  const numbers = readFileSync(fileURLToPath(new URL('./numbers.ts', import.meta.url)), 'utf8').replace(/\s*\*\s*/g, ' ');
+  assert.match(numbers, /could never be finished inside the match/);
+});

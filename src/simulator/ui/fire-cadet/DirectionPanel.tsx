@@ -55,7 +55,7 @@ export function DirectionPanel({ live, current, waiting, onTap }: DirectionPanel
     if (live) onTap(move, down);
   };
   return (
-    <div className="flex flex-col items-center gap-1">
+    <div className="flex flex-col items-center gap-1" data-panel-block>
       <div role="group" aria-label={words.label} className="cadet-panel">
         <div className="grid grid-cols-3 grid-rows-3 gap-1">
           {ORDER.map((move) => (

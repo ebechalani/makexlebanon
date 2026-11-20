@@ -108,8 +108,10 @@ export const CADET_RULES: CadetRulesPart = {
       `Mini, ages ${AGES.panel}: you drive the robot with the Tap Pen.`,
       `Junior, ages ${AGES.cards}: you put coding cards in a row. Then the robot runs the row by itself.`,
       `In Junior you have ${f.PLANNING_SECONDS} seconds to plan your cards before the match.`,
-      'After the start of the row you cannot change the cards or drive the robot.',
-      'After GO, nobody touches the robot.',
+      'When the planning time ends, the cards cannot be changed. Then the row is started.',
+      'In Junior, nobody drives the robot after the start: it runs by itself.',
+      'After GO, only the referee touches the robot. Nobody moves an item or an obstacle by hand.',
+      'Coaches may not give directions or help with the cards.',
     ]),
     section('The match', [
       `A match lasts ${f.MATCH_SECONDS} seconds (${MATCH_MINUTES} minutes).`,
@@ -120,7 +122,7 @@ export const CADET_RULES: CadetRulesPart = {
       `Each item in its place: ${f.POINTS_ITEM} points.`,
       `The robot fully inside the Fire Station at the end: ${f.POINTS_RETURN} points.`,
       `Each obstacle touched: ${f.POINTS_OBSTACLE} point less.`,
-      `You play ${ROUNDS} rounds. Your best score counts. Mini and Junior are ranked apart.`,
+      `You play ${ROUNDS} rounds, perhaps on another map each time. Your best score counts. Mini and Junior are ranked apart.`,
       'With equal points, the shorter time wins. In Junior the planning time can count too.',
     ]),
   ],
@@ -164,14 +166,18 @@ const S = {
   oncePerObstacle:
     `Only the robot touching an obstacle costs a point: ${f.POINTS_OBSTACLE} point once for each obstacle, however often. ` +
     `So ${OBSTACLE_KINDS.length * f.POINTS_OBSTACLE} points at most.`,
-  itemAgainst: 'An item that the robot pushes against an obstacle costs no point.',
-  closedRoad: 'While an obstacle is off the map, the robot could drive through its square here. On the real map that is not allowed: drive around the obstacles.',
+  itemAgainst:
+    'Here an item that the robot pushes against an obstacle costs no point: the rules do not say. ' +
+    'But on the real map the robot may not open a blocked road that way.',
+  closedRoad:
+    'While an obstacle is off the map, the robot - or an item it pushes - could go through its square here. ' +
+    'On the real map that is not allowed: drive around the obstacles.',
 
   cards: `Junior uses the cards seen at the organiser's events: Forward, Backward, Turn left, Turn right, and ${NUMBER_CARDS.join(', ')}. There are no Loop cards here.`,
   startCard: 'The row begins with the yellow start card. The round button starts it, like the button of the Tap Pen.',
   numberRule: 'Here a number card must follow an arrow card, and each arrow takes one number card at most. What a real robot does otherwise is not known.',
   times3: `With ${NUMBER_CARDS[1]} the arrow before it runs ${NUMBER_CARDS[1].slice(1)} times in all.`,
-  maxCards: `A row holds ${f.MAX_ROW_CARDS} cards at most: more could not run in ${f.MATCH_SECONDS} seconds.`,
+  maxCards: `A row holds ${f.MAX_ROW_CARDS} cards at most: more could not all be done in ${f.MATCH_SECONDS} seconds.`,
   mini: 'Mini uses the four arrow cards of the yellow panel. One tap is one whole move. Here a tap during a move is kept for after the move - only the last one.',
   realPen: 'On a real pen, wait until the robot stops before you tap again.',
   joystick: 'The joystick of the pen is not here.',
@@ -193,6 +199,9 @@ const S = {
 
   notSimulated: `The ${ROUNDS} rounds and the ranking. A run that the referee stops because somebody touched the robot. The real Tap Pen and the real cards.`,
 } as const;
+
+/** What a screen reader calls the text of the window, which can take the keyboard to be scrolled (./RulesWindow.tsx). */
+export const CADET_RULES_TEXT_LABEL = 'The rules, and what this simulator assumes';
 
 /** The line under the heading of part 2. */
 export const ASSUMPTIONS_NOTE =

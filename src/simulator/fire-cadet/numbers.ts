@@ -120,7 +120,8 @@ export function ticks(seconds: number, dt: number = SIM_DT): number {
  *                      so the free width between them is BODY_WIDTH - 2 x STICK_THICKNESS = 90.5 mm
  *   MAX_ROW_CARDS      ASSUMPTION N9: the most cards a row can hold, 70. The shortest card is a
  *                      turn, and a row never has more cards than moves, so the 71st card of any row
- *                      could never run inside the match. Worked out in ticks, as the interpreter
+ *                      could never be finished inside the match (70 turns end at 118.6 s; a 71st
+ *                      would start at 119.0 s and be cut by the clock). Worked out in ticks, as the interpreter
  *                      counts: floor((ticks(MATCH) + ticks(REST)) / (ticks(TURN) + ticks(REST))) =
  *                      floor(12,040 / 170) = 70. It follows the times: change one and it changes.
  *   TABLE_MARGIN       the engine's own: the edge of the table, 100 mm outside the mat

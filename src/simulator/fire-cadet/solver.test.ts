@@ -11,7 +11,9 @@
  * 120.00 s, by the clock - see the last test.)
  */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { cardRowProgram, cardsFromText, cardsToText, expand, rowSeconds, rowTicks, type MoveCard } from './cards';
 import { FIRE_CADET, ticks } from './numbers';
 import { playFireCadet } from './play';
@@ -82,6 +84,19 @@ test('the survey of design 5.4: 3,000 own setups, no row for 18, a row inside 12
   assert.deepEqual([cards[0], cards[cards.length >> 1], cards[cards.length - 1]], [21, 36, 60]);
   // 1,034 of the 2,925 have an item on a marked place
   assert.equal(SETUPS.filter((s, i) => (rows[i]?.ticks ?? Infinity) <= MATCH_TICKS && itemOnMarkedPlace(s)).length, 1034);
+  // the numbers the README gives for the 2,925 rows inside 120 s - of those rows, not of all 2,982 found
+  const inside = within.map((r) => r.seconds).sort((a, b) => a - b);
+  const nineInTen = inside[Math.ceil(0.9 * inside.length) - 1];
+  const insideCards = within.map((r) => r.cards.length).sort((a, b) => a - b);
+  assert.deepEqual([inside[0], inside[Math.ceil(0.5 * inside.length) - 1], nineInTen, inside[inside.length - 1]], [51.5, 92, 107.4, 120]);
+  assert.deepEqual([insideCards[0], insideCards[Math.ceil(0.5 * insideCards.length) - 1], insideCards[insideCards.length - 1]], [21, 36, 54]);
+  const readme = readFileSync(fileURLToPath(new URL('../../../README.md', import.meta.url)), 'utf8').replace(/\s+/g, ' ');
+  assert.ok(
+    readme.includes(
+      '18 have no row; 57 have one only over 120 s; 2,925 have one inside 120 s (shortest 51.5 s, middle 92.0 s, nine in ten under 107.4 s, longest 120.0 s; 21 to 54 cards, middle 36)',
+    ),
+    'the README gives the numbers of the 2,925 rows',
+  );
 });
 
 test('every row the solver finds for the first 300 setups of the survey scores 25 in the engine, at exactly its time', () => {
