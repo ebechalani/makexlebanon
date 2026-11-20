@@ -98,9 +98,11 @@ export interface ModalProps {
    * Where the window stands. 'center' (the default): in the middle of the screen. 'top': a
    * little below the top edge, for a window whose content changes height while it is open -
    * it then grows and shrinks at its lower edge only, and what is being read or typed in it
-   * stays where it is.
+   * stays where it is. 'full': like 'top' from 640 px up; on a phone the window fills the screen,
+   * with no frame and no rounded corners around it (Fire Cadet: the board of "My own map" needs
+   * every pixel of a phone's width).
    */
-  align?: 'center' | 'top';
+  align?: 'center' | 'top' | 'full';
 }
 
 /** The frame around the window, and the tallest the window may be inside it. */
@@ -110,6 +112,10 @@ const MODAL_FRAME = {
     // (on a phone the window starts right under the edge: every line of it counts there)
     frame: 'items-start px-3 pb-3 pt-[var(--mbot2-modal-top)] [--mbot2-modal-top:0.75rem] sm:[--mbot2-modal-top:max(0.75rem,6dvh)]',
     panel: 'max-h-[calc(100dvh_-_var(--mbot2-modal-top)_-_0.75rem)]',
+  },
+  full: {
+    frame: 'items-start p-0 sm:px-3 sm:pb-3 sm:pt-[max(0.75rem,6dvh)]',
+    panel: 'h-dvh max-h-dvh max-sm:rounded-none sm:h-auto sm:max-h-[calc(100dvh_-_max(0.75rem,6dvh)_-_0.75rem)]',
   },
 } as const;
 

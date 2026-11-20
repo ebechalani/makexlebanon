@@ -9,7 +9,8 @@
 import assert from 'node:assert/strict';
 import { before, describe, test } from 'node:test';
 
-import { ALL_GAMES, FIRE_CHIEF, FIRE_RESCUE, LOCKER_ROOM, WAREHOUSE_SORT } from '../members/all-examples';
+import { readCards } from '../fire-cadet/cards';
+import { ALL_GAMES, FIRE_CADET, FIRE_CHIEF, FIRE_RESCUE, LOCKER_ROOM, WAREHOUSE_SORT } from '../members/all-examples';
 import { fingerprintOf } from '../members/code-fingerprint.mjs';
 import { normalizeCode } from '../members/code-format.mjs';
 import { GAME_WHEN_NONE_IS_NAMED, handleUnlockRequest, type UnlockSetup } from '../members/unlock';
@@ -48,6 +49,7 @@ const RESCUE: ExamplesSource = { unlockUrl: '/u', game: 'fire-rescue' };
 const CHIEF: ExamplesSource = { unlockUrl: '/u', game: 'fire-chief' };
 const SORT: ExamplesSource = { unlockUrl: '/u', game: 'warehouse-sort' };
 const LOCKER: ExamplesSource = { unlockUrl: '/u', game: 'locker-room' };
+const CADET: ExamplesSource = { unlockUrl: '/u', game: 'fire-cadet' };
 
 const STARTER = { id: 'starter', title: 'Starter', about: 'first steps' };
 const HARDER = { id: 'harder', title: 'Harder', about: 'one whole mission' };
@@ -466,6 +468,48 @@ describe('two games behind one address', () => {
     // a server of before Locker Room does not know the game: "unknown-game" is no "wrong code"
     const before = (async () => Response.json({ ok: false, reason: 'unknown-game' }, { status: 400 })) as unknown as typeof fetch;
     assert.deepEqual(await requestUnlock(LOCKER, CODE, before), { kind: 'unreachable' });
+    // the code is kept in the one place of every game: a code typed in another game works here too
+    assert.equal(SAVED_CODE_KEY, storageKey('fire-rescue', 'member-code'));
+  });
+
+  test('Fire Cadet: the page names its game; a visitor gets 5 cards and 3 to open, a member code opens all 5, an advanced code shows 6 - and never a word of another game', async () => {
+    const server = pretendServer(setup);
+    const counts: string[] = [];
+    for (const code of [null, CODE, ADVANCED_CODE]) {
+      const outcome = await requestUnlock(CADET, code, server.fetch);
+      assert.ok(outcome.kind === 'examples');
+      assert.equal(outcome.member, code !== null);
+      counts.push(`${outcome.cards.length} / ${outcome.examples.length}`);
+      const got = JSON.stringify(outcome);
+      for (const example of [...FIRE_RESCUE.examples, ...FIRE_CHIEF.examples, ...WAREHOUSE_SORT.examples, ...LOCKER_ROOM.examples]) {
+        assert.ok(!got.includes(`"${example.id}"`) && !got.includes(example.title), `nothing about ${example.id}`);
+      }
+      if (code !== ADVANCED_CODE) {
+        for (const secret of ['cadet-all-four', FIRE_CADET.examples[5].title, 'dvanced', FIRE_CADET.levels[2].about]) assert.ok(!got.includes(secret), `${code ?? 'a visitor'} does not get "${secret}"`);
+      }
+      // a row of cards survives the door: every opened example reads back, with readCards, to the row of samples.ts - and keeps its map
+      for (const opened of outcome.examples) {
+        const original = FIRE_CADET.examples.find((example) => example.id === opened.id);
+        assert.ok(original, opened.id);
+        const row = readCards(original.program);
+        assert.ok(row.length > 0, opened.id);
+        assert.deepEqual(readCards(opened.program), row, `${opened.id}: the same row of cards`);
+        assert.equal(opened.program.field, (original.program as { field?: unknown }).field, `${opened.id}: the same map`);
+        assert.deepEqual(opened.program, original.program, `${opened.id}: the program, as it is`);
+      }
+    }
+    assert.deepEqual(counts, ['5 / 3', '5 / 5', '6 / 6']);
+    assert.deepEqual(server.sent, ['{"game":"fire-cadet"}', `{"game":"fire-cadet","code":"${CODE}"}`, `{"game":"fire-cadet","code":"${ADVANCED_CODE}"}`]);
+    // an answer about another game - or one without a name - is no answer for this page
+    for (const named of [{ game: 'fire-rescue' }, { game: 'fire-chief' }, { game: 'warehouse-sort' }, { game: 'locker-room' }, {}]) {
+      const other = (async () => Response.json({ ...answer(false, [], []), ...named })) as unknown as typeof fetch;
+      assert.deepEqual(await requestUnlock(CADET, null, other), { kind: 'unreachable' }, JSON.stringify(named));
+    }
+    // a server of before Fire Cadet does not know the game: "unknown-game" is no "wrong code"
+    const before = (async () => Response.json({ ok: false, reason: 'unknown-game' }, { status: 400 })) as unknown as typeof fetch;
+    assert.deepEqual(await requestUnlock(CADET, CODE, before), { kind: 'unreachable' });
+    const beforeCadet = pretendServer({ ...setup, games: [FIRE_RESCUE, FIRE_CHIEF, WAREHOUSE_SORT, LOCKER_ROOM] });
+    for (const code of [CODE, ADVANCED_CODE, 'FIRE-CCCC-4444', null]) assert.deepEqual(await requestUnlock(CADET, code, beforeCadet.fetch), { kind: 'unreachable' }, String(code));
     // the code is kept in the one place of every game: a code typed in another game works here too
     assert.equal(SAVED_CODE_KEY, storageKey('fire-rescue', 'member-code'));
   });

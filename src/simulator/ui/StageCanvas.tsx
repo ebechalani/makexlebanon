@@ -21,7 +21,7 @@
 import { memo, useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type RefObject } from 'react';
 import type { Vec2 } from '../core/geometry';
 import type { Pose, Simulation, ZoneOverlay } from '../core/types';
-import { drawStage, fitView, MatPainter, robotHit, STAGE_MARGIN, viewToMat, type StageOptions, type StageView } from './render';
+import { drawStage, fitView, MatPainter, robotHit, STAGE_MARGIN, viewToMat, type StageOptions, type StagePainters, type StageView } from './render';
 import { addRulerPoint, dragRulerPoint, isRulerClick, rulerClick, rulerHold, type Ruler, type RulerHold, type RulerPointer } from './ruler';
 import type { Trail } from './trail';
 
@@ -49,6 +49,8 @@ export interface StageCanvasProps {
    * on which it can still move.
    */
   margin?: number;
+  /** the game's own drawings of the robot, the elements, the walls and the ground (left out: the mBot2 games' drawings) */
+  painters?: StagePainters;
 }
 
 /** How far outside the robot (mm) a click still grabs it - fingers are thicker than a mouse pointer. */
@@ -175,6 +177,7 @@ function StageCanvasImpl(props: StageCanvasProps) {
           placing: p.placing,
           ghost: p.ghost,
           ruler: rulerRef.current,
+          painters: p.painters,
         });
       }),
     [painter, simRef, subscribeFrame, trail],

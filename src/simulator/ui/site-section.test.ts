@@ -307,7 +307,7 @@ test('pages: every simulator is /simulator/<game>, with its page folder, its add
   const folders = readdirSync(fromRoot('src/app/simulator'), { withFileTypes: true });
   assert.deepEqual(
     folders.map((entry) => (entry.isDirectory() ? `${entry.name}/` : entry.name)).sort(),
-    ['fire-chief/', 'fire-rescue/', 'locker-room/', 'page.tsx', 'warehouse-sort/'],
+    ['fire-cadet/', 'fire-chief/', 'fire-rescue/', 'locker-room/', 'page.tsx', 'warehouse-sort/'],
   );
   assert.ok(!existsSync(fromRoot('src/app/training/simulator')), 'the old folder is gone');
 });
@@ -401,6 +401,9 @@ test('title row of a game: Home / Simulator, not Training', () => {
     ['/simulator', 'Simulator'],
   ]);
   assert.match(html, /<h1[^>]*>Fire Rescue simulator /);
+  // after the title, the robot: the mBot2 when the screen names none, else the one it names
+  assert.match(html, /<h1[^>]*>Fire Rescue simulator <span[^>]*>· mBot2<\/span><\/h1>/);
+  assert.match(renderToStaticMarkup(createElement(TitleBar, { title: 'Fire Cadet', robot: 'mTiny' })), /<h1[^>]*>Fire Cadet simulator <span[^>]*>· mTiny<\/span><\/h1>/);
   // the four games show the same row: they all hand only their title to it
   for (const [loader, title] of [
     ['fire-rescue/FireRescueLoader.tsx', 'Fire Rescue'],

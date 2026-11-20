@@ -4,8 +4,8 @@
  * levels. This is what the server hands out from (see ./unlock.ts).
  *
  * Server only. This file brings the samples.ts and the sample-catalog.ts of every game along
- * (../fire-rescue, ../fire-chief, ../warehouse-sort and ../locker-room), so nothing of the
- * simulator screen may import it (a test, ./client-guard.test.ts, watches over this).
+ * (../fire-rescue, ../fire-chief, ../warehouse-sort, ../locker-room and ../fire-cadet), so nothing
+ * of the simulator screen may import it (a test, ./client-guard.test.ts, watches over this).
  *
  * A game is named here the way its page names it when it asks the server ("game" in the
  * request), which is also the id of the game in its game.ts.
@@ -15,6 +15,8 @@
  * example by its id alone. (The website is not built while two games share an id: see
  * mistakesInSetup in ./unlock.ts.)
  */
+import { EXAMPLE_LEVELS as FIRE_CADET_LEVELS, SAMPLE_CATALOG as FIRE_CADET_CATALOG } from '../fire-cadet/sample-catalog';
+import { getSampleProgram as fireCadetProgram } from '../fire-cadet/samples';
 import { EXAMPLE_LEVELS as FIRE_CHIEF_LEVELS, SAMPLE_CATALOG as FIRE_CHIEF_CATALOG } from '../fire-chief/sample-catalog';
 import { getSampleProgram as fireChiefProgram } from '../fire-chief/samples';
 import { EXAMPLE_LEVELS as FIRE_RESCUE_LEVELS, SAMPLE_CATALOG as FIRE_RESCUE_CATALOG } from '../fire-rescue/sample-catalog';
@@ -72,5 +74,17 @@ export const LOCKER_ROOM = {
   levels: LOCKER_ROOM_LEVELS,
 };
 
+/**
+ * Fire Cadet (MakeX Lebanon, Season 2027, the mTiny, ages 4-7): its six examples, ordered like the
+ * list in ../fire-cadet/sample-catalog.ts, under headings of its own. Every id starts with
+ * "cadet-". Its programs are rows of coding cards (../fire-cadet/cards.ts), not blocks: the door
+ * hands them out the same way.
+ */
+export const FIRE_CADET = {
+  game: 'fire-cadet',
+  examples: inCatalogOrder('Fire Cadet', FIRE_CADET_CATALOG, fireCadetProgram),
+  levels: FIRE_CADET_LEVELS,
+};
+
 /** Every game that has examples. A request to the server names one of them (or none, which means Fire Rescue). */
-export const ALL_GAMES = [FIRE_RESCUE, FIRE_CHIEF, WAREHOUSE_SORT, LOCKER_ROOM];
+export const ALL_GAMES = [FIRE_RESCUE, FIRE_CHIEF, WAREHOUSE_SORT, LOCKER_ROOM, FIRE_CADET];

@@ -25,11 +25,13 @@ export interface TitleBarProps {
    * it always was - the titles of Fire Rescue and Fire Chief fit a 360 px phone.
    */
   wrapOnPhone?: boolean;
+  /** the robot the simulator plays with, after the title ("mBot2" when left out; Fire Cadet: "mTiny") */
+  robot?: string;
   /** the buttons on the right of the row */
   children?: ReactNode;
 }
 
-export function TitleBar({ title, wrapOnPhone = false, children }: TitleBarProps) {
+export function TitleBar({ title, wrapOnPhone = false, robot = 'mBot2', children }: TitleBarProps) {
   return (
     <div className="relative z-30 flex shrink-0 flex-wrap items-center gap-x-2 gap-y-0.5 border-b border-white/10 bg-ink-950 px-3 py-1.5 text-white sm:h-12 sm:flex-nowrap sm:px-4 sm:py-0">
       <nav aria-label="Breadcrumb" className="max-sm:w-full">
@@ -52,7 +54,7 @@ export function TitleBar({ title, wrapOnPhone = false, children }: TitleBarProps
           lower than the row, so the row keeps its height. */}
       <div className="flex min-w-0 flex-1 flex-col justify-center">
         <h1 className={`truncate text-base font-semibold leading-tight text-white${wrapOnPhone ? ' max-sm:whitespace-normal' : ''}`}>
-          {title} simulator <span className="font-medium text-brand-300 max-md:hidden">· mBot2</span>
+          {title} simulator <span className="font-medium text-brand-300 max-md:hidden">· {robot}</span>
         </h1>
         <PoweredBy className="truncate max-sm:hidden" />
       </div>

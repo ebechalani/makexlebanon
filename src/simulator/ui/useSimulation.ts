@@ -416,13 +416,16 @@ export function useSimulation<S>(options: UseSimulationOptions<S>): SimulationCo
 
     logsRef.current = [];
     addLog({ time: 0, level: 'info', text: `Start! ${capital(optionsRef.current.scenarioWord ?? 'combination')} ${game.encodeScenario(scenarioRef.current)}.` });
-    if (!hasHatBlock(program)) {
+    // (the two warnings are about blocks: a game with an interpreter of its own - Fire Cadet's
+    // coding cards - says on its own screen what its program lacks)
+    const blockProgram = game.createVM === undefined;
+    if (blockProgram && !hasHatBlock(program)) {
       addLog({
         time: 0,
         level: 'warn',
         text: 'Nothing will happen: the program has no yellow "when CyberPi starts up" block to begin with.',
       });
-    } else if (!hasRunnableScript(program)) {
+    } else if (blockProgram && !hasRunnableScript(program)) {
       addLog({
         time: 0,
         level: 'warn',
@@ -532,6 +535,8 @@ export function useSimulation<S>(options: UseSimulationOptions<S>): SimulationCo
 
   // the floor sensors read the real mat picture as soon as it has loaded
   useEffect(() => {
+    // a robot without floor sensors has no sensor picture (Game.mat.sensorImageUrl is ''): nothing to load, nothing to warn about
+    if (game.mat.sensorImageUrl === '') return;
     let cancelled = false;
     loadRasterMatSampler(game.mat.sensorImageUrl, game.mat.width, game.mat.height, game.mat.vector.outside)
       .then((sampler) => {

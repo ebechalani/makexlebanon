@@ -313,6 +313,25 @@ describe('the words of the Examples window', () => {
     assert.match(EXAMPLES_WORDS.noExamples, /^No examples/);
   });
 
+  test('a game can say what loading one does in it: the sentence changes in the views that carry it, and only there', () => {
+    // (as Fire Cadet does: its examples are rows of cards, not blocks)
+    const BLOCKS = 'Loading one replaces the blocks in your workspace (Undo brings them back).';
+    const OWN = 'Loading one puts its cards in your row.';
+    const carrying: ExamplesView[] = [];
+    for (const view of VIEWS) {
+      const today = examplesIntro(view, ORG);
+      const own = examplesIntro(view, ORG, OWN);
+      assert.equal(examplesIntro(view, ORG, undefined), today, `${view}: left out is today's sentence`);
+      if (today.includes(BLOCKS)) {
+        carrying.push(view);
+        assert.equal(own, today.replace(BLOCKS, OWN), view);
+      } else {
+        assert.equal(own, today, `${view}: says nothing about loading, so nothing changes`);
+      }
+    }
+    assert.deepEqual(carrying, ['unlocked', 'all-open', 'some-open', 'checking-some-open']);
+  });
+
   test('the organisation is never written into the words themselves', () => {
     for (const status of EVERY_STATUS) assert.ok(!textOf(codeMessage(status, 'the Robot Club')).includes('MakeX'));
     for (const status of EVERY_STATUS) assert.ok(!textOf(codeMessage(status, 'the Robot Club', true)).includes('MakeX'));
@@ -695,6 +714,17 @@ describe('the window as each kind of visitor sees it', () => {
     // what the window itself adds to the answer is the same in both games, word for word
     assert.equal(ownWords(draw(inChief(windowWith(await ask(null, 'fire-chief'))))), ownWords(draw(windowWith(visitor))));
     assert.equal(ownWords(draw(inChief(unlockedWith(await ask(MEMBER_CODE, 'fire-chief'))))), ownWords(draw(unlockedWith(member))));
+  });
+
+  test('the window hands its game\'s sentence about loading to the line at the top (left out: the one about blocks)', () => {
+    const intro = (html: string): string => decode((html.match(/<p[^>]*data-examples-intro[^>]*>([\s\S]*?)<\/p>/) ?? ['', ''])[1]);
+    const OWN = 'Loading one puts its cards in your row.';
+    const drawWith = (examples: MemberExamples, howLoadingWorks?: string): string =>
+      renderToStaticMarkup(createElement(ExamplesDialog, { examples, onLoad: nothing, onClose: nothing, ...(howLoadingWorks === undefined ? {} : { howLoadingWorks }) }));
+    assert.equal(intro(drawWith(windowWith(visitor), OWN)), examplesIntro('some-open', ORG, OWN));
+    assert.equal(intro(drawWith(unlockedWith(member), OWN)), examplesIntro('unlocked', ORG, OWN));
+    assert.equal(drawWith(windowWith(visitor)), draw(windowWith(visitor)), 'left out: the window as before');
+    assert.equal(drawWith(windowWith(visitor), OWN).replace(OWN, ''), draw(windowWith(visitor)).replace('Loading one replaces the blocks in your workspace (Undo brings them back).', ''), 'nothing else changes');
   });
 
   test('a member is back: while the saved code is checked the line at the top is the one that stays', () => {

@@ -14,5 +14,5 @@ import { createEngineSimulation } from './engine';
 import type { Simulation, SimulationOptions } from './types';
 
 export function createSimulation<S>(opts: SimulationOptions<S>): Simulation<S> {
-  return createEngineSimulation(opts, createVM);
+  return createEngineSimulation(opts, opts.game.createVM ?? createVM);
 }
