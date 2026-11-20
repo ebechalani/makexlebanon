@@ -16,6 +16,9 @@
  *   Locker Room   the robot of Warehouse Sort (it carries a Team Box on top, which no block
  *                 touches): the same blocks, and the same hover texts about the white line and
  *                 the cubes; the colour sensor at the claw also reads the referee's colour card.
+ *   Fire Fighter  the robot of Fire Rescue, part for part: the same blocks. Its mat has black
+ *                 lines on white, as Fire Rescue's, so the line texts stay the catalog's; the
+ *                 gripper takes cubes, so two hover texts say "a cube", as Warehouse Sort's do.
  *
  *   Fire Rescue Junior   another version of Fire Rescue (the same robot and field, fewer draws):
  *                 the palette of Fire Rescue, through GAME_VERSIONS below.
@@ -37,7 +40,7 @@
 import { GRIPPER_SHORTCUT, type CategoryId } from './catalog';
 
 /** The games that have a palette: the same words as Game.id. */
-export type PaletteId = 'fire-rescue' | 'fire-chief' | 'warehouse-sort' | 'locker-room';
+export type PaletteId = 'fire-rescue' | 'fire-chief' | 'warehouse-sort' | 'locker-room' | 'fire-fighter';
 
 /** The palette an editor gets when no game is named (and for a game that has no palette of its own). */
 export const DEFAULT_PALETTE: PaletteId = 'fire-rescue';
@@ -51,6 +54,7 @@ export const PALETTES: Record<PaletteId, readonly CategoryId[]> = {
   'fire-chief': [...COMMON, 'extensionport', 'quadrgb', 'ultrasonic', 'frontcolorsensor'],
   'warehouse-sort': [...COMMON, 'servo', 'gripper', 'quadrgb', 'ultrasonic', 'colorsensor'],
   'locker-room': [...COMMON, 'servo', 'gripper', 'quadrgb', 'ultrasonic', 'colorsensor'],
+  'fire-fighter': [...COMMON, 'servo', 'gripper', 'quadrgb', 'ultrasonic', 'colorsensor'],
 };
 
 /**
@@ -72,6 +76,11 @@ export const PALETTE_TOOLTIPS: Partial<Record<PaletteId, Readonly<Record<string,
     sensing_quadrgb_probe_detects: 'True when this probe is over the white line (or over the black mat).',
     gripper_claw: `Opens or closes the claw and waits until it has finished. Closing on a cube grabs it. ${GRIPPER_SHORTCUT}`,
     sensing_claw_object_detected: "True when there is a cube or the referee's colour card in (or just in front of) the claw.",
+  },
+  // (the cubes of Fire Fighter; its lines are black on white, as in Fire Rescue: the line text stays the catalog's)
+  'fire-fighter': {
+    gripper_claw: `Opens or closes the claw and waits until it has finished. Closing on a cube grabs it. ${GRIPPER_SHORTCUT}`,
+    sensing_claw_object_detected: 'True when there is a cube in (or just in front of) the claw.',
   },
 };
 

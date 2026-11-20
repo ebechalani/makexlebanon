@@ -61,6 +61,12 @@ export interface ScreenWords {
   scenarios: string;
   scenarioTitle: string;
   /**
+   * The few words beside that heading in a category with one setup (SimulatorAppProps.fixedSetup:
+   * Fire Fighter, "one setup"), where a category that draws its arrangement shows the code of the
+   * one on the stage. Left out: nothing there. Only a screen with `fixedSetup` shows these words.
+   */
+  scenarioSummary?: string;
+  /**
    * The last line of that panel. Left out: the screen says how many combinations the game has
    * and that changing one puts the field back to the start.
    */

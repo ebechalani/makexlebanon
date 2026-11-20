@@ -97,6 +97,57 @@ export function boxesOverlap(
   return true;
 }
 
+/**
+ * The overlap of boxes A and B along each of the four axes that boxesOverlap() tries, in its order
+ * and with its arithmetic: A's forward direction, A's right direction, B's forward direction, B's
+ * right direction. A negative number is a gap of that size. Nothing returns early, so the four
+ * numbers can be compared with those of another moment (the engine's rigid groups do that).
+ *   out[0..3]  the overlaps (mm)
+ *   out[4..7]  +1 or -1: on which side of A box B lies along that axis - moving B along the axis
+ *              times this sign moves it away from A (the normal boxesOverlap() would give)
+ */
+export function boxAxisOverlaps(
+  ax: number,
+  ay: number,
+  ahw: number,
+  ahl: number,
+  asin: number,
+  acos: number,
+  bx: number,
+  by: number,
+  bhw: number,
+  bhl: number,
+  bsin: number,
+  bcos: number,
+  out: Float64Array,
+): void {
+  const dx = bx - ax;
+  const dy = by - ay;
+  // |cos| and |sin| of the angle between the two boxes
+  const c = Math.abs(asin * bsin + acos * bcos);
+  const s = Math.abs(asin * bcos - acos * bsin);
+
+  // axis 1: A's forward direction (asin, -acos)
+  let d = dx * asin - dy * acos;
+  out[0] = ahl + bhl * c + bhw * s - Math.abs(d);
+  out[4] = d < 0 ? -1 : 1;
+
+  // axis 2: A's right direction (acos, asin)
+  d = dx * acos + dy * asin;
+  out[1] = ahw + bhl * s + bhw * c - Math.abs(d);
+  out[5] = d < 0 ? -1 : 1;
+
+  // axis 3: B's forward direction (bsin, -bcos)
+  d = dx * bsin - dy * bcos;
+  out[2] = ahl * c + ahw * s + bhl - Math.abs(d);
+  out[6] = d < 0 ? -1 : 1;
+
+  // axis 4: B's right direction (bcos, bsin)
+  d = dx * bcos + dy * bsin;
+  out[3] = ahl * s + ahw * c + bhw - Math.abs(d);
+  out[7] = d < 0 ? -1 : 1;
+}
+
 /** True when the point (px, py) is inside the box (its edge counts as inside). */
 export function pointInBox(
   px: number,

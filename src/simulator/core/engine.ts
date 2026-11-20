@@ -29,10 +29,16 @@
  * that turns right beside a wall completes its turn and is pushed away from the wall. A real
  * robot would catch on the wall there.
  *
+ * Game elements can also be joined into rigid pieces made of several boxes (Body.group: Fire
+ * Fighter's letter towers, two side supports each). A piece slides as one and never turns, and
+ * what runs into it pushes it, or slides along it, by the side it met - not by how fast it came
+ * (see "Rigid groups" below). In a game without groups none of that runs.
+ *
  * Plain TypeScript, no DOM: it runs in the browser and headless under Node.
  * Use createSimulation() from ./simulation.ts unless you want to plug in your own VM.
  */
 import {
+  boxAxisOverlaps as importedBoxAxisOverlaps,
   boxesOverlap as importedBoxesOverlap,
   makeContact,
   pointInBox as importedPointInBox,
@@ -97,6 +103,7 @@ import {
  * match). So they are read once, here, into constants of this file.
  */
 const boxesOverlap = importedBoxesOverlap;
+const boxAxisOverlaps = importedBoxAxisOverlaps;
 const pointInBox = importedPointInBox;
 const rayBoxDistance = importedRayBoxDistance;
 const DC_MOTOR_PORTS = IMPORTED_DC_MOTOR_PORTS;
@@ -443,6 +450,25 @@ class EngineSimulation<S> implements Simulation<S> {
   private readonly maxSubstep: number;
   private readonly maxSubsteps: number;
 
+  // ---- rigid groups (Body.group, see "Rigid groups" below)
+  /** some body has a group: only then is the snapshot below kept, and contacts with members judged by their side */
+  private readonly hasGroups: boolean;
+  /** x, y and angle of every body at the last moment everything was apart (empty in a game without groups) */
+  private readonly apartBodies: Float64Array;
+  /** the robot's chassis and two fingers at that moment (what it carries is a body: apartBodies has it) */
+  private readonly apartShapes: Box[] = [makeBox(), makeBox(), makeBox()];
+  /** `epoch` at that moment: once the world has changed outside a tick, the snapshot is not used */
+  private apartEpoch = 0;
+  /** shiftBody is moving the members of a group, each of them once */
+  private shiftingGroup = false;
+  /** scratch for sideThatMet: two boxes now and then, and their overlaps along the four axes */
+  private readonly nowA: Box = makeBox();
+  private readonly nowB: Box = makeBox();
+  private readonly thenA: Box = makeBox();
+  private readonly thenB: Box = makeBox();
+  private readonly overlapsNow = new Float64Array(8);
+  private readonly overlapsThen = new Float64Array(8);
+
   // ---- sensors (values are cached so that reading a sensor twice in a tick is free)
   /** grows every time the robot's pose changes */
   private poseVersion = 0;
@@ -503,6 +529,9 @@ class EngineSimulation<S> implements Simulation<S> {
     this.lastBump = new Int32Array(n);
     this.savedBodies = new Float64Array(3 * n);
     this.savedDirty = new Uint8Array(n);
+    // (only a game with rigid groups keeps the snapshot of sideThatMet; it is taken below, once the robot stands)
+    this.hasGroups = bodies.some((b) => b.group !== undefined);
+    this.apartBodies = new Float64Array(this.hasGroups ? 3 * n : 0);
     for (let i = 0; i < n; i++) {
       const b = bodies[i];
       this.indexById.set(b.id, i);
@@ -594,6 +623,7 @@ class EngineSimulation<S> implements Simulation<S> {
     }
 
     this.updateShapes();
+    if (this.hasGroups) this.rememberApart();
     if (!robotFitsInRect(cfg, this.startPose, opts.game.startZone, this.robot.gripper.gap)) {
       this.pushEvent({
         type: 'log',
@@ -1376,11 +1406,14 @@ class EngineSimulation<S> implements Simulation<S> {
    * because the robot turns with a box between its fingers. If the box would fit between the
    * fingers when it stands straight, they turn it straight and centre it - so it swings round
    * with the claw instead of being squeezed out. Returns false when the body is not between
-   * the fingers or is too wide for them.
+   * the fingers or is too wide for them, and for a member of a rigid group (Body.group): turned
+   * and centred alone, it would leave its group (a 22.5 mm side support of a Fire Fighter tower
+   * fits between the open fingers). It is pushed out instead, and its group with it.
    */
   private straightenBetweenFingers(i: number): boolean {
     if (this.heldIndex >= 0) return false; // the claw is full
     const b = this.bodies[i];
+    if (b.group !== undefined) return false; // (a member of a group moves with its group only)
     const pose = this.robot.pose;
     const s = Math.sin(pose.heading);
     const c = Math.cos(pose.heading);
@@ -1649,7 +1682,9 @@ class EngineSimulation<S> implements Simulation<S> {
    * tips of the sticks, and all of it between their inner faces. (What it runs into on the way is
    * sorted out like every other push, right after this.) It is done for every element that stands
    * there, of any kind, and it moves the element without a touch: no part of the robot need be
-   * near it. A referee that judges touches should also look at what has moved.
+   * near it. A referee that judges touches should also look at what has moved. The one exception is
+   * a member of a rigid group (Body.group): swung alone it would leave its group; the sticks push
+   * it, and its group with it, like any other push.
    * A step that ends in a jam is taken back with everything in it (restoreState), so the swing goes
    * back too. Only the motion step's second jam rule, for games with fixed walls, puts back the
    * robot alone; Fire Cadet, the one game with fixed sticks, has no fixed walls.
@@ -1667,7 +1702,7 @@ class EngineSimulation<S> implements Simulation<S> {
     const zmax = zmin + g.fingerHeight;
     for (let i = 0; i < bodies.length; i++) {
       const b = bodies[i];
-      if (b.held) continue;
+      if (b.held || b.group !== undefined) continue;
       if (zmin >= b.z + b.h - Z_EPS || b.z >= zmax - Z_EPS) continue; // the sticks pass above or below it
       const dx = b.x - x;
       const dy = b.y - y;
@@ -1706,10 +1741,20 @@ class EngineSimulation<S> implements Simulation<S> {
     this.poseVersion++;
   }
 
-  /** Slide a body; whatever stands on top of it rides along. */
+  /** Slide a body; whatever stands on top of it rides along, and so do the other members of its group. */
   private shiftBody(i: number, dx: number, dy: number): void {
     const bodies = this.bodies;
     const b = bodies[i];
+    const group = b.group;
+    if (group !== undefined && !this.shiftingGroup) {
+      // a rigid group is one piece: every member moves by the same amount, each with its riders
+      this.shiftingGroup = true;
+      for (let j = 0; j < bodies.length; j++) {
+        if (bodies[j].group === group) this.shiftBody(j, dx, dy);
+      }
+      this.shiftingGroup = false;
+      return;
+    }
     b.x += dx;
     b.y += dy;
     this.dirty[i] = 1;
@@ -1747,8 +1792,26 @@ class EngineSimulation<S> implements Simulation<S> {
     return Math.max(Math.abs(dx), Math.abs(dy));
   }
 
-  /** Remember that body i cannot give way in direction (ux, uy), and why (SOFT: robot behind it, HARD: wall). */
+  /**
+   * Remember that body i cannot give way in direction (ux, uy), and why (SOFT: robot behind it,
+   * HARD: wall). A member of a rigid group: what is behind one member is behind the whole piece, so
+   * every member gets the same backing - and backingAgainst() asked about any member answers for the
+   * piece.
+   */
   private addBacking(i: number, ux: number, uy: number, kind: number): void {
+    const bodies = this.bodies;
+    const group = bodies[i].group;
+    if (group === undefined) {
+      this.addBackingTo(i, ux, uy, kind);
+      return;
+    }
+    for (let j = 0; j < bodies.length; j++) {
+      if (bodies[j].group === group) this.addBackingTo(j, ux, uy, kind);
+    }
+  }
+
+  /** addBacking() for body i alone. */
+  private addBackingTo(i: number, ux: number, uy: number, kind: number): void {
     const list = this.backing;
     const kinds = this.backingKind;
     const count = this.backingCount[i];
@@ -2070,6 +2133,8 @@ class EngineSimulation<S> implements Simulation<S> {
           const sh = shapes[k];
           if (sh.zmin >= top - Z_EPS || b.z >= sh.zmax - Z_EPS) continue; // one passes above the other
           if (!boxesOverlap(sh.x, sh.y, sh.hw, sh.hl, sh.sin, sh.cos, b.x, b.y, hw, hl, bs, bc, hit)) continue;
+          // (a member of a rigid group: across the side they met on, not the side of least overlap)
+          if (b.group !== undefined) this.robotMeetsMember(k, i, hit);
           if (hit.depth > deepest) deepest = hit.depth;
           touching = true;
           this.noteBump(i);
@@ -2121,10 +2186,12 @@ class EngineSimulation<S> implements Simulation<S> {
           // a fixed wall.
           const overWall = this.confineBody(i);
           if (overWall > deepest) deepest = overWall;
+          const groupA = a.group;
           for (let j = 0; j < n; j++) {
             if (j === i || (dirty[j] && j < i)) continue; // (a pair of moved bodies is looked at once)
             const b = bodies[j];
             if (b.held) continue;
+            if (groupA !== undefined && groupA === b.group) continue; // (one rigid piece: its members never push each other)
             if (a.z >= b.z + b.h - Z_EPS || b.z >= a.z + a.h - Z_EPS) continue;
             const dx = b.x - a.x;
             const dy = b.y - a.y;
@@ -2149,6 +2216,8 @@ class EngineSimulation<S> implements Simulation<S> {
             ) {
               continue;
             }
+            // (a member of a rigid group: across the side they met on, not the side of least overlap)
+            if (groupA !== undefined || b.group !== undefined) this.bodiesMeet(i, j, hit);
             if (hit.depth > deepest) deepest = hit.depth;
             this.separateBodies(i, j, hit.nx, hit.ny, hit.depth);
           }
@@ -2202,6 +2271,8 @@ class EngineSimulation<S> implements Simulation<S> {
       this.leftover = false;
     }
     this.unsettled = false;
+    // everything is apart: the moment the contacts of a rigid group are judged against (sideThatMet)
+    if (this.hasGroups) this.rememberApart();
     return true;
   }
 
@@ -2269,6 +2340,147 @@ class EngineSimulation<S> implements Simulation<S> {
     }
     this.confineBody(i);
     this.confineBody(j);
+  }
+
+  // ===========================================================================================
+  // Rigid groups (Body.group)
+  // ===========================================================================================
+  //
+  // Bodies with the same group are one rigid piece (Fire Fighter: the two side supports of a
+  // letter tower). shiftBody() moves every member when one of them is pushed; addBacking() gives
+  // every member what is behind one of them, so what stops one stops all; resolveContacts() never
+  // lets two members push each other; straightenBetweenFingers() and swingBetweenSticks() leave
+  // members alone (they would move or turn one member alone). So nothing turns a member: a push
+  // never turns a body, and a member is not grippable (Body.group). Nor does a member stand on a
+  // platform: one that lost its platform would come down alone (comeDown, slideOffWhatIsUnder).
+  //
+  // A contact with a member is pushed apart across the side the two met on, not across the side of
+  // least overlap that boxesOverlap() gives. How deep a cube has run into the front of a support
+  // during one small step depends on how far it moved in that step - on its speed: with the side
+  // of least overlap, a cube a little off the middle of a tower slid in when it was pushed fast and
+  // pushed the tower along when it was pushed slowly (the Fire Fighter design measured 5.0 mm of
+  // room at 10 RPM and 7 mm at 100 RPM). So the engine remembers where everything stood at the
+  // last moment everything was apart - the end of a settled resolveContacts() - and sideThatMet()
+  // takes the axis whose gap closed last since then. A cube that runs into the front of a support
+  // pushes the tower, at any speed; a cube that drifts against the inside of a support slides along
+  // it and nudges the tower aside. Who gives way is decided as before (separateBodies(), the
+  // backing). A game without groups keeps no snapshot and never comes here.
+  //
+  // Once the world has changed outside a tick (a new start pose, a restart, an element taken off
+  // the field or put back: `epoch`), the snapshot is not used until the next settled moment: what
+  // overlaps right after something was put down is pushed apart across its side of least overlap,
+  // as in every game. RefereeCall.removeBodies and restoreBodies take single elements: a referee
+  // that takes one member off the field, or puts one back, moves that member alone.
+
+  /** Everything is apart: remember where every body and the robot's chassis and fingers stand (see sideThatMet). */
+  private rememberApart(): void {
+    const bodies = this.bodies;
+    const at = this.apartBodies;
+    for (let i = 0; i < bodies.length; i++) {
+      const b = bodies[i];
+      at[3 * i] = b.x;
+      at[3 * i + 1] = b.y;
+      at[3 * i + 2] = b.angle;
+    }
+    for (let k = CHASSIS; k < CARRIED; k++) {
+      const sh = this.shapes[k];
+      const then = this.apartShapes[k];
+      then.x = sh.x;
+      then.y = sh.y;
+      then.hw = sh.hw;
+      then.hl = sh.hl;
+      then.sin = sh.sin;
+      then.cos = sh.cos;
+    }
+    this.apartEpoch = this.epoch;
+  }
+
+  /** Part k of the robot overlaps body i, a member of a group (`hit`: boxesOverlap's answer): see sideThatMet. */
+  private robotMeetsMember(k: number, i: number, hit: Contact): void {
+    if (this.apartEpoch !== this.epoch) return; // (just put down: the side of least overlap stays)
+    // (what the robot carries is a body: where it stood then is that body's place then)
+    const partThen = k === CARRIED ? this.apartBox(this.thenA, this.heldIndex) : this.apartShapes[k];
+    this.sideThatMet(this.shapes[k], partThen, this.bodyBox(this.nowB, i), this.apartBox(this.thenB, i), hit);
+  }
+
+  /** Bodies i and j overlap and at least one of them is a member of a group (`hit`: boxesOverlap's answer): see sideThatMet. */
+  private bodiesMeet(i: number, j: number, hit: Contact): void {
+    if (this.apartEpoch !== this.epoch) return; // (just put down: the side of least overlap stays)
+    this.sideThatMet(this.bodyBox(this.nowA, i), this.apartBox(this.thenA, i), this.bodyBox(this.nowB, j), this.apartBox(this.thenB, j), hit);
+  }
+
+  /** `box` set to the footprint of body i as it stands now. */
+  private bodyBox(box: Box, i: number): Box {
+    const b = this.bodies[i];
+    box.x = b.x;
+    box.y = b.y;
+    box.hw = b.w / 2;
+    box.hl = b.l / 2;
+    box.sin = Math.sin(b.angle);
+    box.cos = Math.cos(b.angle);
+    return box;
+  }
+
+  /** `box` set to the footprint of body i as it stood at the last moment everything was apart. */
+  private apartBox(box: Box, i: number): Box {
+    const b = this.bodies[i];
+    const at = this.apartBodies;
+    box.x = at[3 * i];
+    box.y = at[3 * i + 1];
+    box.hw = b.w / 2;
+    box.hl = b.l / 2;
+    box.sin = Math.sin(at[3 * i + 2]);
+    box.cos = Math.cos(at[3 * i + 2]);
+    return box;
+  }
+
+  /**
+   * Box A overlaps box B, and at least one of them is a member of a rigid group; `hit` holds the
+   * push of boxesOverlap(A, B), across the side of least overlap. `aThen` and `bThen` are the same
+   * two boxes at the last moment everything was apart. Of the four axes of boxesOverlap, those that
+   * had a gap then (or overlapped by no more than SETTLE_TOLERANCE) and overlap more now are the
+   * sides the two can have met on; the one whose gap closed last - at the largest share of the way
+   * from then to now - is the side they met on, and `hit` becomes the push across it, as deep as
+   * they overlap along it now. When no axis had a gap then (a squeeze that was there already),
+   * `hit` stays as it is.
+   */
+  private sideThatMet(a: Box, aThen: Box, b: Box, bThen: Box, hit: Contact): void {
+    const now = this.overlapsNow;
+    const then = this.overlapsThen;
+    boxAxisOverlaps(a.x, a.y, a.hw, a.hl, a.sin, a.cos, b.x, b.y, b.hw, b.hl, b.sin, b.cos, now);
+    boxAxisOverlaps(
+      aThen.x,
+      aThen.y,
+      aThen.hw,
+      aThen.hl,
+      aThen.sin,
+      aThen.cos,
+      bThen.x,
+      bThen.y,
+      bThen.hw,
+      bThen.hl,
+      bThen.sin,
+      bThen.cos,
+      then,
+    );
+    let best = -1;
+    let bestShare = -Infinity;
+    for (let axis = 0; axis < 4; axis++) {
+      if (then[axis] > SETTLE_TOLERANCE || now[axis] <= then[axis]) continue; // no gap then, or it did not close
+      const share = -then[axis] / (now[axis] - then[axis]); // how far from then to now it closed
+      if (share > bestShare) {
+        bestShare = share;
+        best = axis;
+      }
+    }
+    if (best < 0) return;
+    // the axes in the order of boxesOverlap: A forward (sin, -cos), A right (cos, sin), B forward, B right
+    const box = best < 2 ? a : b;
+    const forward = best % 2 === 0;
+    const side = now[4 + best];
+    hit.nx = side * (forward ? box.sin : box.cos);
+    hit.ny = side * (forward ? -box.cos : box.sin);
+    hit.depth = now[best];
   }
 
   /**

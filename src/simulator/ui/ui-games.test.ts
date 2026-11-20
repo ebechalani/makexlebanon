@@ -25,6 +25,7 @@ import { START_RECT, roomRect } from '../fire-chief/field';
 import { clock, fireChiefGame, KIND_FIRE_TARGET } from '../fire-chief/game';
 import { FIRE_CHIEF_ROBOT, START_POSE } from '../fire-chief/robot';
 import { PLAYABLE_MAZE_COUNT, decodeScenario, defaultScenario, encodeScenario, openField, scenarioProblems, withFire, type FireChiefScenario } from '../fire-chief/scenario';
+import { fireFighterGame } from '../fire-fighter/game';
 import { fireRescueGame, startPoseFor } from '../fire-rescue/game';
 import { arm, clawColorIs, colorSensorColor, colorSensorDetects, dcMotor, gripper, ifThen, moveCm, print, program, repeatUntil, script, setServo, stopDcMotor, turn, wait, whenStart } from '../vm/builder';
 import { ConsolePanel } from './ConsolePanel';
@@ -1266,6 +1267,22 @@ test('console: a wall is named after the two cells it stands between, or after i
   assert.equal(bodyName('bucket:red'), 'the red bucket');
   // every wall of a maze has such a name
   for (const w of fireChiefGame.createWalls?.(defaultScenario()) ?? []) assert.match(bodyName(w.id), /^the (wall between [A-E][1-5] and [A-E][1-5]|(top|right|bottom|left) wall)$/);
+});
+
+test('console: Fire Fighter names its four red cubes "a red cube" (they are alike), the yellow one "the yellow cube", a side support its tower', () => {
+  assert.equal(bodyName('cube:red-left-upper'), 'a red cube');
+  assert.equal(describeEvent({ type: 'bump', bodyId: 'cube:red-left-upper', time: 2 })?.text, 'Bumped into a red cube.');
+  assert.equal(describeEvent({ type: 'grab', bodyId: 'cube:red-right-lower', time: 3 })?.text, 'Picked up a red cube.');
+  assert.equal(describeEvent({ type: 'release', bodyId: 'cube:red-left-lower', onto: null, time: 4 })?.text, 'Put down a red cube on the mat.');
+  assert.equal(bodyName('cube:yellow'), 'the yellow cube');
+  assert.equal(bodyName('tower:K:left'), 'tower K');
+  assert.equal(describeEvent({ type: 'bump', bodyId: 'tower:X:right', time: 5 })?.text, 'Bumped into tower X.');
+  // every game element of the game has such a name
+  const names = fireFighterGame.createBodies(fireFighterGame.defaultScenario()).map((body) => bodyName(body.id));
+  assert.deepEqual(names, ['M', 'A', 'K', 'E', 'X'].flatMap((t) => [`tower ${t}`, `tower ${t}`]).concat(['a red cube', 'a red cube', 'a red cube', 'a red cube', 'the yellow cube']));
+  // the other games' cubes keep their names
+  assert.equal(bodyName('cube:team-red'), 'the RED team cube');
+  assert.equal(bodyName('cube:W2'), 'the W2 cube');
 });
 
 // =============================================================================================
