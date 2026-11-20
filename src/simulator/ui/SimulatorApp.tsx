@@ -5,8 +5,8 @@
  * right (stacked on narrow screens). It works for any Game; what is special about one category
  * (its examples, rules, combination editor, a few words) is passed in as props - see
  * ./fire-rescue/FireRescueSimulator.tsx (Fire Rescue Senior), ./fire-rescue-junior/FireRescueJuniorSimulator.tsx,
- * ./fire-chief/FireChiefSimulator.tsx, ./warehouse-sort/WarehouseSortSimulator.tsx and
- * ./locker-room/LockerRoomSimulator.tsx.
+ * ./fire-chief/FireChiefSimulator.tsx, ./warehouse-sort/WarehouseSortSimulator.tsx,
+ * ./locker-room/LockerRoomSimulator.tsx and ./fire-fighter/FireFighterSimulator.tsx.
  * Fire Cadet has a screen of its own: ./fire-cadet/FireCadetSimulator.tsx.
  *
  * Everything else the screen asks the game, the robot and the simulation:
@@ -158,6 +158,14 @@ export interface SimulatorAppProps<S> {
    * yellow start block. Left out: nothing is said.
    */
   emptyWorkspaceNote?: () => string | null;
+  /**
+   * true: this category has ONE setup and nothing is drawn (Fire Fighter). The title row has no
+   * "Test on many …" button, and the panel of the combination shows only the category's own
+   * editor (renderCombinationEditor): no code, no Random, no Default, no code field, no count.
+   * Beside the panel's heading stand the words `words.scenarioSummary` ("one setup") instead of
+   * the code. Left out: as always.
+   */
+  fixedSetup?: boolean;
   /** the category's own editor for a combination */
   renderCombinationEditor: (scenario: S, onChange: (next: S) => void) => ReactNode;
   /**
@@ -731,20 +739,23 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
     <div className={`${PAGE_FRAME} text-ink-900`}>
       {/* ================================================================ title row (under the site header) */}
       <TitleBar title={props.title} wrapOnPhone={props.titleWrapsOnPhone}>
-        <button
-          type="button"
-          onClick={() => {
-            hush();
-            setBatchOpen(true);
-          }}
-          disabled={!editorReady}
-          className={titleBarButton}
-          title={words.batchHint}
-        >
-          <TestIcon className="h-4 w-4" />
-          <span className="hidden md:inline">{`Test on many ${words.scenarios}`}</span>
-          <span className="md:hidden">Test</span>
-        </button>
+        {/* (a category with one setup has nothing to test it on many of: see `fixedSetup`) */}
+        {!props.fixedSetup && (
+          <button
+            type="button"
+            onClick={() => {
+              hush();
+              setBatchOpen(true);
+            }}
+            disabled={!editorReady}
+            className={titleBarButton}
+            title={words.batchHint}
+          >
+            <TestIcon className="h-4 w-4" />
+            <span className="hidden md:inline">{`Test on many ${words.scenarios}`}</span>
+            <span className="md:hidden">Test</span>
+          </button>
+        )}
         <div className="relative" ref={rules.ref}>
           <button type="button" onClick={() => rules.setOpen(!rules.open)} aria-expanded={rules.open} aria-haspopup="true" className={titleBarButton}>
             <RulesIcon className="h-4 w-4" />
@@ -1048,10 +1059,20 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
           </Section>
           </div>
 
-          <Section title={words.scenarioTitle} summary={<span className="font-mono">{game.encodeScenario(scenario)}</span>} open={open.combination} onToggle={toggleSection('combination')}>
-            <CombinationPanel game={game} scenario={scenario} onChange={changeScenario} words={words} readCode={props.readCode} randomDraws={props.randomDraws}>
-              {props.renderCombinationEditor(scenario, changeScenario)}
-            </CombinationPanel>
+          <Section
+            title={words.scenarioTitle}
+            summary={props.fixedSetup ? words.scenarioSummary : <span className="font-mono">{game.encodeScenario(scenario)}</span>}
+            open={open.combination}
+            onToggle={toggleSection('combination')}
+          >
+            {/* (one setup: the category's own list of it, and nothing to choose - see `fixedSetup`) */}
+            {props.fixedSetup ? (
+              props.renderCombinationEditor(scenario, changeScenario)
+            ) : (
+              <CombinationPanel game={game} scenario={scenario} onChange={changeScenario} words={words} readCode={props.readCode} randomDraws={props.randomDraws}>
+                {props.renderCombinationEditor(scenario, changeScenario)}
+              </CombinationPanel>
+            )}
           </Section>
 
           <Section
