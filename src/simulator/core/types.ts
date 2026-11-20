@@ -207,6 +207,15 @@ export interface GripperConfig {
   fingerLength: number;
   fingerThickness: number;
   fingerHeight: number;
+  /**
+   * true = the two fingers are two fixed STICKS on the front of the robot (Fire Cadet: the mTiny
+   * with its two pushing sticks). Nothing opens or closes them and they grip nothing. A game
+   * element that stands between them - its middle beside the sticks, not ahead of their tips, and
+   * all of it between them - goes round with the robot when the robot turns: it keeps its place
+   * in front of the robot and turns with it. Driving forward pushes it as always; driving
+   * backward leaves it where it is. Left out by every robot before the mTiny.
+   */
+  fixedSticks?: boolean;
 }
 
 export interface RobotConfig {
@@ -554,6 +563,28 @@ export interface RefereeCall {
    * World.walls is a new list without them. They do not come back in this match.
    */
   removeWalls?: string[];
+  /**
+   * Game elements (Body.id) the referee takes off the field now - Fire Cadet: a rescue item that
+   * has been delivered is collected, an obstacle that something touched is lifted. From the next
+   * tick on they are not in World.bodies: nothing collides with them and no sensor sees them. They
+   * come back only when the referee puts them back (restoreBodies); a restart does not bring them
+   * back. An element in the claw is taken out of it first; what stood on the element comes down
+   * onto the mat. An id that is no element here, or one that is gone already, changes nothing.
+   * Left out by every game before Fire Cadet.
+   */
+  removeBodies?: string[];
+  /**
+   * Game elements (Body.id) that the referee took off the field before (removeBodies) and now puts
+   * back - Fire Cadet: a lifted obstacle goes back on its own spot. Each one goes back where it
+   * stood at the start of the match (Body.home), unturned, standing on the mat, and only when that
+   * place is free: no part of the robot and no other element is nearer to its base than
+   * RESTORE_CLEARANCE (core/engine.ts), and no fixed wall stands in it (a wall never comes nearer,
+   * so it gets no margin). If it is not free, the element stays off the field
+   * and nothing happens: the referee asks again on a later tick (World.bodies shows whether it is
+   * back). It runs after removeBodies of the same call. An id that was never taken off, or that is
+   * back already, changes nothing. Left out by every game before Fire Cadet.
+   */
+  restoreBodies?: string[];
 }
 
 /**
@@ -614,6 +645,10 @@ export interface RestartRules {
 export interface Game<S = unknown> {
   id: string;
   title: string;
+  /**
+   * imageUrl: the picture the stage shows. sensorImageUrl: the picture the floor sensors read;
+   * '' = this game's robot has no floor sensor (Fire Cadet), so no second picture is loaded.
+   */
   mat: { width: number; height: number; imageUrl: string; sensorImageUrl: string; vector: MatVector };
   /** seconds */
   matchDuration: number;
@@ -655,6 +690,12 @@ export interface Game<S = unknown> {
    * can be played. For editors: a combination being built may be invalid for a while.
    */
   scenarioProblems?(s: S): string[];
+  /**
+   * The interpreter of this game's programs (left out = the interpreter of block programs, ../vm).
+   * Fire Cadet: a row of mTiny coding cards, or the direction panel. It gets the program object as
+   * it was saved and talks to the robot through RobotIO only.
+   */
+  createVM?(program: ProgramJson, io: import('./io').RobotIO): VM;
 }
 
 // =============================================================================================

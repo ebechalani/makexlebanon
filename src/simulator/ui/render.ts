@@ -501,7 +501,7 @@ export function drawBody(ctx: CanvasRenderingContext2D, body: Body, devicePerMm:
 // Robot
 // =============================================================================================
 
-type StageSim = Pick<Simulation<unknown>, 'world' | 'robotConfig' | 'game' | 'status' | 'readSensors'>;
+export type StageSim = Pick<Simulation<unknown>, 'world' | 'robotConfig' | 'game' | 'status' | 'readSensors'>;
 
 /** Oriented box around the whole robot (chassis and gripper), used to tell whether the pointer is on it. */
 export function robotHull(config: RobotConfig, pose: Pose): OBB {
@@ -1419,6 +1419,23 @@ export interface StageOptions {
   trail: boolean;
 }
 
+/**
+ * A game's own drawings (Fire Cadet: the mTiny with its two sticks, the rescue items, the
+ * obstacles, the Fire marker). Each one is optional; what a game leaves out is drawn as always.
+ * Every painter draws in millimetres on the mat (the transform of drawStage is set) and must
+ * leave the context as it found it (save / restore).
+ */
+export interface StagePainters {
+  /** flat things on the mat, right after the mat picture and under everything else */
+  ground?(ctx: CanvasRenderingContext2D, sim: StageSim, view: StageView): void;
+  /** one game element; true = drawn, false = let the stage draw it as always */
+  body?(ctx: CanvasRenderingContext2D, body: Body, view: StageView): boolean;
+  /** the fixed walls of the match, in place of the stage's grey boxes */
+  walls?(ctx: CanvasRenderingContext2D, walls: readonly FixedWall[], view: StageView): void;
+  /** the robot, in place of the mBot2 */
+  robot?(ctx: CanvasRenderingContext2D, sim: StageSim, view: StageView): void;
+}
+
 export interface StageScene {
   sim: StageSim;
   view: StageView;
@@ -1432,13 +1449,15 @@ export interface StageScene {
   ghost: Pose | null;
   /** the measuring line, while the ruler is on (null = no ruler) */
   ruler: Ruler | null;
+  /** the game's own drawings (left out: everything is drawn as for the mBot2 games) */
+  painters?: StagePainters;
 }
 
 /** The table the mat lies on: the website's ink-600 (the frame of the stage in StageCanvas.tsx has the same colour). */
 export const TABLE_COLOR = '#2c3a5c';
 
 export function drawStage(ctx: CanvasRenderingContext2D, scene: StageScene): void {
-  const { sim, view, options } = scene;
+  const { sim, view, options, painters } = scene;
   const devicePerMm = view.scale * view.dpr;
   const mat = sim.game.mat;
 
@@ -1456,6 +1475,7 @@ export function drawStage(ctx: CanvasRenderingContext2D, scene: StageScene): voi
   ctx.fillRect(0, 0, mat.width, mat.height);
   ctx.restore();
   scene.mat.paint(ctx, view);
+  painters?.ground?.(ctx, sim, view);
 
   // The zones: their coloured areas lie on the mat, under everything else. Their names are
   // written right after them - except on a field with walls: a name is often wider than its
@@ -1471,7 +1491,8 @@ export function drawStage(ctx: CanvasRenderingContext2D, scene: StageScene): voi
   if (scene.placing) drawStartZone(ctx, sim, view, scene.ghost !== null);
   if (options.trail) drawTrail(ctx, scene.trail, view);
   // the fixed walls of the match (a game without walls has none)
-  drawWalls(ctx, walls, view);
+  if (painters?.walls) painters.walls(ctx, walls, view);
+  else drawWalls(ctx, walls, view);
   if (options.overlays && namesOverWalls) drawZoneNames(ctx, scene.overlays, view);
 
   // game elements, lowest first, so that what stands on a tower is drawn over the tower
@@ -1484,6 +1505,7 @@ export function drawStage(ctx: CanvasRenderingContext2D, scene: StageScene): voi
   if (beam) drawUltrasonicBeam(ctx, beam, view);
 
   for (const body of standing) {
+    if (painters?.body?.(ctx, body, view)) continue;
     if (body.kind === FIRE_KIND) {
       // the fire: its sign first, then the body itself on top, with an outline that shows on a small stage too
       drawFlameSign(ctx, body, view);
@@ -1492,7 +1514,8 @@ export function drawStage(ctx: CanvasRenderingContext2D, scene: StageScene): voi
       drawBody(ctx, body, devicePerMm);
     }
   }
-  drawRobot(ctx, sim, devicePerMm);
+  if (painters?.robot) painters.robot(ctx, sim, view);
+  else drawRobot(ctx, sim, devicePerMm);
   // (only a game whose referee holds something has World.props: every other game draws nothing more here)
   drawProps(ctx, sim, view, devicePerMm);
   drawFanAir(ctx, sim, view);

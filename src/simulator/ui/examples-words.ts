@@ -41,8 +41,11 @@ export type ExamplesView = 'unlocked' | 'all-open' | 'some-open' | 'checking-som
 const WHAT_THEY_ARE = 'Ready-made programs to run, read and change.';
 const HOW_LOADING_WORKS = 'Loading one replaces the blocks in your workspace (Undo brings them back).';
 
-/** The one or two sentences at the top of the window. `organisation` is e.g. "MakeX Lebanon". */
-export function examplesIntro(view: ExamplesView, organisation: string): string {
+/**
+ * The one or two sentences at the top of the window. `organisation` is e.g. "MakeX Lebanon".
+ * `howLoadingWorks`: what loading does in this game (left out: it replaces the blocks).
+ */
+export function examplesIntro(view: ExamplesView, organisation: string, howLoadingWorks: string = HOW_LOADING_WORKS): string {
   const members = `registered ${organisation} members`;
   switch (view) {
     case 'unlocked':
@@ -51,9 +54,9 @@ export function examplesIntro(view: ExamplesView, organisation: string): string 
     // very words that stand there once the code is accepted, so that no card moves under a
     // finger at that moment. (The panel below says that the member code is being checked.)
     case 'checking-some-open':
-      return `${WHAT_THEY_ARE} ${HOW_LOADING_WORKS}`;
+      return `${WHAT_THEY_ARE} ${howLoadingWorks}`;
     case 'some-open':
-      return `${WHAT_THEY_ARE} ${HOW_LOADING_WORKS} The ones marked “${EXAMPLES_WORDS.membersOnly}” are for ${members}.`;
+      return `${WHAT_THEY_ARE} ${howLoadingWorks} The ones marked “${EXAMPLES_WORDS.membersOnly}” are for ${members}.`;
     case 'checking-saved':
       return `These ready-made programs are for ${members}.`;
     case 'locked':

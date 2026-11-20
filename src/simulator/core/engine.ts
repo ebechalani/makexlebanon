@@ -118,6 +118,14 @@ export const SIM_DT = 0.01;
  * can name it in its own texts and tests; it is the same for every game.)
  */
 export const TABLE_MARGIN = 100;
+/**
+ * RefereeCall.restoreBodies puts an element back on its place only when no part of the robot,
+ * no other element and no fixed wall is nearer to its base than this (mm). It is more than a
+ * referee's "touching" distance (Fire Cadet: 0.5 mm) and more than the robot moves in one tick
+ * (about 1.3 mm for the mTiny), so an element that has just been put back is not touched again
+ * in the same moment. (Exported so that a game can name it in its own texts and tests.)
+ */
+export const RESTORE_CLEARANCE = 5;
 /** The robot never moves further than this (mm) between two collision checks. */
 const MAX_SUBSTEP_MM = 2.5;
 const MAX_SUBSTEPS = 10;
@@ -363,6 +371,15 @@ class EngineSimulation<S> implements Simulation<S> {
   private clawBlocked = false;
   /** index of the body in the claw, or -1 */
   private heldIndex = -1;
+  /** the two fingers are fixed sticks: what stands between them goes round with the robot (see swingBetweenSticks) */
+  private readonly fixedSticks: boolean;
+  /**
+   * The elements the referee has taken off the field (removeBodies), kept so that it can put them
+   * back (restoreBodies), and the place of every element in the list as the game created it, taken
+   * at the first removal. Both stay null in a game whose referee never takes anything away.
+   */
+  private offField: Body[] | null = null;
+  private createdOrder: Map<string, number> | null = null;
   /** where the held body sits in the robot frame */
   private heldForward = 0;
   private heldTurn = 0;
@@ -554,6 +571,7 @@ class EngineSimulation<S> implements Simulation<S> {
     }
     this.shapeActive[FINGER_LEFT] = g.enabled;
     this.shapeActive[FINGER_RIGHT] = g.enabled;
+    this.fixedSticks = g.enabled && g.fixedSticks === true;
 
     const halfWidth = cfg.chassisWidth / 2;
     let radius = Math.max(Math.hypot(cfg.chassisFront, halfWidth), Math.hypot(cfg.chassisRear, halfWidth));
@@ -844,6 +862,8 @@ class EngineSimulation<S> implements Simulation<S> {
           for (const text of call.say) this.pushEvent({ type: 'log', level: 'info', text, time: world.time });
         }
         if (call.removeWalls) this.removeWalls(call.removeWalls);
+        if (call.removeBodies) this.removeBodies(call.removeBodies);
+        if (call.restoreBodies) this.restoreBodies(call.restoreBodies);
         if (call.end) {
           this.finish(call.end.reason, call.end.detail);
           return;
@@ -972,6 +992,7 @@ class EngineSimulation<S> implements Simulation<S> {
         pose.x += stepForward * Math.sin(mid);
         pose.y -= stepForward * Math.cos(mid);
         pose.heading += stepTurn;
+        if (this.fixedSticks && stepTurn !== 0) this.swingBetweenSticks(beforeX, beforeY, beforeHeading, stepTurn);
         this.updateShapes();
         const settled = this.resolveContacts();
         if (robot.touching) touching = true;
@@ -1616,6 +1637,54 @@ class EngineSimulation<S> implements Simulation<S> {
       carried.cos = Math.cos(b.angle);
       carried.zmin = b.z;
       carried.zmax = b.z + b.h;
+    }
+  }
+
+  /**
+   * Fixed sticks (GripperConfig.fixedSticks): the robot has just turned by `turn` (radians,
+   * clockwise positive) around (x, y), where it looked along `heading` before. Every game element
+   * that stood between the two sticks goes round with it: it is turned by the same angle around
+   * the same point, so it keeps its place in front of the robot. "Between the sticks" means: at
+   * the height of the sticks, its middle ahead of the front of the chassis and not ahead of the
+   * tips of the sticks, and all of it between their inner faces. (What it runs into on the way is
+   * sorted out like every other push, right after this.) It is done for every element that stands
+   * there, of any kind, and it moves the element without a touch: no part of the robot need be
+   * near it. A referee that judges touches should also look at what has moved.
+   * A step that ends in a jam is taken back with everything in it (restoreState), so the swing goes
+   * back too. Only the motion step's second jam rule, for games with fixed walls, puts back the
+   * robot alone; Fire Cadet, the one game with fixed sticks, has no fixed walls.
+   */
+  private swingBetweenSticks(x: number, y: number, heading: number, turn: number): void {
+    const g = this.cfg.gripper;
+    const bodies = this.bodies;
+    const s = Math.sin(heading);
+    const c = Math.cos(heading);
+    const ts = Math.sin(turn);
+    const tc = Math.cos(turn);
+    const half = this.robot.gripper.gap / 2;
+    const tip = g.gripForward + g.fingerLength / 2;
+    const zmin = this.robot.gripper.height;
+    const zmax = zmin + g.fingerHeight;
+    for (let i = 0; i < bodies.length; i++) {
+      const b = bodies[i];
+      if (b.held) continue;
+      if (zmin >= b.z + b.h - Z_EPS || b.z >= zmax - Z_EPS) continue; // the sticks pass above or below it
+      const dx = b.x - x;
+      const dy = b.y - y;
+      const along = dx * s - dy * c;
+      if (along <= this.cfg.chassisFront || along > tip) continue; // its middle is not beside the sticks
+      const across = dx * c + dy * s;
+      // how wide it is between the sticks (a turned square is wider)
+      const askew = b.angle - heading;
+      const halfWidth = (b.w * Math.abs(Math.cos(askew)) + b.l * Math.abs(Math.sin(askew))) / 2;
+      if (Math.abs(across) + halfWidth > half + GRIP_SLACK) continue; // not all of it is between them
+      b.x = x + dx * tc - dy * ts;
+      b.y = y + dx * ts + dy * tc;
+      b.angle += turn;
+      this.dirty[i] = 1;
+      this.unsettled = true;
+      this.bodiesShifted = true;
+      this.shiftCount++;
     }
   }
 
@@ -2287,6 +2356,161 @@ class EngineSimulation<S> implements Simulation<S> {
     this.world.walls = this.walls.filter((_, w) => data[w * WALL_STRIDE + WALL_H] !== -Infinity);
     // (a sensor value worked out before the wall went is not kept)
     this.epoch++;
+  }
+
+  /**
+   * The referee takes game elements off the field (RefereeCall.removeBodies: a delivered item is
+   * collected, a touched obstacle is lifted). The element leaves the list of bodies - World.bodies
+   * is that same list - and every number the engine keeps per body moves up with the bodies behind
+   * it. The element itself is kept aside, for restoreBodies. An element in the claw is taken out of
+   * it first; what stood on the element comes down onto the mat. An id that is no element here, or
+   * one that is gone already, changes nothing.
+   */
+  private removeBodies(ids: readonly string[]): void {
+    const bodies = this.bodies;
+    if (this.createdOrder === null) {
+      // (before anything is taken away, the list is still in the order the game created it)
+      const order = new Map<string, number>();
+      for (let i = 0; i < bodies.length; i++) order.set(bodies[i].id, i);
+      this.createdOrder = order;
+    }
+    const off = (this.offField ??= []);
+    let removed = false;
+    for (let i = bodies.length - 1; i >= 0; i--) {
+      const gone = bodies[i];
+      if (!ids.includes(gone.id)) continue;
+      if (this.heldIndex === i) this.letGo();
+      const n = bodies.length;
+      bodies.splice(i, 1);
+      off.push(gone);
+      this.bodyRadius.copyWithin(i, i + 1, n);
+      this.backing.copyWithin(i * MAX_BACKINGS * 2, (i + 1) * MAX_BACKINGS * 2, n * MAX_BACKINGS * 2);
+      this.backingKind.copyWithin(i * MAX_BACKINGS, (i + 1) * MAX_BACKINGS, n * MAX_BACKINGS);
+      this.backingCount.copyWithin(i, i + 1, n);
+      this.dirty.copyWithin(i, i + 1, n);
+      this.lastBump.copyWithin(i, i + 1, n);
+      if (this.heldIndex > i) this.heldIndex--;
+      for (let j = 0; j < bodies.length; j++) {
+        const rider = bodies[j];
+        if (rider.restingOn !== gone.id) continue;
+        // what stood on it comes down onto the mat and finds its place there
+        rider.restingOn = null;
+        rider.z = 0;
+        this.dirty[j] = 1;
+        this.unsettled = true;
+      }
+      removed = true;
+    }
+    if (!removed) return;
+    this.indexById.clear();
+    for (let i = 0; i < bodies.length; i++) this.indexById.set(bodies[i].id, i);
+    // (a sensor value worked out before the element went is not kept)
+    this.epoch++;
+  }
+
+  /**
+   * The referee puts game elements back that it took off the field (RefereeCall.restoreBodies:
+   * Fire Cadet's referee puts a lifted obstacle back on its spot). Each one goes back where it
+   * stood at the start of the match (Body.home), unturned and standing on the mat, and takes its
+   * old place in the list of bodies again (so World.bodies keeps the order the game gave it). It
+   * goes back only when that place is free (placeIsClear, RESTORE_CLEARANCE); otherwise it stays
+   * off the field and the referee asks again later. An id that was never taken off, or that is
+   * back already, changes nothing.
+   */
+  private restoreBodies(ids: readonly string[]): void {
+    const off = this.offField;
+    const order = this.createdOrder;
+    if (off === null || order === null) return; // (nothing was ever taken off)
+    const bodies = this.bodies;
+    let restored = false;
+    for (let k = 0; k < off.length; k++) {
+      const back = off[k];
+      if (!ids.includes(back.id)) continue;
+      const home = back.home;
+      if (!this.placeIsClear(back, home.x, home.y, home.angle, RESTORE_CLEARANCE)) continue;
+      off.splice(k, 1);
+      k--;
+      // its old place: right before the first element on the field that the game created after it
+      const created = order.get(back.id) ?? bodies.length;
+      let i = 0;
+      while (i < bodies.length && (order.get(bodies[i].id) ?? 0) < created) i++;
+      // Every number the engine keeps per body moves down by one place to make room. (The arrays
+      // were made for every element of the game, and this one was not on the field, so there is
+      // room.) The element starts with no backing and no recent bump.
+      const n = bodies.length;
+      bodies.splice(i, 0, back);
+      this.bodyRadius.copyWithin(i + 1, i, n);
+      this.backing.copyWithin((i + 1) * MAX_BACKINGS * 2, i * MAX_BACKINGS * 2, n * MAX_BACKINGS * 2);
+      this.backingKind.copyWithin((i + 1) * MAX_BACKINGS, i * MAX_BACKINGS, n * MAX_BACKINGS);
+      this.backingCount.copyWithin(i + 1, i, n);
+      this.dirty.copyWithin(i + 1, i, n);
+      this.lastBump.copyWithin(i + 1, i, n);
+      this.bodyRadius[i] = Math.hypot(back.w, back.l) / 2;
+      this.backingCount[i] = 0;
+      this.lastBump[i] = -BUMP_QUIET_TICKS - 1;
+      if (this.heldIndex >= i) this.heldIndex++;
+      this.placeBody(i, home.x, home.y, home.angle, 0, null);
+      restored = true;
+    }
+    if (!restored) return;
+    this.indexById.clear();
+    for (let i = 0; i < bodies.length; i++) this.indexById.set(bodies[i].id, i);
+    // (a sensor value worked out while the element was away is not kept)
+    this.epoch++;
+  }
+
+  /**
+   * Could element `b`, which is not on the field now, stand on the mat at (x, y), turned by
+   * `angle`, with no part of the robot and no element on the field nearer to its base than
+   * `clearance` mm, and inside no fixed wall? (Its base is grown by `clearance` on every side and
+   * must overlap nothing at its own height; at the corners of the base the room is a little more.
+   * A fixed wall never comes nearer, so against a wall only an overlap counts: an element that
+   * started right against a wall can go back there.)
+   */
+  private placeIsClear(b: Body, x: number, y: number, angle: number, clearance: number): boolean {
+    const bodies = this.bodies;
+    const hit = this.contact;
+    const hw = b.w / 2 + clearance;
+    const hl = b.l / 2 + clearance;
+    const s = Math.sin(angle);
+    const c = Math.cos(angle);
+    const top = b.h;
+    for (let j = 0; j < bodies.length; j++) {
+      const o = bodies[j];
+      if (o.held) continue; // (an element in the claw is looked at with the robot, below)
+      if (o.z >= top - Z_EPS) continue; // it is above it
+      if (boxesOverlap(x, y, hw, hl, s, c, o.x, o.y, o.w / 2, o.l / 2, Math.sin(o.angle), Math.cos(o.angle), hit)) return false;
+    }
+    for (let k = 0; k < SHAPE_COUNT; k++) {
+      if (!this.shapeActive[k]) continue;
+      const sh = this.shapes[k];
+      if (sh.zmin >= top - Z_EPS) continue; // this part of the robot passes above it
+      if (boxesOverlap(x, y, hw, hl, s, c, sh.x, sh.y, sh.hw, sh.hl, sh.sin, sh.cos, hit)) return false;
+    }
+    const data = this.wallData;
+    for (let w = 0, at = 0; w < this.wallCount; w++, at += WALL_STRIDE) {
+      if (data[at + WALL_H] <= Z_EPS) continue; // a wall the referee took away (its top is below the mat)
+      if (
+        boxesOverlap(
+          x,
+          y,
+          b.w / 2,
+          b.l / 2,
+          s,
+          c,
+          data[at + WALL_X],
+          data[at + WALL_Y],
+          data[at + WALL_HW],
+          data[at + WALL_HL],
+          data[at + WALL_SIN],
+          data[at + WALL_COS],
+          hit,
+        )
+      ) {
+        return false;
+      }
+    }
+    return true;
   }
 
   // ===========================================================================================

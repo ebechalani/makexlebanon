@@ -34,9 +34,11 @@ export interface ExamplesDialogProps {
   examples: MemberExamples;
   onLoad: (example: ExampleProgram) => void;
   onClose: () => void;
+  /** the sentence that says what loading an example does (left out: it replaces the blocks) */
+  howLoadingWorks?: string;
 }
 
-export function ExamplesDialog({ examples, onLoad, onClose }: ExamplesDialogProps) {
+export function ExamplesDialog({ examples, onLoad, onClose, howLoadingWorks }: ExamplesDialogProps) {
   const { config, levels, cards, available, unlocked, status, openList, refreshOpenList } = examples;
   const canOpen = (card: ExampleCard): boolean => available[card.id] !== undefined;
   // a member is back: the code saved on this device is being checked, there is nothing to type
@@ -101,7 +103,7 @@ export function ExamplesDialog({ examples, onLoad, onClose }: ExamplesDialogProp
   return (
     <Modal title="Examples" onClose={close} widthClass="max-w-3xl" align="top">
       <p className="mb-3 text-sm leading-relaxed text-ink-600" data-examples-intro>
-        {examplesIntro(view, config.organisation)}
+        {examplesIntro(view, config.organisation, howLoadingWorks)}
       </p>
 
       <MemberCodePanel examples={examples} />

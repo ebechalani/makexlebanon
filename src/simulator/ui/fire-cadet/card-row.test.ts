@@ -1,0 +1,230 @@
+/**
+ * Junior's row of coding cards (./card-row.ts, design 7.3 and 4.3): what every tap does, every
+ * refusal with its words, Undo and Redo - and, over 10,000 random taps, that the row is never
+ * invalid and never longer than the game allows.
+ *
+ * Run with:  npm run test:sim
+ */
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { CARD_NAMES, ROW_PROBLEM_WORDS, cardsFromText, cardsToText, readCards, rowProblem, type CardName } from '../../fire-cadet/cards';
+import { FIRE_CADET } from '../../fire-cadet/numbers';
+import {
+  ROW_IN_VIEW_GAP,
+  UNDO_STEPS,
+  addCard,
+  barIndex,
+  canRedo,
+  canUndo,
+  clearRow,
+  moveCard,
+  pageScrollToShow,
+  pageScrollToShowUnderBlock,
+  redo,
+  removeCard,
+  replaceRow,
+  rowOf,
+  selectCard,
+  undo,
+  type RowEdit,
+  type RowState,
+} from './card-row';
+
+const row = (text: string): RowState => rowOf(cardsFromText(text));
+const ok = (edit: RowEdit): RowState => {
+  assert.ok(edit.ok, edit.ok ? '' : `refused: ${edit.problem}`);
+  return edit.state;
+};
+const text = (state: RowState): string => cardsToText(state.cards);
+
+test('add: a card goes in at the bar; with nothing selected the bar is at the end of the row', () => {
+  let s = rowOf();
+  assert.equal(barIndex(s), 0);
+  s = ok(addCard(s, 'forward'));
+  s = ok(addCard(s, 'x3'));
+  s = ok(addCard(s, 'left'));
+  assert.equal(text(s), 'F3 L');
+  assert.equal(s.selected, null);
+  assert.equal(barIndex(s), 3);
+});
+
+test('select: the bar moves behind the selected card - behind its number card when it has one - and a tap in the box puts the card there', () => {
+  let s = row('F3 L F');
+  s = selectCard(s, 0);
+  assert.equal(barIndex(s), 2, 'behind the x3 of the selected Forward');
+  s = ok(addCard(s, 'right'));
+  assert.equal(text(s), 'F3 R L F');
+  // the bar moved behind the new card, which is now the selected one
+  assert.equal(s.selected, 2);
+  s = ok(addCard(s, 'x2'));
+  assert.equal(text(s), 'F3 R2 L F');
+  // a number card selected: the bar is right behind it
+  s = selectCard(s, 1);
+  assert.equal(barIndex(s), 2);
+  // tap the selected card again: let go, the bar is at the end again
+  s = selectCard(s, 1);
+  assert.equal(s.selected, null);
+  assert.equal(barIndex(s), s.cards.length);
+  // "the empty end of the row": select(null)
+  assert.equal(selectCard(selectCard(s, 0), null).selected, null);
+});
+
+test('refusals: a number card first, a second number card for an arrow, a full row - each with the game\'s words', () => {
+  const first = addCard(rowOf(), 'x2');
+  assert.deepEqual(first, { ok: false, problem: 'number-first' });
+  assert.equal(ROW_PROBLEM_WORDS['number-first'], 'Put an arrow card first.');
+  const twice = addCard(row('F3'), 'x2');
+  assert.deepEqual(twice, { ok: false, problem: 'number-twice' });
+  assert.equal(ROW_PROBLEM_WORDS['number-twice'], 'One number card for each arrow.');
+  // the arrow before the bar has a number card already, even when it is selected in the middle of the row
+  assert.deepEqual(addCard(selectCard(row('F3 L'), 0), 'x4'), { ok: false, problem: 'number-twice' });
+  // full: 70 cards
+  const full = rowOf(Array.from({ length: FIRE_CADET.MAX_ROW_CARDS }, () => 'right' as CardName));
+  assert.deepEqual(addCard(full, 'forward'), { ok: false, problem: 'full' });
+  assert.equal(ROW_PROBLEM_WORDS.full, 'The row is full: 70 cards.');
+  // a refused tap changes nothing: no step of Undo either
+  assert.equal(canUndo(row('F3')), false);
+});
+
+test('remove: the selected card, or the last one; an arrow takes its number card with it', () => {
+  let s = row('F3 L R2');
+  s = removeCard(s);
+  assert.equal(text(s), 'F3 L R', 'the last card: the x2 alone');
+  s = removeCard(selectCard(s, 0));
+  assert.equal(text(s), 'L R', 'the Forward and its x3');
+  assert.equal(s.selected, null);
+  s = removeCard(selectCard(row('F3 L'), 1));
+  assert.equal(text(s), 'F L', 'a number card alone');
+  assert.equal(removeCard(rowOf()).cards.length, 0);
+});
+
+test('move: an arrow moves with its number card past the whole piece beside it; a number card moves alone, only behind an arrow without one', () => {
+  // (places in the row: F 0, x3 1, L 2, R 3)
+  let s = selectCard(row('F3 L R'), 3);
+  s = ok(moveCard(s, -1));
+  assert.equal(text(s), 'F3 R L');
+  assert.equal(s.selected, 2, 'the moved card stays selected');
+  s = ok(moveCard(s, -1));
+  assert.equal(text(s), 'R F3 L');
+  assert.equal(s.selected, 0);
+  // the Forward with its x3, to the right past L
+  s = ok(moveCard(selectCard(s, 1), 1));
+  assert.equal(text(s), 'R L F3');
+  assert.equal(s.selected, 2);
+  // at the end of the row: nothing happens
+  const end = moveCard(s, 1);
+  assert.ok(end.ok && end.state === s);
+  // a number card alone: behind an arrow without one - fine
+  s = ok(moveCard(selectCard(row('F3 L'), 1), 1));
+  assert.equal(text(s), 'F L3');
+  // ... to the front: "A number card comes after an arrow."
+  assert.deepEqual(moveCard(selectCard(row('F3 L'), 1), -1), { ok: false, problem: 'number-alone' });
+  assert.equal(ROW_PROBLEM_WORDS['number-alone'], 'A number card comes after an arrow.');
+  // ... behind an arrow that has one: "One number card for each arrow."
+  assert.deepEqual(moveCard(selectCard(row('F3 L2'), 1), 1), { ok: false, problem: 'number-twice' });
+  // nothing selected: nothing happens
+  const none = moveCard(row('F L'), 1);
+  assert.ok(none.ok && none.state.cards.length === 2);
+});
+
+test('undo and redo: every change is one step; a new change forgets Redo; 100 steps are kept', () => {
+  let s = rowOf();
+  s = ok(addCard(s, 'forward'));
+  s = ok(addCard(s, 'x2'));
+  s = removeCard(s);
+  assert.equal(text(s), 'F');
+  s = undo(s);
+  assert.equal(text(s), 'F2');
+  s = undo(s);
+  assert.equal(text(s), 'F');
+  assert.ok(canRedo(s));
+  s = redo(s);
+  assert.equal(text(s), 'F2');
+  s = ok(addCard(s, 'left'));
+  assert.equal(canRedo(s), false);
+  // "New row": empty, and Undo brings the cards back
+  s = clearRow(s);
+  assert.equal(s.cards.length, 0);
+  assert.equal(text(undo(s)), 'F2 L');
+  // an example loaded is one step
+  s = replaceRow(s, cardsFromText('F3 B3'));
+  assert.equal(text(s), 'F3 B3');
+  assert.equal(text(undo(s)), '');
+  // at most UNDO_STEPS steps
+  let many = rowOf();
+  for (let i = 0; i < UNDO_STEPS + 20; i++) many = i % 2 === 0 ? ok(addCard(many, 'left')) : removeCard(many);
+  assert.equal(many.past.length, UNDO_STEPS);
+  assert.equal(UNDO_STEPS, 100);
+});
+
+test('10,000 random taps: the row is always valid and never longer than 70 cards (the screen never builds another row)', () => {
+  // a small fixed random generator, so a failure can be repeated
+  let seed = 2027;
+  const rnd = (): number => {
+    seed = (seed * 1103515245 + 12345) % 2147483648;
+    return seed / 2147483648;
+  };
+  let s = rowOf();
+  let refused = 0;
+  for (let i = 0; i < 10_000; i++) {
+    const r = rnd();
+    let edit: RowEdit | null = null;
+    if (r < 0.55) edit = addCard(s, CARD_NAMES[Math.floor(rnd() * CARD_NAMES.length)]);
+    else if (r < 0.65) s = selectCard(s, s.cards.length === 0 ? null : Math.floor(rnd() * (s.cards.length + 1)));
+    else if (r < 0.72) s = removeCard(s);
+    else if (r < 0.84) edit = moveCard(s, rnd() < 0.5 ? -1 : 1);
+    else if (r < 0.9) s = undo(s);
+    else if (r < 0.96) s = redo(s);
+    else if (r < 0.97) s = clearRow(s);
+    else s = selectCard(s, null);
+    if (edit !== null) {
+      if (edit.ok) s = edit.state;
+      else refused++;
+    }
+    assert.equal(rowProblem(s.cards), null, `step ${i}: ${text(s)}`);
+    assert.ok(s.cards.length <= FIRE_CADET.MAX_ROW_CARDS, `step ${i}: ${s.cards.length} cards`);
+    assert.deepEqual(readCards({ cards: s.cards }), [...s.cards], 'the row reads back as it is');
+    assert.ok(s.selected === null || (s.selected >= 0 && s.selected < s.cards.length), `step ${i}: selected ${s.selected}`);
+  }
+  assert.ok(refused > 100, `the random taps were refused ${refused} times: the refusals were tried`);
+});
+
+test('GO on a phone: how far the page scrolls so that the row stands between the map block and the bar of the round button', () => {
+  const gap = ROW_IN_VIEW_GAP;
+  // the band: under the map block (its bottom at 460 px) and over the bar (its top at 756 px) - a 390 x 844 phone
+  const band = { top: 460, bottom: 756 };
+  // in view already: the page stays
+  assert.equal(pageScrollToShow({ top: 470, bottom: 550 }, band), 0);
+  assert.equal(pageScrollToShow({ top: 460 + gap, bottom: 756 - gap }, band), 0);
+  // hidden under the map block (the child scrolled down to the Map section): back up, to just under the block
+  assert.equal(pageScrollToShow({ top: 200, bottom: 280 }, band), 200 - (460 + gap));
+  assert.equal(pageScrollToShow({ top: -300, bottom: -220 }, band), -300 - (460 + gap));
+  // below the bar: down, just far enough
+  assert.equal(pageScrollToShow({ top: 760, bottom: 840 }, band), 840 - (756 - gap));
+  // a row taller than the band (rows of many lines): its top under the block, never more
+  assert.equal(pageScrollToShow({ top: 600, bottom: 1200 }, band), 600 - (460 + gap));
+  // the gap is the one named
+  assert.equal(pageScrollToShow({ top: 400, bottom: 480 }, band, 0), -60);
+});
+
+test('the first screen of a phone: the title row and the mode switch are scrolled away, so that the row and the box (or the panel) stand above the bar', () => {
+  // 390 x 844, as measured in Chromium: the map block at 232-646 (it sticks at 65, under the site
+  // header), the row, its buttons and the box at 658-918, the bar at 756 - the box was under the bar
+  const block = { top: 232, bottom: 646 };
+  const by = pageScrollToShowUnderBlock({ top: 658, bottom: 918 }, block, 65, 756);
+  assert.equal(by, 167 + 3, 'first until the block sticks (167 px), then just far enough');
+  // after it: the block at 65-479, the work area at 488-748, between them and the bar, with the gap
+  assert.ok(658 - by >= 646 - 167 + ROW_IN_VIEW_GAP && 918 - by <= 756 - ROW_IN_VIEW_GAP);
+  // Mini at 390 x 844: the panel at 633-909 and its line to 933; Turn left, Turn right and Backward were under the bar.
+  // Panel and line are taller than the band: their top under the block - the four cards then stand above the bar
+  const panel = pageScrollToShowUnderBlock({ top: 633, bottom: 933 }, { top: 232, bottom: 623 }, 65, 756);
+  assert.equal(panel, 167 + 2);
+  assert.ok(909 - panel <= 756 - ROW_IN_VIEW_GAP && 633 - panel >= 623 - 167 + ROW_IN_VIEW_GAP, String(panel));
+  // a block that sticks already: as pageScrollToShow
+  const band = { top: 460, bottom: 756 };
+  for (const row of [{ top: 470, bottom: 550 }, { top: 200, bottom: 280 }, { top: 760, bottom: 840 }]) {
+    assert.equal(pageScrollToShowUnderBlock(row, { top: 65, bottom: 460 }, 65, 756), pageScrollToShow(row, band));
+  }
+  // in view already on the first screen (a tall window): the page stays, the title row and the mode switch too
+  assert.equal(pageScrollToShowUnderBlock({ top: 700, bottom: 900 }, { top: 150, bottom: 690 }, 81, 1100), 0);
+});

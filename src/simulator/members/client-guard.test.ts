@@ -2,10 +2,10 @@
  * The guard on the examples: nothing a visitor's browser gets may contain an example program,
  * the text that explains one - or so much as the title of one.
  *
- * Every game of the simulator has examples of its own: Fire Rescue, Fire Chief, Warehouse Sort
- * and Locker Room. The programs and descriptions (samples.ts in ../fire-rescue, ../fire-chief,
- * ../warehouse-sort and ../locker-room) and the lists of the titles (sample-catalog.ts, next to
- * them) stay on the server. They leave it only through
+ * Every game of the simulator has examples of its own: Fire Rescue, Fire Chief, Warehouse Sort,
+ * Locker Room and Fire Cadet. The programs and descriptions (samples.ts in ../fire-rescue,
+ * ../fire-chief, ../warehouse-sort, ../locker-room and ../fire-cadet) and the lists of the titles
+ * (sample-catalog.ts, next to them) stay on the server. They leave it only through
  * /api/simulator/unlock, which decides for every request what that visitor may see: an example
  * the owner keeps for advanced codes only must not show anywhere - not even its title, not
  * even the heading of its level - before an advanced code was checked. If a file of the
@@ -18,7 +18,8 @@
  *   - the files listed in HOLDERS below;
  *   - any file (that is not a test) which imports the program builder, vm/builder.ts: that is
  *     how an example program is written, so a new file of examples is caught without being
- *     listed here;
+ *     listed here (the examples of Fire Cadet are rows of cards, written without the builder:
+ *     their file is in HOLDERS by hand);
  *   - any file (that is not a test) in which the title or the id of an example is written,
  *     anywhere, even in a comment: so a list of titles copied into a file of the screen by
  *     hand is caught as well. That goes for files that are not code too - a .json file of
@@ -60,6 +61,9 @@ import { describe, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
+import { cardsToText } from '../fire-cadet/cards';
+import { EXAMPLE_LEVELS as CADET_LEVELS, SAMPLE_CATALOG as CADET_CATALOG } from '../fire-cadet/sample-catalog';
+import { SAMPLE_PROGRAMS as CADET_PROGRAMS } from '../fire-cadet/samples';
 import { EXAMPLE_LEVELS as CHIEF_LEVELS, SAMPLE_CATALOG as CHIEF_CATALOG } from '../fire-chief/sample-catalog';
 import { EXAMPLE_LEVELS as RESCUE_LEVELS, SAMPLE_CATALOG as RESCUE_CATALOG } from '../fire-rescue/sample-catalog';
 import { EXAMPLE_LEVELS as LOCKER_LEVELS, SAMPLE_CATALOG as LOCKER_CATALOG } from '../locker-room/sample-catalog';
@@ -74,24 +78,27 @@ const CATALOG = 'src/simulator/fire-rescue/sample-catalog.ts';
 const CHIEF_CATALOG_FILE = 'src/simulator/fire-chief/sample-catalog.ts';
 /** ... for Warehouse Sort ... */
 const SORT_CATALOG_FILE = 'src/simulator/warehouse-sort/sample-catalog.ts';
-/** ... and for Locker Room. */
+/** ... for Locker Room ... */
 const LOCKER_CATALOG_FILE = 'src/simulator/locker-room/sample-catalog.ts';
+/** ... and for Fire Cadet. */
+const CADET_CATALOG_FILE = 'src/simulator/fire-cadet/sample-catalog.ts';
 /** The list of every game, with the number of examples it holds. */
 const CATALOGS: ReadonlyArray<{ file: string; samples: string; game: string; examples: number }> = [
   { file: CATALOG, samples: 'src/simulator/fire-rescue/samples.ts', game: 'Fire Rescue', examples: 7 },
   { file: CHIEF_CATALOG_FILE, samples: 'src/simulator/fire-chief/samples.ts', game: 'Fire Chief', examples: 6 },
   { file: SORT_CATALOG_FILE, samples: 'src/simulator/warehouse-sort/samples.ts', game: 'Warehouse Sort', examples: 6 },
   { file: LOCKER_CATALOG_FILE, samples: 'src/simulator/locker-room/samples.ts', game: 'Locker Room', examples: 6 },
+  { file: CADET_CATALOG_FILE, samples: 'src/simulator/fire-cadet/samples.ts', game: 'Fire Cadet', examples: 6 },
 ];
 
 /** The cards of every game: what the titles and the ids are taken from. */
-const SAMPLE_CATALOG = [...RESCUE_CATALOG, ...CHIEF_CATALOG, ...SORT_CATALOG, ...LOCKER_CATALOG];
+const SAMPLE_CATALOG = [...RESCUE_CATALOG, ...CHIEF_CATALOG, ...SORT_CATALOG, ...LOCKER_CATALOG, ...CADET_CATALOG];
 /**
- * The headings of every game. (The four games call their levels the same - Starter,
- * Intermediate, Advanced - but the few words after a heading are a game's own, and all twelve
+ * The headings of every game. (The five games call their levels the same - Starter,
+ * Intermediate, Advanced - but the few words after a heading are a game's own, and all fifteen
  * are looked for.)
  */
-const EXAMPLE_LEVELS = [...RESCUE_LEVELS, ...CHIEF_LEVELS, ...SORT_LEVELS, ...LOCKER_LEVELS];
+const EXAMPLE_LEVELS = [...RESCUE_LEVELS, ...CHIEF_LEVELS, ...SORT_LEVELS, ...LOCKER_LEVELS, ...CADET_LEVELS];
 
 /** The files that hold the examples (paths from the repository's folder), and what they hold. */
 const HOLDERS: Record<string, string> = {
@@ -99,11 +106,14 @@ const HOLDERS: Record<string, string> = {
   'src/simulator/fire-chief/samples.ts': 'holds example programs and descriptions',
   'src/simulator/warehouse-sort/samples.ts': 'holds example programs and descriptions',
   'src/simulator/locker-room/samples.ts': 'holds example programs and descriptions',
+  // (written without the program builder - its programs are rows of cards - so it is listed by hand)
+  'src/simulator/fire-cadet/samples.ts': 'holds example programs and descriptions',
   'src/simulator/members/all-examples.ts': 'holds example programs and descriptions',
   [CATALOG]: 'holds the titles of the examples',
   [CHIEF_CATALOG_FILE]: 'holds the titles of the examples',
   [SORT_CATALOG_FILE]: 'holds the titles of the examples',
   [LOCKER_CATALOG_FILE]: 'holds the titles of the examples',
+  [CADET_CATALOG_FILE]: 'holds the titles of the examples',
 };
 
 /** Files that belong to the server for other reasons: the lists of codes and the code that checks one. */
@@ -164,12 +174,36 @@ function descriptionMarkers(examples: ReadonlyArray<{ description: string }>): R
   return markers;
 }
 
+/**
+ * What gives the PROGRAM of a Fire Cadet example away: its row of cards. A row is the whole
+ * program - a child can lay it without its title or its words - and it is a plain list of card
+ * names, written without the program builder, so nothing else would find it. For every example
+ * that is not open to everyone (not a starter), its row as a list of card names in any quotes and
+ * with any commas or blanks between them (JSON with " or ', a list joined with ", " or " "), and in
+ * the short notation of the cards ("F3 B L F3 ...", cards.ts cardsToText). Taken from the examples
+ * themselves, so a new example is looked for without being listed here.
+ */
+function cadetRowMarkers(): RegExp[] {
+  const escape = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const open = new Set(CADET_CATALOG.filter((card) => card.level === 'starter').map((card) => card.id));
+  const markers: RegExp[] = [];
+  for (const sample of CADET_PROGRAMS) {
+    if (open.has(sample.id)) continue;
+    const cards = sample.program.cards;
+    markers.push(new RegExp(`(?<![\\w-])${cards.map(escape).join(`['"\`]?[\\s,]*['"\`]?`)}(?![\\w-])`, 'i'));
+    markers.push(new RegExp(`(?<![\\w-])${cardsToText(cards).split(' ').map(escape).join('\\s+')}(?![\\w-])`, 'i'));
+  }
+  return markers;
+}
+
 /** The titles and ids of the real examples, of every game. */
 const TITLE_MARKERS = exampleMarkers(SAMPLE_CATALOG);
 /** The sentences of the descriptions of the real examples, of every game. */
 const DESCRIPTION_MARKERS = descriptionMarkers(ALL_GAMES.flatMap((game) => game.examples));
+/** The rows of the Fire Cadet examples that are not open to everyone. */
+const ROW_MARKERS = cadetRowMarkers();
 /** Everything that gives a real example away when it is written in a file. */
-const REAL_MARKERS = [...TITLE_MARKERS, ...DESCRIPTION_MARKERS];
+const REAL_MARKERS = [...TITLE_MARKERS, ...DESCRIPTION_MARKERS, ...ROW_MARKERS];
 
 const SOURCE_FILE = /\.(?:ts|tsx|mts|cts|js|jsx|mjs|cjs)$/;
 const TEST_FILE = /\.test\.[a-z]+$/;
@@ -617,6 +651,17 @@ describe('the examples stay on the server', () => {
       'src/simulator/ui/locker-room/LockerRoomSimulator.tsx',
       'src/simulator/ui/locker-room/LockerRoomLoader.tsx',
       'src/simulator/ui/locker-room/CardsEditor.tsx',
+      // Fire Cadet: its loader and its screen, and the parts of its screen that are components of their own
+      'src/simulator/ui/fire-cadet/FireCadetSimulator.tsx',
+      'src/simulator/ui/fire-cadet/FireCadetLoader.tsx',
+      'src/simulator/ui/fire-cadet/CardRow.tsx',
+      'src/simulator/ui/fire-cadet/DirectionPanel.tsx',
+      'src/simulator/ui/fire-cadet/GoButton.tsx',
+      'src/simulator/ui/fire-cadet/MapEditor.tsx',
+      'src/simulator/ui/fire-cadet/MapPicker.tsx',
+      'src/simulator/ui/fire-cadet/MatchBar.tsx',
+      'src/simulator/ui/fire-cadet/PlanningClock.tsx',
+      'src/simulator/ui/fire-cadet/RulesWindow.tsx',
     ]) {
       assert.ok(roots.client.includes(screen), `${screen} begins with 'use client'`);
     }
@@ -636,6 +681,25 @@ describe('the examples stay on the server', () => {
       assert.ok(fromPage.has(own), `${page}: the game itself`);
       for (const catalog of CATALOGS) assert.ok(!fromPage.has(catalog.file) && !fromPage.has(catalog.samples), `${page}: the screen holds no list of examples, and no example: not of ${catalog.game}`);
       assert.ok(reachableFrom(graph, simulator).has('src/simulator/vm/index.ts'), `${simulator}: and the interpreter`);
+    }
+    // the Fire Cadet page has a screen of its own, not the general one (design 10.3): it reaches its loader, its
+    // screen, the Examples window and what asks the server, its game and its two interpreters of cards - and not
+    // SimulatorApp.tsx, so the guard does not count on that file's words being harmless for it. (That holds
+    // because ui/fire-cadet/rules.ts declares its own types instead of importing RulesSection from there.)
+    // (It does reach vm/index.ts, through core/simulation.ts; nothing is asserted about that either way.)
+    {
+      const page = 'src/app/simulator/fire-cadet/page.tsx';
+      const loader = 'src/simulator/ui/fire-cadet/FireCadetLoader.tsx';
+      const simulator = 'src/simulator/ui/fire-cadet/FireCadetSimulator.tsx';
+      assert.ok(roots.pages.includes(page), page);
+      const fromPage = reachableFrom(graph, page);
+      assert.ok(fromPage.has(loader) && fromPage.has(simulator), `${page} -> loader -> import() -> the screen of its game`);
+      assert.ok(reachableFrom(graph, loader).has(simulator), `${loader} -> the Fire Cadet screen`);
+      assert.ok(!fromPage.has('src/simulator/ui/SimulatorApp.tsx'), `${page}: not the general screen`);
+      assert.ok(fromPage.has('src/simulator/ui/ExamplesDialog.tsx'), `${page}: the Examples window`);
+      assert.ok(fromPage.has('src/simulator/ui/member-unlock.ts'), page);
+      for (const own of ['src/simulator/fire-cadet/game.ts', 'src/simulator/fire-cadet/cards.ts']) assert.ok(fromPage.has(own), `${page}: ${own}`);
+      for (const catalog of CATALOGS) assert.ok(!fromPage.has(catalog.file) && !fromPage.has(catalog.samples), `${page}: the screen holds no list of examples, and no example: not of ${catalog.game}`);
     }
     // the Fire Chief screen has files of its own: its words, its rules window and its maze panel are looked at too
     const chiefScreen = reachableFrom(graph, 'src/simulator/ui/fire-chief/FireChiefSimulator.tsx');
@@ -666,6 +730,24 @@ describe('the examples stay on the server', () => {
     ]) {
       assert.ok(lockerScreen.has(file), `the Locker Room screen -> ${file}`);
     }
+    // ... and so has the Fire Cadet screen: its words, its rules window, the row of cards, the direction panel,
+    // the own-map editor, the map code, its drawings on the stage, the banner and the planning clock
+    const cadetScreen = reachableFrom(graph, 'src/simulator/ui/fire-cadet/FireCadetSimulator.tsx');
+    for (const file of [
+      'src/simulator/ui/fire-cadet/words.ts',
+      'src/simulator/ui/fire-cadet/rules.ts',
+      'src/simulator/ui/fire-cadet/CardRow.tsx',
+      'src/simulator/ui/fire-cadet/card-row.ts',
+      'src/simulator/ui/fire-cadet/DirectionPanel.tsx',
+      'src/simulator/ui/fire-cadet/MapEditor.tsx',
+      'src/simulator/ui/fire-cadet/map-editor.ts',
+      'src/simulator/ui/fire-cadet/map-code.ts',
+      'src/simulator/ui/fire-cadet/paint.ts',
+      'src/simulator/ui/fire-cadet/banner.ts',
+      'src/simulator/ui/fire-cadet/planning-clock.ts',
+    ]) {
+      assert.ok(cadetScreen.has(file), `the Fire Cadet screen -> ${file}`);
+    }
     // the page that lists the simulators is a page of the website like any other
     assert.ok(roots.pages.includes('src/app/simulator/page.tsx'));
   });
@@ -676,7 +758,7 @@ describe('the examples stay on the server', () => {
     // the examples of every game: its list of titles and its programs
     assert.deepEqual(
       CATALOGS.map((catalog) => catalog.game),
-      ['Fire Rescue', 'Fire Chief', 'Warehouse Sort', 'Locker Room'],
+      ['Fire Rescue', 'Fire Chief', 'Warehouse Sort', 'Locker Room', 'Fire Cadet'],
     );
     for (const catalog of CATALOGS) {
       assert.match(forbidden.get(catalog.file) ?? '', /titles/, catalog.file);
@@ -688,7 +770,9 @@ describe('the examples stay on the server', () => {
       [],
       'a file that imports the program builder holds programs: list it in HOLDERS and keep it on the server',
     );
-    for (const catalog of CATALOGS) assert.ok((graph.edges.get(catalog.samples) ?? []).includes(BUILDER), `${catalog.samples} is written with the program builder`);
+    // (the examples of Fire Cadet are rows of coding cards, plain objects: the one samples.ts without the builder, which is why HOLDERS names it)
+    for (const catalog of CATALOGS.filter((c) => c.game !== 'Fire Cadet')) assert.ok((graph.edges.get(catalog.samples) ?? []).includes(BUILDER), `${catalog.samples} is written with the program builder`);
+    assert.ok(!(graph.edges.get('src/simulator/fire-cadet/samples.ts') ?? []).includes(BUILDER), 'the rows of Fire Cadet are not block programs');
     // ... and the server's own list brings them all along
     for (const catalog of CATALOGS) {
       for (const file of [catalog.file, catalog.samples]) assert.ok((graph.edges.get('src/simulator/members/all-examples.ts') ?? []).includes(file), `all-examples.ts imports ${file}`);
@@ -700,11 +784,12 @@ describe('the examples stay on the server', () => {
     assert.equal(exampleMarkers(CHIEF_CATALOG).length, 6 + 0 + 6, 'Fire Chief: six titles (none with a colon), six ids of more than one word');
     assert.equal(exampleMarkers(SORT_CATALOG).length, 6 + 0 + 6, 'Warehouse Sort: six titles (none with a colon), six ids of more than one word');
     assert.equal(exampleMarkers(LOCKER_CATALOG).length, 6 + 0 + 6, 'Locker Room: six titles (none with a colon), six ids of more than one word');
-    assert.equal(TITLE_MARKERS.length, 15 + 12 + 12 + 12, 'and the guard looks for all of them');
-    assert.equal(SAMPLE_CATALOG.length, 7 + 6 + 6 + 6);
-    // ... and for the sentences of every description: of all twenty-five examples, several each
+    assert.equal(exampleMarkers(CADET_CATALOG).length, 6 + 0 + 6, 'Fire Cadet: six titles (none with a colon), six ids of more than one word');
+    assert.equal(TITLE_MARKERS.length, 15 + 12 + 12 + 12 + 12, 'and the guard looks for all of them');
+    assert.equal(SAMPLE_CATALOG.length, 7 + 6 + 6 + 6 + 6);
+    // ... and for the sentences of every description: of all thirty-one examples, several each
     const everyExample = ALL_GAMES.flatMap((game) => game.examples);
-    assert.equal(everyExample.length, 7 + 6 + 6 + 6);
+    assert.equal(everyExample.length, 7 + 6 + 6 + 6 + 6);
     for (const example of everyExample) {
       const mine = descriptionMarkers([example]);
       assert.ok(mine.length >= 2, `${example.id}: ${mine.length} sentences of its description are looked for`);
@@ -714,7 +799,32 @@ describe('the examples stay on the server', () => {
       assert.ok(REAL_MARKERS.some((marker) => marker.test(`about: '${first}'`)), `${example.id}: ${first}`);
       assert.ok(REAL_MARKERS.some((marker) => marker.test(first.toUpperCase().replace(/ /g, '\n  '))), `${example.id}, in capitals and over many lines`);
     }
-    assert.equal(REAL_MARKERS.length, TITLE_MARKERS.length + DESCRIPTION_MARKERS.length);
+    assert.equal(REAL_MARKERS.length, TITLE_MARKERS.length + DESCRIPTION_MARKERS.length + ROW_MARKERS.length);
+    // ... and for the row of every Fire Cadet example that is not open to everyone (in a card game the row is the whole program)
+    const locked = CADET_CATALOG.filter((card) => card.level !== 'starter');
+    assert.equal(locked.length, 3);
+    assert.equal(ROW_MARKERS.length, 2 * locked.length, 'two ways of writing each locked row');
+    for (const card of locked) {
+      const cards = (CADET_PROGRAMS.find((sample) => sample.id === card.id) as (typeof CADET_PROGRAMS)[number]).program.cards;
+      const writings = [
+        `export const PROBE_ROW = { format: 'mtiny-cards', version: 1, cards: [${cards.map((c) => `'${c}'`).join(',')}], field: 'P1' };`,
+        JSON.stringify({ cards }),
+        `cards: [\n  ${cards.map((c) => `'${c}'`).join(',\n  ')}\n]`,
+        cards.join(', '),
+        cards.join(' '),
+        `const row = '${cardsToText(cards)}';`,
+        cardsToText(cards).replace(/ /g, '\n'),
+      ];
+      for (const writing of writings) assert.ok(REAL_MARKERS.some((marker) => marker.test(writing)), `${card.id}: ${writing}`);
+    }
+    // the rows that are open to everyone, and rows that only begin like a locked one, are not looked for
+    for (const card of CADET_CATALOG.filter((c) => c.level === 'starter')) {
+      const cards = (CADET_PROGRAMS.find((sample) => sample.id === card.id) as (typeof CADET_PROGRAMS)[number]).program.cards;
+      for (const harmless of [JSON.stringify(cards), cardsToText(cards)]) assert.ok(!REAL_MARKERS.some((marker) => marker.test(harmless)), harmless);
+    }
+    for (const harmless of ["['forward', 'x3', 'left']", 'F3 B L', "['forward','backward','left','right']", 'Forward, x3']) {
+      assert.ok(!REAL_MARKERS.some((marker) => marker.test(harmless)), harmless);
+    }
     for (const card of SAMPLE_CATALOG) {
       assert.ok(REAL_MARKERS.some((marker) => marker.test(`title: '${card.title}'`)), card.title);
       assert.ok(REAL_MARKERS.some((marker) => marker.test(card.title.toUpperCase())), `${card.title}, in capitals`);
@@ -763,6 +873,28 @@ describe('the examples stay on the server', () => {
     ]) {
       assert.ok(!REAL_MARKERS.some((marker) => marker.test(harmless)), harmless);
     }
+    // and for Fire Cadet - whose screen speaks of the Cat, the Safe Zone, the cards and the maps all the time
+    for (const telling of ["'cadet-all-four'", '"cadet-two-rescues"', '`cadet-turn-around`', 'the "Round the closed road" program', 'ALL FOUR RESCUES', 'data-example="cadet-three-forward"']) {
+      assert.ok(REAL_MARKERS.some((marker) => marker.test(telling)), telling);
+    }
+    for (const harmless of [
+      'fire-cadet',
+      'Fire Cadet',
+      'cadet',
+      'the Cat',
+      'the Safe Zone',
+      'Turn right',
+      'x3',
+      'Map 1',
+      'there and back',
+      'two rescues',
+      'the Road Closed sign',
+      'the closed road',
+      'three cards',
+      'cadet-all-four-later',
+    ]) {
+      assert.ok(!REAL_MARKERS.some((marker) => marker.test(harmless)), harmless);
+    }
   });
 
   test("nothing reachable from a 'use client' file, a page, a layout or a component imports a file that holds programs, descriptions or titles", () => {
@@ -790,8 +922,8 @@ describe('the examples stay on the server', () => {
         'must not get the word "Advanced" either.\n',
     );
     // the headings of every game are looked for: the names of the three levels, and the words after each heading
-    assert.equal(EXAMPLE_LEVELS.length, 3 + 3 + 3 + 3);
-    assert.equal(new Set(EXAMPLE_LEVELS.map((level) => level.about)).size, 12, 'twelve different texts');
+    assert.equal(EXAMPLE_LEVELS.length, 3 + 3 + 3 + 3 + 3);
+    assert.equal(new Set(EXAMPLE_LEVELS.map((level) => level.about)).size, 15, 'fifteen different texts');
     assert.deepEqual([...new Set(EXAMPLE_LEVELS.map((level) => level.id))], ['starter', 'intermediate', 'advanced']);
     // (the check looks at the screen's own files, and at their code, not at their comments)
     const screen = reachableFrom(graph, 'src/simulator/ui/fire-rescue/FireRescueSimulator.tsx');
@@ -855,6 +987,8 @@ describe('the examples stay on the server', () => {
     assert.deepEqual(importers('src/simulator/warehouse-sort/samples.ts'), ['src/simulator/members/all-examples.ts']);
     assert.deepEqual(importers(LOCKER_CATALOG_FILE), ['src/simulator/locker-room/samples.ts', 'src/simulator/members/all-examples.ts']);
     assert.deepEqual(importers('src/simulator/locker-room/samples.ts'), ['src/simulator/members/all-examples.ts']);
+    assert.deepEqual(importers(CADET_CATALOG_FILE), ['src/simulator/fire-cadet/samples.ts', 'src/simulator/members/all-examples.ts']);
+    assert.deepEqual(importers('src/simulator/fire-cadet/samples.ts'), ['src/simulator/members/all-examples.ts']);
     assert.deepEqual(importers('src/simulator/members/all-examples.ts'), ['src/app/api/simulator/unlock/route.ts']);
     assert.deepEqual(importers('src/simulator/members/unlock.ts'), ['src/app/api/simulator/unlock/route.ts']);
     assert.deepEqual(importers('content/simulator-codes.ts'), ['src/app/api/simulator/unlock/route.ts']);

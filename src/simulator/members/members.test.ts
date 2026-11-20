@@ -7,7 +7,7 @@
  *     a request that is too large, a cancelled code, examples that are open to everyone
  *   - who sees what: a visitor, a member code and an advanced code - and that an example kept
  *     for advanced codes only is in no answer but the one to an advanced code
- *   - four games behind one address: each game's examples for each kind of visitor, nothing of
+ *   - five games behind one address: each game's examples for each kind of visitor, nothing of
  *     another game in an answer, a request that names no game, one that names an unknown
  *     one, and the count of wrong codes across the games
  *   - the courtesy limit on wrong codes
@@ -34,6 +34,11 @@ import {
 } from '../../../content/simulator-codes';
 import { addToListFile, emptyListFile, freshListFile, main as generateCodes, makeCodes, readListFile } from '../../../scripts/generate-simulator-codes.mjs';
 import { GET as routeGet, POST as routePost } from '../../app/api/simulator/unlock/route';
+import { readCards, rowProblem } from '../fire-cadet/cards';
+import { fireCadetGame } from '../fire-cadet/game';
+import { EXAMPLE_LEVELS as CADET_LEVELS, SAMPLE_CATALOG as CADET_CATALOG } from '../fire-cadet/sample-catalog';
+import { SAMPLE_PROGRAMS as CADET_PROGRAMS } from '../fire-cadet/samples';
+import { practiceMapNumber, readMapCode } from '../fire-cadet/scenario';
 import { fireChiefGame } from '../fire-chief/game';
 import { EXAMPLE_LEVELS as CHIEF_LEVELS, SAMPLE_CATALOG as CHIEF_CATALOG } from '../fire-chief/sample-catalog';
 import { SAMPLE_PROGRAMS as CHIEF_PROGRAMS } from '../fire-chief/samples';
@@ -47,7 +52,7 @@ import { EXAMPLES_GAMES } from '../ui/member-unlock';
 import { warehouseSortGame } from '../warehouse-sort/game';
 import { EXAMPLE_LEVELS as SORT_LEVELS, SAMPLE_CATALOG as SORT_CATALOG } from '../warehouse-sort/sample-catalog';
 import { SAMPLE_PROGRAMS as SORT_PROGRAMS } from '../warehouse-sort/samples';
-import { ALL_GAMES, FIRE_CHIEF, FIRE_RESCUE, LOCKER_ROOM, WAREHOUSE_SORT } from './all-examples';
+import { ALL_GAMES, FIRE_CADET, FIRE_CHIEF, FIRE_RESCUE, LOCKER_ROOM, WAREHOUSE_SORT } from './all-examples';
 import { FINGERPRINT_BYTES, FINGERPRINT_PATTERN, FINGERPRINT_ROUNDS, FINGERPRINT_SALT, fingerprintOf } from './code-fingerprint.mjs';
 import { CODE_ALPHABET, CODE_EXAMPLE, CODE_LENGTH, CODE_PREFIX, formatCode, maskCode, normalizeCode } from './code-format.mjs';
 import {
@@ -72,7 +77,7 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..
  * Most tests of this file were written while Fire Rescue was the only game, and they still try
  * every rule on its seven examples: ALL_EXAMPLES, ALL_LEVELS, MENU_ORDER, ALL_CARDS and
  * ALL_HEADINGS are Fire Rescue's, and a setup made with rescueOnly() knows no other game.
- * What more games change is tried in "four games behind one address", further down, and in
+ * What more games change is tried in "five games behind one address", further down, and in
  * the tests of the owner's file and of the website's address, which go through every game.
  */
 const ALL_EXAMPLES = FIRE_RESCUE.examples;
@@ -253,19 +258,20 @@ describe('the list of examples', () => {
     assert.match(FULL_MISSION_SAMPLE.description, /180 ONLY on the default combination/);
   });
 
-  test('the server holds the examples of four games, each under the name of its game', () => {
-    assert.deepEqual(ALL_GAMES, [FIRE_RESCUE, FIRE_CHIEF, WAREHOUSE_SORT, LOCKER_ROOM]);
+  test('the server holds the examples of five games, each under the name of its game', () => {
+    assert.deepEqual(ALL_GAMES, [FIRE_RESCUE, FIRE_CHIEF, WAREHOUSE_SORT, LOCKER_ROOM, FIRE_CADET]);
     assert.deepEqual(
       ALL_GAMES.map((game) => game.game),
-      ['fire-rescue', 'fire-chief', 'warehouse-sort', 'locker-room'],
+      ['fire-rescue', 'fire-chief', 'warehouse-sort', 'locker-room', 'fire-cadet'],
     );
     // the name in a request is the id of the game (what its page is built around)
     assert.equal(FIRE_RESCUE.game, fireRescueGame.id);
     assert.equal(FIRE_CHIEF.game, fireChiefGame.id);
     assert.equal(WAREHOUSE_SORT.game, warehouseSortGame.id);
     assert.equal(LOCKER_ROOM.game, lockerRoomGame.id);
+    assert.equal(FIRE_CADET.game, fireCadetGame.id);
     // the names a page of the website can ask with are exactly these
-    assert.deepEqual([...EXAMPLES_GAMES], ['fire-rescue', 'fire-chief', 'warehouse-sort', 'locker-room']);
+    assert.deepEqual([...EXAMPLES_GAMES], ['fire-rescue', 'fire-chief', 'warehouse-sort', 'locker-room', 'fire-cadet']);
     // a request that names no game is about Fire Rescue: pages loaded before there was a second game ask like that
     assert.equal(GAME_WHEN_NONE_IS_NAMED, 'fire-rescue');
     assert.ok(ALL_GAMES.some((game) => game.game === GAME_WHEN_NONE_IS_NAMED));
@@ -360,6 +366,45 @@ describe('the list of examples', () => {
     }
   });
 
+  test('Fire Cadet: its six examples in the order of its catalog, each a row of cards for one practice map with its description, under headings of its own', () => {
+    assert.deepEqual(
+      FIRE_CADET.examples.map((example) => example.id),
+      ['cadet-three-forward', 'cadet-there-and-back', 'cadet-turn-around', 'cadet-two-rescues', 'cadet-round-the-sign', 'cadet-all-four'],
+    );
+    assert.deepEqual(
+      FIRE_CADET.examples.map((example) => example.level),
+      ['starter', 'starter', 'starter', 'intermediate', 'intermediate', 'advanced'],
+    );
+    assert.deepEqual(new Set(FIRE_CADET.examples), new Set(CADET_PROGRAMS), 'the six programs of samples.ts, nothing else');
+    FIRE_CADET.examples.forEach((example, i) => {
+      assert.equal(example.id, CADET_CATALOG[i].id);
+      assert.equal(example.title, CADET_CATALOG[i].title);
+      assert.equal(example.level, CADET_CATALOG[i].level);
+      assert.ok(example.description.length > 40, example.id);
+      // its program is a row of mTiny coding cards, not blocks: valid as it stands, and made for one practice map
+      const program = example.program as { format?: unknown; cards?: unknown; field?: unknown; blocks?: unknown };
+      assert.equal(program.format, 'mtiny-cards', example.id);
+      assert.equal(program.blocks, undefined, `${example.id}: no blocks`);
+      const row = readCards(program);
+      assert.ok(row.length > 0, `${example.id}: a row of cards`);
+      assert.deepEqual(row, program.cards, `${example.id}: read back unchanged, so the row is valid`);
+      assert.equal(rowProblem(row), null, example.id);
+      const map = readMapCode(String(program.field));
+      assert.ok(map.ok && practiceMapNumber(map.scenario) !== null, `${example.id}: "field" is a practice map`);
+    });
+    assert.equal(FIRE_CADET.levels, CADET_LEVELS, 'the server hands out the headings of Fire Cadet');
+    assert.deepEqual(
+      CADET_LEVELS.map((level) => level.title),
+      ['Starter', 'Intermediate', 'Advanced'],
+    );
+    for (const level of CADET_LEVELS) assert.deepEqual(Object.keys(level).sort(), ['about', 'id', 'title'], level.id);
+    for (const card of CADET_CATALOG) {
+      assert.deepEqual(Object.keys(card).sort(), ['id', 'level', 'title'], `${card.id}: nothing but id, title and level`);
+      assert.ok(CADET_LEVELS.some((level) => level.id === card.level), `${card.id} stands under a heading`);
+      assert.match(card.id, /^cadet-/, 'every id of Fire Cadet begins with "cadet-"');
+    }
+  });
+
   test('no id and no title is used twice across the games: the owner\'s lists name an example by its id alone', () => {
     const seen = new Map<string, string>();
     for (const { game, examples } of ALL_GAMES) {
@@ -370,7 +415,7 @@ describe('the list of examples', () => {
         }
       }
     }
-    assert.equal(seen.size, 2 * (7 + 6 + 6 + 6));
+    assert.equal(seen.size, 2 * (7 + 6 + 6 + 6 + 6));
     // (the website is not built with such a double either: see mistakesInSetup)
     assert.deepEqual(mistakesInSetup({ games: ALL_GAMES, advancedOnly: [] }), []);
   });
@@ -918,10 +963,10 @@ describe('who sees what: a visitor, a member code and an advanced code', () => {
 });
 
 // =============================================================================================
-// Four games behind one address
+// Five games behind one address
 // =============================================================================================
 
-describe('four games behind one address: Fire Rescue, Fire Chief, Warehouse Sort and Locker Room', () => {
+describe('five games behind one address: Fire Rescue, Fire Chief, Warehouse Sort, Locker Room and Fire Cadet', () => {
   /**
    * The rule, the same in every game: the starter examples are open to everyone, the
    * intermediate ones open with a member code or an advanced code, and the advanced ones are
@@ -952,6 +997,12 @@ describe('four games behind one address: Fire Rescue, Fire Chief, Warehouse Sort
       starters: ['locker-to-station', 'locker-follow-line', 'locker-read-card'],
       forMembers: ['locker-to-station', 'locker-follow-line', 'locker-read-card', 'locker-team-cube', 'locker-two-tokens'],
       all: ['locker-to-station', 'locker-follow-line', 'locker-read-card', 'locker-team-cube', 'locker-two-tokens', 'locker-whole-mission'],
+    },
+    {
+      game: FIRE_CADET,
+      starters: ['cadet-three-forward', 'cadet-there-and-back', 'cadet-turn-around'],
+      forMembers: ['cadet-three-forward', 'cadet-there-and-back', 'cadet-turn-around', 'cadet-two-rescues', 'cadet-round-the-sign'],
+      all: ['cadet-three-forward', 'cadet-there-and-back', 'cadet-turn-around', 'cadet-two-rescues', 'cadet-round-the-sign', 'cadet-all-four'],
     },
   ] as const;
 
@@ -1005,16 +1056,23 @@ describe('four games behind one address: Fire Rescue, Fire Chief, Warehouse Sort
     return found;
   }
 
+  /** A row of mTiny coding cards (the programs of Fire Cadet): no blocks, a list of card names. */
+  const isCardRow = (program: unknown): program is { format: 'mtiny-cards'; cards: string[] } =>
+    typeof program === 'object' && program !== null && (program as { format?: unknown }).format === 'mtiny-cards' && Array.isArray((program as { cards?: unknown }).cards);
+
   /**
    * What would give an example away beyond its id and its title: the sentences of its
    * description, and pieces of its program - every text in it, and the program itself cut into
-   * stretches of 120 characters, as it is written into an answer.
+   * stretches of 120 characters, as it is written into an answer. A row of cards (Fire Cadet) is
+   * short and holds no text: the row itself, as it is written into an answer, is the piece that
+   * gives it away.
    */
   function piecesOf(example: UnlockedExample): { description: string[]; program: string[] } {
     const description = example.description
       .split(/(?<=[.?!])\s+/)
       .filter((sentence) => sentence.length >= 30)
       .map(asInJson);
+    if (isCardRow(example.program)) return { description, program: [`"cards":${JSON.stringify(example.program.cards)}`] };
     const written = JSON.stringify(example.program);
     const program = textsIn(example.program).map(asInJson);
     for (let at = 0; at + 120 <= written.length; at += 120) program.push(written.slice(at, at + 120));
@@ -1052,9 +1110,10 @@ describe('four games behind one address: Fire Rescue, Fire Chief, Warehouse Sort
           const pieces = piecesOf(example);
           const telling = { description: pieces.description.filter((piece) => !mayHold.includes(piece)), program: pieces.program.filter((piece) => !mayHold.includes(piece)) };
           assert.ok(telling.description.length >= 3, `${example.id}: ${telling.description.length} sentences of its description are its own`);
-          // (the shortest programs, the first starters of Warehouse Sort and Locker Room, have 7 pieces of their own:
-          //  some blocks of the one are blocks of the other, and an answer that holds one of them holds those too)
-          assert.ok(telling.program.length >= 7, `${example.id}: ${telling.program.length} pieces of its program are its own`);
+          // (the shortest block programs, the first starters of Warehouse Sort and Locker Room, have 7 pieces of their own:
+          //  some blocks of the one are blocks of the other, and an answer that holds one of them holds those too.
+          //  A row of cards is one piece: the whole row, which no other example has)
+          assert.ok(telling.program.length >= (isCardRow(example.program) ? 1 : 7), `${example.id}: ${telling.program.length} pieces of its program are its own`);
           for (const piece of telling.description) assert.ok(!text.includes(piece), `${about} this sentence of the description of ${example.id}: "${piece}"`);
           for (const piece of telling.program) assert.ok(!text.includes(piece), `${about} this piece of the program of ${example.id}: ${piece}`);
         }
@@ -1210,7 +1269,32 @@ describe('four games behind one address: Fire Rescue, Fire Chief, Warehouse Sort
     check({ ...good, body: { ...good.body, extra: [FIRE_CHIEF.examples[0], { id: locked.id, title: locked.title }] } } as unknown as UnlockResponse);
   });
 
-  test('the numbers: Fire Rescue 5 cards / 3 open, 5 / 5, 7 / 7 - Fire Chief, Warehouse Sort and Locker Room 5 / 3, 5 / 5, 6 / 6', async () => {
+  test('... and in Fire Cadet, whose programs are rows of cards: the row of an example a visitor may not open is a leak, a row of theirs is not', async () => {
+    const good = await ask('fire-cadet', null);
+    const check = (response: UnlockResponse): void => assertOnlyTheirs(response, FIRE_CADET, RULE[4].forMembers, RULE[4].starters, 'a visitor');
+    check(good);
+    const hidden = FIRE_CADET.examples[5];
+    const locked = FIRE_CADET.examples[3];
+    assert.deepEqual([hidden.id, locked.id], ['cadet-all-four', 'cadet-two-rescues']);
+    const cardsOf = (example: UnlockedExample): unknown => (example.program as { cards: unknown }).cards;
+    const leaks: Array<[string, unknown]> = [
+      ['the id of the example for advanced codes only', { id: hidden.id }],
+      ['its title', hidden.title],
+      ['its program', hidden.program],
+      ['its row of cards alone', { cards: cardsOf(hidden) }],
+      ['the row of a card this visitor may not open', { cards: cardsOf(locked) }],
+      ['the program of an example of another game', FIRE_CHIEF.examples[0].program],
+      ['the words after the heading nobody else sees', FIRE_CADET.levels[2].about],
+    ];
+    for (const [what, extra] of leaks) {
+      const leaking = { ...good, body: { ...good.body, extra } } as unknown as UnlockResponse;
+      assert.throws(() => check(leaking), assert.AssertionError, `an answer that also holds ${what} does not pass`);
+    }
+    // a row of theirs, and a row of no example at all, do not trip it
+    check({ ...good, body: { ...good.body, extra: [FIRE_CADET.examples[0], { cards: ['forward', 'x2'] }] } } as unknown as UnlockResponse);
+  });
+
+  test('the numbers: Fire Rescue 5 cards / 3 open, 5 / 5, 7 / 7 - Fire Chief, Warehouse Sort, Locker Room and Fire Cadet 5 / 3, 5 / 5, 6 / 6', async () => {
     const counts = async (game: string, code: string | null): Promise<string> => {
       const body = yes(await ask(game, code));
       return `${body.cards.length} / ${body.examples.length}`;
@@ -1219,6 +1303,7 @@ describe('four games behind one address: Fire Rescue, Fire Chief, Warehouse Sort
     assert.deepEqual([await counts('fire-chief', null), await counts('fire-chief', CODE_A), await counts('fire-chief', CODE_ADVANCED)], ['5 / 3', '5 / 5', '6 / 6']);
     assert.deepEqual([await counts('warehouse-sort', null), await counts('warehouse-sort', CODE_A), await counts('warehouse-sort', CODE_ADVANCED)], ['5 / 3', '5 / 5', '6 / 6']);
     assert.deepEqual([await counts('locker-room', null), await counts('locker-room', CODE_A), await counts('locker-room', CODE_ADVANCED)], ['5 / 3', '5 / 5', '6 / 6']);
+    assert.deepEqual([await counts('fire-cadet', null), await counts('fire-cadet', CODE_A), await counts('fire-cadet', CODE_ADVANCED)], ['5 / 3', '5 / 5', '6 / 6']);
   });
 
   test('a request that names no game is about Fire Rescue - as every request was before there was a second game', async () => {
@@ -1244,6 +1329,7 @@ describe('four games behind one address: Fire Rescue, Fire Chief, Warehouse Sort
       if (unnamed.body.ok) assert.notDeepEqual(unnamed, await ask('fire-chief', code), `${who}: and not the answer about Fire Chief`);
       if (unnamed.body.ok) assert.notDeepEqual(unnamed, await ask('warehouse-sort', code), `${who}: and not the answer about Warehouse Sort`);
       if (unnamed.body.ok) assert.notDeepEqual(unnamed, await ask('locker-room', code), `${who}: and not the answer about Locker Room`);
+      if (unnamed.body.ok) assert.notDeepEqual(unnamed, await ask('fire-cadet', code), `${who}: and not the answer about Fire Cadet`);
     }
     // the requests an open page of the live site sends, as its browser writes them - and an empty one
     const visitor = yes(withoutGame(await ask('fire-rescue', null)));
@@ -1258,7 +1344,7 @@ describe('four games behind one address: Fire Rescue, Fire Chief, Warehouse Sort
     assertOnlyTheirs(await ask(undefined, CODE_ADVANCED), FIRE_RESCUE, RULE[0].all, RULE[0].all, 'an advanced code that names no game');
   });
 
-  test('a game that is not one of the four: 400 "unknown-game" - one and the same answer, with no list of the games there are', async () => {
+  test('a game that is not one of the five: 400 "unknown-game" - one and the same answer, with no list of the games there are', async () => {
     const unknown: unknown[] = [
       'fire',
       'chief',
@@ -1281,6 +1367,16 @@ describe('four games behind one address: Fire Rescue, Fire Chief, Warehouse Sort
       ' locker-room',
       'locker-room,warehouse-sort',
       'capelli-starter',
+      'cadet',
+      'firecadet',
+      'Fire-Cadet', // capitals
+      'fire cadet',
+      'fire_cadet',
+      'fire-cadet ',
+      ' fire-cadet',
+      'fire-cadet,fire-rescue',
+      'mtiny',
+      'rescue-city',
       'Fire-Chief', // capitals
       'FIRE-RESCUE',
       ' fire-chief', // blanks
@@ -1345,6 +1441,14 @@ describe('four games behind one address: Fire Rescue, Fire Chief, Warehouse Sort
         assert.equal(JSON.stringify(await ask(game, code)), JSON.stringify(await ask(game, code, beforeLocker)), `${game} with ${code}: the same answer, letter for letter, as without a fourth game`);
       }
     }
+    // ... and a server from before Fire Cadet (the four games of before) does not know Fire Cadet - and answers the other four as before
+    const beforeCadet: Partial<UnlockSetup> = { games: [FIRE_RESCUE, FIRE_CHIEF, WAREHOUSE_SORT, LOCKER_ROOM] };
+    assert.deepEqual((await ask('fire-cadet', null, beforeCadet)).body, { ok: false, reason: 'unknown-game' });
+    for (const game of [undefined, 'fire-rescue', 'fire-chief', 'warehouse-sort', 'locker-room']) {
+      for (const code of [null, CODE_A, CODE_B, CODE_ADVANCED, CODE_ADVANCED_2, CODE_NOT_LISTED, 'not a code']) {
+        assert.equal(JSON.stringify(await ask(game, code)), JSON.stringify(await ask(game, code, beforeCadet)), `${game} with ${code}: the same answer, letter for letter, as without a fifth game`);
+      }
+    }
 
     // what is not such a request at all is still "bad-request", whatever game it names
     for (const body of ['{"game":"fire-chief","code":123}', '{"game":"nonsense","code":["FIRE-AAAA-2222"]}', '["fire-chief"]', '"fire-chief"', 'fire-chief']) {
@@ -1406,7 +1510,7 @@ describe('four games behind one address: Fire Rescue, Fire Chief, Warehouse Sort
     const sortMoved: Partial<UnlockSetup> = { openToEveryone: [...setup.openToEveryone, 'sort-one-cube'], advancedOnly: ['sort-two-cubes'] };
     assert.deepEqual(ids(yes(await ask('warehouse-sort', null, sortMoved)).examples), [...RULE[2].starters, 'sort-one-cube']);
     assert.deepEqual(ids(yes(await ask('warehouse-sort', null, sortMoved)).cards), ['sort-leave-start', 'sort-white-line', 'sort-cube-colour', 'sort-one-cube', 'sort-all-cubes']);
-    for (const rule of [RULE[0], RULE[1], RULE[3]]) {
+    for (const rule of RULE.filter((other) => other.game !== WAREHOUSE_SORT)) {
       assert.deepEqual(ids(yes(await ask(rule.game.game, null, sortMoved)).examples), rule.starters, rule.game.game);
       assert.deepEqual(ids(yes(await ask(rule.game.game, CODE_A, sortMoved)).cards), rule.all, `${rule.game.game}: nothing hidden there`);
     }
@@ -1415,14 +1519,27 @@ describe('four games behind one address: Fire Rescue, Fire Chief, Warehouse Sort
     assert.deepEqual(ids(yes(await ask('locker-room', null, lockerMoved)).examples), [...RULE[3].starters, 'locker-team-cube']);
     assert.deepEqual(ids(yes(await ask('locker-room', null, lockerMoved)).cards), ['locker-to-station', 'locker-follow-line', 'locker-read-card', 'locker-team-cube', 'locker-whole-mission']);
     assert.deepEqual(ids(yes(await ask('locker-room', CODE_ADVANCED, lockerMoved)).cards), RULE[3].all);
-    for (const rule of RULE.slice(0, 3)) {
+    for (const rule of RULE.filter((other) => other.game !== LOCKER_ROOM)) {
       assert.deepEqual(ids(yes(await ask(rule.game.game, null, lockerMoved)).examples), rule.starters, rule.game.game);
       assert.deepEqual(ids(yes(await ask(rule.game.game, CODE_A, lockerMoved)).cards), rule.all, `${rule.game.game}: nothing hidden there`);
     }
     // the advanced example of Locker Room is hidden by its own line: hiding the advanced examples of the other games hides nothing here
-    const othersHidden: Partial<UnlockSetup> = { advancedOnly: ['smart-bucket', 'full-mission', 'chief-full-mission', 'sort-all-cubes'] };
+    const othersHidden: Partial<UnlockSetup> = { advancedOnly: ['smart-bucket', 'full-mission', 'chief-full-mission', 'sort-all-cubes', 'cadet-all-four'] };
     assert.deepEqual(ids(yes(await ask('locker-room', CODE_A, othersHidden)).cards), RULE[3].all);
     assert.deepEqual(ids(yes(await ask('locker-room', null, othersHidden)).cards), RULE[3].all, 'a visitor sees its card too, with a lock');
+    // a line of Fire Cadet decides about Fire Cadet alone
+    const cadetMoved: Partial<UnlockSetup> = { openToEveryone: [...setup.openToEveryone, 'cadet-two-rescues'], advancedOnly: ['cadet-round-the-sign'] };
+    assert.deepEqual(ids(yes(await ask('fire-cadet', null, cadetMoved)).examples), [...RULE[4].starters, 'cadet-two-rescues']);
+    assert.deepEqual(ids(yes(await ask('fire-cadet', null, cadetMoved)).cards), ['cadet-three-forward', 'cadet-there-and-back', 'cadet-turn-around', 'cadet-two-rescues', 'cadet-all-four']);
+    assert.deepEqual(ids(yes(await ask('fire-cadet', CODE_ADVANCED, cadetMoved)).cards), RULE[4].all);
+    for (const rule of RULE.filter((other) => other.game !== FIRE_CADET)) {
+      assert.deepEqual(ids(yes(await ask(rule.game.game, null, cadetMoved)).examples), rule.starters, rule.game.game);
+      assert.deepEqual(ids(yes(await ask(rule.game.game, CODE_A, cadetMoved)).cards), rule.all, `${rule.game.game}: nothing hidden there`);
+    }
+    // the advanced example of Fire Cadet is hidden by its own line: hiding the advanced examples of the other games hides nothing here
+    const notCadet: Partial<UnlockSetup> = { advancedOnly: ['smart-bucket', 'full-mission', 'chief-full-mission', 'sort-all-cubes', 'locker-whole-mission'] };
+    assert.deepEqual(ids(yes(await ask('fire-cadet', CODE_A, notCadet)).cards), RULE[4].all);
+    assert.deepEqual(ids(yes(await ask('fire-cadet', null, notCadet)).cards), RULE[4].all, 'a visitor sees its card too, with a lock');
   });
 
   test('the website is not built while "examplesForAdvancedCodesOnly" names something that is an example of neither game', () => {
@@ -1451,6 +1568,11 @@ describe('four games behind one address: Fire Rescue, Fire Chief, Warehouse Sort
     assert.deepEqual(mistakesInSetup({ games: ALL_GAMES, advancedOnly: ['locker-whole-mission'] }), []);
     for (const slip of ['locker-whole-misson', 'locker-wholemission', 'Locker-Whole-Mission', 'locker-room', 'whole-mission', 'locker-']) {
       assert.equal(mistakesInSetup({ games: ALL_GAMES, advancedOnly: [slip] }).length, 1, `a misspelt id of Locker Room stops the build too: ${slip}`);
+    }
+    assert.equal(mistakesInSetup({ games: [FIRE_RESCUE, FIRE_CHIEF, WAREHOUSE_SORT, LOCKER_ROOM], advancedOnly: ['cadet-all-four'] }).length, 1);
+    assert.deepEqual(mistakesInSetup({ games: ALL_GAMES, advancedOnly: ['cadet-all-four'] }), []);
+    for (const slip of ['cadet-all-for', 'cadet-allfour', 'Cadet-All-Four', 'fire-cadet', 'all-four', 'cadet-', 'cadet-all-four ']) {
+      assert.equal(mistakesInSetup({ games: ALL_GAMES, advancedOnly: [slip] }).length, 1, `a misspelt id of Fire Cadet stops the build too: ${JSON.stringify(slip)}`);
     }
     assert.equal(mistakesInSetup({ games: [FIRE_CHIEF], advancedOnly: ['full-mission'] }).length, 1);
     assert.deepEqual(mistakesInSetup({ games: [FIRE_CHIEF], advancedOnly: ['chief-full-mission'] }), []);
@@ -1496,8 +1618,8 @@ describe('four games behind one address: Fire Rescue, Fire Chief, Warehouse Sort
       assert.equal((await from('fire-chief', wrongCode(4))).status, 403);
       // the limit is reached - for the address, in every game. One code goes through the slow lane ...
       assert.equal((await from('fire-chief', wrongCode(5))).status, 403, 'the one turn of the slow lane');
-      // ... and until the second is over nothing is checked, in neither game and not without a game either
-      for (const game of ['fire-rescue', 'fire-chief', undefined]) {
+      // ... and until the second is over nothing is checked, in no game and not without a game either
+      for (const game of [...EXAMPLES_GAMES, undefined]) {
         for (const code of [wrongCode(6), CODE_A, CODE_ADVANCED]) {
           const waiting = await from(game, code);
           assert.equal(waiting.status, 429, `${game}: ${code}`);
@@ -1592,7 +1714,7 @@ describe('four games behind one address: Fire Rescue, Fire Chief, Warehouse Sort
         assert.equal((await from(then, CODE_A)).status, 429, `${first} then ${then}: a right code waits its turn too`);
         assert.deepEqual([...(limiter as unknown as { clients: Map<string, unknown> }).clients.keys()], ['10.0.0.1']);
       }
-      // the four games and a request without a game in turn: one count of five
+      // the four games before Fire Cadet and a request without a game in turn: one count of five
       const limiter = new AttemptLimiter(5, 60_000, 5000, 1_000);
       const from = (game: unknown, code: string) => ask(game, code, { limiter, now: () => 7_000 });
       const games = ['fire-rescue', 'fire-chief', 'warehouse-sort', 'locker-room', undefined];
@@ -1602,6 +1724,39 @@ describe('four games behind one address: Fire Rescue, Fire Chief, Warehouse Sort
       // a second later the slow lane gives one turn, to a right code of Locker Room as to any other
       const later = (game: unknown, code: string) => ask(game, code, { limiter, now: () => 8_001 });
       assert.equal((await later('locker-room', CODE_A)).status, 200, 'a right code in the slow lane opens the examples');
+    });
+
+    test('Fire Cadet draws on the same count: tries used in the other four games leave none at full speed there, and the other way round', async () => {
+      for (const [first, then] of [
+        ['fire-rescue', 'fire-cadet'],
+        ['fire-chief', 'fire-cadet'],
+        ['warehouse-sort', 'fire-cadet'],
+        ['locker-room', 'fire-cadet'],
+        [undefined, 'fire-cadet'],
+        ['fire-cadet', 'fire-rescue'],
+        ['fire-cadet', 'fire-chief'],
+        ['fire-cadet', 'warehouse-sort'],
+        ['fire-cadet', 'locker-room'],
+        ['fire-cadet', undefined],
+      ] as const) {
+        const limiter = new AttemptLimiter(3, 60_000, 5000, 1_000);
+        const from = (game: unknown, code: string) => ask(game, code, { limiter, now: () => 5_000 });
+        for (let i = 0; i < 3; i++) assert.equal((await from(first, wrongCode(i))).status, 403);
+        assert.equal((await from(then, wrongCode(3))).status, 403, `${first} then ${then}: the slow lane`);
+        assert.equal((await from(then, wrongCode(4))).status, 429, `${first} then ${then}: no fresh tries in the other game`);
+        assert.equal((await from(then, CODE_A)).status, 429, `${first} then ${then}: a right code waits its turn too`);
+        assert.deepEqual([...(limiter as unknown as { clients: Map<string, unknown> }).clients.keys()], ['10.0.0.1']);
+      }
+      // the five games and a request without a game in turn: one count of six
+      const limiter = new AttemptLimiter(6, 60_000, 5000, 1_000);
+      const from = (game: unknown, code: string) => ask(game, code, { limiter, now: () => 7_000 });
+      const games = ['fire-rescue', 'fire-chief', 'warehouse-sort', 'locker-room', 'fire-cadet', undefined];
+      for (let i = 0; i < 6; i++) assert.equal((await from(games[i], wrongCode(10 + i))).status, 403);
+      assert.equal((await from('fire-cadet', wrongCode(16))).status, 403, 'the one turn of the slow lane');
+      for (const game of games) assert.equal((await from(game, wrongCode(17))).status, 429, `${game}: waits`);
+      // a second later the slow lane gives one turn, to a right code of Fire Cadet as to any other
+      const later = (game: unknown, code: string) => ask(game, code, { limiter, now: () => 8_001 });
+      assert.equal((await later('fire-cadet', CODE_ADVANCED)).status, 200, 'a right code in the slow lane opens the examples');
     });
 
     test('right codes never count, whichever game they are for', async () => {
@@ -1615,6 +1770,8 @@ describe('four games behind one address: Fire Rescue, Fire Chief, Warehouse Sort
         assert.equal((await from('warehouse-sort', CODE_ADVANCED)).status, 200);
         assert.equal((await from('locker-room', CODE_A)).status, 200);
         assert.equal((await from('locker-room', CODE_ADVANCED)).status, 200);
+        assert.equal((await from('fire-cadet', CODE_A)).status, 200);
+        assert.equal((await from('fire-cadet', CODE_ADVANCED)).status, 200);
       }
       assert.equal((limiter as unknown as { clients: Map<string, unknown> }).clients.size, 0, 'nothing is remembered about this address');
       assert.equal((await from('fire-chief', wrongCode(1))).status, 403);
@@ -1885,8 +2042,11 @@ describe('content/simulator-codes.ts', () => {
       'locker-to-station',
       'locker-follow-line',
       'locker-read-card',
+      'cadet-three-forward',
+      'cadet-there-and-back',
+      'cadet-turn-around',
     ]);
-    assert.deepEqual(examplesForAdvancedCodesOnly, ['smart-bucket', 'full-mission', 'chief-full-mission', 'sort-all-cubes', 'locker-whole-mission']);
+    assert.deepEqual(examplesForAdvancedCodesOnly, ['smart-bucket', 'full-mission', 'chief-full-mission', 'sort-all-cubes', 'locker-whole-mission', 'cadet-all-four']);
     // which is the rule "starter / intermediate / advanced", in every game
     for (const game of ALL_GAMES) {
       for (const example of game.examples) {
@@ -1913,7 +2073,10 @@ describe('content/simulator-codes.ts', () => {
       ALL_GAMES.flatMap((game) => game.examples.map(({ id, title, level }) => ({ id, title, level }))),
       'game by game, in the order of the Examples windows',
     );
-    assert.ok(lines.includes(' *   Fire Rescue (seven)') && lines.includes(' *   Fire Chief (six)') && lines.includes(' *   Warehouse Sort (six)') && lines.includes(' *   Locker Room (six)'), 'under the name of their game');
+    assert.ok(
+      lines.includes(' *   Fire Rescue (seven)') && lines.includes(' *   Fire Chief (six)') && lines.includes(' *   Warehouse Sort (six)') && lines.includes(' *   Locker Room (six)') && lines.includes(' *   Fire Cadet (six)'),
+      'under the name of their game',
+    );
   });
 
   test('no example is on both lists: open to everyone AND for advanced codes only', () => {
@@ -1981,7 +2144,7 @@ describe('content/simulator-codes.ts', () => {
     });
   }
 
-  test('with the owner\'s lists, the numbers are: Fire Rescue 5 cards / 3 open, 5 / 5, 7 / 7 - Fire Chief, Warehouse Sort and Locker Room 5 / 3, 5 / 5, 6 / 6', async () => {
+  test('with the owner\'s lists, the numbers are: Fire Rescue 5 cards / 3 open, 5 / 5, 7 / 7 - Fire Chief, Warehouse Sort, Locker Room and Fire Cadet 5 / 3, 5 / 5, 6 / 6', async () => {
     const setup: UnlockSetup = {
       codes: [await entryFor(1, CODE_A)],
       advancedCodes: [await entryFor(1, CODE_ADVANCED)],
@@ -1998,6 +2161,7 @@ describe('content/simulator-codes.ts', () => {
     assert.deepEqual([await counts('fire-chief', null), await counts('fire-chief', CODE_A), await counts('fire-chief', CODE_ADVANCED)], ['5 / 3', '5 / 5', '6 / 6']);
     assert.deepEqual([await counts('warehouse-sort', null), await counts('warehouse-sort', CODE_A), await counts('warehouse-sort', CODE_ADVANCED)], ['5 / 3', '5 / 5', '6 / 6']);
     assert.deepEqual([await counts('locker-room', null), await counts('locker-room', CODE_A), await counts('locker-room', CODE_ADVANCED)], ['5 / 3', '5 / 5', '6 / 6']);
+    assert.deepEqual([await counts('fire-cadet', null), await counts('fire-cadet', CODE_A), await counts('fire-cadet', CODE_ADVANCED)], ['5 / 3', '5 / 5', '6 / 6']);
   });
 
   test('there is no code in the file - only the made-up one that shows what a code looks like', () => {
@@ -2058,7 +2222,7 @@ describe('src/app/api/simulator/unlock/route.ts, with the owner\'s lists', () =>
         'under the headings of this game',
       );
       const notTheirs = [...game.examples.filter((e) => examplesForAdvancedCodesOnly.includes(e.id)), ...ALL_GAMES.filter((other) => other !== game).flatMap((other) => other.examples)];
-      assert.equal(notTheirs.length, 25 - 5);
+      assert.equal(notTheirs.length, 31 - 5);
       for (const example of notTheirs) {
         for (const secret of [`"${example.id}"`, example.title, descriptionMark(example)]) assert.ok(!text.includes(secret), `the answer does not hold ${secret}`);
       }
@@ -2084,10 +2248,18 @@ describe('src/app/api/simulator/unlock/route.ts, with the owner\'s lists', () =>
     assert.notEqual((await visitorAnswer('{"game":"fire-chief"}')).text.replace('"game":"fire-chief",', ''), unnamedText);
     assert.notEqual((await visitorAnswer('{"game":"warehouse-sort"}')).text.replace('"game":"warehouse-sort",', ''), unnamedText);
     assert.notEqual((await visitorAnswer('{"game":"locker-room"}')).text.replace('"game":"locker-room",', ''), unnamedText);
+    assert.notEqual((await visitorAnswer('{"game":"fire-cadet"}')).text.replace('"game":"fire-cadet",', ''), unnamedText);
   });
 
   test('a code that is on no list, and what is not such a request, are refused as before - in every game', async () => {
-    for (const sent of [{ code: CODE_EXAMPLE }, { game: 'fire-rescue', code: CODE_EXAMPLE }, { game: 'fire-chief', code: CODE_EXAMPLE }, { game: 'warehouse-sort', code: CODE_EXAMPLE }, { game: 'locker-room', code: CODE_EXAMPLE }]) {
+    for (const sent of [
+      { code: CODE_EXAMPLE },
+      { game: 'fire-rescue', code: CODE_EXAMPLE },
+      { game: 'fire-chief', code: CODE_EXAMPLE },
+      { game: 'warehouse-sort', code: CODE_EXAMPLE },
+      { game: 'locker-room', code: CODE_EXAMPLE },
+      { game: 'fire-cadet', code: CODE_EXAMPLE },
+    ]) {
       const wrong = await ask(JSON.stringify(sent));
       assert.equal(wrong.status, 403, JSON.stringify(sent));
       assert.equal(wrong.headers.get('Cache-Control'), 'no-store');
@@ -2104,8 +2276,24 @@ describe('src/app/api/simulator/unlock/route.ts, with the owner\'s lists', () =>
     assert.deepEqual(await get.json(), { ok: false, reason: 'method-not-allowed' });
   });
 
-  test('a game that is not one of the four is refused with "unknown-game", and the answer lists no game', async () => {
-    for (const sent of [{ game: 'fire' }, { game: 'Fire-Chief' }, { game: 'Warehouse-Sort' }, { game: 'sort' }, { game: 'Locker-Room' }, { game: 'locker' }, { game: 'locker_room' }, { game: '' }, { game: null }, { game: 7 }, { game: ['fire-chief'] }, { game: 'no-such-game', code: CODE_EXAMPLE }]) {
+  test('a game that is not one of the five is refused with "unknown-game", and the answer lists no game', async () => {
+    for (const sent of [
+      { game: 'fire' },
+      { game: 'Fire-Chief' },
+      { game: 'Warehouse-Sort' },
+      { game: 'sort' },
+      { game: 'Locker-Room' },
+      { game: 'locker' },
+      { game: 'locker_room' },
+      { game: 'Fire-Cadet' },
+      { game: 'cadet' },
+      { game: 'fire_cadet' },
+      { game: '' },
+      { game: null },
+      { game: 7 },
+      { game: ['fire-chief'] },
+      { game: 'no-such-game', code: CODE_EXAMPLE },
+    ]) {
       const response = await ask(JSON.stringify(sent));
       assert.equal(response.status, 400, JSON.stringify(sent));
       assert.equal(response.headers.get('Cache-Control'), 'no-store');
@@ -2118,8 +2306,8 @@ describe('src/app/api/simulator/unlock/route.ts, with the owner\'s lists', () =>
     const from = (sent: object, address = '203.0.113.77'): Promise<Response> =>
       routePost(new Request('http://localhost/api/simulator/unlock', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-forwarded-for': address }, body: JSON.stringify(sent) }));
     const wrongCode = (i: number): string => formatCode(`UUUU${[...String(i).padStart(4, '2')].map((d) => CODE_ALPHABET[Number(d)]).join('')}`);
-    const GAMES = [{ game: 'fire-rescue' }, { game: 'fire-chief' }, { game: 'warehouse-sort' }, { game: 'locker-room' }, {}];
-    // 104 wrong codes in the same instant, in turn about Fire Rescue, Fire Chief, Warehouse Sort, Locker Room and without a game. They are counted
+    const GAMES = [{ game: 'fire-rescue' }, { game: 'fire-chief' }, { game: 'warehouse-sort' }, { game: 'locker-room' }, { game: 'fire-cadet' }, {}];
+    // 104 wrong codes in the same instant, in turn about Fire Rescue, Fire Chief, Warehouse Sort, Locker Room, Fire Cadet and without a game. They are counted
     // before they are checked, so however the checks overlap: 100 at full speed, 1 in the slow lane, 3 turned away
     const all = await Promise.all(Array.from({ length: 104 }, (_, i) => from({ ...GAMES[i % GAMES.length], code: wrongCode(i) })));
     const statuses = all.map((response) => response.status);
@@ -2129,13 +2317,14 @@ describe('src/app/api/simulator/unlock/route.ts, with the owner\'s lists', () =>
     assert.ok(waiting);
     assert.equal(waiting.headers.get('Retry-After'), '1');
     assert.deepEqual(await waiting.json(), { ok: false, reason: 'too-many-attempts' });
-    // with a count per game there would have been 21 wrong codes in each, all under a limit of a hundred, and none turned away
+    // with a count per game there would have been 18 wrong codes in each, all under a limit of a hundred, and none turned away
     assert.ok(Math.ceil(104 / GAMES.length) < 100);
     // a request without a code is still answered at once, in every game - and another address has all its tries
     assert.equal((await from({ game: 'fire-rescue' })).status, 200);
     assert.equal((await from({ game: 'fire-chief' })).status, 200);
     assert.equal((await from({ game: 'warehouse-sort' })).status, 200);
     assert.equal((await from({ game: 'locker-room' })).status, 200);
+    assert.equal((await from({ game: 'fire-cadet' })).status, 200);
     assert.equal((await from({ game: 'fire-chief', code: wrongCode(500) }, '203.0.113.78')).status, 403);
   });
 
@@ -2449,9 +2638,12 @@ describe('scripts/generate-simulator-codes.mjs', () => {
       'locker-to-station',
       'locker-follow-line',
       'locker-read-card',
+      'cadet-three-forward',
+      'cadet-there-and-back',
+      'cadet-turn-around',
     ]);
     // ... and keeps the advanced examples of every game for advanced codes: starting over never shows them to everybody
-    assert.deepEqual(exampleListOf(fresh, 'examplesForAdvancedCodesOnly'), ['smart-bucket', 'full-mission', 'chief-full-mission', 'sort-all-cubes', 'locker-whole-mission']);
+    assert.deepEqual(exampleListOf(fresh, 'examplesForAdvancedCodesOnly'), ['smart-bucket', 'full-mission', 'chief-full-mission', 'sort-all-cubes', 'locker-whole-mission', 'cadet-all-four']);
     assert.deepEqual(readListFile(fresh, 'advanced')?.active, 0);
     assert.equal(readListFile(fresh, 'advanced')?.nextNumber, 1);
     for (const game of ALL_GAMES) for (const { id } of game.examples) assert.ok(fresh.includes(`'${id}'`), `the explanation lists '${id}'`);
@@ -2546,14 +2738,18 @@ describe('scripts/generate-simulator-codes.mjs', () => {
     // and no text of the script speaks of one game only any more
     const script = readFileSync(path.join(REPO_ROOT, 'scripts', 'generate-simulator-codes.mjs'), 'utf8');
     assert.ok(!script.includes('the Fire Rescue simulator'), 'the script is about the codes of every game');
-    assert.ok(!/\bseven ready-made\b|The seven ids|the same seven\b|the same thirteen\b|the same nineteen\b/.test(script), 'not "seven", "thirteen" or "nineteen" examples: there are twenty-five');
-    assert.ok(!/\bboth games\b|\ball three games\b|\ball three of its games\b|\bin all three\b/.test(script), 'not "both games" or "all three games": there are four');
+    assert.ok(!/\bseven ready-made\b|The seven ids|the same seven\b|the same thirteen\b|the same nineteen\b|the same twenty-five\b/.test(script), 'not "seven", "thirteen", "nineteen" or "twenty-five" examples: there are thirty-one');
+    assert.ok(
+      !/\bboth games\b|\ball three games\b|\ball three of its games\b|\bin all three\b|\ball four games\b|\ball four of its games\b|\bin all four\b/.test(script),
+      'not "both games", "all three games" or "all four games": there are five',
+    );
+    assert.match(script, /the same thirty-one as above/);
   });
 
-  test('--help says that the codes are for all four games', async () => {
+  test('--help says that the codes are for all five games', async () => {
     const shown: string[] = [];
     await generateCodes(['--help'], (line: string) => shown.push(line));
-    assert.match(shown.join('\n'), /all four games, Fire Rescue, Fire Chief, Warehouse Sort and Locker Room/);
+    assert.match(shown.join('\n'), /all five games, Fire Rescue, Fire Chief, Warehouse Sort, Locker Room and Fire Cadet/);
   });
 
   // ------------------------------------------------------------------------------------------

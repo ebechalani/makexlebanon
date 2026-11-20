@@ -266,9 +266,11 @@ rules. It lives at:
 https://www.makexlebanon.com/simulator/fire-rescue
 ```
 
-The same simulator has a second game, **Fire Chief** (the maze, ages 14–17), and a third,
-**Warehouse Sort** (the beginner mission of the MakeX Lebanon Inspire category, local event):
-see "The Fire Chief simulator" and "The Warehouse Sort simulator" further down.
+The same simulator has a second game, **Fire Chief** (the maze, ages 14–17), a third,
+**Warehouse Sort** (the beginner mission of the MakeX Lebanon Inspire category, local event), and
+a fourth, **Locker Room** (Season 2026): see "The Fire Chief simulator", "The Warehouse Sort
+simulator" and "The Locker Room simulator" further down. A fifth simulator, **Fire Cadet**, is for
+another robot, the mTiny, and has a screen of its own: see "The Fire Cadet simulator".
 `/simulator` lists the simulators by season — see "The Simulator page" there. Nothing is installed, and the
 student's blocks are saved in their own browser — they are never sent anywhere. The one thing
 the simulator asks the website's server for is the ready-made examples: the server decides,
@@ -363,13 +365,14 @@ the second is only the summary students read. Change both when a rule changes.
 
 ### Member codes for the simulator examples
 
-The simulator has four games, **Fire Rescue**, **Fire Chief** (the maze), **Warehouse
-Sort** (Inspire, beginner) and **Locker Room** (Capelli Starter, Season 2026), and each has its
-own **Examples** window with ready-made programs: seven in Fire Rescue, six in Fire Chief, six
-in Warehouse Sort, six in Locker Room. In every game the examples are in three groups, and
-there are two kinds of codes:
+The simulators have five games: **Fire Rescue**, **Fire Chief** (the maze), **Warehouse
+Sort** (Inspire, beginner) and **Locker Room** (Capelli Starter, Season 2026) for the mBot2, and
+**Fire Cadet** (Season 2027, ages 4–7) for the mTiny. Each has its own **Examples** window with
+ready-made programs (in Fire Cadet: rows of coding cards): seven in Fire Rescue, six in Fire
+Chief, six in Warehouse Sort, six in Locker Room, six in Fire Cadet. In every game the examples
+are in three groups, and there are two kinds of codes:
 
-| Group | Now in it, in Fire Rescue | Now in it, in Fire Chief, Warehouse Sort and Locker Room | Who sees the card | Who can open it |
+| Group | Now in it, in Fire Rescue | Now in it, in Fire Chief, Warehouse Sort, Locker Room and Fire Cadet | Who sees the card | Who can open it |
 | --- | --- | --- | --- | --- |
 | **Open to everyone** | the three starter examples | the three starter examples | everybody | everybody, without a code |
 | **For members** | the two intermediate examples | the two intermediate examples | everybody — with a lock and "Members only" | a **member code** or an advanced code |
@@ -380,13 +383,15 @@ So there are three kinds of visitor, and each sees the same in every game:
 - **No code.** Three open cards, two locked ones. Nothing else.
 - **A member code** (one of the 500 you already have). Five open cards. Nothing else.
 - **An advanced code.** All the cards of that game — seven in Fire Rescue, six in Fire Chief,
-  Warehouse Sort and Locker Room — under the headings Starter, Intermediate and Advanced.
+  Warehouse Sort, Locker Room and Fire Cadet — under the headings Starter, Intermediate and
+  Advanced.
 
-**One set of codes for all four games.** There is no code "for Fire Rescue", "for Fire Chief",
-"for Warehouse Sort" or "for Locker Room". A member code opens the examples for members in every
-game, and an advanced code opens every example in every game. The codes you have already handed
-out work in Fire Chief, Warehouse Sort and Locker Room as they are: there is nothing to make and
-nothing to hand out again. Cancelling a code cancels it in every game.
+**One set of codes for all five games.** There is no code "for Fire Rescue", "for Fire Chief",
+"for Warehouse Sort", "for Locker Room" or "for Fire Cadet". A member code opens the examples for
+members in every game, and an advanced code opens every example in every game. The codes you have
+already handed out work in Fire Chief, Warehouse Sort, Locker Room and Fire Cadet as they are:
+there is nothing to make and nothing to hand out again. Cancelling a code cancels it in every
+game.
 
 An example of the third group is *hidden*, not locked. A visitor, and a member with an ordinary
 member code, do not see its card, its title, the "Advanced" heading or a count — nothing on
@@ -406,8 +411,8 @@ with their descriptions and a "Load this example" button. The browser remembers 
 it is typed once per device, and the simulator checks it with the server again on every visit.
 
 The code is remembered once for all games. Somebody who typed a code in Fire Rescue — also
-long ago, before Fire Chief existed — finds the examples of Fire Chief, Warehouse Sort and
-Locker Room open in the same browser without typing anything, and the other way round. Other tabs of the same browser that
+long ago, before Fire Chief existed — finds the examples of Fire Chief, Warehouse Sort, Locker
+Room and Fire Cadet open in the same browser without typing anything, and the other way round. Other tabs of the same browser that
 have a simulator open follow at once: a code that is accepted in one tab opens the examples in
 the others too (each asks the server what the code opens in its own game). A tab that follows
 stands as it does after a fresh load with that code: what an earlier code had opened there is
@@ -438,7 +443,7 @@ this order, each with its own explanation:
 After any change: save, commit and push. The change is live once Vercel has redeployed.
 
 **Moving an example between the three groups.** Every example has an id; the ids of all
-four games are listed at the top of the file:
+five games are listed at the top of the file:
 
 - Fire Rescue: `'hello'`, `'line-follow'`, `'gripper-demo'`, `'one-bucket'`, `'one-person'`,
   `'smart-bucket'`, `'full-mission'`
@@ -448,10 +453,12 @@ four games are listed at the top of the file:
   `'sort-one-cube'`, `'sort-two-cubes'`, `'sort-all-cubes'`
 - Locker Room: `'locker-to-station'`, `'locker-follow-line'`, `'locker-read-card'`,
   `'locker-team-cube'`, `'locker-two-tokens'`, `'locker-whole-mission'`
+- Fire Cadet: `'cadet-three-forward'`, `'cadet-there-and-back'`, `'cadet-turn-around'`,
+  `'cadet-two-rescues'`, `'cadet-round-the-sign'`, `'cadet-all-four'`
 
-Lists 1 and 2 hold the ids of all four games together, one below the other. Every id of Fire
-Chief begins with `chief-`, every id of Warehouse Sort with `sort-` and every id of Locker Room
-with `locker-`, so they cannot be mixed up: `'full-mission'` is the full mission of Fire Rescue, `'chief-full-mission'` the one
+Lists 1 and 2 hold the ids of all five games together, one below the other. Every id of Fire
+Chief begins with `chief-`, every id of Warehouse Sort with `sort-`, every id of Locker Room
+with `locker-` and every id of Fire Cadet with `cadet-`, so they cannot be mixed up: `'full-mission'` is the full mission of Fire Rescue, `'chief-full-mission'` the one
 of Fire Chief. A line decides about that one example, in its own game, and about nothing in
 another game.
 
@@ -561,13 +568,14 @@ in its name.)
 The honest limits:
 
 - **The repository is public on GitHub.** Anyone who looks there can read every example
-  program in `src/simulator/fire-rescue/samples.ts`, `src/simulator/fire-chief/samples.ts` and
-  `src/simulator/warehouse-sort/samples.ts` — the advanced ones too — and can read in
+  program in the `samples.ts` of every game (`src/simulator/fire-rescue/samples.ts`,
+  `src/simulator/fire-chief/samples.ts` and so on) — the advanced ones too — and can read in
   `content/simulator-codes.ts` which examples are kept for advanced codes. The lock and the
   hiding keep the examples out of the *website*, not out of GitHub. If that ever matters, the
   repository has to be made private.
 - **Somebody with a code can pass things on**: the code itself, or a loaded example saved as a
-  file (the **Save** button), which anyone can open with **Open**. One code per person keeps
+  file (the **Save** button), which anyone can open with **Open** (Fire Cadet has no Save, but a
+  row of cards can be copied by hand). One code per person keeps
   this in check — when a code gets around, cancel that one code. Give advanced codes only to
   people you trust with the advanced programs.
 - **A shared computer remembers.** Once somebody has typed a code in a browser, the examples
@@ -578,8 +586,9 @@ The honest limits:
   browser. A very old browser that does not tell its other tabs still shows them there until
   the tab is loaded again.)
 - **Forgetting a code does not empty the workspace.** A program that was loaded stays in the
-  blocks — and is saved in that browser — until somebody presses **New** or loads something
-  else. That goes for an advanced example as well.
+  blocks (in Fire Cadet: in the row of cards) — and is saved in that browser — until somebody
+  presses **New** (in Fire Cadet: **New row**) or loads something else. That goes for an advanced
+  example as well.
 - **A member can notice the field.** The window offers "Use a different code" to everybody
   whose examples are open. That is all it says: it does not say what another code would open,
   or that there is another kind.
@@ -603,12 +612,13 @@ The honest limits:
 npm run test:sim
 ```
 
-It runs about eleven hundred checks; among them, every example program of every game is
-played on the real engine with the real referee and its score is compared. They also check
+It runs about fifteen hundred checks (1,566 in November 2026, with Fire Cadet); among them,
+every example program of every game is played on the real engine with the real referee and its
+score is compared, and every practice map of Fire Cadet is proved. They also check
 `content/simulator-codes.ts` (a misspelt example id, an example that is on both lists, a
 damaged line, a code that is on both lists of codes) and that nothing about an example —
 not even a title — can slip back into what every visitor's browser downloads. It takes
-around half a minute and must end with `fail 0`. If it does not, do not deploy — a failing
+around a minute and a half (81 s measured) and must end with `fail 0`. If it does not, do not deploy — a failing
 test means a program would now score differently, a block would behave differently, or an
 example would be shown to somebody who should not see it.
 
@@ -729,9 +739,11 @@ with "Powered by …", the header height.
 ### The Simulator page
 
 The simulators have a section of their own on the website: **Simulator** in the menu, between
-Training and Videos, leads to `/simulator`. It is one page (`src/app/simulator/page.tsx`) with
-one part per season — "Season 2026", then "Season 2027" — and in each part one card per
-simulator: the picture of its mat, its two labels (age group and season, or for a mission
+Training and Videos, leads to `/simulator`. It is one page (`src/app/simulator/page.tsx`, titled
+"Robot simulators") that lists the five simulators of two robots — Locker Room and Warehouse Sort
+(Season 2026), Fire Cadet, Fire Rescue and Fire Chief (Season 2027); Fire Cadet is played with the
+mTiny, the others with the mBot2 — with one part per season — "Season 2026", then "Season 2027" —
+and in each part one card per simulator: the picture of its mat, its two labels (age group and season, or for a mission
 without an age group its category and level, and its event), its name and two sentences. The
 whole card is one link to the simulator; under the card of a category is the link "About
 <category>" to its category page. Nothing about a simulator is written in that page itself:
@@ -756,9 +768,11 @@ is not a category of a season (Warehouse Sort, the beginner mission of a local e
 entry of `missionSimulators` in the same file instead: its `season` (a year) says in which part
 it is shown, after the categories of that season; it has two labels of its own (`label`,
 `event`) and no "About" link. A season without a simulator gets no part. The Training page
-keeps one card that leads to `/simulator` (`simulatorTrack()` in `trainingTracks`, same file):
-its badge and its sentence name the seasons and the simulators, worked out from
-`simulatorSeasons()` too, so a simulator added later is named there by itself.
+keeps one card that leads to `/simulator` (`simulatorTrack()` in `trainingTracks`, same file),
+"Robot simulators": its badge and its sentence name the seasons and the simulators, worked out
+from `simulatorSeasons()` too, so a simulator added later is named there by itself. The page and
+the card name both robots ("blocks (mBot2) or coding cards (mTiny)"); the page of each game names
+its own robot in its title row ("Fire Cadet simulator · mTiny", "Fire Rescue simulator · mBot2").
 
 The **Simulator** item of the menu has a dropdown, built by `simulatorMenu()` in
 `content/site.ts` from the same `simulatorSeasons()`: "All simulators" (this page), then one
@@ -1185,7 +1199,7 @@ Use only blocks of the Fire Chief palette — blocks that exist in real mBlock. 
 
 Described in full in "Member codes for the simulator examples" above. In short:
 
-- **One address, four games.** Every simulator asks `/api/simulator/unlock`, and each says which
+- **One address, five games.** Every simulator asks `/api/simulator/unlock`, and each says which
   game it is. The answer holds the cards and the programs of that game only, and says the name
   of the game back. A page takes an answer only when it is about its own game: should a tab
   stay open while the website is put back to a state from before Fire Chief, that older server
@@ -1198,7 +1212,7 @@ Described in full in "Member codes for the simulator examples" above. In short:
   again cures it, and so does putting the newer server back.
 - **One set of codes.** A member code opens the member examples of every game, an advanced
   code shows every example of every game. There is nothing to make or to hand out for Fire
-  Chief, Warehouse Sort or Locker Room.
+  Chief, Warehouse Sort, Locker Room or Fire Cadet.
 - **Typed once.** The browser keeps the code in one place for all games.
 - **The same three groups.** Fire Chief has three starter examples open to everyone, two for
   members and one that only an advanced code shows — and, without such a code, no card, no
@@ -1943,6 +1957,592 @@ their own:
 
 ---
 
+## The Fire Cadet simulator
+
+The fifth simulator of the site, and the first for another robot: the Makeblock **mTiny**, for the
+Season 2027 category **Fire Cadet – Rescue City** (ages 4–7). The robot is the rescue robot of
+Fire City. It starts in the **Fire Station** at the bottom of a 7 × 7 map and pushes four rescue
+items to their places — the **Water** to the Fire (at the School, the Factory, the House or the
+Bakery), the **Cat** to the Safe Zone, the **Injured Person** to the Hospital and the **Emergency
+Equipment** back to the Fire Station — round three obstacles, and parks in the Fire Station again
+for the return bonus. There are two ways to play, as in the rules: **Junior** (ages 6–7) lays a row
+of mTiny coding cards and presses the round GO button; **Mini** (ages 4–5) drives the robot tap by
+tap with the four arrow cards of a direction panel. A match lasts 120 seconds. It lives at:
+
+```
+https://www.makexlebanon.com/simulator/fire-cadet
+```
+
+**Which rules.** The organiser's rules "Fire Cadet – Rescue City" (version 1, a Word file) and the
+organiser's answers of 19 November 2026: the robot starts and ends in the Fire Station at the
+bottom, the Fire can be at four places, the robot gets two sticks at its front to push an item,
+and every item stands on a 4 cm base for now. The Word file is **not** published on the site (it
+carries a personal name in its metadata), so the category has no download (`content/seasons.ts`
+has no `downloads` for it); the **Rules** window tells the rules in short. The season's sentence
+"missions, fields and rules will be revealed soon" stays as it is (question 20). The map is the
+organiser's print file "Robo-Ville mTiny National 2027" (1250 mm); the PDF is not published
+either (a personal name in its metadata). The picture on the stage is made from it.
+
+**The obstacles: decided by the lead engineer (D1 and D5).** The rules say "If the robot touches
+an obstacle: −1 point. If an obstacle is moved, the referee returns it to its original position
+while the match timer continues." So in this simulator **as soon as anything touches an obstacle**
+— the robot, or an item the robot pushes against it — **the referee lifts it off the map at once**,
+and puts it back on its own square, unturned, as soon as nothing is nearer to its base than 5 mm.
+**An obstacle costs 1 point the first time it is touched, by the robot or by an item the robot
+pushes**: once for each obstacle, whoever touched it, so 3 at most, and the total never goes below
+0. The rules also say "The robot must not push an obstacle away to open the road": pushing an item
+into an obstacle is the robot pushing it away, so it costs the same point, and the referee says
+"The Cat touched the Road Closed sign: -1. On the real map, go round it." So the robot never gets
+stuck on an obstacle and is never pushed off the squares by one: it goes on with its row from
+where it is, on the squares. (The design had fixed blocks instead, with the robot stuck 7.7 cm off
+the squares for the rest of the match after a single hit; that cost a child far more than the 1
+point of the rules. With D1 alone an item's touch cost nothing, and a row that pushed items
+through the obstacles of maps 4, 5 and 8 scored all 25 points sooner than the way round; D5 gave
+the item's touch its point. Question 3 asks the organiser.)
+
+This category is for children of 4 to 7 who mostly cannot read yet, and their teachers. Every
+control a child uses is a picture of at least 48 × 48 px, and every sentence on the screen is
+short and plain — keep it that way. Many teachers read English as a second language.
+
+**It does not use the general screen.** There are no blocks, no block palette, no Open / Save
+of program files, no sensors, no console and no "Test on many". The screen is its own
+(`src/simulator/ui/fire-cadet/`); what it shares with the other games is the engine, the stage,
+the run loop, the score sheet, the windows and the examples with their codes (one set of codes
+for all games: "Member codes for the simulator examples" above).
+
+### How the game is put together
+
+| File | What is in it |
+| --- | --- |
+| `src/simulator/fire-cadet/numbers.ts` | **The one table of numbers**, `FIRE_CADET`: the map, the times of a card, the sizes of the robot, its sticks, the items and the obstacles, the points. Every value says where it comes from (RULE, ORGANISER, MEASURED, SPEC, ASSUMPTION). No other file writes one of these numbers again, not in a sentence either |
+| `src/simulator/fire-cadet/field.ts` | The map as measured from the print file: the eight marked places, the four squares of the Water / Equipment Area, the thirteen road squares, the drawn stand-in of the mat (`MAT_VECTOR`) |
+| `src/simulator/fire-cadet/scenario.ts` | A **map** (one combination): where the Fire is, where the four items and the three obstacles start; the eight practice maps (`PRACTICE_MAPS`); the short code ("P3", "S-A6-D5-C5-C7-E3-F5-F7"); the rules of an own map and their sentences |
+| `src/simulator/fire-cadet/robot.ts` | The mTiny with its two sticks (`MTINY_ROBOT`), and where it starts |
+| `src/simulator/fire-cadet/cards.ts` | The two interpreters: a row of cards (Junior) and the direction panel (Mini); the rules of a row; the time of a row |
+| `src/simulator/fire-cadet/game.ts` | The game and its referee: the score sheet, the obstacles (D1, D5), every sentence of the referee |
+| `src/simulator/fire-cadet/solver.ts` | Finds the shortest row for all 25 points on a map. The own-map editor uses it (it says only "found" and the time, never the row), and the tests prove the practice maps with it |
+| `src/simulator/fire-cadet/play.ts` | Play a row without a screen, on one map or on all eight (the tests use it) |
+| `src/simulator/fire-cadet/test-helpers.ts` | For the tests only: random own maps, a whole match watched tick by tick |
+| `src/simulator/fire-cadet/sample-catalog.ts`, `samples.ts` | The six examples. They stay on the server (see "Member codes" above). `samples.ts` writes each row as a plain object: there is no block builder for cards |
+| `src/simulator/ui/fire-cadet/` | The screen: `FireCadetSimulator.tsx` (the whole screen), `FireCadetLoader.tsx`, `MatchBar.tsx` (the mode switch, the clock, the points, the speed), `GoButton.tsx` (the round GO / STOP / AGAIN button), `CardRow.tsx` with `card-row.ts` (the row and the card box), `CodingCard.tsx` (our drawings of the cards), `DirectionPanel.tsx`, `MapPicker.tsx`, `MapEditor.tsx` with `map-editor.ts` ("My own map"), `map-code.ts` (codes and what the browser remembers), `ScoreStrip.tsx` (the score in pictures), `Banner.tsx` with `banner.ts` (the one sentence under the map), `PlanningClock.tsx` with `planning-clock.ts`, `RulesWindow.tsx` with `rules.ts`, `paint.ts` (what the stage draws), `pictures.tsx` (the small pictures), `words.ts` (every word of the screen), `fire-cadet.css` |
+| `src/app/simulator/fire-cadet/page.tsx` | The page: its address, title and description |
+| `public/simulator/fire-cadet/mat.webp` | The picture of the map (2500 px, 2 px per mm). There is no `mat-sensor.webp`: the mTiny has no floor sensor here |
+
+The category has a `simulator` entry in `content/seasons.ts`, so the Simulator page shows it first
+in the part "Season 2027", the menu's dropdown has the line "Fire Cadet — Season 2027", the season
+page labels it "Online simulator", its category page has the "Try the Fire Cadet simulator" block,
+the homepage's 2027 block has "Try the simulator", and the Training page's card names it. It has
+no `menuName` ("Fire Cadet" is short; question 21).
+
+What the shared code got for this game. Every change is behind something the four older games
+leave out (an optional field, an optional prop, a parameter with a default), so they run exactly
+the lines they ran before. Their examples were played before and after the change, once, in a
+scratch script, with the same result byte for byte, and every older test still passes (only the
+tests that count the games were changed).
+
+| File | The change |
+| --- | --- |
+| `src/simulator/core/types.ts`, `core/engine.ts` | **Fixed sticks** (`GripperConfig.fixedSticks`): what stands between the two sticks turns with the robot when it turns. **The referee can take bodies off the field** (`RefereeCall.removeBodies`: a delivered item, a touched obstacle) **and put them back** (`RefereeCall.restoreBodies`: where it stood at the start of the match, unturned, only when nothing is nearer than `RESTORE_CLEARANCE`, 5 mm; else nothing happens and the referee asks again on a later tick). **A game can name its own interpreter** (`Game.createVM`) |
+| `src/simulator/core/simulation.ts` | uses `game.createVM` when a game has one |
+| `src/simulator/ui/useSimulation.ts` | the two "Nothing will happen …" warnings only for block programs; no sensor picture is loaded when a game has none |
+| `src/simulator/ui/render.ts`, `StageCanvas.tsx` | optional **painters**: a game can draw the robot, its items and flat things on the mat itself |
+| `src/simulator/ui/TitleBar.tsx` | the prop `robot` ("· mTiny"; "· mBot2" when none is given) |
+| `src/simulator/ui/examples-words.ts`, `ExamplesDialog.tsx` | the sentence on how loading works can be given ("Loading one puts its cards in your row and sets its map …") |
+| `src/simulator/ui/widgets.tsx` | `Modal` has a third frame, `align: 'full'`: the own-map editor fills a phone's screen |
+
+Their tests: `core/engine-sticks.test.ts`, `core/engine-referee-bodies.test.ts`,
+`ui/render-painters.test.ts`, `ui/widgets-modal.test.ts`.
+
+### The field (measured from the print file)
+
+All in mm, origin at the top-left corner of the map, +y down. A square is written with a letter
+for its column (A to G) and a number for its row (1 to 7): A1 is the School at the top left, D7
+the Fire Station at the bottom.
+
+| What | Measure |
+| --- | --- |
+| Map | 1250 × 1250, 7 × 7 squares (`MAT`, `GRID_COUNT`) |
+| Black lines | 178.000 apart (`GRID_PITCH`), the first one's middle 179.764 from the edge (`GRID_FIRST_LINE`), 7.06 wide |
+| A square (a target) | to the middle of the lines; at the edge of the map, to the edge: the first column and row are 179.764 wide, the middle five 178, the last 180.236 |
+| Where things stand | on a lattice of 178 mm (one Forward card): x = 90.764 + 178 × column, the same for y. That is the middle of the 25 inner squares and at most 1.12 mm from the middle of an edge square |
+| Marked places (a white dashed frame) | School A1, the top Fire Station D1 (no job), Factory G1, House G3, Safe Zone D4, Hospital A5, Bakery G5, the Fire Station D7 (start, finish, and the Equipment's place) |
+| Water / Equipment Area | A6, B6, A7, B7 (no dashed frame) |
+| Road squares | a drawn road under the middle: C3, D3, E3, B4, D5, F7; within 30 mm of it: C2, E2, C4, B5, F5, G4, E7. The practice maps put their obstacles only there |
+| Table around the map (ASSUMPTION) | 100 mm on every side, as in Warehouse Sort and Locker Room |
+
+### The robot and the two sticks
+
+The robot is a box of 114 × 106.5 mm (98 high) that turns around its middle. The organiser
+answered: "2 sticks will be added on the left and right to push it in front of the robot". Here
+each stick is 30 mm long beyond the front of the body and 8 mm thick, on the left and the right
+edge of the front, so the free width between them is 90.5 mm; the robot reaches 87 mm ahead of
+its turning point. The real sizes are not decided (question 4).
+
+- **Forward** pushes an item: it rests against the body, between the sticks, its middle 77 mm
+  ahead of the turning point.
+- **A turn** takes it along: what stands between the sticks turns with the robot (fixed sticks,
+  in the engine). With real geometry and no such rule, a 40 mm item does not stay between the
+  sticks through quarter turns at any stick length from 20 to 32 mm (at most 7 of 12 sequences of
+  turns worked; measured in the design). So the rule is what the organiser's answer asks for, made
+  into one rule of the engine.
+- **Backward** leaves the item where it is.
+
+Measured: the whole robot fits inside the Fire Station on its start place in all four
+directions, with 2.0 mm to spare at the tips of the sticks (4.24 mm looking down); an item
+caught from any side ends 77 mm ahead of the turning point; 48 moves end on the start place to
+0.001 mm. **What breaks at other sizes** (tell the organiser when the real sizes come):
+
+| Size | Works | Breaks | Why |
+| --- | --- | --- | --- |
+| Stick length (beyond the front of the body) | 21 to 32 mm | 20 mm and less: the item is not held in a turn. 33 mm and more: the robot does not fit inside one square, so no return bonus and no legal start | the middle of a 40 mm item is 20 mm ahead of the body; 57 + 32 = 89 mm = half a square |
+| Item base | up to 59 mm with 30 mm sticks | 60 mm and more: not held in a turn | the base must be less than twice the stick length |
+| Item base, if the referee looked only when the robot has stopped | up to 32 mm | 33 mm sticks out of the far side of the target by 1 mm; 40 mm by 8 mm; 50 mm by 18 mm | 57 + base must be at most 89 mm. Counted "at the first moment" (as here), every base works |
+| Free width between the sticks | 40 mm and more for a 40 mm item | under the item's width | the item must fit between them |
+| Obstacle base | up to 150 mm | 152 mm and more: a robot that turns in the next square touches it | the tips of the sticks sweep a circle of 102 mm |
+| Sticks longer than the item | — | an item pushed against an obstacle would also be the sticks touching it: the same −1 (D5), but the referee would call it the robot's touch | with 30 mm sticks and 40 mm items, 10 mm are left |
+
+`numbers.test.ts` holds these limits: if real sizes break one, it says which.
+
+### The cards and the panel
+
+**Junior: a row of cards.** The row always begins with the yellow start card; the round GO button
+starts it, like the button of the Tap Pen. The cards are the ones seen at the organiser's events:
+
+| Card | The robot |
+| --- | --- |
+| Forward, Backward (blue) | one square ahead or back, without turning: 178 mm in 1.6 s |
+| Turn left, Turn right (blue) | a quarter turn on the spot: 1.3 s |
+| x2, x3, x4, x5 (yellow) | the one arrow card right before it runs 2, 3, 4 or 5 times in all |
+
+The robot rests 0.4 s between two moves, not after the last one, so "Forward, x3" takes 3 × 1.6 +
+2 × 0.4 = 5.6 s. Times are counted in whole ticks of the engine (0.01 s), the way the
+interpreter counts them, so the time worked out for a row is exactly the time of the match.
+A number card must stand right after an arrow card, and an arrow takes one number card at most:
+the row refuses anything else and says why in a few words ("Put an arrow card first.", "One
+number card for each arrow.", "A number card comes after an arrow."). Removing an arrow removes
+its number card; moving it moves its number card with it. A row holds **70 cards** at most ("The
+row is full: 70 cards."): the shortest card is a turn, and a 71st card could never be finished
+inside 120 s — 70 turns end at 118.6 s, so a 71st would start at 119.0 s and be cut off by the
+clock (worked out from the times, so it changes with them). During a match the row is locked; the
+running card has a white ring. The match clock starts when the row starts, and the match ends
+when the whole row has run (that time counts), at 120 s or at STOP.
+
+**Mini: the direction panel.** A yellow panel with the four arrow cards: one tap is one whole
+move. A tap while the robot moves is kept for after the move — only the newest one — so a child
+can tap the next move ahead (and change their mind until it starts). Holding a card down does not
+repeat it. The arrow keys do the same. The match ends at 120 s or at STOP. A real pen probably
+ignores such a tap or keeps every tap, so the Rules window tells children to wait until the robot
+stops on a real pen (question 2).
+
+The programs are plain objects, so a row travels through the examples lock as it is:
+`{ "format": "mtiny-cards", "version": 1, "cards": ["forward", "x3", "left"], "field": "P1" }`
+(`field` only on an example: loading it sets that map), and `{ "format": "mtiny-panel",
+"version": 1 }`. Speeds: Junior 1x, 2x, 4x; Mini 1x only (driving tap by tap at 2x is another
+game). There are no restarts, no pause and no countdown: GO is the referee's start, STOP is the
+student saying "STOP". The planning stopwatch of Junior (the rules give 120 s to plan) only counts
+and says when 2 minutes are over; it locks nothing (question 15).
+
+### The referee
+
+| Line | Points | When |
+| --- | --- | --- |
+| Water to the Fire | +5 | the first moment the Water's whole base is inside the square with the Fire; the referee then takes it off the field and the points stay |
+| Cat to the Safe Zone | +5 | … inside D4 |
+| Injured Person to the Hospital | +5 | … inside A5 |
+| Equipment to the Fire Station | +5 | … inside D7, the Fire Station at the bottom |
+| Robot back in the Fire Station | +5 | when the match ends: the whole robot, sticks included, completely inside D7 — and it was completely outside D7 before |
+| Obstacles touched | −1 each | the robot (its body or a stick) or an item the robot pushes touched it (D5); once for each obstacle, whoever touched it, so −3 at most |
+
+The most is 25 = 4 × 5 + 5, and it can be reached on all eight practice maps. The total is never
+below 0. The four items can be done in any order. Edge cases, in short:
+
+- **An obstacle touched** (D1, D5): the referee lifts it at the first touch and puts it back on
+  its own square once nothing is within 5 mm of its place. Driven into head-on, the robot touches
+  it 0.88 s into the card and goes on to the end of the card, on its square line. An item pushed
+  against it lifts it too and costs the same point: "The Equipment touched the Road Closed sign:
+  -1. On the real map, go round it." Touched again later, by the robot or by an item: no second
+  point ("The robot touched the Road Closed sign again. The referee puts it back."; "… too." when
+  something else touched it first). The score sheet ("Touched: the Road Closed sign.") and the
+  score strip (a red "-1") count an item's touch like the robot's own. An item left on an
+  obstacle's place keeps it off the map until the place is free. An obstacle that moved while
+  nothing touched it was turned along by the sticks: that counts as the robot's touch.
+- **An item in a wrong marked place** brings nothing and costs nothing; it stays on the map. The
+  referee says so once ("The Cat is in the Hospital. It belongs in the Safe Zone."), and only when
+  the item was moved and has come to rest there — not while it is pushed through a marked place,
+  and not for an item that started on one.
+- **A delivery** counts 0.35 s into the card that drives the item in (when the robot has driven
+  32.4 mm of that card); the item is gone from the next tick and the robot drives on without it. The
+  Equipment goes home into D7: the robot must leave, catch it and drive in behind it.
+- **The return bonus** needs the robot to have left D7 first: Forward, Backward scores 5;
+  turning on the spot scores nothing. It is looked at once, when the match ends: STOP 0.6 s
+  before the robot is home gives no bonus. During the match it is never shown as earned, nor added
+  to the points: a robot that is home says "The robot is in the Fire Station now. The bonus counts
+  when the match ends." (it may still drive out again).
+- **Leaving the map** costs nothing: the robot stops with the tips of its sticks 100 mm outside
+  (the edge of the table) and the referee says "The robot left the map." once. An item partly off
+  the map is in no target; nobody puts it back.
+- **The very end**: a delivery on the tick of exactly 120.00 s still counts.
+- **Not simulated**: a run the referee stops because somebody touched the robot, the two rounds
+  and the ranking. The Rules window says so.
+
+The banner under the map shows the referee's newest sentence for 3 s ("The Cat is in the Safe
+Zone. 5 points.", "The robot touched the Fallen Tree: -1. The referee puts it back."), then what to
+do next. The score sheet (for the teacher) is titled "Score sheet · Junior" or "Score sheet ·
+Mini", because the two are ranked apart.
+
+### The screen, as measured
+
+One column on a phone or a tablet: the map block sticks to the top of the window (with the clock,
+the points and the banner), the bar with the round button sticks to the bottom, and the row, its
+buttons and the card box scroll between them. On the first screen the title row and the mode
+switch stand above the map block and push the row and the box under the bar, so when the screen
+opens the page scrolls them away once (only when the work area is not in view, and only down), and
+GO brings the row (Junior) or the panel (Mini) into view the same way. The banner under the map is
+as wide as the screen, not only as the map, and has three lines at most. In a window under 560 px
+high — a phone held sideways — the map block does not stick (it and the bar would cover the whole
+window): the page scrolls as one, and every card and arrow can be reached. From 1024 px wide: two
+columns, the map on the left, the row and the cards on the right. Measured in Chromium, in a build,
+after that first scroll:
+
+| Window | Side of the map | Mat | Room under the banner | Row, buttons and box |
+| --- | --- | --- | --- | --- |
+| 390 × 844 | 366 px | 316 px | 277 px | 260 px: fits |
+| 390 × 664 (a phone with its browser bars shown) | 201 px | 173 px | 262 px | all but the last 8 px of the box |
+| 360 × 640 | 200 px | 172 px | 239 px | a short scroll |
+| 768 × 1024 | 545 px | 470 px | 262 px | 192 px: fits |
+
+On the classroom screen the map is 399 px at 1024 × 768 (the right column fits with no scroll),
+531 px at 1440 × 900 and 711 px at 1920 × 1080. Where the left column is narrow (up to about
+1280 × 800) the banner takes the whole line over the map and the clock and the points lie on the
+map's top edge, as on a phone; the eight map buttons stand in one line only where the picker itself
+is 426 px wide, else in two lines of four (map 8 was cut off at 1024 × 768, 1366 × 768 and 1280 ×
+720). The first GO of a visit closes the Map section, so that the score sheet stays in view in the
+short column under the map. In Mini the four arrows of the panel are in view under the banner on
+the three phones (the line under the panel may need a short scroll). Every control is 48 px or more
+(the panel cards are 64 px under 700 px of height, 56 px under 660 px), and on this page the
+breadcrumb links Home and Simulator of the shared title row too; the squares of the own-map editor
+are 53.4 px at 390 px wide and 49.1 px at 360. A refusal's bubble lets taps through to the buttons
+under it. The Rules window's text takes the keyboard when it opens, so the arrow keys, Page Down,
+Space and End scroll it. The banner reads a refusal out again when it comes twice. The browser remembers the row, the map, the mode, the speed and which sections are open
+(`mbot2-sim:fire-cadet:…`).
+
+### The practice maps
+
+There is **no official list** of field combinations yet (the organiser). So the simulator has
+eight **practice maps of this simulator** — never called official on the screen — from the easiest
+(P1) to the hardest (P8), and "My own map", where a teacher can place the Fire, the four items and
+the three obstacles to copy any combination. "Surprise" gives one of the eight — never the one on
+the stage.
+
+| Map | Code | Fire | Water | Cat | Injured Person | Equipment | Road Closed, Fallen Tree, Broken Vehicle | Cards | Moves (turns) | Time | Without the obstacles |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| P1 | `S-A6-D5-C5-C7-E3-F5-F7` | School | A6 | D5 | C5 | C7 | E3, F5, F7 | 18 | 27 (5) | 52.1 s | 52.1 s |
+| P2 | `B-B6-E5-B4-F7-C2-D3-E2` | Bakery | B6 | E5 | B4 | F7 | C2, D3, E2 | 22 | 29 (7) | 55.5 s | 55.5 s |
+| P3 | `H-B7-C5-E3-D6-C2-E2-B4` | House | B7 | C5 | E3 | D6 | C2, E2, B4 | 26 | 36 (10) | 68.6 s | 68.6 s |
+| P4 | `S-B7-B3-C3-E6-B5-C4-E7` | School | B7 | B3 | C3 | E6 | B5, C4, E7 | 34 | 42 (12) | 80.0 s | 74.3 s |
+| P5 | `F-A7-E6-C3-F2-D5-E3-B4` | Factory | A7 | E6 | C3 | F2 | D5, E3, B4 | 32 | 45 (11) | 86.3 s | 84.6 s |
+| P6 | `B-A6-C6-F2-A7-G4-F5-B5` | Bakery | A6 | C6 | F2 | A7 | G4, F5, B5 | 33 | 47 (11) | 90.3 s | 82.9 s |
+| P7 | `H-A7-F6-B2-B4-D5-C4-D3` | House | A7 | F6 | B2 | B4 | D5, C4, D3 | 40 | 51 (13) | 97.7 s | 88.6 s |
+| P8 | `F-B6-G6-E3-F2-D5-D3-G4` | Factory | B6 | G6 | E3 | F2 | D5, D3, G4 | 41 | 53 (15) | 101.1 s | 92.6 s |
+
+"Cards", "Moves" and "Time" are those of the proof row of each map in `practice.test.ts`: a
+shortest row for all 25 points, as the solver finds it (on map 6 the solver itself lays the same 47
+moves and 90.3 s in 34 cards; the proof row puts them in 33).
+Each map is **proved in the engine** by `practice.test.ts`: its row scores 25 at exactly that time,
+the robot stands on a square after every card, the referee never says "wrong place", and no
+obstacle is touched. Every obstacle stands on a road square; every Fire place and every Water
+square is used twice; on map 6 the Equipment starts in the Water / Equipment Area. On maps 1 to 3
+the obstacles stand beside the ways; from map 4 on they stand on the shortest ways, and the proof
+rows go round them. ("Without the obstacles" is the time with no obstacle on the map. The row of
+that time, played on the real map, pushes items into the obstacles or touches them, and each
+obstacle touched costs 1 point (D5): measured, it scores 22 on map 4 (in 74.3 s), 24 on map 5
+(84.6 s), 24 on map 6 (82.9 s), 22 on map 7 (88.6 s) and 22 on map 8 (92.6 s), never the 25 of the
+proof row; the referee tells the child to go round on the real map, and question 3 asks the
+organiser.) In a code the first
+letter is the Fire (S School, F Factory, H House, B Bakery), then the squares of the Water, the
+Cat, the Injured Person, the Equipment and the three obstacles; capitals, blanks and hyphens do
+not matter, and a practice map always gets its short code (`P3`).
+
+Map 8 leaves 18.9 s. If the real card times are slower (all times more than 120 / 101.1, about
+1.19 times as long), map 8 falls out of the 120 s first, and `practice.test.ts` says so.
+
+**My own map** keeps these rules at every tap: one thing per square; the Water on one of its four
+squares; the Cat, the Injured Person and the Equipment on any other square except their own target
+and D7 (a marked place is allowed: the rules put them "at a rescue location"); the three obstacles
+on squares without a dashed frame (the editor does not check that the square has a road: grass and
+the pond are allowed; question 8); always all four items and all three obstacles.
+That allows 71,983,941,120 maps. The editor says, a moment after every tap, whether this simulator
+**finds** a row for all 25 points inside 120 s ("found", never "possible": the solver never backs
+away from an item). Measured on 3,000 random own maps (seed 2027): 18 have no row; 57 have one
+only over 120 s; 2,925 have one inside 120 s (shortest 51.5 s, middle 92.0 s, nine in ten under
+107.4 s, longest 120.0 s; 21 to 54 cards, middle 36). Every one of those 2,925 rows scored 25 in
+the engine at exactly its time, with the referee of D5 (two of them end at exactly 120.00 s, where
+the clock ends the match on the same tick), and so did all 2,912 rows inside 120 s of 3,000 other
+random own maps (seed 7). In none of these matches did the robot or an item it pushes touch an
+obstacle: the solver never drives into an obstacle's square, and an item between the sticks never
+reaches the next square's obstacle (measured, an item never came nearer than 4.6 cm to one, the
+robot never nearer than 4.0 cm). So "found" never relies on pushing an item into an obstacle.
+`solver.test.ts` plays the first 300 rows of the survey and the rows of 150 of the other maps
+again on every run.
+
+### The examples, as measured
+
+Six rows of cards in `src/simulator/fire-cadet/samples.ts`, each made for one practice map (its
+`field`: loading it sets that map). `samples.test.ts` plays each on its own map and on all eight,
+and checks every number and every claim of its text.
+
+| Id | Level | Title | Map | Row | Cards | Moves | Time | Points on its map |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `cadet-three-forward` | starter | Three cards for the cat | P1 | `F F F` | 3 | 3 | 5.6 s | 5: Cat |
+| `cadet-there-and-back` | starter | There and back again | P1 | `F3 B3` | 4 | 6 | 11.6 s | 10: Cat, return |
+| `cadet-turn-around` | starter | Turn around with the toolbox | P3 | `F R2 F` | 4 | 4 | 7.0 s | 10: Equipment, return |
+| `cadet-two-rescues` | intermediate | Two rescues and home | P1 | `F3 B L F3 B3 L F2` | 11 | 14 | 27.0 s | 15: Cat, Injured Person, return |
+| `cadet-round-the-sign` | intermediate | Round the closed road | P5 | `L B R F3 L F B L F3 R F` | 13 | 15 | 28.1 s | 10: Cat, return; the Road Closed sign on D5 is not touched |
+| `cadet-all-four` | advanced | All four rescues | P1 | `F3 B L F3 L F R2 F5 B5 B R F3` | 18 | 27 | 52.1 s | 25: all five lines, no obstacle |
+
+(F Forward, B Backward, L Turn left, R Turn right; a digit after a letter is the number card
+behind it: `F3 B L` is Forward, x3, Backward, Turn left.) Every row is valid, every match ends by
+itself when the row has run, none touches an obstacle on its own map and none gets a "wrong
+place" sentence. The "Try"s of the texts, measured too: `F3` in place of `F F F` on map 1, 5
+points in 5.6 s; `F L2 F` on map 3, 10 points in 7 s; "there and back" on map 2, 5 points.
+
+**What each one scores on the eight maps** — a row of cards fits one map. (−1) = one obstacle
+touched, each time by the robot itself (no example pushes an item into an obstacle on any of the
+eight maps): that costs 1 point and nothing more. `samples.test.ts` holds this whole table.
+
+| Example | P1 | P2 | P3 | P4 | P5 | P6 | P7 | P8 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `cadet-three-forward` | **5** | 0 | 0 | 0 | 0 (−1) | 0 | 0 (−1) | 0 (−1) |
+| `cadet-there-and-back` | **10** | 5 | 5 | 5 | 4 (−1) | 5 | 4 (−1) | 4 (−1) |
+| `cadet-turn-around` | 5 | 5 | **10** | 5 | 5 | 5 | 5 | 5 |
+| `cadet-two-rescues` | **15** | 5 | 5 | 4 (−1) | 4 (−1) | 4 (−1) | 4 (−1) | 4 (−1) |
+| `cadet-round-the-sign` | 5 | 10 | 5 | 4 (−1) | **10** | 5 | 5 | 5 |
+| `cadet-all-four` | **25** | 5 | 5 | 4 (−1) | 4 (−1) | 4 (−1) | 4 (−1) | 4 (−1) |
+
+The three starters teach one idea each (one card is one square; a number card and Backward; an
+item turns with the robot), the two intermediate ones put two ideas together, the advanced one is
+the whole mission on the easiest map. They use maps 1, 3 and 5 only, so the other maps stay for the
+children's own rows. The three starters are open to everyone, the two intermediate ones need a
+member code, the advanced one is shown to advanced codes only (`content/simulator-codes.ts`).
+
+**A note on the solver.** The own-map editor runs the solver in the browser, and it can work out
+a 25-point row for any map — map 1 included, whose shortest row is the advanced example. The screen
+shows only "found: N moves, S seconds", never the row, and the proof rows of the practice maps are
+in a test file only. Somebody who reads the site's JavaScript could still run it. The lead engineer
+decided to keep it (a practice tool).
+
+### What this simulator assumes
+
+The second part of the **Rules** window, "What this simulator assumes", tells what a child or a
+teacher can notice (`src/simulator/ui/fire-cadet/rules.ts`; `ASSUMPTIONS_SHOWN` there says which
+sentence stands for which assumption, and `rules.test.ts` checks that none is missing and that
+every number comes from `numbers.ts`). The whole list, one line each — A are the assumptions the
+lead engineer took before the design, N those the design added, D1 and D5 the lead's decisions on
+the obstacles. The question to the organiser that would settle each is in brackets.
+
+| # | Assumption |
+| --- | --- |
+| A1 | One Forward or Backward card moves the robot exactly one square, 17.8 cm; one Turn card turns it 90° on the spot. (Q1) |
+| A2 | A move takes 1.6 s, a turn 1.3 s, the rest between two cards 0.4 s. (Q5) |
+| A3 | Junior: Forward, Backward, Turn left, Turn right, x2 to x5; the yellow start card is always first and the round button starts the row; a row the robot may not understand cannot be built — the row refuses it and says why. (Q6, Q7) |
+| A4 | Mini: the four arrow cards of the yellow panel; one tap is one whole move; no joystick. (Q2) |
+| A5 | The items and the obstacles stand on 4 × 4 cm bases; the sticks are 3 cm long and 0.8 cm thick, on the two front corners. (Q4) |
+| A6 | A target is its square, to the middle of the black lines (to the edge at the edge of the map); an item counts at the first moment its whole base is inside. (Q10) |
+| A7 | Touching an obstacle costs 1 point once for each obstacle, 3 at most, whether the robot or an item it pushes touched it (D5); the robot is not put back to the start. (A7 also said the obstacles are fixed and the robot stays stuck: replaced by D1.) (Q3, Q3a, Q3b, Q3c) |
+| A8 | The return bonus: the whole robot, sticks included, completely inside D7 when the match ends, and only if it was completely outside D7 before. (Q11) |
+| A9 | The total is never below 0. (Q17) |
+| A10 | Junior: the match ends when the row has run (that time is recorded), at 120 s or at STOP. Mini: at 120 s or at STOP. (Q14) |
+| A11 | The programming time is a stopwatch that locks nothing. (Q15) |
+| A12 | The robot starts on the middle of D7, looking up the map; it may drive over every square (roads, grass and water are pictures). (Q12, Q19) |
+| A13 | The Water starts on any of A6, B6, A7, B7; the Fire is a flat sign that nothing bumps into. (Q9, Q13) |
+| A14 | Practice maps of this simulator and an own map; never called official. (Q8) |
+| A15 | A visitor opens the three starter examples, a member code five, an advanced code all six, as in the other simulators. (Q22) |
+| A16 | No rules file on the site; the Rules window tells the rules. (Q20) |
+| A17 | Our own simple drawings, in the colours seen at the organiser's events. (Q23) |
+| A18 | For children and teachers, on phones, tablets and classroom screens: a screen of its own with big pictures, few words and 48 px or more for every touch. (Q24) |
+| N1 | Everything stands on a lattice of 178 mm (x = 90.764 + 178 × column), at most 1.12 mm from the middle of an edge square. |
+| N2 | The robot turns around the middle of its body. |
+| N3 | An item between the two sticks goes round with the robot when it turns; Forward pushes it, Backward leaves it. (Q4) |
+| N4 | Items and obstacles are 50 mm high, the sticks 5 to 25 mm above the mat, the wheels 40 mm, their track 74 mm. (They change nothing that is measured here.) |
+| N5 | A move takes exactly its time, speeding up and braking included; the rest comes only between two moves; x3 is three moves with rests. (Q5) |
+| N6 | A delivered item is gone from the next tick. |
+| N7 | Mini: a tap during a move is kept for after it, only the newest one. (Q2) |
+| N8 | Speeds: Junior 1x, 2x, 4x; Mini 1x only. |
+| N9 | A row holds 70 cards at most. (Q6) |
+| N10 | The robot and the items can leave the map; they stop at the edge of the table, 100 mm outside; no points lost; an item partly off the map is in no target. (Q16) |
+| N11 | No countdown, no pause, no restart; the red STOP button is the student saying "STOP". |
+| N12 | My own map: one thing per square; the Water on its four squares; the other items anywhere but their own target and D7; the obstacles on squares without a dashed frame; always three obstacles, one of each kind. (Q8, Q18) |
+| N13 | The match time on the score sheet is the time the match ended. |
+| N14 | An example is tied to its practice map by the word `field` in its program. |
+| N15 | "Surprise" gives one of the eight practice maps, never the one on the stage (a random own map need not be playable). |
+| N16 | On a small screen an item or obstacle is drawn at least 22 px across, with its true base under it. |
+| N17 | Replaced by D1. (It said: after a hit, the row goes on from where the robot is stuck.) |
+| N18 | The own-map editor says whether this simulator finds a row for 25 points inside 120 s; it never shows the row. |
+| N19 | Mini and Junior are two interpreters of one game (no sensors, no "if"), chosen by a word in the program. |
+| N20 | No sound, no program files (Open, Save), no "Test on many". |
+| N21 | The Junior match clock starts at the round button; laying the cards takes no time. (Q14) |
+| N22 | The banner shows the referee's newest sentence for 3 s. |
+| N23 | Dropped with D1. (It said: a robot pressed against a fixed obstacle cannot turn round it. With D1 nothing fixed is left that a turning robot can be pressed against but the edge of the table, which that rule never covered: measured.) |
+| N24 | The referee says that an item is in a wrong marked place only when the item has moved and has come to rest there, or at the end of the match. |
+| D1 | As soon as anything touches an obstacle the referee lifts it, and puts it back on its own square, unturned, once nothing is nearer to its base than 5 mm. (D1 also said that only the robot's touch costs a point: replaced by D5.) (Q3) |
+| D5 | An item the robot pushes against an obstacle costs 1 point too, like the robot's own touch: once for each obstacle, whoever touched it. The referee adds "On the real map, go round it." (Q3b) |
+
+### Questions for the organiser
+
+Most important first. Each says what the simulator does now.
+
+1. **One card against one square.** A real mTiny drives 18.6 cm for one Forward card on the
+   maker's own map blocks of 18.6 cm (verified for Forward; Backward is likely the same). Your Fire
+   City map is 125 cm wide with 7 squares of 17.8 cm, so a real robot would probably end about 0.8
+   cm further with every move (5.6 cm after 7 moves). Is the map printed at 125 cm at the
+   competition? Has a whole run been tried on it? *Now: one card = one square of 17.8 cm (A1).*
+2. **Mini: tapping while the robot moves.** What does a real Tap Pen do when a child taps a card
+   again while the robot still moves: ignore the tap, or keep every tap and run them in order?
+   Only the four arrow cards of the yellow panel, one tap one move, or may Mini also use the
+   joystick of the pen? *Now: the four cards; a tap during a move is kept for after it, only the
+   last one (A4, N7). Part 2 of the Rules window tells children to wait on a real pen.*
+3. **A robot that touches an obstacle.** The rules say −1 when the robot touches an obstacle, that
+   the robot "may not push an obstacle away and use the blocked road", and that the referee
+   returns a moved obstacle to its place while the clock runs (l.183). Are the obstacles loose or
+   fixed to the map? When does the referee put a moved one back: at once, or once the robot has
+   gone? What happens to a robot that pushes an obstacle away and drives on along the blocked
+   road? And three more:
+   (a) **Is the −1 once for each obstacle, or for every touch?** The rules say both "If the robot
+   touches an obstacle: −1 point" (l.179-181) and "Each obstacle touched: −1 point" (l.243-245).
+   (b) **An item against an obstacle.** We chose −1: if the robot pushes a rescue item into an
+   obstacle, that costs 1 point, as if the robot had touched it (once for each obstacle). Is that
+   what the referee does? Or is it "pushing an obstacle away to use the blocked road", and the
+   referee does more: stops the run, or takes more points? (Without a point for it, a row that
+   pushes items through the obstacles of practice maps 4, 5 and 8 scores all 25 points sooner than
+   the way round, and with equal points the shorter time ranks higher.)
+   (c) **Back to the start?** Your mTiny rules of last season said "Touching a cone makes the team
+   lose 1 point and the Judge resets the mTiny to its starting position while the timer is
+   running." Does anything like that apply in 2027?
+   *Now (D1, D5): as soon as anything touches an obstacle the referee lifts it off the map, and
+   puts it back on its own square as soon as nothing is within 5 mm of its place; −1 once for each
+   obstacle (a), whether the robot or an item it pushes touched it (b), and then the referee says
+   "The Cat touched the Road Closed sign: -1. On the real map, go round it."; the robot is not put
+   back to the start (c). So the robot is never stuck and goes on with
+   its row, on the squares. While an obstacle is off the map, the robot — or an item it pushes —
+   could pass through its square: the simulator takes the point but does not check the blocked
+   road, and the Rules window tells children to drive around the obstacles. If real obstacles are
+   fixed to the map, a real robot that hits one stays stuck there, and we would change this.*
+4. **The real sizes**: the base of the 4 items and of the 3 obstacles, their height, and the two
+   sticks (length beyond the front of the robot, thickness, how far apart, how high). *Now: 4 × 4
+   cm bases, sticks 3 cm long and 0.8 cm thick on the two front corners (A5).* What works in the
+   simulator ("The robot and the two sticks" above): sticks 2.1 to 3.2 cm long; an item base under
+   twice the stick length and narrower than the gap between the sticks; sticks shorter than an
+   item. Will an item really stay between the sticks when the robot turns? Please try it with a
+   real mTiny: the simulator assumes it does (N3).
+5. **The time of a card.** How long does one move, one turn, and the pause between two cards take
+   on a real mTiny? A short video or a stopwatch would do. *Now: 1.6 s, 1.3 s and 0.4 s (A2). With
+   these, every practice map can be done inside 120 s; the hardest needs 101.1 s.*
+6. **Which cards are allowed in Junior**, and how many of each? Only Forward, Backward, Turn left,
+   Turn right and x2 to x5 (as on your tables in 2024-2026), or also Loop, brackets and the other
+   cards of the kit? Is there a limit on the number of cards? *Now: those eight cards, at most 70
+   in a row (A3, N9).*
+7. **How a program is started in 2027, and rows the robot may not understand.** Does the row begin
+   with the yellow start card, and is it started with the round Start button of the Tap Pen, as at
+   your 2024-2026 events? What does a real mTiny do with a number card right after the start card,
+   or with x2 followed by x3? *Now: the yellow start card is always there and the round button
+   starts the row; such rows cannot be built here (A3).*
+8. **The official field combinations.** Will there be a list, as last season (8 combinations)?
+   Where may items and obstacles stand: may the Cat, the Injured Person or the Equipment start on a
+   marked place (a House, the School, the top Fire Station), and do the obstacles always stand on
+   roads? *Now: 8 practice maps of this simulator, never called official, and "My own map": items
+   on any square but their own target and the start square, obstacles on squares without a dashed
+   frame — the editor does not check that the square has a road, so grass and the pond are
+   allowed, and its refusal says only "An obstacle cannot stand on a marked place." (A14, N12).*
+9. **Where the Water starts.** The rules list what a combination shows (l.108-114), and the Water
+   is not on that list. Does the Water always start on the same spot? Which one? And may the
+   Equipment also start in the Water / Equipment Area, as its name says? *Now: the Water on any of
+   the four squares of the area; the Equipment of practice map 6 starts there too (A13).*
+10. **When a delivery counts**: at the first moment the base is fully inside the target, or only
+    when the robot has stopped? *Now: the first moment (A6). With the simulator's sizes, a 4 cm
+    item still sticks out of the far side by 0.8 cm when the robot has stopped in the middle of
+    the target, so the answer matters.*
+11. **The return bonus**: must the robot have left the Fire Station first? *Now: yes (A8).*
+12. **Which way the robot faces at the start**, and does it stand in the middle of the Fire
+    Station? The rules say only "fully inside the starting area" (l.49, l.118). *Now: in the
+    middle, looking up the map (A12).*
+13. **The Fire marker**: is it flat, so that the robot and the items can go over it? *Now: flat;
+    nothing bumps into it (A13).*
+14. **The Junior match clock.** Does it start when the row starts (tapping the cards with the pen
+    not counted)? Does the match end, and is the time recorded, when the robot has run the whole
+    row - or only at STOP or after 120 seconds? *Now: it starts with the row and ends when the row
+    has been run, and that time is recorded (A10, N21).*
+15. **The programming time**: is it enforced at 120 s? *Now: a stopwatch that only tells (A11).*
+16. **Leaving the map**: may the robot or an item leave the map, and what happens then? *Now: they
+    may; it costs nothing; an item partly off the map is in no target (N10).*
+17. **The total**: can it go below 0? *Now: never (A9).*
+18. **The obstacles**: always 3, one of each kind? *Now: yes (N12).*
+19. **The roads**: may the robot drive over grass, water and buildings? *Now: yes; the roads are
+    pictures (A12).*
+20. **The rules file and the season page.** When will the rules be published, and may the season's
+    sentence "missions, fields and rules will be revealed soon" change? *Now: no rules file on the
+    site; the Rules window tells the rules (A16).*
+21. **The name in the menu**: "Fire Cadet", or "Fire Cadet — Rescue City"? *Now: "Fire Cadet".*
+22. **The ready-made examples**: is it right that a visitor can open the three starter examples, a
+    member code opens five and an advanced code all six, as in the other simulators? *Now: yes
+    (A15).*
+23. **Pictures**: may the simulator show the real coding cards, the real robot and the real items
+    as pictures, or should it keep its own simple drawings? *Now: our own drawings, in the colours
+    seen at your events (A17).*
+24. **Who uses it**: do the children use the simulator themselves on phones and tablets, or mostly
+    the teachers on a classroom screen? *Now: both; big pictures and few words, 48 px or more for
+    every touch (A18).*
+
+### What to change, and where
+
+| To change … | Change … |
+| --- | --- |
+| a size or a time (a card, the robot, the sticks, an item, an obstacle) | its line in `src/simulator/fire-cadet/numbers.ts`, nothing else: the game, the screen and the Rules window read it from there. Then run the tests: `numbers.test.ts` says which limit of "What breaks at other sizes" a size breaks, `practice.test.ts` whether a practice map still fits in 120 s, and `samples.test.ts` which numbers in the texts of the examples changed (they are written by hand: change them in `samples.ts`, and the tables here) |
+| a rule the organiser decides | the referee in `game.ts`, then the sentence in `src/simulator/ui/fire-cadet/rules.ts` (move it from "What this simulator assumes" into the rules part once it is decided; `rules.test.ts` checks every number), and the lists here |
+| the obstacles, if they turn out to be fixed to the map | not a number: the D1 part of the referee in `game.ts`. Without it the engine's smooth walls would slide a robot that turns while pressed against an obstacle round it (by up to 97 mm, measured in the design); the design's engine rule against that (N23) was dropped with D1 |
+| the margin before a lifted obstacle goes back (5 mm) | `RESTORE_CLEARANCE` in `src/simulator/core/engine.ts` (the engine's, for every game that puts a body back; `numbers.ts` and the Rules window read it) |
+| a practice map | `PRACTICE_MAPS` in `scenario.ts` and its line in `practice.test.ts` (the row, cards, moves, turns and times: the test proves it in the engine); then the table "What each one scores on the eight maps" in `samples.test.ts` and here |
+| an example | `samples.ts` (and `sample-catalog.ts` for a new id, title or level), `samples.test.ts`, the tables here; the id begins with `cadet-`. Then its group in `content/simulator-codes.ts` and the same lines in `scripts/generate-simulator-codes.mjs`. Do not write the title of an example or a sentence of its text anywhere else: the guard (`client-guard.test.ts`) fails |
+| who sees which example | `content/simulator-codes.ts` ("Member codes for the simulator examples" above) |
+| a word on the screen | `src/simulator/ui/fire-cadet/words.ts` (the Rules window: `rules.ts`). No other screen file holds an English sentence (`screen.test.ts` checks) |
+| a picture | `paint.ts` (the stage), `pictures.tsx` (the small pictures), `CodingCard.tsx` (the cards) |
+| the text on the cards that lead to it | the `simulator` entry of the category `fire-cadet` in `content/seasons.ts` |
+
+### Known limits of Fire Cadet
+
+- **Nothing was measured on a real mTiny.** The sizes and times are the specification's or
+  assumptions (questions 1, 4, 5). One card is one square of 17.8 cm here; a real robot probably
+  drives 18.6 cm.
+- **The item is carried rigidly.** An item between the sticks turns with the robot exactly; a real
+  one would slide towards the stick that leads the turn. A pushed item never slides sideways or
+  turns by itself.
+- **No friction, no slip, no drift**: 48 moves end on the start place to 0.001 mm.
+- **An item that was left behind** (the robot backed away from it) can only be caught again along
+  the line it was pushed on: a robot that passes on the next line misses it.
+- **The blocked road is not checked** (D1, D5, question 3): while an obstacle is off the map, the
+  robot can drive through its square, and a robot that pushes an item against an obstacle lifts it
+  and can then push on through. That costs 1 point for each obstacle (D5) and nothing more: on
+  practice maps 4, 5 and 8 the rows through the obstacles score 22, 24 and 22 points, in 74.3 s,
+  84.6 s and 92.6 s (the proof rows, which go round: 25 in 80.0 s, 86.3 s and 101.1 s). The rules
+  forbid using a blocked road: the Rules window says "drive around the obstacles", and the referee
+  says "On the real map, go round it." each time an item touches an obstacle. A real referee may do
+  more than take 1 point (question 3b). An obstacle goes back only once its place is free: an item
+  left on it keeps it off the map.
+- **The edge of the table**: a robot or an item that leaves the map stops at the table, 100 mm
+  outside, and is then off the squares for the rest of the match. A robot that turns while pressed
+  against the table's edge is pushed about 15 mm away from it (the engine's smooth walls, as in the
+  four older games). A robot that stands on a square never reaches the edge when it turns.
+- **Two items at once**: the engine pushes a chain, and the second item is squeezed aside.
+- **The solver** finds rows square by square and never backs away from an item: "found no row"
+  means none without leaving an item behind somewhere. It runs in the browser (see "A note on the
+  solver" above).
+- **Not simulated**: the real Tap Pen and the real cards (the screen's cards and panel stand for
+  them), the joystick of the pen, a run stopped because somebody touched the robot, the two rounds
+  and the ranking.
+- **Not tried with a screen reader** (VoiceOver, NVDA) or on a real phone or Safari: the names and
+  live regions were checked in the page, touch in Chromium only.
+
+---
+
 ## Deploying
 
 The site is designed for Vercel, the same platform already hosting the 2026 team portal.
@@ -2055,7 +2655,7 @@ content/            All editable text and data
 public/
   gallery/          Competition photos, by year and category
   downloads/        Rules, scoresheets, STL archives
-  simulator/        Pictures of the four mats, for the simulators
+  simulator/        Pictures of the five mats, for the simulators
 scripts/
   fetch-legacy-assets.mjs
   generate-simulator-codes.mjs   Makes new member codes for the simulator
@@ -2063,5 +2663,5 @@ src/
   app/              Pages and routing
   components/       Header, Footer, Gallery, shared UI
   lib/gallery.ts    Reads the photo folders
-  simulator/        The mBot2 simulator: Fire Rescue, Fire Chief and Warehouse Sort (see their sections above)
+  simulator/        The simulators: Fire Rescue, Fire Chief, Warehouse Sort, Locker Room (mBot2) and Fire Cadet (mTiny) (see their sections above)
 ```

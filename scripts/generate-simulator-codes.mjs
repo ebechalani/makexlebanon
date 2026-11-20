@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Makes new codes for the examples of the mBot2 simulator: member codes, or - with
- * --advanced - advanced codes. One set of codes serves all four games of the simulator, Fire
- * Rescue, Fire Chief, Warehouse Sort and Locker Room: there is no code "for a game".
+ * Makes new codes for the examples of the simulators: member codes, or - with --advanced -
+ * advanced codes. One set of codes serves all five games, Fire Rescue, Fire Chief, Warehouse
+ * Sort, Locker Room and Fire Cadet: there is no code "for a game".
  *
  *   node scripts/generate-simulator-codes.mjs --count 500 --out ~/Documents/makex-simulator-codes.csv
  *   node scripts/generate-simulator-codes.mjs --advanced --count 10 --out ~/Documents/makex-advanced-codes.csv
@@ -159,12 +159,12 @@ function entryLine(no, fingerprint, kind) {
  */
 export function freshListFile() {
   return `/**
- * Codes for the examples of the mBot2 simulator - for all four of its games, Fire Rescue,
- * Fire Chief, Warehouse Sort and Locker Room.
+ * Codes for the examples of the simulators - for all five games, Fire Rescue, Fire Chief,
+ * Warehouse Sort, Locker Room and Fire Cadet.
  *
  * Each game has an Examples window with ready-made programs: seven in Fire Rescue, six in
- * Fire Chief, six in Warehouse Sort, six in Locker Room. This file decides who gets which of
- * them. The examples are in three groups, and there are two kinds of codes:
+ * Fire Chief, six in Warehouse Sort, six in Locker Room, six in Fire Cadet. This file decides
+ * who gets which of them. The examples are in three groups, and there are two kinds of codes:
  *
  *   GROUP                         WHO SEES THE CARD            WHO CAN OPEN IT
  *   open to everyone              everybody                    everybody, without a code
@@ -177,11 +177,11 @@ export function freshListFile() {
  * code, do not see its card, its title or the heading above it - nothing tells them that it
  * exists.
  *
- * ONE SET OF CODES FOR ALL FOUR GAMES. There is no code "for Fire Rescue", "for Fire Chief",
- * "for Warehouse Sort" or "for Locker Room": a member code opens the examples for members in
- * every game, an advanced code opens every example in every game. Somebody who has typed a code
- * in one game does not have to type it again in another. Cancelling a code cancels it in all
- * four.
+ * ONE SET OF CODES FOR ALL FIVE GAMES. There is no code "for Fire Rescue", "for Fire Chief",
+ * "for Warehouse Sort", "for Locker Room" or "for Fire Cadet": a member code opens the examples
+ * for members in every game, an advanced code opens every example in every game. Somebody who
+ * has typed a code in one game does not have to type it again in another. Cancelling a code
+ * cancels it in all five.
  *
  * The four things you decide here, in this order:
  *
@@ -191,9 +191,9 @@ export function freshListFile() {
  *   4. which advanced codes work                             (at the very end of the file)
  *
  * An example that is on neither list 1 nor list 2 is "for members". Lists 1 and 2 hold the
- * examples of all four games together: an example is named by its id, every id of Fire Chief
- * begins with "chief-", every id of Warehouse Sort with "sort-" and every id of Locker Room
- * with "locker-".
+ * examples of all five games together: an example is named by its id, every id of Fire Chief
+ * begins with "chief-", every id of Warehouse Sort with "sort-", every id of Locker Room with
+ * "locker-" and every id of Fire Cadet with "cadet-".
  *
  * Read "Member codes for the simulator examples" in README.md first. After every change:
  * save, commit and push. The change is live once Vercel has redeployed the site.
@@ -247,6 +247,15 @@ export function freshListFile() {
  *     'locker-two-tokens'      Sort two tokens                             (intermediate)
  *     'locker-whole-mission'   The whole Locker Room mission               (advanced)
  *
+ *   Fire Cadet (six)
+ *
+ *     'cadet-three-forward'    Three cards for the cat                     (starter)
+ *     'cadet-there-and-back'   There and back again                        (starter)
+ *     'cadet-turn-around'      Turn around with the toolbox                (starter)
+ *     'cadet-two-rescues'      Two rescues and home                        (intermediate)
+ *     'cadet-round-the-sign'   Round the closed road                       (intermediate)
+ *     'cadet-all-four'         All four rescues                            (advanced)
+ *
  * Mind the two that look alike: 'full-mission' is the one of Fire Rescue, 'chief-full-mission'
  * the one of Fire Chief.
  *
@@ -283,6 +292,10 @@ export const examplesOpenToEveryone: string[] = [
   'locker-to-station',
   'locker-follow-line',
   'locker-read-card',
+  // Fire Cadet: the three starter examples
+  'cadet-three-forward',
+  'cadet-there-and-back',
+  'cadet-turn-around',
 ];
 
 // =====================================================================================
@@ -294,7 +307,7 @@ export const examplesOpenToEveryone: string[] = [
  * and a member with an ordinary member code - does not get to see that these examples exist:
  * no card, no title, no "Advanced" heading.
  *
- * The ids are the same twenty-five as above. To hide an example from everybody but the holders of
+ * The ids are the same thirty-one as above. To hide an example from everybody but the holders of
  * an advanced code, write its id here. To show it to all members again (with a lock for
  * visitors), take its line out.
  *
@@ -314,6 +327,8 @@ export const examplesForAdvancedCodesOnly: string[] = [
   'sort-all-cubes',
   // Locker Room: the advanced example
   'locker-whole-mission',
+  // Fire Cadet: the advanced example
+  'cadet-all-four',
 ];
 
 // =====================================================================================
@@ -565,8 +580,8 @@ function isInside(folder, file) {
 
 function usage() {
   return [
-    'Makes new codes for the examples of the mBot2 simulator: member codes, or with --advanced',
-    'advanced codes. The same codes work in all four games, Fire Rescue, Fire Chief, Warehouse Sort and Locker Room.',
+    'Makes new codes for the examples of the simulators: member codes, or with --advanced',
+    'advanced codes. The same codes work in all five games, Fire Rescue, Fire Chief, Warehouse Sort, Locker Room and Fire Cadet.',
     '',
     '  node scripts/generate-simulator-codes.mjs --count 500 --out ~/Documents/makex-simulator-codes.csv',
     '  node scripts/generate-simulator-codes.mjs --advanced --count 10 --out ~/Documents/makex-advanced-codes.csv',
