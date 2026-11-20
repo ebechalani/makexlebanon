@@ -29,9 +29,17 @@ const nextConfig = {
       // The mBot2 simulators were under Training until they got a section of their own,
       // /simulator. Shared links and bookmarks go on working (a query string is kept).
       { source: '/training/simulator', destination: '/simulator', permanent: true },
-      { source: '/training/simulator/fire-rescue', destination: '/simulator/fire-rescue', permanent: true },
+      // (straight to Fire Rescue Senior, the simulator that was at /simulator/fire-rescue: no chain of two redirects)
+      { source: '/training/simulator/fire-rescue', destination: '/simulator/fire-rescue-senior', permanent: true },
       { source: '/training/simulator/fire-chief', destination: '/simulator/fire-chief', permanent: true },
       { source: '/training/simulator/warehouse-sort', destination: '/simulator/warehouse-sort', permanent: true },
+
+      // Fire Rescue was split into two categories, Fire Rescue Junior (10-12 years) and Fire Rescue
+      // Senior (13-15 years). Its simulator - every combination drawn - is the Senior one now, so a
+      // shared link or a bookmark keeps the game it had. Its category page is gone: the season page
+      // lists both new categories.
+      { source: '/simulator/fire-rescue', destination: '/simulator/fire-rescue-senior', permanent: true },
+      { source: '/season/2027/fire-rescue', destination: '/season/2027', permanent: true },
 
       // The Locker Room rules file was the organiser's v2.3 until their newer rules replaced it
       // (README, "Locker Room"). The file now has a name without a version, so links to the old

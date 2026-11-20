@@ -12,14 +12,15 @@ import type { ColorName } from '../../core/types';
 import { BUILDINGS, BUILDING_IDS, WATER_TOWER_IDS, type BuildingSlot } from '../../fire-rescue/field';
 import { COLORS, withBucket, withPersonColor, withPersonSlot, type FireRescueScenario } from '../../fire-rescue/scenario';
 
-const COLOR_CSS: Record<ColorName, { fill: string; ink: string; letter: string }> = {
+/** The four colours as the editor draws them (Fire Rescue Junior's editor draws them the same way: ../fire-rescue-junior). */
+export const COLOR_CSS: Record<ColorName, { fill: string; ink: string; letter: string }> = {
   red: { fill: '#ef4044', ink: '#ffffff', letter: 'R' },
   green: { fill: '#40ad49', ink: '#ffffff', letter: 'G' },
   blue: { fill: '#00aeef', ink: '#ffffff', letter: 'B' },
   yellow: { fill: '#ffe600', ink: '#1f2937', letter: 'Y' },
 };
 
-interface ColorChipsProps {
+export interface ColorChipsProps {
   /** what is being coloured, for screen readers: "Bucket on W1" */
   label: string;
   value: ColorName;
@@ -27,7 +28,7 @@ interface ColorChipsProps {
 }
 
 /** Four round colour buttons; the chosen one has a dark ring. Letters make the colours readable without colour vision. */
-function ColorChips({ label, value, onChange }: ColorChipsProps) {
+export function ColorChips({ label, value, onChange }: ColorChipsProps) {
   return (
     <div role="radiogroup" aria-label={label} className="flex gap-1">
       {COLORS.map((color) => {

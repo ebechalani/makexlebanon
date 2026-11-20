@@ -84,7 +84,9 @@ export const seasons: Season[] = [
     subtitle: 'Season announced',
     status: 'upcoming',
     intro:
-      'The alarm sounds in 2027. One city, one emergency — and four ways to answer the call, ' +
+      // TO CONFIRM WITH THE ORGANISER: "five ways" was "four ways" - one way for each category - until
+      // Fire Rescue was split into Fire Rescue Junior and Fire Rescue Senior (see there).
+      'The alarm sounds in 2027. One city, one emergency — and five ways to answer the call, ' +
       // TO CONFIRM WITH THE ORGANISER (see the note at Fire Chief below): it said "to a
       // coordinated two-robot rescue operation" until the draft rules of Fire Chief were
       // written. They describe one robot in a maze.
@@ -116,17 +118,46 @@ export const seasons: Season[] = [
         platform: 'mBot2',
         summary: 'The robot rolls out on its own. Same city — higher stakes.',
       },
+      // Fire Rescue (11–13 years) was split by the organiser into two categories: "a category 10-12
+      // yo where the water buckets will be randomised position everything else at its place. 13-15
+      // yo everything is randomized." The names, the ages and what is drawn are the organiser's.
+      // TO CONFIRM WITH THE ORGANISER - the two `summary` teasers are NOT the organiser's words:
+      // they say what is drawn, and Senior keeps the old teaser of Fire Rescue after that ("Nothing
+      // goes as planned ..."), which was written for a category in which everything was drawn.
+      // Two questions about them are open (README, "Things left to fill in"): Junior's teaser names
+      // "the rule book" while the season says its rules "will be revealed soon" - our assumption is
+      // that "everything else at its place" means where the Fire Rescue rules the simulator follows
+      // draw it (every person in square 1 of its building); and "drawn" means drawn by lot, which a
+      // student who reads English as a second language may take for "drawn with a pencil".
+      // Both play the Fire Rescue field. Both cards show its picture: the one the Fire Rescue game
+      // itself shows, in public/simulator/fire-rescue/ (no copy of it per page).
       {
-        slug: 'fire-rescue',
-        name: 'Fire Rescue',
-        ageRange: '11–13 years',
+        slug: 'fire-rescue-junior',
+        name: 'Fire Rescue Junior',
+        ageRange: '10–12 years',
         platform: 'mBot2',
-        summary: 'Nothing goes as planned. Sense the situation, decide, adapt.',
+        summary: 'Only the water buckets are drawn. Everything else stands where the rule book shows it.',
         simulator: {
-          href: '/simulator/fire-rescue',
+          href: '/simulator/fire-rescue-junior',
           summary:
             'Build a program with mBlock-style blocks and watch the mBot2 run it on the Fire Rescue ' +
-            'mat — on any starting combination the referee could draw, scored by the category rules. ' +
+            'mat — with the four buckets in any of the 24 ways the referee could draw them, and everything ' +
+            'else where the rule book shows it, scored by the category rules. ' +
+            'It runs in the browser: no robot and no installation needed.',
+          mat: '/simulator/fire-rescue/mat.webp',
+        },
+      },
+      {
+        slug: 'fire-rescue-senior',
+        name: 'Fire Rescue Senior',
+        ageRange: '13–15 years',
+        platform: 'mBot2',
+        summary: 'Everything is drawn: the buckets, the people and where they stand. Nothing goes as planned. Sense the situation, decide, adapt.',
+        simulator: {
+          href: '/simulator/fire-rescue-senior',
+          summary:
+            'Build a program with mBlock-style blocks and watch the mBot2 run it on the Fire Rescue ' +
+            'mat — on any of the 9,216 starting combinations the referee could draw, scored by the category rules. ' +
             'It runs in the browser: no robot and no installation needed.',
           mat: '/simulator/fire-rescue/mat.webp',
         },

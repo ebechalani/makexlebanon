@@ -1,19 +1,16 @@
 /**
  * The Fire Rescue rules in a few short bullets, for the "Rules" button of the simulator.
  * (The referee itself lives in ../../fire-rescue/game.ts; this is only the summary students read.)
+ *
+ * These are the rules of Fire Rescue Senior (ages 13-15), where the referee draws everything.
+ * Fire Rescue Junior (ages 10-12) is played by the same rules on the same field; only its draw is
+ * smaller. Its rules window (../fire-rescue-junior/rules.ts) has a first section of its own, "The
+ * field", and then the sections below it word for word (FIRE_RESCUE_SCORING_RULES).
  */
 import type { RulesSection } from '../SimulatorApp';
 
-export const FIRE_RESCUE_RULES: RulesSection[] = [
-  {
-    title: 'The field',
-    items: [
-      'The mat is 1250 x 1250 mm. The robot starts completely inside the Fire Station with nothing loaded, and runs on its own for 3 minutes.',
-      'Four water towers (W1 to W4) each hold one coloured bucket. Four rescue towers (RG, RY, RB, RR) stand on their coloured squares in the two safe zones and start empty.',
-      'One person waits at each building A to D, in the left (1) or right (2) white dashed square. The other square of that building is its water square.',
-      'Before the match the referee draws the combination: which bucket is on which water tower, where each person stands and which colour it is.',
-    ],
-  },
+/** Everything after "The field": the missions, the towers, restarts, the bonus and the end. The same in Junior and Senior. */
+export const FIRE_RESCUE_SCORING_RULES: RulesSection[] = [
   {
     title: 'Mission 1 - water (20 points per bucket)',
     items: [
@@ -47,4 +44,18 @@ export const FIRE_RESCUE_RULES: RulesSection[] = [
       'The match ends when the time is up, or when the team says "Finished" and the robot has stopped. Only the final field counts.',
     ],
   },
+];
+
+/** The rules of Fire Rescue Senior: the field, where everything is drawn, then the rest. */
+export const FIRE_RESCUE_RULES: RulesSection[] = [
+  {
+    title: 'The field',
+    items: [
+      'The mat is 1250 x 1250 mm. The robot starts completely inside the Fire Station with nothing loaded, and runs on its own for 3 minutes.',
+      'Four water towers (W1 to W4) each hold one coloured bucket. Four rescue towers (RG, RY, RB, RR) stand on their coloured squares in the two safe zones and start empty.',
+      'One person waits at each building A to D, in the left (1) or right (2) white dashed square. The other square of that building is its water square.',
+      'Before the match the referee draws the combination: which bucket is on which water tower, where each person stands and which colour it is.',
+    ],
+  },
+  ...FIRE_RESCUE_SCORING_RULES,
 ];

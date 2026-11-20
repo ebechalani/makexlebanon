@@ -292,7 +292,8 @@ function Champions() {
 const TEASER_EMOJI: Record<string, string> = {
   'fire-cadet': '🔥',
   'fire-fighter': '🚒',
-  'fire-rescue': '🧯',
+  'fire-rescue-junior': '🧯',
+  'fire-rescue-senior': '🚁',
   'fire-chief': '🚨',
 };
 
@@ -319,7 +320,7 @@ function FireRescueTeaser() {
             </p>
             <h2 className="text-3xl text-white sm:text-4xl">🔥 Fire Rescue Challenge</h2>
             <p className="mt-4 text-lg leading-relaxed text-white/70 text-pretty">
-              One city. One alarm. Four ways to answer the call. Missions, fields and rules
+              One city. One alarm. Five ways to answer the call. Missions, fields and rules
               will be revealed soon — for now, meet the categories.
             </p>
           </div>
@@ -328,7 +329,8 @@ function FireRescueTeaser() {
           </Button>
         </div>
 
-        <ul className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* (five categories: two rows of three and two on a laptop, one row on a wide screen) */}
+        <ul className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {upcomingSeason.categories.map((category) => (
             <li
               key={category.slug}

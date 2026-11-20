@@ -17,6 +17,9 @@
  *                 touches): the same blocks, and the same hover texts about the white line and
  *                 the cubes; the colour sensor at the claw also reads the referee's colour card.
  *
+ *   Fire Rescue Junior   another version of Fire Rescue (the same robot and field, fewer draws):
+ *                 the palette of Fire Rescue, through GAME_VERSIONS below.
+ *
  * The name of a palette is the id of its game (Game.id). To get the palette of a game:
  *
  *   paletteCategories('fire-chief')              the ids of its categories, in order
@@ -83,9 +86,32 @@ export function isPaletteId(id: unknown): id is PaletteId {
   return typeof id === 'string' && Object.prototype.hasOwnProperty.call(PALETTES, id);
 }
 
-/** The palette of a game (give Game.id). A game without a palette of its own gets the default one. */
+/**
+ * Games that are another version of a game above: the same robot on the same field, with the
+ * same blocks - only what the referee draws before a match is different. Such a game shows the
+ * palette and the hover texts of that game, and a program saved in one opens in the other as a
+ * program of the same game (../ui/program-file.ts: programGameOf).
+ *
+ *   fire-rescue-junior   Fire Rescue Junior (ages 10-12): the Fire Rescue game, but only the
+ *                        buckets are drawn (../fire-rescue-junior). Fire Rescue Senior is the
+ *                        game 'fire-rescue' itself.
+ */
+export const GAME_VERSIONS: Readonly<Record<string, PaletteId>> = {
+  'fire-rescue-junior': 'fire-rescue',
+};
+
+/** The game a version is a version of (GAME_VERSIONS), or undefined for any other id. */
+export function versionOf(gameId: string | undefined): PaletteId | undefined {
+  return typeof gameId === 'string' && Object.prototype.hasOwnProperty.call(GAME_VERSIONS, gameId) ? GAME_VERSIONS[gameId] : undefined;
+}
+
+/**
+ * The palette of a game (give Game.id). Another version of a game (GAME_VERSIONS) gets the
+ * palette of that game; a game without a palette of its own gets the default one.
+ */
 export function paletteOf(gameId: string | undefined): PaletteId {
-  return isPaletteId(gameId) ? gameId : DEFAULT_PALETTE;
+  if (isPaletteId(gameId)) return gameId;
+  return versionOf(gameId) ?? DEFAULT_PALETTE;
 }
 
 /** The ids of the categories a game's palette shows, in order (a fresh list: change it as you like). */
