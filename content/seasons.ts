@@ -98,6 +98,16 @@ export const seasons: Season[] = [
         platform: 'mTiny',
         summary:
           'The city’s first alarm rings for its youngest heroes. Every rescue starts with a plan.',
+        // (no `menuName`: "Fire Cadet" is short. No `downloads`: no rules file is published for this
+        // category yet - the simulator's Rules window tells the rules. See "The Fire Cadet simulator"
+        // in the README.)
+        simulator: {
+          href: '/simulator/fire-cadet',
+          summary:
+            'Lay a row of mTiny coding cards, or drive the robot with taps on the arrow cards, and watch it rescue ' +
+            'Fire City on the competition map. It runs in the browser: no robot and no installation needed.',
+          mat: '/simulator/fire-cadet/mat.webp',
+        },
       },
       {
         slug: 'fire-fighter',
@@ -539,12 +549,12 @@ export function simulatorTrack(sections = simulatorSeasons()): TrainingTrack {
     (section) => `${namesList(section.simulators.map((simulator) => simulator.name))} (Season ${section.year})`,
   );
   return {
-    name: 'mBot2 simulators',
+    name: 'Robot simulators',
     ageRange: `${years.length > 1 ? 'Seasons' : 'Season'} ${years.join(' · ')}`,
     status: 'available',
     href: '/simulator',
     summary:
-      `Program the mBot2 with blocks and watch it play on the competition mat: ${named.join(', ')}. ` +
+      `Program the robot with blocks (mBot2) or coding cards (mTiny) and watch it play on the competition mat: ${named.join(', ')}. ` +
       'Works in the browser, no robot needed.',
     cta: 'Go to the simulators',
   };

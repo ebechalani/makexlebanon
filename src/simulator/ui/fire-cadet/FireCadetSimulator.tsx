@@ -20,31 +20,36 @@
  * words.ts (and rules.ts); the sizes and the layout in fire-cadet.css.
  *
  * As in every game, nothing about the examples is in this file or anything it imports - no
- * program, no description, no title: they come from the server (/api/simulator/unlock).
+ * program, no description, no title: they come from the server (/api/simulator/unlock), and the
+ * shared Examples window (../ExamplesDialog.tsx) shows them.
  */
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type RefObject } from 'react';
 import type { Pose, ProgramJson, Simulation } from '../../core/types';
 import { PANEL_BUTTONS, cardRowProgram, panelProgram, type MoveCard, type RowProblem } from '../../fire-cadet/cards';
 import { fireCadetGame } from '../../fire-cadet/game';
 import { FIRE_CADET } from '../../fire-cadet/numbers';
 import { MTINY_ROBOT, START_POSE } from '../../fire-cadet/robot';
 import type { FireCadetScenario } from '../../fire-cadet/scenario';
-import { RulesIcon } from '../icons';
+import { ExamplesDialog } from '../ExamplesDialog';
+import { EXAMPLES_WORDS } from '../examples-words';
+import { ExamplesIcon, RulesIcon } from '../icons';
+import type { ExampleProgram } from '../member-unlock';
 import { PAGE_FRAME } from '../page-frame';
 import { ScoreSheet } from '../ScoreSheet';
 import { scoreSheetSummary, screenWords } from '../screen-words';
 import { StageCanvas } from '../StageCanvas';
 import { loadJson, saveJson, storageKey } from '../storage';
 import { TitleBar, titleBarButton } from '../TitleBar';
+import { useMemberExamples, type ExamplesConfig, type MemberExamples } from '../useMemberExamples';
 import { useSimulation } from '../useSimulation';
 import { Section } from '../widgets';
 import { NOTE_SECONDS, REFUSAL_SECONDS, bannerSentence, stillShown, type TimedText } from './banner';
 import { Banner } from './Banner';
-import { replaceRow, rowOf, type RowState } from './card-row';
+import { pageScrollToShow, replaceRow, rowOf, type RowState } from './card-row';
 import { CardRow } from './CardRow';
 import { DirectionPanel } from './DirectionPanel';
 import { GoButton, goFace } from './GoButton';
-import { GAME_ID, exampleToLoad, mapCode, mapNote, readSavedRow, readSettings, savedRow, savedSettings, type ScreenSettings } from './map-code';
+import { GAME_ID, exampleNote, exampleToLoad, mapCode, mapNote, readSavedRow, readSettings, savedRow, savedSettings, type ScreenSettings } from './map-code';
 import { MapEditor } from './MapEditor';
 import { MapPicker } from './MapPicker';
 import { MatchClock, MatchPoints, ModeSwitch, SpeedButtons } from './MatchBar';
@@ -71,6 +76,12 @@ const nothing = (): void => undefined;
 /** A button of the title row, at least 48 px high (the general look is a little smaller). */
 const TITLE_BUTTON = `${titleBarButton} min-h-12 min-w-12 justify-center`;
 
+/** The classroom screen of fire-cadet.css (two columns, nothing of the page scrolls): from 64rem wide. */
+const CLASSROOM_SCREEN = '(min-width: 64rem)';
+/** "Reduce motion" is set: the page jumps instead of gliding. */
+const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';
+const matches = (query: string): boolean => typeof window.matchMedia === 'function' && window.matchMedia(query).matches;
+
 /** The places in the row of the running move card and its number card, read from the interpreter's ids ('card-3'). */
 function runningCards(ids: readonly string[]): { card: number; numberCard: number | null } | null {
   const places = ids
@@ -92,6 +103,57 @@ function panelMoves(ids: readonly string[]): { current: MoveCard | null; waiting
     if (now) current = now[1] as MoveCard;
   }
   return { current, waiting };
+}
+
+/**
+ * The examples of this game (design 7.12): the address that hands out the cards and the programs,
+ * the game they are for, and whose members they are for. One object for the whole visit, as
+ * useMemberExamples asks.
+ */
+export const EXAMPLES: ExamplesConfig = {
+  unlockUrl: '/api/simulator/unlock',
+  game: GAME_ID,
+  organisation: CADET_WORDS.organisation,
+};
+
+/** What the title row hands the Examples button. */
+export interface ExamplesButtonProps {
+  /** what this visitor may see and load (../useMemberExamples.ts) */
+  examples: MemberExamples;
+  /** true during a match: loading an example would change the row, the map and the way to play, which are all locked then */
+  locked: boolean;
+  /** open the Examples window */
+  onOpen: () => void;
+  /** the look of a button of the title row (48 px high) */
+  className: string;
+}
+
+/**
+ * The Examples button of the title row (design 7.12), before "Rules". It only opens the window:
+ * the window itself is drawn at the end of the screen, next to the Rules window, and not inside
+ * the title row - the title row is a layer of its own under the site's header (ui/TitleBar.tsx,
+ * z-30), and a window drawn inside it would stand under that header.
+ */
+export function ExamplesButton({ examples, locked, onOpen, className }: ExamplesButtonProps) {
+  // (what the button says when the pointer rests on it must be true for this visitor: the shared words of ../EditorToolbar.tsx)
+  const canLoad = Object.keys(examples.available).length > 0;
+  return (
+    <button
+      type="button"
+      aria-haspopup="dialog"
+      disabled={locked}
+      title={canLoad ? EXAMPLES_WORDS.buttonHint : EXAMPLES_WORDS.buttonHintLocked}
+      className={className}
+      onClick={() => {
+        // (the website could not be reached earlier: it is asked again now, before the window says so once more)
+        examples.askAgainIfNotReached();
+        onOpen();
+      }}
+    >
+      <ExamplesIcon className="h-4 w-4" />
+      {CADET_WORDS.examplesButton}
+    </button>
+  );
 }
 
 export default function FireCadetSimulator() {
@@ -119,7 +181,11 @@ export default function FireCadetSimulator() {
   const [lastRan, setLastRan] = useState(-1);
   const [editorOpen, setEditorOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
+  const [examplesOpen, setExamplesOpen] = useState(false);
   const [fieldWords, setFieldWords] = useState('');
+
+  // which examples this visitor may see and load: the website's server says so (more with a code than without)
+  const examples = useMemberExamples(EXAMPLES);
 
   // the program a press of GO starts: the row (Junior) or the panel (Mini)
   const programRef = useRef<ProgramJson>(cardRowProgram(saved.cards));
@@ -186,6 +252,14 @@ export default function FireCadetSimulator() {
     const atRest = snapshot.runState !== 'running' || (before !== null && before.x === pose.x && before.y === pose.y && before.heading === pose.heading);
     if (atRest) setFieldWords(fieldInWords(simRef.current.world, scenario));
   }, [snapshot, scenario, simRef]);
+  // ... and it is the description of the map (design 7.13). The shared stage has no way to be given
+  // one (../StageCanvas.tsx), so it is put on its canvas here, once: React never sets that attribute
+  // of the canvas, so it never takes it away again.
+  const fieldWordsId = useId();
+  const stageRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    stageRef.current?.querySelector('canvas')?.setAttribute('aria-describedby', fieldWordsId);
+  }, [fieldWordsId]);
 
   // ---- the direction panel: a tap holds the engine's button down for at least TAP_TICKS
   const holds = useRef(new Map<MoveCard, { tick: number; released: boolean }>());
@@ -244,6 +318,20 @@ export default function FireCadetSimulator() {
 
   // ---- the round button
   const { start, declareFinished, reset } = sim;
+  // On a phone, GO also brings the row into view under the map block, so that the child sees which
+  // card runs (the row itself keeps the running card in view). Not on the classroom screen: there
+  // the row has a column of its own, and the page does not scroll.
+  const blockRef = useRef<HTMLDivElement>(null);
+  const workRef = useRef<HTMLDivElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
+  const showRow = () => {
+    const list = workRef.current?.querySelector('[role="listbox"]');
+    const block = blockRef.current;
+    const bar = barRef.current;
+    if (!list || !block || !bar || matches(CLASSROOM_SCREEN)) return;
+    const by = pageScrollToShow(list.getBoundingClientRect(), { top: block.getBoundingClientRect().bottom, bottom: bar.getBoundingClientRect().top });
+    if (by !== 0) window.scrollBy({ top: by, behavior: matches(REDUCED_MOTION) ? 'auto' : 'smooth' });
+  };
   const freshMatch = () => {
     holds.current.clear();
     setLastRan(-1);
@@ -262,6 +350,7 @@ export default function FireCadetSimulator() {
       setRefusal(null);
       freshMatch();
       start();
+      if (mode === 'cards') showRow();
     } else if (face === 'stop') {
       declareFinished();
     } else {
@@ -290,33 +379,22 @@ export default function FireCadetSimulator() {
   };
 
   /**
-   * Loading an example (design 7.12) - for the Examples button, which the next package wires once
-   * 'fire-cadet' is an ExamplesGame (see EXAMPLES_BUTTON below): its cards with readCards and its
-   * map with readMapCode (exampleToLoad); Junior; that map, if its code reads; the cards as one
-   * step of Undo; the banner says so. (The window closes itself: ExamplesDialog's onLoad.)
+   * Loading an example from the Examples window (design 7.12): its cards with readCards and its map
+   * with readMapCode (exampleToLoad); Junior; that map, if its code reads (else the map stays); the
+   * cards as one step of Undo; the window closes; the banner says what was loaded. The field goes
+   * back to the start, as with a new map. (During a match the button is locked: see ExamplesButton.)
    */
-  const loadExample = (program: ProgramJson) => {
-    const example = exampleToLoad(program);
+  const loadExample = (chosen: ExampleProgram) => {
+    setExamplesOpen(false);
+    const example = exampleToLoad(chosen.program);
     if (face !== 'go') reset();
     freshMatch();
     setMode('cards');
     if (example.scenario !== null) setScenario(example.scenario);
     setRow((r) => replaceRow(r, example.cards));
     setRefusal(null);
-    showNote(CADET_WORDS.notes.example);
+    showNote(exampleNote(example));
   };
-  void loadExample;
-
-  /**
-   * EXAMPLES_BUTTON - the typed place of the Examples button in the title row. It stays empty
-   * until 'fire-cadet' is in EXAMPLES_GAMES (../member-unlock.ts, WP3): before that,
-   * useMemberExamples({ game: 'fire-cadet' }) does not type-check. Then it becomes:
-   *   const examples = useMemberExamples(EXAMPLES);   // { unlockUrl: '/api/simulator/unlock', game: GAME_ID, organisation: 'MakeX Lebanon' }
-   *   a button (TITLE_BUTTON, ExamplesIcon, CADET_WORDS.examplesButton) that opens
-   *   <ExamplesDialog examples={examples} howLoadingWorks={CADET_WORDS.howLoadingWorks}
-   *     onLoad={(example) => { loadExample(example.program); close(); }} onClose={close} />
-   */
-  const EXAMPLES_BUTTON: ReactNode = null;
 
   // ---- what the screen shows
   const painters = useMemo(() => cadetPainters(scenario), [scenario]);
@@ -343,8 +421,9 @@ export default function FireCadetSimulator() {
 
   return (
     <div className={`${PAGE_FRAME} cadet-app text-ink-900`} data-mode={mode}>
-      <TitleBar title="Fire Cadet" robot="mTiny">
-        {EXAMPLES_BUTTON}
+      {/* (wrapOnPhone: on a 360 px phone the title shares its line with Examples and Rules, and would be cut off) */}
+      <TitleBar title="Fire Cadet" robot="mTiny" wrapOnPhone>
+        <ExamplesButton examples={examples} locked={during} onOpen={() => setExamplesOpen(true)} className={TITLE_BUTTON} />
         <button type="button" onClick={() => setRulesOpen(true)} aria-haspopup="dialog" className={TITLE_BUTTON}>
           <RulesIcon className="h-4 w-4" />
           {CADET_WORDS.rulesButton}
@@ -356,11 +435,11 @@ export default function FireCadetSimulator() {
           <ModeSwitch mode={mode} onMode={changeMode} locked={during} />
         </div>
 
-        <div className="cadet-stage-block">
+        <div ref={blockRef} className="cadet-stage-block">
           <MatchClock timeLeft={snapshot.timeLeft} className="cadet-clock" />
           <Banner sentence={banner} tone={tone} />
           <MatchPoints total={snapshot.score.total} max={snapshot.score.max} className="cadet-points" />
-          <div className="cadet-stage">
+          <div ref={stageRef} className="cadet-stage">
             <StageCanvas
               simRef={simRef as unknown as RefObject<Simulation<unknown>>}
               trail={sim.trail}
@@ -377,13 +456,13 @@ export default function FireCadetSimulator() {
               painters={painters}
             />
           </div>
-          {/* the field in words, right after the stage (the canvas cannot be given a description of its own: see the report of WP4) */}
-          <p className="sr-only" data-field-words>
+          {/* the field in words: the description of the map's canvas (see fieldWordsId), and right after it for a reader that goes line by line */}
+          <p id={fieldWordsId} className="sr-only" data-field-words>
             {fieldWords}
           </p>
         </div>
 
-        <div className="cadet-work">
+        <div ref={workRef} className="cadet-work">
           {mode === 'cards' ? (
             <>
               <CardRow
@@ -433,7 +512,7 @@ export default function FireCadetSimulator() {
           </Section>
         </div>
 
-        <div className="cadet-bar">
+        <div ref={barRef} className="cadet-bar">
           {mode === 'cards' ? <SpeedButtons speed={speed} onSpeed={setSpeed} /> : <span />}
           <GoButton face={face} mode={mode} onPress={onGo} />
         </div>
@@ -450,6 +529,7 @@ export default function FireCadetSimulator() {
         />
       )}
       {rulesOpen && <RulesWindow onClose={() => setRulesOpen(false)} />}
+      {examplesOpen && <ExamplesDialog examples={examples} howLoadingWorks={CADET_WORDS.howLoadingWorks} onLoad={loadExample} onClose={() => setExamplesOpen(false)} />}
     </div>
   );
 }

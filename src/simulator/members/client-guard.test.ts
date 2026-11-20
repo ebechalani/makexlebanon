@@ -625,6 +625,17 @@ describe('the examples stay on the server', () => {
       'src/simulator/ui/locker-room/LockerRoomSimulator.tsx',
       'src/simulator/ui/locker-room/LockerRoomLoader.tsx',
       'src/simulator/ui/locker-room/CardsEditor.tsx',
+      // Fire Cadet: its loader and its screen, and the parts of its screen that are components of their own
+      'src/simulator/ui/fire-cadet/FireCadetSimulator.tsx',
+      'src/simulator/ui/fire-cadet/FireCadetLoader.tsx',
+      'src/simulator/ui/fire-cadet/CardRow.tsx',
+      'src/simulator/ui/fire-cadet/DirectionPanel.tsx',
+      'src/simulator/ui/fire-cadet/GoButton.tsx',
+      'src/simulator/ui/fire-cadet/MapEditor.tsx',
+      'src/simulator/ui/fire-cadet/MapPicker.tsx',
+      'src/simulator/ui/fire-cadet/MatchBar.tsx',
+      'src/simulator/ui/fire-cadet/PlanningClock.tsx',
+      'src/simulator/ui/fire-cadet/RulesWindow.tsx',
     ]) {
       assert.ok(roots.client.includes(screen), `${screen} begins with 'use client'`);
     }
@@ -644,6 +655,25 @@ describe('the examples stay on the server', () => {
       assert.ok(fromPage.has(own), `${page}: the game itself`);
       for (const catalog of CATALOGS) assert.ok(!fromPage.has(catalog.file) && !fromPage.has(catalog.samples), `${page}: the screen holds no list of examples, and no example: not of ${catalog.game}`);
       assert.ok(reachableFrom(graph, simulator).has('src/simulator/vm/index.ts'), `${simulator}: and the interpreter`);
+    }
+    // the Fire Cadet page has a screen of its own, not the general one (design 10.3): it reaches its loader, its
+    // screen, the Examples window and what asks the server, its game and its two interpreters of cards - and not
+    // SimulatorApp.tsx, so the guard does not count on that file's words being harmless for it. (That holds
+    // because ui/fire-cadet/rules.ts declares its own types instead of importing RulesSection from there.)
+    // (It does reach vm/index.ts, through core/simulation.ts; nothing is asserted about that either way.)
+    {
+      const page = 'src/app/simulator/fire-cadet/page.tsx';
+      const loader = 'src/simulator/ui/fire-cadet/FireCadetLoader.tsx';
+      const simulator = 'src/simulator/ui/fire-cadet/FireCadetSimulator.tsx';
+      assert.ok(roots.pages.includes(page), page);
+      const fromPage = reachableFrom(graph, page);
+      assert.ok(fromPage.has(loader) && fromPage.has(simulator), `${page} -> loader -> import() -> the screen of its game`);
+      assert.ok(reachableFrom(graph, loader).has(simulator), `${loader} -> the Fire Cadet screen`);
+      assert.ok(!fromPage.has('src/simulator/ui/SimulatorApp.tsx'), `${page}: not the general screen`);
+      assert.ok(fromPage.has('src/simulator/ui/ExamplesDialog.tsx'), `${page}: the Examples window`);
+      assert.ok(fromPage.has('src/simulator/ui/member-unlock.ts'), page);
+      for (const own of ['src/simulator/fire-cadet/game.ts', 'src/simulator/fire-cadet/cards.ts']) assert.ok(fromPage.has(own), `${page}: ${own}`);
+      for (const catalog of CATALOGS) assert.ok(!fromPage.has(catalog.file) && !fromPage.has(catalog.samples), `${page}: the screen holds no list of examples, and no example: not of ${catalog.game}`);
     }
     // the Fire Chief screen has files of its own: its words, its rules window and its maze panel are looked at too
     const chiefScreen = reachableFrom(graph, 'src/simulator/ui/fire-chief/FireChiefSimulator.tsx');
@@ -673,6 +703,24 @@ describe('the examples stay on the server', () => {
       'src/simulator/ui/locker-room/cards-batch.ts',
     ]) {
       assert.ok(lockerScreen.has(file), `the Locker Room screen -> ${file}`);
+    }
+    // ... and so has the Fire Cadet screen: its words, its rules window, the row of cards, the direction panel,
+    // the own-map editor, the map code, its drawings on the stage, the banner and the planning clock
+    const cadetScreen = reachableFrom(graph, 'src/simulator/ui/fire-cadet/FireCadetSimulator.tsx');
+    for (const file of [
+      'src/simulator/ui/fire-cadet/words.ts',
+      'src/simulator/ui/fire-cadet/rules.ts',
+      'src/simulator/ui/fire-cadet/CardRow.tsx',
+      'src/simulator/ui/fire-cadet/card-row.ts',
+      'src/simulator/ui/fire-cadet/DirectionPanel.tsx',
+      'src/simulator/ui/fire-cadet/MapEditor.tsx',
+      'src/simulator/ui/fire-cadet/map-editor.ts',
+      'src/simulator/ui/fire-cadet/map-code.ts',
+      'src/simulator/ui/fire-cadet/paint.ts',
+      'src/simulator/ui/fire-cadet/banner.ts',
+      'src/simulator/ui/fire-cadet/planning-clock.ts',
+    ]) {
+      assert.ok(cadetScreen.has(file), `the Fire Cadet screen -> ${file}`);
     }
     // the page that lists the simulators is a page of the website like any other
     assert.ok(roots.pages.includes('src/app/simulator/page.tsx'));

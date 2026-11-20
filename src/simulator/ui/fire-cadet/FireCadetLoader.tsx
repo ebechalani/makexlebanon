@@ -16,7 +16,7 @@ import { CADET_WORDS } from './words';
 function LoadingScreen() {
   return (
     <div className={PAGE_FRAME}>
-      <TitleBar title="Fire Cadet" robot="mTiny" />
+      <TitleBar title="Fire Cadet" robot="mTiny" wrapOnPhone />
       <div className="flex flex-1 items-center justify-center p-6" role="status">
         <div className="flex items-center gap-3 text-ink-600">
           <span className="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-brand-600" aria-hidden="true" />

@@ -64,6 +64,7 @@ test('menu: the dropdown of "Simulator" is the Simulator page, then each simulat
     { label: 'All simulators', href: '/simulator' },
     { label: 'Locker Room — Season 2026', href: '/simulator/locker-room' },
     { label: 'Warehouse Sort — Season 2026', href: '/simulator/warehouse-sort' },
+    { label: 'Fire Cadet — Season 2027', href: '/simulator/fire-cadet' },
     { label: 'Fire Rescue — Season 2027', href: '/simulator/fire-rescue' },
     { label: 'Fire Chief — Season 2027', href: '/simulator/fire-chief' },
   ]);
@@ -96,6 +97,7 @@ test('menu: a simulator added to a season appears in the dropdown by itself, in 
     { label: `${first2025} — Season 2025`, href: '/simulator/new' },
     { label: 'Locker Room — Season 2026', href: '/simulator/locker-room' },
     { label: 'Warehouse Sort — Season 2026', href: '/simulator/warehouse-sort' },
+    { label: 'Fire Cadet — Season 2027', href: '/simulator/fire-cadet' },
     { label: 'Fire Rescue — Season 2027', href: '/simulator/fire-rescue' },
     { label: 'Fire Chief — Season 2027', href: '/simulator/fire-chief' },
     { label: 'Later Mission — Season 2027', href: '/simulator/later' },
@@ -287,7 +289,7 @@ test('menu on a computer: a line picked in a dropdown lets go of the focus, so t
 test('pages: every simulator is /simulator/<game>, with its page folder, its address in the page, and its mat picture in public/simulator/<game>/', async () => {
   assert.deepEqual(
     SIMULATOR_HREFS.map((simulator) => simulator.href).sort(),
-    ['/simulator/fire-chief', '/simulator/fire-rescue', '/simulator/locker-room', '/simulator/warehouse-sort'],
+    ['/simulator/fire-cadet', '/simulator/fire-chief', '/simulator/fire-rescue', '/simulator/locker-room', '/simulator/warehouse-sort'],
   );
   for (const { href, mat } of SIMULATOR_HREFS) {
     const game = /^\/simulator\/([a-z0-9-]+)$/.exec(href)?.[1];
@@ -312,12 +314,12 @@ test('pages: every simulator is /simulator/<game>, with its page folder, its add
   assert.ok(!existsSync(fromRoot('src/app/training/simulator')), 'the old folder is gone');
 });
 
-test('Simulator page: Season 2026 (Locker Room, Warehouse Sort), then Season 2027 (Fire Rescue, Fire Chief)', () => {
+test('Simulator page: Season 2026 (Locker Room, Warehouse Sort), then Season 2027 (Fire Cadet, Fire Rescue, Fire Chief)', () => {
   assert.deepEqual(
     simulatorSeasons().map((section) => [section.year, section.simulators.map((simulator) => simulator.name)]),
     [
       [2026, ['Capelli Starter — Locker Room', 'Warehouse Sort']],
-      [2027, ['Fire Rescue', 'Fire Chief']],
+      [2027, ['Fire Cadet', 'Fire Rescue', 'Fire Chief']],
     ],
   );
   const [season2026, season2027] = simulatorSeasons();
@@ -326,10 +328,36 @@ test('Simulator page: Season 2026 (Locker Room, Warehouse Sort), then Season 202
     ['/simulator/locker-room', ['13–15 years', 'Season 2026'], '/season/2026/locker-room'],
     ['/simulator/warehouse-sort', ['MakeX Inspire · Beginner', 'Local event'], undefined],
   ]);
+  // (Fire Cadet first: the first category of Season 2027 in content/seasons.ts)
   assert.deepEqual(season2027.simulators.map((card) => [card.href, card.labels, card.about]), [
+    ['/simulator/fire-cadet', ['4–7 years', 'Season 2027'], '/season/2027/fire-cadet'],
     ['/simulator/fire-rescue', ['11–13 years', 'Season 2027'], '/season/2027/fire-rescue'],
     ['/simulator/fire-chief', ['14–17 years', 'Season 2027'], '/season/2027/fire-chief'],
   ]);
+});
+
+test('Fire Cadet: the first category of Season 2027 has a simulator (the mTiny), no shorter menu name, and no download', async () => {
+  const season2027 = seasons.find((season) => season.year === 2027);
+  const cadet = season2027?.categories.find((category) => category.slug === 'fire-cadet');
+  assert.ok(cadet);
+  assert.equal(season2027?.categories[0], cadet);
+  assert.deepEqual([cadet.name, cadet.ageRange, cadet.platform], ['Fire Cadet', '4–7 years', 'mTiny']);
+  assert.deepEqual(cadet.simulator, {
+    href: '/simulator/fire-cadet',
+    summary:
+      'Lay a row of mTiny coding cards, or drive the robot with taps on the arrow cards, and watch it rescue ' +
+      'Fire City on the competition map. It runs in the browser: no robot and no installation needed.',
+    mat: '/simulator/fire-cadet/mat.webp',
+  });
+  // no rules file is published for this category yet (the Rules window of the simulator tells the rules),
+  // and no official printed map is said to exist: neither is added for the simulator
+  assert.equal(cadet.downloads, undefined);
+  assert.equal(cadet.hasMap, undefined);
+  // the mTiny has no line sensor: the mat has one picture only, the one that is shown
+  assert.deepEqual(readdirSync(fromRoot('public/simulator/fire-cadet')), ['mat.webp']);
+  // the page names the robot in its title
+  const { metadata } = (await import('../../app/simulator/fire-cadet/page')) as { metadata: { title?: string } };
+  assert.equal(metadata.title, 'mTiny simulator — Fire Cadet');
 });
 
 test('Simulator page: a simulator added to a season appears in its part by itself; a season without one has no part', () => {
@@ -348,7 +376,7 @@ test('Simulator page: a simulator added to a season appears in its part by itsel
     [
       [2025, ['/simulator/new']],
       [2026, ['/simulator/locker-room', '/simulator/warehouse-sort']],
-      [2027, ['/simulator/fire-rescue', '/simulator/fire-chief', '/simulator/later']],
+      [2027, ['/simulator/fire-cadet', '/simulator/fire-rescue', '/simulator/fire-chief', '/simulator/later']],
     ],
   );
   // no simulator at all: no part at all
@@ -358,11 +386,17 @@ test('Simulator page: a simulator added to a season appears in its part by itsel
 test('Simulator page: each card is one link (picture, name, sentences) that names the simulator it opens; "About" is a link of its own', async () => {
   const { default: SimulatorPage, metadata } = (await import('../../app/simulator/page')) as {
     default: () => Parameters<typeof renderToStaticMarkup>[0];
-    metadata: { alternates?: { canonical?: string }; openGraph?: { url?: string } };
+    metadata: { title?: string; description?: string; alternates?: { canonical?: string }; openGraph?: { url?: string } };
   };
   assert.equal(metadata.alternates?.canonical, '/simulator');
   assert.equal(metadata.openGraph?.url, '/simulator');
+  // the page is about every simulator, so it names both robots, not only the mBot2
+  assert.equal(metadata.title, 'Robot simulators');
+  assert.match(metadata.description ?? '', /^Program a Makeblock mBot2 with mBlock-style blocks, or lay mTiny coding cards, /);
+  assert.match(metadata.description ?? '', /the 2027 categories Fire Cadet \(mTiny, ages 4–7\), Fire Rescue \(ages 11–13\) and Fire Chief \(ages 14–17\)\./);
   const html = renderToStaticMarkup(createElement(SimulatorPage));
+  assert.ok(html.includes('mBot2 · mTiny · In the browser'), 'the eyebrow');
+  assert.ok(html.includes('Build a program with blocks for the mBot2, or a row of coding cards for the mTiny, and watch the robot run it'), 'the lead');
   // the breadcrumb of the hero: Home / Simulator
   assert.match(html, /<nav aria-label="Breadcrumb"[^>]*><ol[^>]*><li[^>]*><a[^>]*href="\/">Home<\/a>.*?<\/li><li[^>]*><span[^>]*>Simulator<\/span><\/li><\/ol><\/nav>/);
   assert.match(html, /<h1[^>]*>Simulator<\/h1>/);
@@ -404,14 +438,21 @@ test('title row of a game: Home / Simulator, not Training', () => {
   // after the title, the robot: the mBot2 when the screen names none, else the one it names
   assert.match(html, /<h1[^>]*>Fire Rescue simulator <span[^>]*>· mBot2<\/span><\/h1>/);
   assert.match(renderToStaticMarkup(createElement(TitleBar, { title: 'Fire Cadet', robot: 'mTiny' })), /<h1[^>]*>Fire Cadet simulator <span[^>]*>· mTiny<\/span><\/h1>/);
-  // the four games show the same row: they all hand only their title to it
-  for (const [loader, title] of [
-    ['fire-rescue/FireRescueLoader.tsx', 'Fire Rescue'],
-    ['fire-chief/FireChiefLoader.tsx', 'Fire Chief'],
-    ['warehouse-sort/WarehouseSortLoader.tsx', 'Warehouse Sort'],
-    ['locker-room/LockerRoomLoader.tsx', 'Locker Room'],
-  ]) {
-    assert.match(readFileSync(fromRoot(`src/simulator/ui/${loader}`), 'utf8'), new RegExp(`<TitleBar title="${title}"`), loader);
+  // the five games show the same row: the four mBot2 games hand only their title to it, Fire Cadet its title and its robot
+  const loaders: Array<[loader: string, title: string, robot: string | null]> = [
+    ['fire-rescue/FireRescueLoader.tsx', 'Fire Rescue', null],
+    ['fire-chief/FireChiefLoader.tsx', 'Fire Chief', null],
+    ['warehouse-sort/WarehouseSortLoader.tsx', 'Warehouse Sort', null],
+    ['locker-room/LockerRoomLoader.tsx', 'Locker Room', null],
+    ['fire-cadet/FireCadetLoader.tsx', 'Fire Cadet', 'mTiny'],
+  ];
+  for (const [loader, title, robot] of loaders) {
+    const source = readFileSync(fromRoot(`src/simulator/ui/${loader}`), 'utf8');
+    const bars = [...source.matchAll(/<TitleBar\b[^>]*>/g)].map((match) => match[0]);
+    assert.equal(bars.length, 1, `${loader}: one title row`);
+    assert.match(bars[0], new RegExp(`^<TitleBar title="${title}"`), loader);
+    // (no robot named: the row says "· mBot2"; Fire Cadet's says "· mTiny")
+    assert.equal(/\brobot="([^"]*)"/.exec(bars[0])?.[1] ?? null, robot, loader);
   }
 });
 
@@ -458,21 +499,23 @@ test('Training page: the card names the seasons and the simulators of the Simula
   const card = trainingTracks.find((track) => track.href === '/simulator');
   assert.deepEqual(card, simulatorTrack(simulatorSeasons()));
   assert.equal(card?.ageRange, 'Seasons 2026 · 2027');
+  assert.equal(card?.name, 'Robot simulators');
   assert.equal(
     card?.summary,
-    'Program the mBot2 with blocks and watch it play on the competition mat: Capelli Starter — Locker Room and Warehouse Sort (Season 2026), ' +
-      'Fire Rescue and Fire Chief (Season 2027). Works in the browser, no robot needed.',
+    'Program the robot with blocks (mBot2) or coding cards (mTiny) and watch it play on the competition mat: ' +
+      'Capelli Starter — Locker Room and Warehouse Sort (Season 2026), Fire Cadet, Fire Rescue and Fire Chief (Season 2027). ' +
+      'Works in the browser, no robot needed.',
   );
   // a simulator added later is named on the card too, in its season
   const missions: MissionSimulator[] = [
     ...missionSimulators,
     { name: 'Later Mission', season: 2027, label: 'Level', event: 'Local event', href: '/simulator/later', summary: 'Two sentences.' },
   ];
-  assert.match(simulatorTrack(simulatorSeasons(seasons, missions)).summary, /: Capelli Starter — Locker Room and Warehouse Sort \(Season 2026\), Fire Rescue, Fire Chief and Later Mission \(Season 2027\)\. /);
+  assert.match(simulatorTrack(simulatorSeasons(seasons, missions)).summary, /: Capelli Starter — Locker Room and Warehouse Sort \(Season 2026\), Fire Cadet, Fire Rescue, Fire Chief and Later Mission \(Season 2027\)\. /);
   // one season only: "Season", not "Seasons"
   const only2027 = simulatorTrack(simulatorSeasons(seasons.filter((season) => season.year !== 2026), []));
   assert.equal(only2027.ageRange, 'Season 2027');
-  assert.match(only2027.summary, /: Fire Rescue and Fire Chief \(Season 2027\)\. /);
+  assert.match(only2027.summary, /: Fire Cadet, Fire Rescue and Fire Chief \(Season 2027\)\. /);
 });
 
 test('a page opened from a link of a scrolled page starts at its top, not under the sticky header', () => {

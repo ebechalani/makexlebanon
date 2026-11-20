@@ -120,3 +120,6 @@ export function exampleToLoad(program: unknown): ExampleToLoad {
   const field = isRecord(program) && typeof program.field === 'string' ? readMapCode(program.field) : null;
   return { cards: readCards(program), scenario: field?.ok ? field.scenario : null };
 }
+
+/** What the banner says after an example was loaded: its cards and its map - or only its cards, when its map code did not read (the map then stays). */
+export const exampleNote = (example: ExampleToLoad): string => (example.scenario !== null ? CADET_WORDS.notes.example : CADET_WORDS.notes.exampleCards);

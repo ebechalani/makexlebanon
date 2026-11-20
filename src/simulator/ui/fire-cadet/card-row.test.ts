@@ -9,7 +9,25 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { CARD_NAMES, ROW_PROBLEM_WORDS, cardsFromText, cardsToText, readCards, rowProblem, type CardName } from '../../fire-cadet/cards';
 import { FIRE_CADET } from '../../fire-cadet/numbers';
-import { UNDO_STEPS, addCard, barIndex, canRedo, canUndo, clearRow, moveCard, redo, removeCard, replaceRow, rowOf, selectCard, undo, type RowEdit, type RowState } from './card-row';
+import {
+  ROW_IN_VIEW_GAP,
+  UNDO_STEPS,
+  addCard,
+  barIndex,
+  canRedo,
+  canUndo,
+  clearRow,
+  moveCard,
+  pageScrollToShow,
+  redo,
+  removeCard,
+  replaceRow,
+  rowOf,
+  selectCard,
+  undo,
+  type RowEdit,
+  type RowState,
+} from './card-row';
 
 const row = (text: string): RowState => rowOf(cardsFromText(text));
 const ok = (edit: RowEdit): RowState => {
@@ -168,4 +186,22 @@ test('10,000 random taps: the row is always valid and never longer than 70 cards
     assert.ok(s.selected === null || (s.selected >= 0 && s.selected < s.cards.length), `step ${i}: selected ${s.selected}`);
   }
   assert.ok(refused > 100, `the random taps were refused ${refused} times: the refusals were tried`);
+});
+
+test('GO on a phone: how far the page scrolls so that the row stands between the map block and the bar of the round button', () => {
+  const gap = ROW_IN_VIEW_GAP;
+  // the band: under the map block (its bottom at 460 px) and over the bar (its top at 756 px) - a 390 x 844 phone
+  const band = { top: 460, bottom: 756 };
+  // in view already: the page stays
+  assert.equal(pageScrollToShow({ top: 470, bottom: 550 }, band), 0);
+  assert.equal(pageScrollToShow({ top: 460 + gap, bottom: 756 - gap }, band), 0);
+  // hidden under the map block (the child scrolled down to the Map section): back up, to just under the block
+  assert.equal(pageScrollToShow({ top: 200, bottom: 280 }, band), 200 - (460 + gap));
+  assert.equal(pageScrollToShow({ top: -300, bottom: -220 }, band), -300 - (460 + gap));
+  // below the bar: down, just far enough
+  assert.equal(pageScrollToShow({ top: 760, bottom: 840 }, band), 840 - (756 - gap));
+  // a row taller than the band (rows of many lines): its top under the block, never more
+  assert.equal(pageScrollToShow({ top: 600, bottom: 1200 }, band), 600 - (460 + gap));
+  // the gap is the one named
+  assert.equal(pageScrollToShow({ top: 400, bottom: 480 }, band, 0), -60);
 });

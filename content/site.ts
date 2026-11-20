@@ -106,7 +106,7 @@ export const nav: NavItem[] = [
       { label: 'Competition kits', href: '/kits' },
     ],
   },
-  // the mBot2 simulators: one page that lists them by season (src/app/simulator/page.tsx), and a
+  // the simulators: one page that lists them by season (src/app/simulator/page.tsx), and a
   // dropdown that opens each one directly
   { label: 'Simulator', href: '/simulator', children: simulatorMenu(), childrenOnOneLine: true },
   { label: 'Videos', href: '/media' },

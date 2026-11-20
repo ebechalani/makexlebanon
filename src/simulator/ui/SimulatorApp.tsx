@@ -6,6 +6,7 @@
  * (its examples, rules, combination editor, a few words) is passed in as props - see
  * ./fire-rescue/FireRescueSimulator.tsx, ./fire-chief/FireChiefSimulator.tsx,
  * ./warehouse-sort/WarehouseSortSimulator.tsx and ./locker-room/LockerRoomSimulator.tsx.
+ * Fire Cadet has a screen of its own: ./fire-cadet/FireCadetSimulator.tsx.
  *
  * Everything else the screen asks the game, the robot and the simulation:
  *   game.id                 the block palette (../blocks/palettes.ts), the saved work, the program files

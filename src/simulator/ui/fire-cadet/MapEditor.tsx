@@ -114,27 +114,29 @@ export function MapEditor({ scenario, onUse, onClose }: MapEditorProps) {
               const k = sq.square.col;
               const pale = state.lifted !== null && !sq.lit;
               return (
-                      <button
-                        key={sq.name}
-                        type="button"
-                        data-square={sq.name}
-                        data-lit={sq.lit ? 'true' : undefined}
-                        aria-label={sq.label}
-                        tabIndex={index === focusIndex ? 0 : -1}
-                        onClick={() => setState(tapSquare(state, sq.square))}
-                        className={`cadet-square relative flex items-center justify-center ${sq.lit ? 'cadet-square-lit' : ''} ${pale ? 'cadet-square-pale' : ''}`}
-                      >
-                        {(row === 0 || k === 0) && (
-                          <span aria-hidden="true" className="cadet-corner">
-                            {sq.name}
-                          </span>
-                        )}
-                        {sq.fire && <Picture name="fire" className="absolute inset-[12%] h-[76%] w-[76%] opacity-90" />}
-                        {sq.start && <StartMark />}
-                        {sq.things.map((thing) => (
-                          <Picture key={thing} name={thing as PictureName} className={`relative h-[62%] w-[62%] ${state.lifted === thing ? 'cadet-lifted' : ''}`} />
-                        ))}
-                      </button>
+                <button
+                  key={sq.name}
+                  type="button"
+                  data-square={sq.name}
+                  data-lit={sq.lit ? 'true' : undefined}
+                  aria-label={sq.label}
+                  tabIndex={index === focusIndex ? 0 : -1}
+                  // (the keys act on the square that has the focus, however it got it)
+                  onFocus={() => setState((now) => (now.focus.col === k && now.focus.row === row ? now : { ...now, focus: sq.square }))}
+                  onClick={() => setState(tapSquare(state, sq.square))}
+                  className={`cadet-square relative flex items-center justify-center ${sq.lit ? 'cadet-square-lit' : ''} ${pale ? 'cadet-square-pale' : ''}`}
+                >
+                  {(row === 0 || k === 0) && (
+                    <span aria-hidden="true" className="cadet-corner">
+                      {sq.name}
+                    </span>
+                  )}
+                  {sq.fire && <Picture name="fire" className="absolute inset-[12%] h-[76%] w-[76%] opacity-90" />}
+                  {sq.start && <StartMark />}
+                  {sq.things.map((thing) => (
+                    <Picture key={thing} name={thing as PictureName} className={`relative h-[62%] w-[62%] ${state.lifted === thing ? 'cadet-lifted' : ''}`} />
+                  ))}
+                </button>
               );
             })}
           </div>

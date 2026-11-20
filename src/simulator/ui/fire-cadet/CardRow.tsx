@@ -202,6 +202,8 @@ export function CardRow(props: CardRowProps) {
         tabIndex={focusAt === i + 1 ? 0 : -1}
         data-running={isRunning ? 'true' : undefined}
         data-card={card}
+        // (the keys act on the card that has the focus, however it got it)
+        onFocus={() => setFocus(i + 1)}
         onClick={(event) => {
           event.stopPropagation();
           setFocus(i + 1);
@@ -242,6 +244,7 @@ export function CardRow(props: CardRowProps) {
           aria-label={words.startCard}
           tabIndex={focusAt === 0 ? 0 : -1}
           className="cadet-row-card cadet-start-card shrink-0"
+          onFocus={() => setFocus(0)}
           onClick={(event) => {
             event.stopPropagation();
             setFocus(0);

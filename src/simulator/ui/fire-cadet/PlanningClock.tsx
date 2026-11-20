@@ -24,7 +24,7 @@ export function PlanningClock({ clock, onPress }: { clock: Clock; onPress: () =>
   const view = planningView(clock, clock.phase === 'running' ? now : Date.now());
   const words = CADET_WORDS.planning;
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5" data-planning>
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-slate-200 bg-white px-3" data-planning>
       <span className="text-sm font-semibold text-ink-700">{words.title}</span>
       <span
         role="timer"
@@ -33,9 +33,21 @@ export function PlanningClock({ clock, onPress }: { clock: Clock; onPress: () =>
       >
         {view.clock}
       </span>
-      <span aria-hidden="true" className="h-2 min-w-16 flex-1 overflow-hidden rounded-full bg-slate-200">
-        <span className={`block h-full rounded-full ${view.over ? 'bg-amber-500' : 'bg-brand-500'}`} style={{ width: `${Math.round(view.bar * 100)}%` }} />
-      </span>
+      {/* the bar fills in the planning time; once there is a sentence ("2 minutes are over.", "Planning time: 1:23.") the
+          sentence stands in its place, so the strip keeps one line. The sentence is said once: a polite live region, always
+          there (hidden while it is empty), reads it out when it appears. */}
+      {view.note === null && (
+        <span aria-hidden="true" className="h-2 min-w-16 flex-1 overflow-hidden rounded-full bg-slate-200">
+          <span className={`block h-full rounded-full ${view.over ? 'bg-amber-500' : 'bg-brand-500'}`} style={{ width: `${Math.round(view.bar * 100)}%` }} />
+        </span>
+      )}
+      <p
+        aria-live="polite"
+        className={view.note === null ? 'sr-only' : `min-w-0 flex-1 text-xs font-semibold leading-tight ${view.over && clock.phase === 'running' ? 'text-amber-700' : 'text-ink-600'}`}
+        data-planning-note
+      >
+        {view.note ?? ''}
+      </p>
       <button
         type="button"
         onClick={onPress}
@@ -43,10 +55,6 @@ export function PlanningClock({ clock, onPress }: { clock: Clock; onPress: () =>
       >
         {view.button}
       </button>
-      {/* (said once: the sentence appears when the time is over and stays; a polite live region reads it out when it appears) */}
-      <p aria-live="polite" className={`w-full text-xs font-semibold ${view.over && clock.phase === 'running' ? 'text-amber-700' : 'text-ink-600'}`} data-planning-note>
-        {view.note ?? ''}
-      </p>
     </div>
   );
 }

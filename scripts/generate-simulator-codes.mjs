@@ -580,7 +580,7 @@ function isInside(folder, file) {
 
 function usage() {
   return [
-    'Makes new codes for the examples of the mBot2 simulator: member codes, or with --advanced',
+    'Makes new codes for the examples of the simulators: member codes, or with --advanced',
     'advanced codes. The same codes work in all five games, Fire Rescue, Fire Chief, Warehouse Sort, Locker Room and Fire Cadet.',
     '',
     '  node scripts/generate-simulator-codes.mjs --count 500 --out ~/Documents/makex-simulator-codes.csv',

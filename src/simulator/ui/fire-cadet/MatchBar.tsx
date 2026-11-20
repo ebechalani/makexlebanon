@@ -126,7 +126,7 @@ export function ModeSwitch({ mode, onMode, locked }: { mode: PlayMode; onMode: (
             tabIndex={on ? 0 : -1}
             disabled={locked}
             onClick={() => onMode(value)}
-            className={`flex min-h-12 items-center gap-2 rounded-xl border-2 px-2.5 py-1 text-left disabled:cursor-not-allowed ${
+            className={`cadet-touch flex items-center gap-2 rounded-xl border-2 px-2.5 py-1 text-left disabled:cursor-not-allowed ${
               on ? 'border-brand-600 bg-brand-50 text-ink-900' : 'border-slate-300 bg-white text-ink-700 hover:bg-slate-50 disabled:opacity-50'
             }`}
           >

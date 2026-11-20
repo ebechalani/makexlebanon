@@ -129,6 +129,8 @@ export const CADET_WORDS = {
   loading: 'Getting the map and the robot ready…',
   /** the one sentence of the Examples window that says what loading an example does here (design 7.12, ../ExamplesDialog.tsx howLoadingWorks) */
   howLoadingWorks: 'Loading one puts its cards in your row and sets its map (Undo brings your cards back).',
+  /** whose members the examples are for: the shared Examples window says "registered MakeX Lebanon members" (../examples-words.ts) */
+  organisation: 'MakeX Lebanon',
 
   // ---- the mode switch
   modeGroup: 'How to play',
@@ -183,6 +185,8 @@ export const CADET_WORDS = {
     emptied: 'The row is empty. Undo brings your cards back.',
     addFirst: 'Add a card first.',
     example: 'Example loaded: its cards and its map.',
+    /** (an example whose map code does not read here: its cards are loaded, the map stays as it was - design 7.12) */
+    exampleCards: 'Example loaded: its cards.',
     practiceMap: (n: number): string => `Map ${n}.`,
     ownMap: 'My own map.',
   },

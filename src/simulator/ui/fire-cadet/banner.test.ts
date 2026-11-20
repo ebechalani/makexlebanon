@@ -58,6 +58,8 @@ test('the few seconds of a refusal and of a note', () => {
   assert.equal(CADET_WORDS.notes.emptied, 'The row is empty. Undo brings your cards back.');
   assert.equal(CADET_WORDS.notes.addFirst, 'Add a card first.');
   assert.equal(CADET_WORDS.notes.example, 'Example loaded: its cards and its map.');
+  // (an example whose map code does not read here: only its cards are loaded - ./examples-window.test.ts)
+  assert.equal(CADET_WORDS.notes.exampleCards, 'Example loaded: its cards.');
   assert.equal(CADET_WORDS.notes.practiceMap(3), 'Map 3.');
   assert.equal(CADET_WORDS.notes.ownMap, 'My own map.');
 });

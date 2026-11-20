@@ -171,3 +171,32 @@ export const numberCardOf = (cards: readonly CardName[], place: number): number 
 
 /** Is the card at `place` a number card (so its arrow is the card before it)? */
 export const isNumberAt = (cards: readonly CardName[], place: number): boolean => isNumberCard(cards[place]);
+
+// =============================================================================================
+// The row in view when GO is pressed (a phone)
+// =============================================================================================
+
+/** The room left between the row and the map block above it (or the bar with the round button below it), in px. */
+export const ROW_IN_VIEW_GAP = 8;
+
+/** Top and bottom of something on the screen, in px from the top of the window. */
+export interface Band {
+  top: number;
+  bottom: number;
+}
+
+/**
+ * How far to scroll the page (px, + is down) so that the row stands in the band between the map
+ * block, which sticks at the top of a phone's screen, and the bar of the round button, which sticks
+ * at its bottom; 0 when it is in view already. The screen asks once, when GO is pressed: the child
+ * may have scrolled down to the Map section, and then the row is hidden under the map block while
+ * the robot runs it. (During the match the row itself keeps the running card in view.) A row
+ * taller than the band shows its top.
+ */
+export function pageScrollToShow(row: Band, band: Band, gap: number = ROW_IN_VIEW_GAP): number {
+  const top = band.top + gap;
+  const bottom = band.bottom - gap;
+  if (row.top < top) return row.top - top;
+  if (row.bottom > bottom) return Math.min(row.bottom - bottom, row.top - top);
+  return 0;
+}
