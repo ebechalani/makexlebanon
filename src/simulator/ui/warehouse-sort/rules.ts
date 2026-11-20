@@ -180,7 +180,8 @@ export const WAREHOUSE_SORT_ASSUMPTIONS: RulesPart = {
     {
       title: 'The robot',
       items: [
-        `It is the mBot2 of the Fire Rescue simulator, with the gripper at the front: ${cm(robotLength(WAREHOUSE_SORT_ROBOT))} cm long and ${cm(robotWidth(WAREHOUSE_SORT_ROBOT))} cm wide. It fits inside the start zone.`,
+        // (the two Fire Rescue categories play with the same robot: there is no page called "Fire Rescue" any more)
+        `It is the mBot2 of Fire Rescue Junior and Senior, with the gripper at the front: ${cm(robotLength(WAREHOUSE_SORT_ROBOT))} cm long and ${cm(robotWidth(WAREHOUSE_SORT_ROBOT))} cm wide. It fits inside the start zone.`,
         'Its line sensor is set for white lines on a black mat: "line" means a white line.',
         "On a real mBot2 the line sensor may first have to learn this mat. Look in Makeblock's help for the Quad RGB sensor.",
         `The colour sensor at the claw sees a cube that is at most ${cm(WAREHOUSE_SORT_ROBOT.frontColorSensor.rangeMm)} cm in front of the middle of the claw.`,

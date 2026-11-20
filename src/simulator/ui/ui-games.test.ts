@@ -33,7 +33,7 @@ import { MAZE_CHOICES, mazeChoiceOf, ROOM_LABEL, SPOT_LABEL, withMaze } from './
 import { FIRE_CHIEF_START_ZONE, FIRE_CHIEF_WORDS } from './fire-chief/words';
 import { bodyName, CYBERPI_PANEL_HOLDS, cyberPiSummary, describeEvent, finishText, formatRefereeTime, formatStamp, restartFacts, restartLine, restartsLeftText, timeTextOf, type LogLine } from './format';
 import { finishHeadline, finishSentence, restartButton, restartSummary } from './match-words';
-import { foreignBlocks, gameNameFromId, otherGameNote, parseProgramFile, serializeProgramFile } from './program-file';
+import { foreignBlocks, gameName, gameNameFromId, otherGameNote, parseProgramFile, serializeProgramFile } from './program-file';
 import { colourSight, drawColourSight, FIRE_KIND, fitView, placeZoneLabels, sightPolygon, viewToMat, wallDrawBox, WALL_MIN_PIXELS } from './render';
 import { colourNeedsCloser, colourRangeNote, colourRangeText, dcMotorUse, NEAR_FOR_COLOUR_CM, robotParts, sensorSummary, sensorsViewHint } from './robot-parts';
 import { addRulerPoint, EMPTY_RULER, rulerText } from './ruler';
@@ -1072,13 +1072,19 @@ test('other game: opening such a file says in plain words what will not work', (
   assert.equal(gameNameFromId('fire-rescue'), 'Fire Rescue');
   assert.equal(gameNameFromId('fire-chief'), 'Fire Chief');
   assert.equal(gameNameFromId(''), '');
+  // the name the note gives a game: the one of its page (Fire Rescue Senior kept the id of the Fire Rescue game of before the split)
+  assert.equal(gameName('fire-rescue'), 'Fire Rescue Senior');
+  assert.equal(gameName('fire-rescue-junior'), 'Fire Rescue Junior');
+  assert.equal(gameName('fire-chief'), 'Fire Chief');
+  assert.equal(gameName(''), '');
+  for (const odd of ['constructor', '__proto__', 'toString']) assert.equal(gameName(odd), gameNameFromId(odd), odd);
 
-  // a Fire Rescue file on the Fire Chief page
+  // a Fire Rescue (Senior) file on the Fire Chief page
   const file = parseProgramFile(serializeProgramFile('fire-rescue', RESCUE_PROGRAM));
   assert.ok(file.ok);
   assert.equal(
     otherGameNote(file.program, file.game, 'fire-chief'),
-    'This program was saved in the Fire Rescue simulator. 3 of its blocks are for parts this robot does not have (Gripper, Servos): they do not work here.',
+    'This program was saved in the Fire Rescue Senior simulator. 3 of its blocks are for parts this robot does not have (Gripper, Servos): they do not work here.',
   );
   // the other way round
   const note = otherGameNote(CHIEF_PROGRAM, 'fire-chief', 'fire-rescue');
@@ -1088,7 +1094,10 @@ test('other game: opening such a file says in plain words what will not work', (
   assert.equal(otherGameNote(one, null, 'fire-chief'), '1 of its blocks is for parts this robot does not have (Gripper): it does not work here.');
   // a file of the other game that only uses blocks both games have
   const plain = program([script(whenStart(), [moveCm('forward', 10)])]);
-  assert.equal(otherGameNote(plain, 'fire-rescue', 'fire-chief'), 'This program was saved in the Fire Rescue simulator. All its blocks work here too.');
+  assert.equal(otherGameNote(plain, 'fire-rescue', 'fire-chief'), 'This program was saved in the Fire Rescue Senior simulator. All its blocks work here too.');
+  for (const other of ['warehouse-sort', 'locker-room']) {
+    assert.equal(otherGameNote(plain, 'fire-rescue', other), 'This program was saved in the Fire Rescue Senior simulator. All its blocks work here too.', other);
+  }
   // nothing to say: a file of this game, a bare file without foreign blocks
   assert.equal(otherGameNote(MISSION, 'fire-chief', 'fire-chief'), null);
   assert.equal(otherGameNote(plain, null, 'fire-chief'), null);

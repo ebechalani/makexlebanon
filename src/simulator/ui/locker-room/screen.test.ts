@@ -663,8 +663,8 @@ test('page: the Locker Room screen hands the general screen its game, robot, exa
   const app = code(read('../SimulatorApp.tsx'));
   const bar = app.slice(app.indexOf('<ControlBar'), app.indexOf('/>', app.indexOf('<ControlBar')));
   assert.match(bar, /\srestartButton=\{props\.restartButton\}\s/);
-  // ... and the other three games pass none of it: their screens are as they were
-  for (const other of ['../fire-rescue/FireRescueSimulator.tsx', '../fire-chief/FireChiefSimulator.tsx', '../warehouse-sort/WarehouseSortSimulator.tsx']) {
+  // ... and the other games pass none of it: their screens are as they were (Fire Rescue Junior's too)
+  for (const other of ['../fire-rescue/FireRescueSimulator.tsx', '../fire-rescue-junior/FireRescueJuniorSimulator.tsx', '../fire-chief/FireChiefSimulator.tsx', '../warehouse-sort/WarehouseSortSimulator.tsx']) {
     assert.ok(!read(other).includes('restartButton'), other);
     assert.ok(!read(other).includes('rulesNoteLink'), other);
   }

@@ -74,7 +74,12 @@ export default async function SeasonPage({ params }: Params) {
         <SectionHeading
           eyebrow="Categories"
           title="Competition categories"
-          lead={`${season.categories.length} categories ran in the ${season.year} season. Open a category for its rules, resources and photos.`}
+          lead={
+            // (a season that has not happened yet did not "run": it has announced categories, and their rules may not be out)
+            season.status === 'completed'
+              ? `${season.categories.length} categories ran in the ${season.year} season. Open a category for its rules, resources and photos.`
+              : `${season.categories.length} categories are announced for the ${season.year} season. Open a category to find out more.`
+          }
         />
 
         <ul className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">

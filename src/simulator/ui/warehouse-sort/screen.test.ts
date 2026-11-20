@@ -616,10 +616,13 @@ test('page: the Warehouse Sort screen hands the general screen its game, robot, 
   assert.match(app, /<TitleBar title=\{props\.title\} wrapOnPhone=\{props\.titleWrapsOnPhone\}>/);
   const stage = app.slice(app.indexOf('<StageCanvas'), app.indexOf('/>', app.indexOf('<StageCanvas')));
   assert.match(stage, /\smargin=\{props\.stageMargin\}\s/);
-  // ... and the two other games pass none of them: their screens are as they were
+  // ... and the two other games pass none of them: their screens are as they were. (Since Fire Rescue was
+  // split, its screen is Fire Rescue Senior's: "Fire Rescue Senior simulator" is too long for a phone too, so
+  // its title wraps there - only that.)
   for (const other of ['../fire-rescue/FireRescueSimulator.tsx', '../fire-chief/FireChiefSimulator.tsx', '../fire-rescue/FireRescueLoader.tsx', '../fire-chief/FireChiefLoader.tsx']) {
     const source = read(other);
-    for (const prop of ['batchRandomLists', 'batchTieBreak', 'batchSummaryLabel', 'batchSummaryOrder', 'titleWrapsOnPhone', 'stageMargin', 'wrapOnPhone']) assert.ok(!source.includes(prop), `${other}: ${prop}`);
+    const wraps = other.startsWith('../fire-rescue/') ? [] : ['titleWrapsOnPhone', 'wrapOnPhone'];
+    for (const prop of ['batchRandomLists', 'batchTieBreak', 'batchSummaryLabel', 'batchSummaryOrder', 'stageMargin', ...wraps]) assert.ok(!source.includes(prop), `${other}: ${prop}`);
   }
   // the start pose of the page is the game's, and it fits the start zone
   assert.deepEqual(START_POSE, warehouseSortGame.defaultStartPose);

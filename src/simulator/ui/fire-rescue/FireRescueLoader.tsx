@@ -1,7 +1,8 @@
 'use client';
 
 /**
- * Loads the Fire Rescue simulator in the browser only.
+ * Loads the Fire Rescue Senior simulator in the browser only. (Fire Rescue Junior has a loader
+ * of its own: ../fire-rescue-junior/FireRescueJuniorLoader.tsx.)
  *
  * The simulator remembers things in the browser (blocks, combination, where the robot starts)
  * and draws on a canvas, so there is nothing useful the server could render for it. Loading it
@@ -18,7 +19,7 @@ import { TitleBar } from '../TitleBar';
 function LoadingScreen() {
   return (
     <div className={PAGE_FRAME}>
-      <TitleBar title="Fire Rescue" />
+      <TitleBar title="Fire Rescue Senior" wrapOnPhone />
       <div className="flex flex-1 items-center justify-center p-6" role="status">
         <div className="flex items-center gap-3 text-ink-600">
           <span className="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-brand-600" aria-hidden="true" />
