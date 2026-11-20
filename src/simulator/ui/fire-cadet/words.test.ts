@@ -233,11 +233,11 @@ function refereeSentences(): string[] {
       out.push(REFEREE_WORDS.reached[item](fire), REFEREE_WORDS.push[item](fire), REFEREE_WORDS.offMap(item, fire));
       for (const place of PLACE_NAMES) out.push(REFEREE_WORDS.wrongPlace(item, place, fire));
     }
-    for (const kind of OBSTACLE_KINDS) out.push(REFEREE_WORDS.itemTouched(item, kind));
+    for (const kind of OBSTACLE_KINDS) out.push(REFEREE_WORDS.itemTouched(item, kind), REFEREE_WORDS.itemTouchedAgain(item, kind), REFEREE_WORDS.itemTouchedToo(item, kind));
   }
-  for (const kind of OBSTACLE_KINDS) out.push(REFEREE_WORDS.robotTouched(kind), REFEREE_WORDS.robotTouchedAgain(kind));
+  for (const kind of OBSTACLE_KINDS) out.push(REFEREE_WORDS.robotTouched(kind), REFEREE_WORDS.robotTouchedAgain(kind), REFEREE_WORDS.robotTouchedToo(kind));
   out.push(REFEREE_WORDS.leftMap, REFEREE_WORDS.home, REFEREE_WORDS.homeNow, REFEREE_WORDS.neverLeft, REFEREE_WORDS.partlyHome, REFEREE_WORDS.notHome, REFEREE_WORDS.noObstacle);
-  out.push(...Object.values(REFEREE_WORDS.label), REFEREE_WORDS.touched([...OBSTACLE_KINDS]), REFEREE_WORDS.pushed([...OBSTACLE_KINDS]), REFEREE_WORDS.robotNone);
+  out.push(...Object.values(REFEREE_WORDS.label), REFEREE_WORDS.touched([...OBSTACLE_KINDS]));
   return out;
 }
 
@@ -252,8 +252,22 @@ test('no sentence of the referee is copied into the screen: the banner and the s
     const source = readFileSync(here(file), 'utf8');
     for (const piece of pieces) assert.ok(!source.includes(piece), `${file} holds the referee's words: "${piece}"`);
   }
-  // in particular what the referee says about an obstacle under D1
+  // in particular what the referee says about an obstacle under D1 and D5
   assert.equal(REFEREE_WORDS.robotTouched('fallen-tree'), 'The robot touched the Fallen Tree: -1. The referee puts it back.');
+  assert.equal(REFEREE_WORDS.itemTouched('cat', 'road-closed'), 'The Cat touched the Road Closed sign: -1. On the real map, go round it.');
+});
+
+test('every sentence the referee says fits the banner: 87 characters at most (measured in a build: 87 fit in the two lines of the narrowest classroom banner, 325 px at 1280 x 720; the 108 of "... The referee puts it back. On the real map, go round it." did not)', () => {
+  const said: string[] = [REFEREE_WORDS.leftMap];
+  for (const item of ITEM_NAMES) {
+    said.push(REFEREE_WORDS.delivered[item]);
+    for (const fire of FIRE_PLACES) for (const place of PLACE_NAMES) said.push(REFEREE_WORDS.wrongPlace(item, place, PLACE_WORDS[fire]));
+    for (const kind of OBSTACLE_KINDS) said.push(REFEREE_WORDS.itemTouched(item, kind), REFEREE_WORDS.itemTouchedAgain(item, kind), REFEREE_WORDS.itemTouchedToo(item, kind));
+  }
+  for (const kind of OBSTACLE_KINDS) said.push(REFEREE_WORDS.robotTouched(kind), REFEREE_WORDS.robotTouchedAgain(kind), REFEREE_WORDS.robotTouchedToo(kind));
+  for (const text of said) assert.ok(text.length <= 87, `${text.length}: ${text}`);
+  // the longest of the obstacles (D5)
+  assert.equal(Math.max(...said.filter((t) => /touched/.test(t)).map((t) => t.length)), 84);
 });
 
 test('the score strip says what the referee wrote: its pictures are the sheet\'s lines, its obstacles the referee\'s touched ones', () => {
@@ -276,12 +290,14 @@ test('the score strip says what the referee wrote: its pictures are the sheet\'s
   const sign = stripState(sheet).find((p) => p.id === 'road-closed');
   assert.deepEqual([sign?.on, sign?.label], [true, 'Road Closed: touched, 1 point less']);
   assert.equal(CADET_WORDS.score.minus, '-1');
-  // the Equipment pushed into the Road Closed sign (D1: no point): not "not touched" - the strip says an item touched it
+  // the Equipment pushed into the Road Closed sign (D5): counted like the robot's own touch - the referee's -1, "touched, 1 point less"
   const pushed = run(mapOf('S-A6-B3-C5-D5-D3-F5-F7'), 'F4');
-  assert.equal(pushed.score().lines.find((line) => line.id === 'obstacles')?.points, 0);
+  assert.equal(pushed.score().lines.find((line) => line.id === 'obstacles')?.points, -f.POINTS_OBSTACLE);
   const pushedSign = stripState(pushed.score()).find((p) => p.id === 'road-closed');
-  assert.deepEqual([pushedSign?.on, pushedSign?.pushed, pushedSign?.label], [false, true, 'Road Closed: touched by an item. Not allowed on the real map']);
-  assert.ok(stripState(pushed.score()).filter((p) => p.id !== 'road-closed').every((p) => !p.pushed));
+  assert.deepEqual([pushedSign?.on, pushedSign?.label], [true, 'Road Closed: touched, 1 point less']);
+  assert.deepEqual(stripState(pushed.score()).filter((p) => p.id !== 'road-closed').map((p) => p.on), [false, false, false, false, false, false, false]);
+  // the strip has no other words for an obstacle: touched (-1) or not touched
+  assert.deepEqual(Object.keys(CADET_WORDS.score).sort(), ['done', 'minus', 'notTouched', 'notYet', 'sheet', 'stripLabel', 'touched']);
   // the strip's name of an obstacle is the referee's, without "the" and "sign"
   for (const kind of OBSTACLE_KINDS) assert.ok(OBSTACLE_WORDS[kind].includes(THING_WORDS[kind]), kind);
   assert.equal(STRIP_WORDS.return, 'Robot home');

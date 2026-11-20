@@ -46,10 +46,11 @@
  * and that time counts. (Squares: a letter A to G for the column, a number 1 to 7 for the row,
  * A1 at the top left.)
  *
- * THE OBSTACLES (lead decision D1): a touched obstacle costs the robot 1 point, and the referee
- * puts it back on its spot. On their own maps the six rows never touch one; on the other maps
- * some of them do (the comments below say where). An item the robot pushes against an obstacle
- * costs nothing.
+ * THE OBSTACLES (lead decisions D1 and D5): a touched obstacle costs 1 point, once for each
+ * obstacle, whether the robot or an item it pushes touched it, and the referee puts it back on its
+ * spot. On their own maps the six rows never touch one; on the other maps some of them do, always
+ * with the robot itself (the comments below say where): none of them pushes an item into an
+ * obstacle on any of the eight maps.
  *
  * The descriptions are for children of 4 to 7 and the teachers who read with them, many in English
  * as a second language: short sentences, plain words, and nothing more certain than the

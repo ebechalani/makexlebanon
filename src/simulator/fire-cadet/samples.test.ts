@@ -9,11 +9,13 @@
  * promises - no more, no less - and every number written in a description is checked against
  * the measured one.
  *
- * The second table is the one of lead decision D1: an obstacle that the robot touches costs 1
- * point, the referee puts it back, and the robot goes on with its row, on the squares. (With the
- * fixed obstacles of the design's revision 2 a touched obstacle stopped the robot off the squares
- * for the rest of the match: 14 cells of that table were 0 where they are 4 now - the return
- * bonus minus the touch. The first table did not change.)
+ * The second table is the one of lead decisions D1 and D5: an obstacle touched costs 1 point,
+ * the referee puts it back, and the robot goes on with its row, on the squares. (With the fixed
+ * obstacles of the design's revision 2 a touched obstacle stopped the robot off the squares for
+ * the rest of the match: 14 cells of that table were 0 where they are 4 now - the return bonus
+ * minus the touch. The first table did not change.) Every touch of that table is the robot's own:
+ * no example pushes an item into an obstacle on any map, so D5 (an item's touch costs the point
+ * too) changed no number of either table.
  */
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -368,6 +370,21 @@ describe('each example on all eight practice maps (the second table of design 5.
         assert.deepEqual(delivered, ALSO_DELIVERED[id]?.[map] ?? [], `${why}: what it delivers`);
       });
     }
+  });
+
+  test('D5: no example pushes an item into an obstacle, on any of the eight maps - every obstacle it touches, the robot itself touches', () => {
+    let robotTouches = 0;
+    for (const id of IDS) {
+      PRACTICE_MAPS.forEach((map, n) => {
+        const said = watchMatch(sample(id).program, map).said.map(([, text]) => text);
+        for (const text of said) assert.doesNotMatch(text, /^The (Water|Cat|Injured Person|Equipment) touched /, `${id} on P${n + 1}: ${text}`);
+        if (said.some((text) => /^The robot touched .+: -1\./.test(text))) robotTouches++;
+      });
+    }
+    // the cells with a (-1) in the second table: each one a touch of the robot
+    const minus = IDS.flatMap((id) => (ON_EIGHT.get(id) as BatchResult[]).filter((r) => lineOf(r, 'obstacles').points < 0)).length;
+    assert.equal(robotTouches, minus);
+    assert.equal(minus, 17);
   });
 });
 

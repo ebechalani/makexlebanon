@@ -16,16 +16,16 @@
  *       referee then takes it off the field and the points stay (rules l.162-167, N6).
  *   +5  the return bonus: when the match ends, the whole robot, sticks included, is inside D7 - and
  *       it was completely outside D7 before (A8).
- *   -1  each obstacle the ROBOT (its body or a stick) touched, once for each obstacle, so -3 at
- *       most (rules l.179-181, l.243-245; A7).
- *    0  an obstacle that only an ITEM the robot pushes touched: D1 says it costs nothing. But the
- *       rules say the robot "may not push an obstacle away and use the blocked road" (l.100,
- *       l.185), and here a lifted obstacle opens its square. So the referee never says "no points
- *       lost" for it: it says "On the real map, go round it.", and the sheet's obstacle line is a
- *       note that names it (question 3 of the README asks the organiser).
+ *   -1  each obstacle touched by the robot (its body or a stick) OR by an item the robot pushes,
+ *       once for each obstacle, whoever touched it, so -3 at most (rules l.179-181, l.243-245; A7;
+ *       lead decision D5). The rules say the robot "must not push an obstacle away to open the
+ *       road" (l.100, l.185): an item pushed into an obstacle is the robot pushing it away. So an
+ *       item's touch costs the same point as the robot's own, and the referee adds "On the real
+ *       map, go round it." (question 3b of the README asks the organiser whether -1 is what a
+ *       referee does).
  *   The total is never below 0 (A9). Highest score: 4 x 5 + 5 = 25 (rules l.254).
  *
- * THE OBSTACLES (lead decision D1, which replaces A7's fixed blocks, N17 and N23 of the design).
+ * THE OBSTACLES (lead decisions D1 and D5; D1 replaces A7's fixed blocks, N17 and N23 of the design).
  * The rules say "If an obstacle is moved, the referee returns it to its original position while
  * the match timer continues" (l.183), so real obstacles can be moved. Here an obstacle is a game
  * element standing on the middle of its square (OBSTACLE_BASE). As soon as ANYTHING touches it -
@@ -34,9 +34,10 @@
  * free (RefereeCall.restoreBodies: nothing nearer to its base than RESTORE_CLEARANCE; the engine
  * checks, and the referee asks again at every tick until it is back). So the robot is never stuck
  * on an obstacle and never pushed off the squares by one: it goes on with its row, on the squares.
- * Only the robot's own touch costs a point; an item that touches an obstacle costs nothing. (An
- * obstacle that moved although nothing touches it was turned by the robot's sticks - the sticks
- * take along what stands between them, core/engine.ts - so it counts as the robot's touch.)
+ * The first touch of each obstacle costs 1 point, whether the robot or an item it pushes touched
+ * it (D5); later touches of the same obstacle cost nothing more. (An obstacle that moved although
+ * nothing touches it was turned by the robot's sticks - the sticks take along what stands between
+ * them, core/engine.ts - so it counts as the robot's touch.)
  *
  * The match lasts 120 s. Junior: it also ends when the whole row has run (the engine ends it when
  * the interpreter is idle and the robot stands still: 'program-ended'), and that time counts (A10).
@@ -151,7 +152,7 @@ export function overlays(s: FireCadetScenario): ZoneOverlay[] {
 }
 
 // =============================================================================================
-// The referee's words (design 6.2 and 6.4, with lead decision D1 for the obstacles)
+// The referee's words (design 6.2 and 6.4, with lead decisions D1 and D5 for the obstacles)
 // =============================================================================================
 
 const points = (n: number): string => `${n} ${n === 1 ? 'point' : 'points'}`;
@@ -173,16 +174,25 @@ export const REFEREE_WORDS = {
     person: `The Injured Person is in ${PLACE_WORDS.hospital}. ${points(FIRE_CADET.POINTS_ITEM)}.`,
     equipment: `The Equipment is back in ${PLACE_WORDS.station}. ${points(FIRE_CADET.POINTS_ITEM)}.`,
   } as Readonly<Record<ItemName, string>>,
-  /** the robot touched an obstacle for the first time (D1) */
+  /** the robot touched an obstacle that nothing had touched before: -1 (D1, D5) */
   robotTouched: (kind: ObstacleKind): string => `The robot touched ${OBSTACLE_WORDS[kind]}: -${FIRE_CADET.POINTS_OBSTACLE}. The referee puts it back.`,
-  /** the robot touched an obstacle it had touched before: no point more (D1) */
-  robotTouchedAgain: (kind: ObstacleKind): string => `The robot touched ${OBSTACLE_WORDS[kind]} again. The referee puts it back.`,
   /**
-   * an item the robot pushes touched an obstacle (D1: it costs nothing here). It does not say "no
-   * points lost": on the real map a robot may not push an obstacle away to use the blocked road
-   * (rules l.100, l.185), and whether a referee counts it is not known (README, question 3).
+   * an item the robot pushes touched an obstacle that nothing had touched before: -1 too (D5: that
+   * is the robot pushing it away, and on the real map it may not use the blocked road, rules l.100,
+   * l.185). Whether a real referee takes the point is not known (README, question 3b). (It does not
+   * say "The referee puts it back." as well: the item's name makes it longer than the robot's
+   * sentence, and with it the banner would cut it on a classroom screen, where it has two lines.)
    */
-  itemTouched: (item: ItemName, kind: ObstacleKind): string => `The ${ITEM_WORDS[item]} touched ${OBSTACLE_WORDS[kind]}. On the real map, go round it.`,
+  itemTouched: (item: ItemName, kind: ObstacleKind): string =>
+    `The ${ITEM_WORDS[item]} touched ${OBSTACLE_WORDS[kind]}: -${FIRE_CADET.POINTS_OBSTACLE}. On the real map, go round it.`,
+  // an obstacle touched before is touched once more: no point more (once for each obstacle, D1, D5).
+  // "again" when the same one (the robot, or that item) touched it before, "too" when another did.
+  robotTouchedAgain: (kind: ObstacleKind): string => `The robot touched ${OBSTACLE_WORDS[kind]} again. The referee puts it back.`,
+  robotTouchedToo: (kind: ObstacleKind): string => `The robot touched ${OBSTACLE_WORDS[kind]} too. The referee puts it back.`,
+  itemTouchedAgain: (item: ItemName, kind: ObstacleKind): string =>
+    `The ${ITEM_WORDS[item]} touched ${OBSTACLE_WORDS[kind]} again. On the real map, go round it.`,
+  itemTouchedToo: (item: ItemName, kind: ObstacleKind): string =>
+    `The ${ITEM_WORDS[item]} touched ${OBSTACLE_WORDS[kind]} too. On the real map, go round it.`,
   /** an item at rest in a marked place that is not its own (N24); also the line's detail */
   wrongPlace: (item: ItemName, place: PlaceName, fire: string): string => `The ${ITEM_WORDS[item]} is in ${PLACE_WORDS[place]}. ${BELONGS[item](fire)}`,
   leftMap: 'The robot left the map.',
@@ -217,45 +227,30 @@ export const REFEREE_WORDS = {
   neverLeft: 'The robot has not left the Fire Station yet. Here the bonus needs it to leave first.',
   partlyHome: 'A part of the robot is outside the Fire Station.',
   notHome: 'The robot is not in the Fire Station.',
-  // ---- the score sheet: the obstacles
+  // ---- the score sheet: the obstacles (touched by the robot or by an item it pushes: D5)
   noObstacle: 'No obstacle touched.',
-  touched: (kinds: readonly ObstacleKind[]): string => `Touched: ${obstacleList(kinds)}.`,
-  /** obstacles that only an item touched (no point here, D1 - but not allowed on the real map) */
-  pushed: (kinds: readonly ObstacleKind[]): string => `An item touched ${obstacleList(kinds)}. On the real map, go round the obstacles.`,
-  /** ... when the robot itself touched none */
-  robotNone: 'The robot touched no obstacle.',
+  touched: (kinds: readonly ObstacleKind[]): string => {
+    const names = kinds.map((kind) => OBSTACLE_WORDS[kind]);
+    const list = names.length <= 1 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+    return `Touched: ${list}.`;
+  },
 };
-
-/** "the Road Closed sign", "the Road Closed sign and the Fallen Tree" ... */
-function obstacleList(kinds: readonly ObstacleKind[]): string {
-  const names = kinds.map((kind) => OBSTACLE_WORDS[kind]);
-  return names.length <= 1 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
-}
 
 // =============================================================================================
 // The referee
 // =============================================================================================
 
-/** The score sheet of this game: a ScoreReport that also names the obstacles the robot touched (for the screen's score strip). */
+/** The score sheet of this game: a ScoreReport that also names the obstacles touched (for the screen's score strip). */
 export interface FireCadetScoreReport extends ScoreReport {
-  /** the obstacles the robot touched, in the order of OBSTACLE_KINDS */
+  /** the obstacles touched by the robot or by an item it pushes (-1 each: D1, D5), in the order of OBSTACLE_KINDS */
   obstaclesTouched: ObstacleKind[];
-  /** the obstacles that only an item touched (the robot did not), in the order of OBSTACLE_KINDS: no point here (D1), but not allowed on the real map */
-  obstaclesPushed: ObstacleKind[];
 }
 
-/** The obstacles the robot touched, read from any score report of this game ([] for another report). */
+/** The obstacles touched (by the robot or by an item it pushes), read from any score report of this game ([] for another report). */
 export function obstaclesTouched(report: ScoreReport): ObstacleKind[] {
-  return obstacleListOf((report as Partial<FireCadetScoreReport>).obstaclesTouched);
+  const list = (report as Partial<FireCadetScoreReport>).obstaclesTouched;
+  return Array.isArray(list) ? list.filter((kind): kind is ObstacleKind => (OBSTACLE_KINDS as readonly string[]).includes(kind)) : [];
 }
-
-/** The obstacles that only an item touched, read from any score report of this game ([] for another report). */
-export function obstaclesPushed(report: ScoreReport): ObstacleKind[] {
-  return obstacleListOf((report as Partial<FireCadetScoreReport>).obstaclesPushed);
-}
-
-const obstacleListOf = (list: unknown): ObstacleKind[] =>
-  Array.isArray(list) ? list.filter((kind): kind is ObstacleKind => (OBSTACLE_KINDS as readonly string[]).includes(kind)) : [];
 
 const boxOf = (b: Body): OBB => ({ x: b.x, y: b.y, w: b.w, l: b.l, angle: b.angle });
 const START_RECT: Rect = squareRect(START_SQUARE);
@@ -279,10 +274,10 @@ export function createReferee(s: FireCadetScenario): Referee<FireCadetScenario> 
   const fire = PLACE_WORDS[s.fire];
   /** the time each item was delivered */
   const delivered: Partial<Record<ItemName, number>> = {};
-  /** the obstacles the robot touched (-1 each, once) */
+  /** the obstacles touched by the robot or by an item it pushes (-1 each, once: D1, D5) */
   const touched = new Set<ObstacleKind>();
-  /** the obstacles an item the robot pushes touched (no point: D1) */
-  const pushed = new Set<ObstacleKind>();
+  /** who touched which obstacle ("robot:road-closed", "cat:road-closed"), for "again" and "too" */
+  const touchedBy = new Set<string>();
   /** the obstacles the referee has lifted and not yet put back */
   const lifted = new Set<ObstacleKind>();
   /** when the referee last said something about each obstacle */
@@ -336,26 +331,15 @@ export function createReferee(s: FireCadetScenario): Referee<FireCadetScenario> 
     return { id: 'return', label, points: 0, max: FIRE_CADET.POINTS_RETURN, ok: false, detail };
   };
 
-  /** the obstacles that only an item touched */
-  const onlyPushed = (): ObstacleKind[] => OBSTACLE_KINDS.filter((kind) => pushed.has(kind) && !touched.has(kind));
-
   const obstacleLine = (): ScoreLine => {
     const kinds = OBSTACLE_KINDS.filter((kind) => touched.has(kind));
-    const byItems = onlyPushed();
-    const sentences: string[] = [];
-    if (kinds.length > 0) sentences.push(REFEREE_WORDS.touched(kinds));
-    else if (byItems.length > 0) sentences.push(REFEREE_WORDS.robotNone);
-    else sentences.push(REFEREE_WORDS.noObstacle);
-    if (byItems.length > 0) sentences.push(REFEREE_WORDS.pushed(byItems));
     return {
       id: 'obstacles',
       label: REFEREE_WORDS.label.obstacles,
       points: kinds.length === 0 ? 0 : -FIRE_CADET.POINTS_OBSTACLE * kinds.length,
       max: 0,
-      // (an obstacle that only an item touched costs nothing here, but it is not "nothing wrong":
-      // the line is then a note for the team to read - ../ui/ScoreSheet.tsx lineMark)
-      ok: kinds.length === 0 && byItems.length === 0,
-      detail: sentences.join(' '),
+      ok: kinds.length === 0,
+      detail: kinds.length === 0 ? REFEREE_WORDS.noObstacle : REFEREE_WORDS.touched(kinds),
     };
   };
 
@@ -412,10 +396,11 @@ export function createReferee(s: FireCadetScenario): Referee<FireCadetScenario> 
         }
       }
 
-      // 3. The obstacles (D1). One that is back on the field is no longer lifted. One that anything
-      //    touches - or that has moved - is lifted at once; the robot's own touch costs a point,
-      //    once for each obstacle. Every lifted obstacle is asked back at every tick: the engine
-      //    puts it on its spot as soon as nothing is nearer to it than RESTORE_CLEARANCE.
+      // 3. The obstacles (D1, D5). One that is back on the field is no longer lifted. One that
+      //    anything touches - or that has moved - is lifted at once; its first touch costs a point,
+      //    whether the robot or an item it pushes touched it, once for each obstacle. Every lifted
+      //    obstacle is asked back at every tick: the engine puts it on its spot as soon as nothing
+      //    is nearer to it than RESTORE_CLEARANCE.
       for (const kind of [...lifted]) if (bodyOf(ctx, obstacleId(kind)) !== undefined) lifted.delete(kind);
       for (const b of w.bodies) {
         const kind = KIND_OF_OBSTACLE.get(b.id);
@@ -429,18 +414,24 @@ export function createReferee(s: FireCadetScenario): Referee<FireCadetScenario> 
         // (moved with nothing touching it: the sticks turned it along - the robot moved it)
         const robotsDoing = byRobot || (byItem === undefined && moved(b));
         if (!robotsDoing && byItem === undefined) continue;
-        if (!robotsDoing) pushed.add(kind);
-        if (robotsDoing && !touched.has(kind)) {
+        // who touched it: the robot, or the item it pushed (when both touch it in one tick, the robot)
+        const who: 'robot' | ItemName = robotsDoing ? 'robot' : (byItem as ItemName);
+        const byWho = `${who}:${kind}`;
+        if (!touched.has(kind)) {
+          // the first touch of this obstacle, by anyone: -1 (D5)
           touched.add(kind);
-          say(REFEREE_WORDS.robotTouched(kind));
+          say(who === 'robot' ? REFEREE_WORDS.robotTouched(kind) : REFEREE_WORDS.itemTouched(who, kind));
           saidAbout.set(kind, w.time);
         } else if (w.time - (saidAbout.get(kind) ?? -Infinity) >= FIRE_CADET.MESSAGE_SECONDS - 1e-9) {
-          // (a touch that costs nothing is said again only after the last sentence about this
+          // (a touch that costs nothing more is said again only after the last sentence about this
           // obstacle has had its time in the banner: an obstacle that the sticks turn along is
           // lifted and put back at every small step of a turn)
-          say(robotsDoing ? REFEREE_WORDS.robotTouchedAgain(kind) : REFEREE_WORDS.itemTouched(byItem as ItemName, kind));
+          const again = touchedBy.has(byWho);
+          if (who === 'robot') say(again ? REFEREE_WORDS.robotTouchedAgain(kind) : REFEREE_WORDS.robotTouchedToo(kind));
+          else say(again ? REFEREE_WORDS.itemTouchedAgain(who, kind) : REFEREE_WORDS.itemTouchedToo(who, kind));
           saidAbout.set(kind, w.time);
         }
+        touchedBy.add(byWho);
         lifted.add(kind);
         remove(b.id);
       }
@@ -492,7 +483,6 @@ export function createReferee(s: FireCadetScenario): Referee<FireCadetScenario> 
         lines,
         complete: lines.every((line) => line.id === 'obstacles' || line.ok),
         obstaclesTouched: OBSTACLE_KINDS.filter((kind) => touched.has(kind)),
-        obstaclesPushed: onlyPushed(),
       };
       if (over) report.time = endTime;
       else if (message !== null && ctx.world.time - message.time < FIRE_CADET.MESSAGE_SECONDS - 1e-9) report.now = message.text;

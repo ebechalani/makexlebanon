@@ -4,7 +4,7 @@
  * The proof rows are written HERE ONLY: the files the browser gets never hold a row that scores
  * all 25 points (design 5.5, the note for the lead). Each is the shortest row the design's solver
  * found; this file plays it through the whole chain - the card interpreter, the engine with the
- * two sticks, the referee of lead decision D1 - and checks the table of 5.3 number for number.
+ * two sticks, the referee of lead decisions D1 and D5 - and checks the table of 5.3 number for number.
  */
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -16,7 +16,7 @@ import { cardRowProgram, cardsFromText, expand, rowSeconds, rowTicks } from './c
 import { isRoadSquare } from './field';
 import { FIRE_CADET, spot, ticks, type CardTimes } from './numbers';
 import { playFireCadet } from './play';
-import { PRACTICE_MAPS, decodeScenario, describeScenario, encodeScenario, hyphenated, squareName } from './scenario';
+import { PRACTICE_MAPS, decodeScenario, describeScenario, encodeScenario, hyphenated, squareName, type FireCadetScenario } from './scenario';
 import { solve } from './solver';
 import { watchMatch } from './test-helpers';
 
@@ -112,6 +112,37 @@ test('the table of 5.3: the solver\'s shortest time is the time of the table, an
     assert.ok(free);
     assert.equal(free.seconds, TABLE[n].free, `P${n + 1} without obstacles`);
   });
+});
+
+test('D5: the row of "Without the obstacles", played on the real map, never scores 25 - each obstacle it touches costs 1 point, also through an item - and the README says what it scores', () => {
+  const off: FireCadetScenario['obstacles'] = [{ col: -1, row: -1 }, { col: -1, row: -1 }, { col: -1, row: -1 }];
+  const measured = PRACTICE_MAPS.map((s, n) => {
+    const free = solve({ ...s, obstacles: off });
+    assert.ok(free, `P${n + 1}`);
+    const result = playFireCadet(cardRowProgram(free.cards), s);
+    const penalty = result.lines.find((line) => line.id === 'obstacles')?.points ?? 0;
+    // every item delivered and the robot home: only the obstacles can cost points
+    assert.ok(result.lines.every((line) => line.id === 'obstacles' || line.points === 5), `P${n + 1}`);
+    assert.equal(result.total, 25 + penalty, `P${n + 1}`);
+    assert.ok(Math.abs(result.time - TABLE[n].free) < 1e-9, `P${n + 1}: ${result.time}`);
+    return result.total;
+  });
+  // maps 1 to 3: the obstacles stand beside the ways, the row is the proof row's time and touches none
+  assert.deepEqual(measured, [25, 25, 25, 22, 24, 24, 22, 22]);
+  for (let n = 3; n < 8; n++) assert.ok(TABLE[n].free < TABLE[n].seconds && measured[n] < 25, `P${n + 1}`);
+  const readme = readFileSync(fileURLToPath(new URL('../../../README.md', import.meta.url)), 'utf8').replace(/\s+/g, ' ');
+  const sentence = (n: number): string => `${measured[n]} on map ${n + 1} (${n === 3 ? 'in ' : ''}${TABLE[n].free.toFixed(1)} s)`;
+  assert.ok(
+    readme.includes(`measured, it scores ${sentence(3)}, ${sentence(4)}, ${sentence(5)}, ${sentence(6)} and ${sentence(7)}, never the 25 of the proof row`),
+    'the README gives what the rows of "Without the obstacles" score',
+  );
+  assert.ok(
+    readme.includes(
+      `the rows through the obstacles score ${measured[3]}, ${measured[4]} and ${measured[7]} points, in ${TABLE[3].free.toFixed(1)} s, ${TABLE[4].free.toFixed(1)} s and ${TABLE[7].free.toFixed(1)} s ` +
+        `(the proof rows, which go round: 25 in ${TABLE[3].seconds.toFixed(1)} s, ${TABLE[4].seconds.toFixed(1)} s and ${TABLE[7].seconds.toFixed(1)} s)`,
+    ),
+    'Known limits gives the same numbers',
+  );
 });
 
 test('easy to hard: the shortest times rise from P1 to P8', () => {

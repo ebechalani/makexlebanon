@@ -20,6 +20,14 @@
  * Because it never backs away from an item, "no row found" means "none without leaving an item
  * behind somewhere". The screen says "found", never "possible".
  *
+ * A row it finds never touches an obstacle, with the robot or with an item (lead decision D5: an
+ * item pushed into an obstacle costs 1 point, so a row that did would not score 25). The robot never
+ * enters the square of an obstacle, and only an item between the sticks moves: its far edge is at
+ * most 97 mm ahead of the turning point (its middle 77 mm, half its base 20 mm), and in a turn it
+ * stays inside a circle of 99 mm, the tips of the sticks inside one of 102 mm. An obstacle in a
+ * next square begins 158 mm from the turning point (178 - 20), one in a corner square farther.
+ * solver.test.ts plays its rows in the engine, with the referee of D5, on random own maps.
+ *
  * Plain TypeScript, no DOM: it runs in the browser (the editor) and under Node.
  */
 import { type CardName, type MoveCard, rowSeconds, rowTicks } from './cards';

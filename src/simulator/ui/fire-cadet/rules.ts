@@ -1,14 +1,14 @@
 /**
- * What the "Rules" button of the Fire Cadet simulator shows (design 7.11, changed by lead decision
- * D1 for the obstacles). Two parts, kept clearly apart:
+ * What the "Rules" button of the Fire Cadet simulator shows (design 7.11, changed by lead decisions
+ * D1 and D5 for the obstacles). Two parts, kept clearly apart:
  *
  *   1. CADET_RULES - the organiser's rules in short (txt/rules.txt, "Fire Cadet - Rescue City",
  *      Season 2027) and the organiser's answers: nothing else. No sentence of it begins with
  *      "Here": what the simulator had to choose is never mixed into the rules.
  *   2. CADET_ASSUMPTIONS - "What this simulator assumes": where the rules are open, what the
  *      organiser has not decided yet, and every number the simulator had to choose. Each sentence
- *      stands for one or more assumptions of the design (A1-A14, N1-N24, and D1 of the lead), which
- *      ASSUMPTIONS_SHOWN lists, so rules.test.ts can check that none is missing.
+ *      stands for one or more assumptions of the design (A1-A14, N1-N24, and D1 and D5 of the
+ *      lead), which ASSUMPTIONS_SHOWN lists, so rules.test.ts can check that none is missing.
  *
  * For children of 4 to 7 and their teachers, many of whom read English as a second language: short
  * sentences, plain words, and nothing more certain than the rules or the simulator. Every number
@@ -164,11 +164,11 @@ const S = {
     `It goes back on its own square as soon as nothing is closer to its place than ${cm(f.RESTORE_CLEARANCE)} cm.`,
   neverStuck: 'So the robot never gets stuck on an obstacle. It goes on from where it is.',
   oncePerObstacle:
-    `Only the robot touching an obstacle costs a point: ${f.POINTS_OBSTACLE} point once for each obstacle, however often. ` +
+    `Touching an obstacle costs ${f.POINTS_OBSTACLE} point once for each obstacle, however often it is touched. ` +
     `So ${OBSTACLE_KINDS.length * f.POINTS_OBSTACLE} points at most.`,
   itemAgainst:
-    'Here an item that the robot pushes against an obstacle costs no point: the rules do not say. ' +
-    'But on the real map the robot may not open a blocked road that way.',
+    `Here an item that the robot pushes against an obstacle costs ${f.POINTS_OBSTACLE} point too, as if the robot touched it. ` +
+    'The rules do not say how a referee counts it.',
   closedRoad:
     'While an obstacle is off the map, the robot - or an item it pushes - could go through its square here. ' +
     'On the real map that is not allowed: drive around the obstacles.',
@@ -235,8 +235,9 @@ export const CADET_ASSUMPTIONS: CadetRulesPart = {
 /**
  * Which sentence of part 2 stands for which assumption (design 7.11, the list at its end, with
  * lead decision D1 in place of N17 and N23: an obstacle is put back by the referee, so the robot
- * is never stuck). Every assumption that changes what a child sees has a sentence; the others are
- * in the README with their questions to the organiser.
+ * is never stuck; and D5: an item pushed against an obstacle costs the point too). Every
+ * assumption that changes what a child sees has a sentence; the others are in the README with
+ * their questions to the organiser.
  */
 export const ASSUMPTIONS_SHOWN: Readonly<Record<string, string>> = {
   A1: S.oneSquare,
@@ -264,4 +265,5 @@ export const ASSUMPTIONS_SHOWN: Readonly<Record<string, string>> = {
   N21: S.juniorClock,
   N24: S.wrongPlace,
   D1: S.lifted,
+  D5: S.itemAgainst,
 };

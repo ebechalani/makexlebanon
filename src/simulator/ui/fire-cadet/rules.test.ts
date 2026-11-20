@@ -1,13 +1,16 @@
 /**
- * The Rules window of Fire Cadet (./rules.ts, design 7.11 with lead decision D1) against the game:
+ * The Rules window of Fire Cadet (./rules.ts, design 7.11 with lead decisions D1 and D5) against
+ * the game:
  *   - every number of every sentence is a number of the game - FIRE_CADET or the game's own lists;
  *     a number that is on no list here fails the test. 18.6 cm, the one number of the real robot,
  *     comes from REAL_STEP only;
  *   - part 2 holds a sentence for every assumption that changes what a child sees (with D1 in
- *     place of N17 and N23), and part 1 - the rules - holds no sentence that begins with "Here";
+ *     place of N17 and N23, and D5), and part 1 - the rules - holds no sentence that begins with
+ *     "Here";
  *   - what part 2 says about the obstacles is what the referee and the engine really do, tried on
  *     real matches: the referee lifts a touched obstacle at once and puts it back on its own spot,
- *     the robot goes on, the robot's own touch costs 1 point once, an item's touch costs nothing;
+ *     the robot goes on, and the first touch of each obstacle costs 1 point, by the robot or by an
+ *     item it pushes (D5), however often it is touched;
  *   - rules.ts reaches nothing outside ui/fire-cadet/ and fire-cadet/ (not ../SimulatorApp.tsx);
  *   - the sentences are short.
  *
@@ -104,8 +107,8 @@ test('the numbers are where they belong: each sentence carries the value of its 
   assert.doesNotMatch(code, /18\.6|\b186\b|17\.8|\b0\.8\b/, 'the sizes are written from FIRE_CADET, not typed');
 });
 
-test('part 2 holds a sentence for every assumption a child sees; D1 stands in place of N17 and N23', () => {
-  const required = ['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9', 'A10', 'A11', 'A12', 'A13', 'A14', 'N1', 'N2', 'N3', 'N5', 'N7', 'N9', 'N10', 'N12', 'N21', 'N24', 'D1'];
+test('part 2 holds a sentence for every assumption a child sees; D1 stands in place of N17 and N23, and D5 has its own', () => {
+  const required = ['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9', 'A10', 'A11', 'A12', 'A13', 'A14', 'N1', 'N2', 'N3', 'N5', 'N7', 'N9', 'N10', 'N12', 'N21', 'N24', 'D1', 'D5'];
   assert.deepEqual(Object.keys(ASSUMPTIONS_SHOWN).sort(), [...required].sort());
   const part2 = itemsOf(CADET_ASSUMPTIONS);
   for (const id of required) assert.ok(part2.includes(ASSUMPTIONS_SHOWN[id]), `${id}: ${ASSUMPTIONS_SHOWN[id]}`);
@@ -206,18 +209,22 @@ test('"It goes back on its own square as soon as nothing is near its place": the
   assert.deepEqual([sign.x, sign.y, sign.angle], [d5.x, d5.y, 0]);
 });
 
-test('"Only the robot touching an obstacle costs a point: 1 point once for each obstacle, however often"', () => {
+test('"Touching an obstacle costs 1 point once for each obstacle, however often it is touched"', () => {
   const twice = run(SIGN_AHEAD, 'F3 B3');
   assert.equal(obstacleLine(twice)?.points, -f.POINTS_OBSTACLE, 'two touches of the same sign: 1 point');
 });
 
-test('"An item that the robot pushes against an obstacle costs no point"', () => {
+test('"Here an item that the robot pushes against an obstacle costs 1 point too, as if the robot touched it" (D5)', () => {
   let lifted = false;
   const sim = run(ITEM_INTO_SIGN, 'F4', (s) => {
     if (signOf(s) === undefined) lifted = true;
   });
   assert.ok(lifted, 'the Equipment touched the sign: the referee lifted it');
-  assert.equal(obstacleLine(sim)?.points, 0);
+  assert.equal(obstacleLine(sim)?.points, -f.POINTS_OBSTACLE);
+  // ... once for the sign: the Equipment touches it, the robot backs home (the sign goes back) and
+  // drives into the sign itself
+  const both = run(ITEM_INTO_SIGN, 'F4 B4 F4');
+  assert.equal(obstacleLine(both)?.points, -f.POINTS_OBSTACLE, 'touched again and again: still 1 point');
 });
 
 test('"Here an obstacle always stands in the middle of its square" (on the lattice of the squares, N1)', () => {
@@ -243,11 +250,12 @@ test('part 1, Mini and Junior, says what the rules say: the cards are kept when 
   assert.ok(itemsOf(CADET_RULES).includes(`You play ${ROUNDS} rounds, perhaps on another map each time. Your best score counts. Mini and Junior are ranked apart.`));
 });
 
-test('part 2 never calls an item pushed against an obstacle allowed, and a 71st card is one that could not be finished', () => {
+test('part 2 never calls an item pushed against an obstacle allowed or free, and a 71st card is one that could not be finished', () => {
   const part2 = itemsOf(CADET_ASSUMPTIONS);
   const item = part2.find((s) => /pushes against an obstacle/.test(s));
   assert.ok(item);
-  assert.match(item, /^Here .* costs no point: the rules do not say\. But on the real map the robot may not open a blocked road that way\.$/);
+  assert.equal(item, `Here an item that the robot pushes against an obstacle costs ${f.POINTS_OBSTACLE} point too, as if the robot touched it. The rules do not say how a referee counts it.`);
+  for (const sentence of ALL.filter((s) => /obstacle/i.test(s))) assert.doesNotMatch(sentence, /costs? (no point|nothing)|only the robot touching|for free|not counted/i, sentence);
   assert.ok(part2.some((s) => /or an item it pushes - could go through its square here\. On the real map that is not allowed/.test(s)));
   const cards = part2.find((s) => /cards at most/.test(s));
   assert.ok(cards);

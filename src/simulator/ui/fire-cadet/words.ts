@@ -274,10 +274,7 @@ export const CADET_WORDS = {
     notYet: (name: string): string => `${name}: not yet`,
     touched: (name: string): string => `${name}: touched, ${FIRE_CADET.POINTS_OBSTACLE} point less`,
     notTouched: (name: string): string => `${name}: not touched`,
-    /** only an item touched it: no point here (lead decision D1), but on the real map the road stays closed */
-    pushed: (name: string): string => `${name}: touched by an item. Not allowed on the real map`,
     minus: `-${FIRE_CADET.POINTS_OBSTACLE}`,
-    pushedMark: '!',
   },
 };
 

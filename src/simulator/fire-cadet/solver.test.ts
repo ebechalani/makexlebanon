@@ -5,10 +5,12 @@
  * The survey: the 3,000 random own setups of the design (seed 2027, drawn as P/rev2/survey-rev2.mts
  * drew them, the rules of 5.4). The solver finds no row for 18 of them and a row inside 120 s for
  * 2,925. Every row it finds for the first 300 setups is played in the engine, through the referee
- * of lead decision D1, and must score all 25 points at exactly the planned time. (All 2,925 in the
- * engine take about three minutes: that run is a probe, not part of test:sim. It was run on this
- * code on 19 November: 2,925 of 2,925 scored 25 at the planned time; two of them end exactly at
- * 120.00 s, by the clock - see the last test.)
+ * of lead decisions D1 and D5, and must score all 25 points at exactly the planned time; so must
+ * the rows of 150 other random own maps (seed 7), with no obstacle touched by the robot or by an
+ * item: a row found for 25 points never relies on pushing an item into an obstacle. (All rows in
+ * the engine take minutes: that run is a probe, not part of test:sim - PROBE below. Before D5 it
+ * was run on 19 November with the referee of D1: 2,925 of 2,925 scored 25 at the planned time; two
+ * of them end exactly at 120.00 s, by the clock - see the last test.)
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -117,6 +119,37 @@ test('every row the solver finds for the first 300 setups of the survey scores 2
   }
   assert.ok(played >= 290, `${played} rows played`);
   assert.ok(onMarked >= 20, `${onMarked} with an item on a marked place`);
+});
+
+/*
+ * PROBE, run on this code on 20 November with the referee of D5 (not part of test:sim: about four
+ * minutes for each set): every row the solver finds inside 120 s, played tick by tick in the
+ * engine, as the test below plays them.
+ *   - the 3,000 setups of the survey (seed 2027): 2,925 rows, 2,925 scored 25 at exactly their time;
+ *   - 3,000 other random own maps (seed 7): 2,988 with a row, 2,912 inside 120 s, 2,912 scored 25
+ *     at exactly their time.
+ * In none of the 5,837 matches was an obstacle touched or lifted. Measured by the referee's own
+ * test of a touch (core/geometry.ts obbTouches with a growing margin), an item never came nearer
+ * than 46.38 mm to an obstacle, the robot (body and sticks) never nearer than 40.32 mm; the referee
+ * counts a touch at 0.5 mm (TOUCH_MM).
+ */
+
+test('D5: a row the solver finds never touches an obstacle, with the robot or an item - 150 other random own maps, every row inside 120 s scores 25 in the engine', () => {
+  const setups = ownSetups(150, 7);
+  let played = 0;
+  for (const s of setups) {
+    const row = solve(s);
+    if (row === null || row.ticks > MATCH_TICKS) continue;
+    played++;
+    const result = playFireCadet(cardRowProgram(row.cards), s);
+    const what = `${hyphenated(s)}: ${cardsToText(row.cards)}`;
+    // an obstacle touched by an item the robot pushes costs 1 point (D5): 25 means none was touched
+    assert.equal(result.total, 25, what);
+    assert.equal(Math.round(result.time / FIRE_CADET.SIM_DT), row.ticks, what);
+    const obstacles = result.lines.find((line) => line.id === 'obstacles');
+    assert.deepEqual([obstacles?.points, obstacles?.ok, obstacles?.detail], [0, true, 'No obstacle touched.'], what);
+  }
+  assert.ok(played >= 140, `${played} rows played`);
 });
 
 test('E12: a row that ends at exactly 120.00 s - the match ends by the clock at that tick, and the last look still counts', () => {

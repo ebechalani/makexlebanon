@@ -27,7 +27,7 @@ test('the limits of the sizes (design 0.3): if the organiser sends real sizes th
   assert.ok(
     f.STICK_LENGTH < f.ITEM_BASE,
     `a stick (${f.STICK_LENGTH} mm) must be shorter than an item (${f.ITEM_BASE} mm): otherwise an item pushed against an ` +
-      'obstacle would also be the sticks touching it',
+      'obstacle would also be the sticks touching it (the same 1 point, D5, but the referee would call it the robot\'s touch)',
   );
   assert.equal(frontReach(), 87);
 });
