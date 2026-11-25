@@ -209,8 +209,8 @@ test('what the simulator only assumes is in the second part; the rules part does
     ['the room in a tower', /The cube may be up to 7\.8 mm off the middle towards the opening or the back\. Sideways it has 5 mm on each side: more, and it can catch a side and push the tower away\./],
     ['upright cubes', /A cube always stands upright here\./],
     ['the claw with a cube', /A claw that holds a cube does not fit between the sides\./],
-    ['how to push a cube in', /Let the cube go in front of the tower, move back at least 5 cm, close the empty claw and push the cube in\./],
-    ['the claw inside a tower', /Opening or closing the claw inside a tower pushes the tower\. A real claw would stop\./],
+    ['how to push a cube in', /Let the cube go in front of the tower, move back more than 5 cm, close the empty claw and push the cube in\./],
+    ['the claw inside a tower', /Opening the claw inside a tower pushes the tower\. A real claw would stop\./],
     ['where the cubes start', /Each cube starts in the middle of its marked square\./],
     ['taking the yellow cube', /The robot has taken the yellow cube when its claw holds it, or when the middle of the cube has left its red square\./],
     ['when a delivery counts', /A delivery counts when the letter shows and no part of the robot touches the cube\./],
@@ -348,7 +348,9 @@ test('the claw: with a cube in it, it is too wide for a tower; closed and empty,
   assert.ok(withCube > TOWER_GAP, '"A claw that holds a cube does not fit between the sides."');
   assert.ok(open > TOWER_GAP);
   assert.ok(closed < TOWER_GAP, '"close the empty claw and push the cube in"');
-  // "move back at least 5 cm": the cube is that deep, and the open fingers must come off it before they close
+  // "move back more than 5 cm": the cube is that deep, and the open fingers must come off it before they close (exactly
+  // 5 cm is not always enough: ../../fire-fighter/samples.test.ts, "the trap of its note"; closing the claw around a
+  // support moves nothing, so the window names only opening: ../../fire-fighter/game.test.ts)
   assert.equal(cm(CUBE_SIZE), '5');
   // "the mBot2 of Fire Rescue Junior and Senior", part for part (both screens play with DEFAULT_ROBOT_CONFIG)
   assert.deepEqual(FIRE_FIGHTER_ROBOT, DEFAULT_ROBOT_CONFIG);

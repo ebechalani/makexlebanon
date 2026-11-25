@@ -144,8 +144,8 @@ export const FIRE_FIGHTER_ASSUMPTIONS: RulesPart = {
       title: 'Pushing a cube in',
       items: [
         'A claw that holds a cube does not fit between the sides.',
-        `Let the cube go in front of the tower, move back at least ${cm(CUBE_SIZE)} cm, close the empty claw and push the cube in.`,
-        'Opening or closing the claw inside a tower pushes the tower. A real claw would stop.',
+        `Let the cube go in front of the tower, move back more than ${cm(CUBE_SIZE)} cm, close the empty claw and push the cube in.`,
+        'Opening the claw inside a tower pushes the tower. A real claw would stop.',
       ],
     },
     {

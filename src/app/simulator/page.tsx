@@ -13,8 +13,8 @@ const DESCRIPTION =
   'Program a Makeblock mBot2 with mBlock-style blocks, or lay mTiny coding cards, and watch the robot play a ' +
   'MakeX Lebanon mission in the browser: the Season 2026 category Locker Room (Capelli, ages 13–15) and ' +
   'Warehouse Sort, the beginner mission of the Inspire category (Season 2026), and the 2027 categories ' +
-  'Fire Cadet (mTiny, ages 4–7), Fire Rescue Junior (ages 10–12), Fire Rescue Senior (ages 13–15) and Fire Chief ' +
-  '(ages 14–17). Free, nothing to install.';
+  'Fire Cadet (mTiny, ages 4–7), Fire Fighter (ages 8–10), Fire Rescue Junior (ages 10–12), Fire Rescue Senior ' +
+  '(ages 13–15) and Fire Chief (ages 14–17). Free, nothing to install.';
 
 /**
  * The site's share card (src/app/opengraph-image.tsx). A page that sets its own `openGraph`

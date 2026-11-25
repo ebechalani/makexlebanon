@@ -353,10 +353,11 @@ Both cards show the picture of the Fire Rescue mat, the one the game itself show
 `public/simulator/fire-rescue/mat.webp` (no copy of it next to the new pages).
 
 The same simulator has more games: **Fire Chief** (the maze, ages 14–17), **Warehouse Sort**
-(the beginner mission of the MakeX Lebanon Inspire category, local event) and **Locker Room**
-(Season 2026): see "The Fire Chief simulator", "The Warehouse Sort simulator" and "The Locker
-Room simulator" further down. One more simulator, **Fire Cadet**, is for another robot, the mTiny,
-and has a screen of its own: see "The Fire Cadet simulator". `/simulator` lists the six
+(the beginner mission of the MakeX Lebanon Inspire category, local event), **Locker Room**
+(Season 2026) and **Fire Fighter** (the letter towers, ages 8–10): see "The Fire Chief
+simulator", "The Warehouse Sort simulator", "The Locker Room simulator" and "The Fire Fighter
+simulator" further down. One more simulator, **Fire Cadet**, is for another robot, the mTiny,
+and has a screen of its own: see "The Fire Cadet simulator". `/simulator` lists the seven
 simulators by season — see "The Simulator page" there. Nothing is installed, and the
 student's blocks are saved in their own browser — they are never sent anywhere. The one thing
 the simulator asks the website's server for is the ready-made examples: the server decides,
@@ -455,15 +456,16 @@ the second is only the summary students read. Change both when a rule changes.
 
 ### Member codes for the simulator examples
 
-The simulators have five games with examples: **Fire Rescue** (both pages, Fire Rescue Junior
+The simulators have six games with examples: **Fire Rescue** (both pages, Fire Rescue Junior
 and Fire Rescue Senior, show the same examples: both ask for the game `'fire-rescue'`), **Fire
-Chief** (the maze), **Warehouse Sort** (Inspire, beginner) and **Locker Room** (Capelli Starter,
-Season 2026) for the mBot2, and **Fire Cadet** (Season 2027, ages 4–7) for the mTiny. Each has its own **Examples** window with
+Chief** (the maze), **Warehouse Sort** (Inspire, beginner), **Locker Room** (Capelli Starter,
+Season 2026) and **Fire Fighter** (Season 2027, ages 8–10) for the mBot2, and **Fire Cadet**
+(Season 2027, ages 4–7) for the mTiny. Each has its own **Examples** window with
 ready-made programs (in Fire Cadet: rows of coding cards): seven in Fire Rescue, six in Fire
-Chief, six in Warehouse Sort, six in Locker Room, six in Fire Cadet. In every game the examples
-are in three groups, and there are two kinds of codes:
+Chief, six in Warehouse Sort, six in Locker Room, six in Fire Cadet, six in Fire Fighter. In
+every game the examples are in three groups, and there are two kinds of codes:
 
-| Group | Now in it, in Fire Rescue | Now in it, in Fire Chief, Warehouse Sort, Locker Room and Fire Cadet | Who sees the card | Who can open it |
+| Group | Now in it, in Fire Rescue | Now in it, in Fire Chief, Warehouse Sort, Locker Room, Fire Cadet and Fire Fighter | Who sees the card | Who can open it |
 | --- | --- | --- | --- | --- |
 | **Open to everyone** | the three starter examples | the three starter examples | everybody | everybody, without a code |
 | **For members** | the two intermediate examples | the two intermediate examples | everybody — with a lock and "Members only" | a **member code** or an advanced code |
@@ -474,14 +476,14 @@ So there are three kinds of visitor, and each sees the same in every game:
 - **No code.** Three open cards, two locked ones. Nothing else.
 - **A member code** (one of the 500 you already have). Five open cards. Nothing else.
 - **An advanced code.** All the cards of that game — seven in Fire Rescue, six in Fire Chief,
-  Warehouse Sort, Locker Room and Fire Cadet — under the headings Starter, Intermediate and
-  Advanced.
+  Warehouse Sort, Locker Room, Fire Cadet and Fire Fighter — under the headings Starter,
+  Intermediate and Advanced.
 
-**One set of codes for all five games.** There is no code "for Fire Rescue", "for Fire Chief",
-"for Warehouse Sort", "for Locker Room" or "for Fire Cadet". A member code opens the examples for
-members in every game, and an advanced code opens every example in every game. The codes you have
-already handed out work in Fire Chief, Warehouse Sort, Locker Room and Fire Cadet as they are:
-there is nothing to make and nothing to hand out again. Cancelling a code cancels it in every
+**One set of codes for all six games.** There is no code "for Fire Rescue", "for Fire Chief",
+"for Warehouse Sort", "for Locker Room", "for Fire Cadet" or "for Fire Fighter". A member code
+opens the examples for members in every game, and an advanced code opens every example in every
+game. The codes you have already handed out work in Fire Chief, Warehouse Sort, Locker Room,
+Fire Cadet and Fire Fighter as they are: there is nothing to make and nothing to hand out again. Cancelling a code cancels it in every
 game.
 
 An example of the third group is *hidden*, not locked. A visitor, and a member with an ordinary
@@ -503,7 +505,7 @@ it is typed once per device, and the simulator checks it with the server again o
 
 The code is remembered once for all games. Somebody who typed a code in Fire Rescue — also
 long ago, before Fire Chief existed — finds the examples of Fire Chief, Warehouse Sort, Locker
-Room and Fire Cadet open in the same browser without typing anything, and the other way round. Other tabs of the same browser that
+Room, Fire Cadet and Fire Fighter open in the same browser without typing anything, and the other way round. Other tabs of the same browser that
 have a simulator open follow at once: a code that is accepted in one tab opens the examples in
 the others too (each asks the server what the code opens in its own game). A tab that follows
 stands as it does after a fresh load with that code: what an earlier code had opened there is
@@ -534,7 +536,7 @@ this order, each with its own explanation:
 After any change: save, commit and push. The change is live once Vercel has redeployed.
 
 **Moving an example between the three groups.** Every example has an id; the ids of all
-five games are listed at the top of the file:
+six games are listed at the top of the file:
 
 - Fire Rescue: `'hello'`, `'line-follow'`, `'gripper-demo'`, `'one-bucket'`, `'one-person'`,
   `'smart-bucket'`, `'full-mission'`
@@ -546,10 +548,13 @@ five games are listed at the top of the file:
   `'locker-team-cube'`, `'locker-two-tokens'`, `'locker-whole-mission'`
 - Fire Cadet: `'cadet-three-forward'`, `'cadet-there-and-back'`, `'cadet-turn-around'`,
   `'cadet-two-rescues'`, `'cadet-round-the-sign'`, `'cadet-all-four'`
+- Fire Fighter: `'fighter-first-grab'`, `'fighter-line-to-t'`, `'fighter-yellow-x'`,
+  `'fighter-left-bay'`, `'fighter-right-bay'`, `'fighter-whole-mission'`
 
-Lists 1 and 2 hold the ids of all five games together, one below the other. Every id of Fire
+Lists 1 and 2 hold the ids of all six games together, one below the other. Every id of Fire
 Chief begins with `chief-`, every id of Warehouse Sort with `sort-`, every id of Locker Room
-with `locker-` and every id of Fire Cadet with `cadet-`, so they cannot be mixed up: `'full-mission'` is the full mission of Fire Rescue, `'chief-full-mission'` the one
+with `locker-`, every id of Fire Cadet with `cadet-` and every id of Fire Fighter with
+`fighter-`, so they cannot be mixed up: `'full-mission'` is the full mission of Fire Rescue, `'chief-full-mission'` the one
 of Fire Chief. A line decides about that one example, in its own game, and about nothing in
 another game.
 
@@ -703,13 +708,13 @@ The honest limits:
 npm run test:sim
 ```
 
-It runs about sixteen hundred checks (1,607 in November 2026, with Fire Rescue Junior and Senior); among them,
+It runs about eighteen hundred checks (1,781 in November 2026, with Fire Fighter); among them,
 every example program of every game is played on the real engine with the real referee and its
 score is compared, and every practice map of Fire Cadet is proved. They also check
 `content/simulator-codes.ts` (a misspelt example id, an example that is on both lists, a
 damaged line, a code that is on both lists of codes) and that nothing about an example —
 not even a title — can slip back into what every visitor's browser downloads. It takes
-around a minute and a half (68 to 81 s measured) and must end with `fail 0`. If it does not, do not deploy — a failing
+around a minute and a half (78 to 107 s measured) and must end with `fail 0`. If it does not, do not deploy — a failing
 test means a program would now score differently, a block would behave differently, or an
 example would be shown to somebody who should not see it.
 
@@ -831,8 +836,8 @@ with "Powered by …", the header height.
 
 The simulators have a section of their own on the website: **Simulator** in the menu, between
 Training and Videos, leads to `/simulator`. It is one page (`src/app/simulator/page.tsx`, titled
-"Robot simulators") that lists the six simulators of two robots — Locker Room and Warehouse Sort
-(Season 2026), Fire Cadet, Fire Rescue Junior, Fire Rescue Senior and Fire Chief (Season 2027); Fire Cadet is played with the
+"Robot simulators") that lists the seven simulators of two robots — Locker Room and Warehouse Sort
+(Season 2026), Fire Cadet, Fire Fighter, Fire Rescue Junior, Fire Rescue Senior and Fire Chief (Season 2027); Fire Cadet is played with the
 mTiny, the others with the mBot2 — with one part per season — "Season 2026", then "Season 2027" —
 and in each part one card per simulator: the picture of its mat, its two labels (age group and season, or for a mission
 without an age group its category and level, and its event), its name and two sentences. The
@@ -1292,7 +1297,7 @@ Use only blocks of the Fire Chief palette — blocks that exist in real mBlock. 
 
 Described in full in "Member codes for the simulator examples" above. In short:
 
-- **One address, five games.** Every simulator asks `/api/simulator/unlock`, and each says which
+- **One address, six games.** Every simulator asks `/api/simulator/unlock`, and each says which
   game it is (Fire Rescue Junior and Senior both say `'fire-rescue'`: they show the same
   examples). The answer holds the cards and the programs of that game only, and says the name
   of the game back. A page takes an answer only when it is about its own game: should a tab
@@ -1307,7 +1312,7 @@ Described in full in "Member codes for the simulator examples" above. In short:
   server back.
 - **One set of codes.** A member code opens the member examples of every game, an advanced
   code shows every example of every game. There is nothing to make or to hand out for Fire
-  Chief, Warehouse Sort, Locker Room or Fire Cadet.
+  Chief, Warehouse Sort, Locker Room, Fire Cadet or Fire Fighter.
 - **Typed once.** The browser keeps the code in one place for all games.
 - **The same three groups.** Fire Chief has three starter examples open to everyone, two for
   members and one that only an advanced code shows — and, without such a code, no card, no
@@ -2646,6 +2651,422 @@ Most important first. Each says what the simulator does now.
 
 ---
 
+## The Fire Fighter simulator
+
+The seventh simulator of the site, for the Season 2027 category **Fire Fighter** (ages 8–10,
+mBot2), the mission "Fire Fighter — Fire City". The robot is the mBot2 of Fire Rescue, part for
+part. It starts in the **Fire Station** at the bottom middle of a white mat with black lines. Five
+**cubes** stand on the mat, 5 × 5 cm and 7 cm tall: four red ones on the marked squares of the
+two **pickup bays** (left and right) and a yellow one on the **red square** above the Fire Station.
+Five **letter towers** wait for them: **M** at the school (bottom left), **A** at the hospital
+(bottom right), **K** at the bakery (top right), **E** at the park (top left) and **X** at the
+hydrant in the middle. The robot must put one red cube under each of M, A, K and E, and take the
+yellow cube to X — once it has taken the yellow cube, X must be its next delivery. A cube pushed far
+enough in under a tower makes its letter show: M A K E X. 20 points for each tower, at most 100;
+4 points off for each tower pushed off its picture square. A match lasts 180 seconds. It lives at:
+
+```
+https://www.makexlebanon.com/simulator/fire-fighter
+```
+
+**Which rules.** The organiser's rules "Fire Fighter — Fire City" ("Official Rules, Ages 8–10",
+the Word file `Fire_Fighter_Mission_Rules_1.docx`), whose scoring is headed **"Proposed scoring
+for organizer review"**: the organiser has not confirmed it yet. The simulator plays it as written,
+and the first line of its **Rules** window says "The scoring is a proposal the organiser has not confirmed yet." With the rules came the
+organiser's answers of 20 November 2026: a match lasts **3 minutes** ("the same as Fire Rescue");
+the letters stand **"M bottom left and then counter clockwise"** (with the logo at the top: M bottom
+left, A bottom right, K top right, E top left, X at the hydrant), always the same, no draw; a tower
+is **"Width 10.5 cm length 4 cm"**, and "the extra white is the square where the cube will be posed
+(5×5cm) under the tower". After the design the organiser answered two more of our questions (the
+same day): tower X opens **"Up, toward the hydrant line"**, and the space between a tower's two side
+supports is **"About 6 cm"** — both as the simulator already played them (questions 1 and 2 below).
+The rules file is **not** published on the site: whether it may be, with its proposed scoring, is a
+question for the organiser (question 11). So the category has no download (`content/seasons.ts`
+has no `downloads` for it, and says why), and the Rules window tells the rules in short. The map is
+the organiser's print file `Fire_Fighter1250mm.pdf` (1250 mm); it is not published either. The
+pictures on the stage are made from it.
+
+**The ages.** The rules say 8–10; the organiser's Drive folder of the category is named "8-9 yo".
+The site keeps 8–10, as the organiser said earlier (question 16).
+
+This category is for children of 8 to 10, and many of them and their teachers read English as a
+second language: every text on the screen is short and plain, and says nothing more certain than
+the simulator knows — keep it that way. Everything that is general works as in Fire Rescue and is
+described above: the blocks and their saving, the ruler and the enlarged stage, the examples and
+their codes (one set of codes for all games), the title row with "Powered by …", the header height.
+The block palette is the one of Fire Rescue (Servo, Gripper, Quad RGB, ultrasonic and colour
+sensor, plus the Gripper shortcuts); two hover texts speak of cubes, as Warehouse Sort's do.
+
+### How the game is put together
+
+| File | What is in it |
+| --- | --- |
+| `src/simulator/fire-fighter/field.ts` | Every measure of the print file, each a named constant with its source (MEASURED, ORGANISER, RULE, PICTURE, ASSUMPTION): the 32 black lines (`LINES`, B00 – B31, in the order of the print file), the picture tiles and their colours (`TILES`, `TILE_COLORS`), the towers (`TOWER_WIDTH`, `TOWER_DEPTH`, `TOWER_GAP`, `SUPPORT_WIDTH`, `TOWER_HEIGHT`, `DASHED_SQUARES`, `SIDE_MARKS`, `LETTER_AREA`, `OPENING`, `TOWER_STEMS`, `PICTURE_SQUARES`), the cubes (`CUBE_SIZE`, `CUBE_SQUARES`, `CUBE_HOMES`), and the drawn stand-in of the mat the tests read (`MAT_VECTOR`, 163 layers in the order of the print file; the dashes are written out as the numbers that define them) |
+| `src/simulator/fire-fighter/robot.ts` | The robot: Fire Rescue's mBot2, copied part for part (`FIRE_FIGHTER_ROBOT`); how far its claw reaches past its line sensor (`clawAheadOfLineSensor`, 82 mm); where it starts (`START_POSE`) |
+| `src/simulator/fire-fighter/scenario.ts` | The **one setup** (`RULES_SETUP`, code `MAKEX`): nothing is drawn |
+| `src/simulator/fire-fighter/game.ts` | The game and its referee: the bodies (ten side supports in five rigid groups, five cubes), the zones, the letter flaps, the score sheet and every sentence of the referee. At its top, the open points **F1 – F13** (questions 1 – 13 below), each with the constant behind it |
+| `src/simulator/fire-fighter/play.ts` | Play a program without a screen (`playFireFighter`; the tests use it) |
+| `src/simulator/fire-fighter/sample-catalog.ts`, `samples.ts` | The six examples. They stay on the server (see "Member codes" above) |
+| `src/simulator/ui/fire-fighter/` | What only this game shows: `FireFighterSimulator.tsx` (what the general screen is given), `FireFighterLoader.tsx`, `SetupList.tsx` (the read-only list "The field" in place of the Combination panel), `rules.ts` (the Rules window) and `words.ts` (the screen's words) |
+| `src/app/simulator/fire-fighter/page.tsx` | The page: its address, title and description |
+| `public/simulator/fire-fighter/` | The two pictures of the mat: `mat.webp` (2500 px) is shown, `mat-sensor.webp` (1250 px) is what the line sensor reads |
+
+Its tests: `field.test.ts`, `scenario.test.ts`, `game.test.ts`, `integration.test.ts` and
+`samples.test.ts` in `src/simulator/fire-fighter/`, and `rules.test.ts` and `screen.test.ts` in
+`src/simulator/ui/fire-fighter/`.
+
+The category has a `simulator` entry in `content/seasons.ts`, so the Simulator page shows it in the
+part "Season 2027" (after Fire Cadet, in the order of that file), the menu's dropdown has the line
+"Fire Fighter — Season 2027", the season page labels it "Online simulator", its category page has
+the "Try the Fire Fighter simulator" block, the homepage's 2027 block has "Try the simulator", and
+the Training page's card names it. It has no `menuName` ("Fire Fighter" is short).
+
+What the shared code got for this game. Every change is behind something the other games leave
+out (an optional field, an optional prop, a word), so they run exactly the lines they ran before.
+Their examples were played before and after the change, in two scratch scripts, with the same
+result byte for byte, and every older test still passes (only the tests that count the games were
+changed).
+
+| File | The change |
+| --- | --- |
+| `src/simulator/core/types.ts`, `core/engine.ts`, `core/engine-collide.ts` | **Rigid groups** (`Body.group`): bodies with the same group are one piece made of several boxes — the two side supports of a tower. Whatever pushes one moves all of them by the same amount, what stops one stops all, and they never push each other. A group never turns: the engine's helper that straightens a body between the open fingers leaves its members alone, and so do Fire Cadet's fixed sticks. **Contacts with a member are decided by the side that met**: the side whose gap closed last since everything was apart, not the side of least overlap, so how much room a cube has does not depend on the speed of the robot (with the side of least overlap it was 5.0 mm at 10 RPM and 7 mm at 100 RPM) |
+| `src/simulator/core/types.ts`, `ui/render.ts` | `RefereeProp.labelMm`: how high the letters of a prop's label are, in mm of the mat (the letters on the flaps: 30 mm). Left out, as by every other game: 11 px on the screen, as before |
+| `src/simulator/ui/SimulatorApp.tsx`, `ui/screen-words.ts` | **`fixedSetup`** and the word `scenarioSummary`: a category with one setup and no draw. The title row has no "Test on many …" button, and the field's section shows only the game's own list — no code, no Random, no Default, no code field, no count — with "one setup" beside its heading |
+| `src/simulator/ui/format.ts` | `bodyName`: `cube:red-…` reads "a red cube" in the console ("Picked up a red cube.") |
+| `src/simulator/blocks/palettes.ts` | the palette `'fire-fighter'` |
+
+Their tests: `core/engine-groups.test.ts` (the groups, the guard, the contact rule, a seeded random
+test of approaches near a tower: no tower comes apart or turns), `ui/fire-fighter/screen.test.ts`
+(`fixedSetup`, `labelMm`), `blocks/palettes.test.ts`, `ui/ui-games.test.ts`.
+
+### The field (measured from the print file)
+
+All in mm, origin at the top-left corner of the mat (the side with the MakeX Lebanon logo is the
+top), +y down. Measured from the vectors of the PDF (1 pt = 25.4 / 72 mm) and, for the cubes'
+squares, from the colours of the pictures; `field.test.ts` holds the print file's own numbers (in
+points) and checks every constant against them.
+
+| What | Measure |
+| --- | --- |
+| Mat | 1250 × 1250 (the page is 3543.31 pt = 1250.001 mm), white |
+| Black lines | 25.4 wide (72 pt), RGB 35, 31, 32. An **outer loop**: the left line x 380.633, the right line x 885.339, the top line y 248.748, the bottom line y 1110.412 (hidden under the Fire Station picture); **branches** to the park and the school, the bakery and the hospital, and to the two bays; the **hydrant stem** x 637.700, from the top line down to X's T bar; the **Fire Station stem** x 633.834, from the Fire Station up to the yellow T bar. The yellow square is joined to nothing but the Fire Station stem: X is reached only from the top line |
+| Picture tiles | 250 × 250: E park (top left), K bakery (top right), M school (bottom left), A hospital (bottom right), X hydrant (middle), the **Fire Station** (the start zone, x 503.045 – 753.045, y 985.412 – 1235.412); the two bays 120 × 240; the **yellow square** (the red frame) 100 × 100, x 583.833 – 683.833, y 772.058 – 872.058 |
+| A tower's outline | a white **dashed square**, 60.000 × 60.700 between the centre lines of its 4.939 mm dashes (64.939 × 65.639 to their outer edge, 55.061 × 55.761 to their inner edge), between two dashed **side marks** (40.000 deep to their outer edge); the whole outline is 104.894 wide between the centre lines: the organiser's 10.5 cm. The square sticks out 12.8 mm in front of and behind the side marks |
+| Towers (middles of their dashed squares) | M (128.301, 1114.985), A (1104.762, 1114.985), K (1102.645, 138.214), E (129.856, 138.214), X (633.833, 624.310) |
+| Openings (`OPENING`) | M, A and X to the top, K and E to the bottom: the side their stem comes from (rules §3: "The referee faces each tower opening toward its track"; for X the organiser's answer) |
+| T bars, near edge → tower | M and A 58.95, K 56.63, E 60.37, X 130.05 |
+| Cubes (middles of the boxes around their printed corner brackets) | red: left bay (64.203, 573.689) and (64.338, 697.204), right bay (1175.498, 561.227) and (1175.428, 693.132); yellow (633.713, 827.638), 0.12 left of the Fire Station stem and 5.6 below the middle of its red frame |
+| Robot | 237 × 130 with its claw open; it starts facing up with its middle on the Fire Station stem at (633.834, 1158.912): 6.5 free in front and behind inside the Fire Station, 65.8 on its left, 54.2 on its right |
+| Table around the mat | 100 on every side, the engine's table of every game: the robot and the cubes can leave the mat and stop at its edge |
+
+The drawn stand-in (`MAT_VECTOR`) agrees with the print file to 0.00054 mm. Against the picture the
+line sensor reads, on white and on the lines: 99.5 % the same line or background, 99.35 % the same
+colour name; the line edges lie 0.31 mm apart on average (4.4 mm at most, where a line meets a
+picture). The examples score the same on both. Two things of the print: the **hydrant stem is 3.87
+mm right of the middle of tower X** (a cube pushed along it goes in with 1.13 mm to spare), and the
+lower T bar of the right bay lies 2.1 mm over the bay picture (question 17).
+
+### The tower and the letter
+
+**A tower is two side supports and a flap.** The supports are game elements of 22.5 × 40 × 100
+mm, their inner faces 60 mm apart (the organiser: "about 6 cm"), standing on the side marks of the
+outline; with the organiser's 10.5 cm they are solid, 2.25 cm thick (the rules' photos show thin
+plywood plates: question 2). They have the same `Body.group`, so they slide together as one piece
+and never come apart or turn. They cannot be gripped. The **flap** between them is only drawn (a
+`RefereeProp`: nothing collides with it, no sensor sees it), from 7 cm — the top of a cube — up to
+10 cm; it shows the tower's letter, 30 mm high, while the letter shows, and follows the tower when
+it slides. The 250 × 250 picture tile under a tower is its **picture square**.
+
+**The letter shows** when a cube
+
+1. went into the tower **through its opening** — its stay in the tower began with its middle on the
+   opening's side of the middle of the dashed square (a cube that goes in from the back never
+   counts: tower X opens to the top, so the straight way from the yellow square into X's back
+   scores nothing, and the score sheet and the console say why);
+2. stands on the mat: not held, on nothing;
+3. has its **whole base inside the white dashed square, measured to the outer edge of its dashes**
+   (`LETTER_AREA`), where the tower now stands. The dashed line counts as inside.
+
+What that leaves, measured in the engine (`game.test.ts`, `field.test.ts`):
+
+| | Room |
+| --- | --- |
+| Along the opening | the cube's middle up to **7.8 mm** off the middle of the square, towards the opening or the back (7.8 mm: the letter shows; 7.9 mm: it does not) |
+| Across | **5.0 mm** on each side: the supports are 60 mm apart. 5.00 mm off goes in; 5.05 mm catches the front of a support and pushes the tower away (tower X 45.02 mm), at 10, 20, 50 and 100 RPM alike |
+| Turned | a cube pushed straight in by the closed claw: 9.5° goes in (the tower is nudged 3.3 mm sideways), 10° pushes the tower |
+| From the back | never |
+
+**The claw does not fit with a cube.** The open claw is 80 mm wide outside, 66 mm on a cube and 36
+mm closed and empty; the supports are 60 mm apart. So a delivery is: let go about 1 cm before the
+tower, back off **more than 5 cm**, close the empty claw, push the cube in, back off. (Measured: a
+cube that sits exactly in the middle of the claw comes free after 5.0 cm; at 4.95 cm or less the
+closing claw takes hold of it again and the robot carries it back out — no points. The yellow
+cube of the examples sits 0.026 mm deeper in the claw, so for it 5.0 cm is not enough and 5.05 cm
+is.)
+
+**The claw against a support.** The engine has no motor that stalls. Opening the claw 15 mm inside
+an empty tower pushes the tower 15.7 mm along its opening. Closing it around one support stops
+against the support and moves nothing; a turn afterwards drags the tower along, by (−22.1, 20.7)
+mm. A real claw would stop. A centred cube sticks out 5 mm in front of the 40 mm tower, so the
+closed claw's tips never get inside in a normal delivery.
+
+**The T bars of the corner towers come too late for this robot.** Its claw reaches 82 mm further
+ahead than its line sensor (finger tips 167 mm, sensor 85 mm ahead of the axle), but the T bars of
+M, A, K and E lie only 56.6 – 60.4 mm before their towers: a robot that stops when its sensor sees
+the bar has its claw 21.6 – 25.4 mm inside the tower already. At X the bar lies 130 mm before the
+tower, and works (question 6).
+
+**Tower A is within reach of the right line.** A robot with its middle on the right line that faces
+right has its claw tips 0.08 mm inside tower A's left support, and a turn on the spot there, between
+y 1055 and 1175, sweeps the open claw (radius 171.7 mm) up to 4.8 mm into tower A. On the left the
+same moves clear tower M by 28 mm or more. That holds for the simulator's solid 10.5 cm tower
+(question 2). The examples turn only where the sweep of the claw stays at least 5 mm clear of every
+tower (`samples.test.ts` checks it): the bay examples drive 13 cm up before they turn towards the
+right line.
+
+### The referee
+
+| Line | Points | When |
+| --- | --- | --- |
+| M · school: a red cube | 20 / 0 | at the end: a red cube under M whose letter shows, and no part of the robot touches it |
+| A · hospital: a red cube | 20 / 0 | the same |
+| K · bakery: a red cube | 20 / 0 | the same |
+| E · park: a red cube | 20 / 0 | the same |
+| X · hydrant: the yellow cube, as the next delivery | 20 / 0 | at the end: the yellow cube under X whose letter shows, no part of the robot touches it, and X was the robot's next delivery after it took the yellow cube |
+| Towers on their picture squares | 0, −4 per tower | at the end, for each tower whose 105 × 40 mm base, where it now stands, no longer touches its picture square: 0 for that tower's line and 4 points off, once per tower. Touching the edge is enough (rules §7.2); a tower pushed off and back counts as on its square |
+
+**Each tower is judged once, at the end**, with the field as it lay at the last moment of the match.
+A cube counts for the tower whose letter it shows; a cube of the wrong colour (the yellow one under M,
+a red one under X) scores 0, and the sheet says which cube the tower needs. A cube the robot still
+holds, or still touches (within 0.5 mm), scores 0: the robot must move clear. Highest score 100, and a
+robot can reach it (the advanced example). The total is never below 0.
+
+**A delivery** is the first moment, during one **stay** of a cube in a tower (the time its base
+overlaps the space between the two supports without leaving it), at which the letter shows because
+of that cube and no part of the robot is within 0.5 mm of it. At most one per stay: touching or
+nudging a cube that is already under a tower makes no new delivery; a cube taken out from between
+the supports and pushed in again makes one. A cube of the wrong colour makes a delivery too.
+
+**The yellow cube.** The robot has **taken** it at the first moment its claw holds it, or its
+middle has left its red square. Whether X is "the next delivery" is decided once, by the first
+delivery from that moment on: the yellow cube at X — yes; anything else, the yellow cube under
+another tower too — no, for the rest of the match. Deliveries before the robot took the yellow cube
+do not matter. While it is still open, the status line above the stage says "The robot took the
+yellow cube: X must be its next delivery."
+
+**The sentences.** Every line of the score sheet says why it scores or not ("A red cube is under
+tower K and the letter K shows.", "A cube is at the entrance of tower M: push it farther in, inside
+the white dashed square.", "A cube went in from the back of tower X. Tower X opens to the top: a cube
+counts only when it goes in from there.", "The yellow cube is under X, but X was not the robot's next
+delivery after it took the yellow cube: first a red cube went under tower M (0:41.2)."); while the
+match runs a line can say "… It counts once the robot has moved clear.", on the closed sheet "… when
+the match ended: it does not count." The console says each moment once: the yellow cube taken, a
+delivery, the yellow cube no longer able to score, a cube in from the back, a tower off its picture
+square. The summary of the closed sheet reads, for example, "20 / 100 points · 1 of 5 deliveries".
+
+**The end.** The match ends at 180 s, with "Finished", or when the program has ended and the robot
+stands still (as in the other mBot2 games: a convention of the simulator, not a rule). It does not
+end early when all five letters show: the robot must still move clear. There is **no Restart
+button**: the rules name no restarts, and the Rules window says "The rules say nothing about
+restarts." The rules give no rule about how many runs a team has; the simulator plays one.
+
+### The examples, as measured
+
+Six examples in `src/simulator/fire-fighter/samples.ts`, measured by `samples.test.ts` on the vector
+mat and on the picture the browser reads (the same on both). All drive by distance ("move forward …
+cm", "turn … °", 50 RPM), but the line follower. In every one no tower moves by 0.01 mm or more, no
+cube moves before the claw takes it, the robot never bumps a tower, and every scoring cube goes in
+through its tower's opening and ends within 0.1 mm of the middle of its square. How a cube goes into
+a tower is the same at every tower (the my-block **"slide the cube in"** in the intermediate and
+advanced examples, written out block by block in the third starter): let go 1 cm before the tower,
+back off 5.5 cm, close the claw, forward 6 cm, back 6 cm, open the claw.
+
+| Id | Level | Title | What it does | Points | Deliveries | Ends at |
+| --- | --- | --- | --- | --- | --- | --- |
+| `fighter-first-grab` | starter | First grab: the yellow cube | drives 18.93 cm, takes the yellow cube, lifts it, the LEDs turn yellow, the screen says "I have the yellow cube" | 0 (it holds the cube at the end) | — | 2.32 s |
+| `fighter-line-to-t` | starter | Line follower to the T | drives 11 cm (past the Fire Station picture), follows the Fire Station stem up to the T, 3.14 cm more, takes the yellow cube | 0 | — | 1.54 s, at y 969.36 |
+| `fighter-yellow-x` | starter | Yellow cube under the X tower | takes the yellow cube, drives round the hydrant picture and comes down the hydrant line into X | 20 | X 11.67 s | 12.41 s |
+| `fighter-left-bay` | intermediate | Two red cubes: park and school | the two red cubes of the left bay to E and M | 40 | E 15.27 s, M 29.46 s | 30.20 s |
+| `fighter-right-bay` | intermediate | Two red cubes: bakery and hospital | the two red cubes of the right bay to K and A | 40 | K 14.76 s, A 28.24 s | 28.98 s |
+| `fighter-whole-mission` | advanced | The whole Fire Fighter mission | the yellow cube to X first, then the left bay to E and M, the right bay to A and K | **100** | X 11.67, E 25.33, M 39.52, A 55.43, K 68.91 s | 69.65 s |
+
+The "Try"s, measured too: the first starter with 15 cm or 16.25 cm catches nothing (from 16.5 cm it
+catches the cube); the line follower moved 10 mm to the side, turned up to 6° (the most the Fire
+Station allows where the robot stands), or both, still takes the cube (15 mm to the side works on the
+drawing but not on the picture; 20 mm fails on both). Started after only 8 cm, it sees a "T" in the
+Fire Station picture and stops at once; from 9 cm it works. The bay examples drive 13 cm up before
+they turn: with 10 cm or less the turn on the right line pushes tower A (0.58 mm at 10 cm, 4.0 mm at
+8 cm).
+
+**A start that is moved or turned is not made up for** — the examples drive by distance. Tried in
+steps of 0.5 mm and 0.1°, each keeps its points only for a start
+
+| Example | left / right | up / down | turned |
+| --- | --- | --- | --- |
+| `fighter-yellow-x` | 5.0 mm left … 4.5 mm right | 4.5 mm up … 6.5 mm down | 0.5° either way |
+| `fighter-left-bay`, `fighter-right-bay` | 4.5 mm either way | 6.5 mm either way | 0.2° either way |
+| `fighter-whole-mission` | 4.5 mm either way | 4.5 mm up … 6.5 mm down | 0.2° either way |
+
+and one step further it loses points ("down" stops at 6.5 mm: the Fire Station leaves no more room).
+The screen moves the robot in steps of 5 mm and turns it in steps of 1°; one such step:
+
+| Example | 5 mm left | 5 mm right | 5 mm up | 5 mm down | 1° left | 1° right |
+| --- | --- | --- | --- | --- | --- | --- |
+| `fighter-yellow-x` | 20 | 0 (X pushed 45.0 mm) | 0 | 20 | 0 (X pushed 45.5 mm) | 0 (X pushed 45.5 mm) |
+| `fighter-left-bay` | 0 (E pushed) | 20 (M pushed) | 40 | 40 | 0 | 0 (E pushed 3.4 mm) |
+| `fighter-right-bay` | 0 (A and K pushed) | 0 | 40 | 40 | 0 (K pushed) | 0 |
+| `fighter-whole-mission` | 20 | 20 | 80 (no X) | 100 | 0 | 0 |
+
+**The back-off trap.** In the third starter, backing off exactly 5.0 cm before closing the claw
+scores 0: the claw grabs the yellow cube a second time and the robot pulls it out of the tower ("No
+cube under tower X."); 5.05 cm scores 20 (the cube sits 0.026 mm deeper than the middle of the claw,
+see above; `samples.test.ts` pins it). That is also why "5 mm up" gives 0 for the third starter and
+80 for the advanced one. The texts and the notes say "Back off more than 5 cm before you close the
+claw". (The design had expected a pinched cube and a claw that stays open; measured, the claw grabs
+the cube again, and the tower moved only when the back-off was shortened and the 6 cm push kept.)
+
+Every block is one of the Fire Fighter palette; all six load in the block editor, and a saved
+workspace plays the same result. The three starters are open to everyone, the two intermediate ones
+need a member code, the advanced one is shown to advanced codes only (`content/simulator-codes.ts`).
+On a real robot all of them will drift: a real robot has to find the black lines again on its way
+(following the lines on the long legs would make them robust; not done).
+
+### What this simulator assumes
+
+The second part of the **Rules** window, "What this simulator assumes", tells a child or a teacher
+what they can notice (`src/simulator/ui/fire-fighter/rules.ts`; `rules.test.ts` checks every number
+of every sentence against the game's constants). Its note says that these are choices of the
+simulator, not rules, except what the organiser gave: the tower's size and the room between its
+sides. The whole list, with the open point of `game.ts` (F1 – F13) and the question below that
+would settle it:
+
+| # | What the simulator does | Who decided |
+| --- | --- | --- |
+| F1 | Tower X opens to the top, towards the hydrant line; M and A open to the top, K and E to the bottom (towards their stems). A cube that goes in from the back does not count, and the sheet and the console say why. (`OPENING`) | **the organiser** ("Up, toward the hydrant line"); the corner towers: the rules ("toward its track") and the map |
+| F2 | The two sides of a tower stand 60 mm apart; with the 10.5 cm width they are solid, 22.5 mm thick; a cube in the middle has 5 mm on each side. (`TOWER_GAP`, `SUPPORT_WIDTH`) | **the organiser** ("About 6 cm"); the thickness follows from it, solid sides are our choice (the photos show thin plates: question 2) |
+| F3 | A tower is 10 cm high; the flap with the letter is drawn from 7 cm up, and nothing collides with it. The lever a real cube pushes is not simulated: the letter follows the rule above. (`TOWER_HEIGHT`, `FLAP_BOTTOM`) | assumption (question 3) |
+| F4 | The letter shows when the whole base of the cube is inside the white dashed square, measured to the outer edge of its dashes; a cube pushed 8 mm or more past the middle towards the back does not show it either. (`LETTER_AREA`) | assumption (question 4) |
+| F5 | A claw that holds a cube (66 mm) is too wide for the 60 mm between the sides: the robot lets go and pushes the cube in with the closed claw (36 mm). Opening the claw inside a tower pushes the tower (no motor stalls here). | follows from F2 (the organiser's answer says the same); still asked (question 5) |
+| F6 | The claw reaches 8.2 cm further than the line sensor: at M, A, K and E the T bar is so close to the tower that the claw would already be inside the tower when the sensor sees the bar. (`clawAheadOfLineSensor`, `TOWER_STEMS`) | the robot and the map (question 6) |
+| F7 | The robot has taken the yellow cube when its claw holds it, or when the middle of the cube has left its red square. (`YELLOW_SQUARE`) | assumption (question 7) |
+| F8 | A delivery: a cube under any tower with its letter showing and the robot clear of it — also under the wrong tower, so the yellow cube under K first breaks the yellow rule. Touching or nudging a cube already under a tower is not a new delivery; taking it out and pushing it in again is. | assumption (question 8) |
+| F9 | A cube the robot still touches at the end scores 0: "move clear" is read as "no longer touching" (0.5 mm). (`TOUCH_MM`) | assumption (question 9) |
+| F10 | A tower that moved but still touches its picture square keeps its 20 points; its letter is judged where it now stands. | the rules (§7.2) (question 10) |
+| F11 | The scoring is the rules' "Proposed scoring for organizer review", played as written; no rules file on the site. (`DELIVERY_POINTS`, `MOVED_TOWER_PENALTY`, `MAX_SCORE`) | the rules (question 11) |
+| F12 | No restarts, no Restart button. | the rules name none (question 12) |
+| F13 | The robot starts inside the Fire Station, at first facing up with its middle on the Fire Station stem; a student may move and turn it inside the Fire Station picture. (`START_POSE`) | assumption (question 13) |
+| — | Each cube starts in the middle of its marked square, upright and square to the mat. (`CUBE_HOMES`) | assumption (question 14) |
+| — | A support weighs as much as a cube: a robot that bumps a tower slides it. (`TOWER_MASS`) | assumption (question 15) |
+| — | A tower can slide but never turns and never falls over; a cube always stands upright (the engine cannot turn or tip things: the rules' "A tower may slide or turn" is half simulated). | the engine |
+| — | The match also ends with "Finished", or when the program has ended and the robot stands still. | the simulator, as in the other mBot2 games |
+| — | A referee's judgement by eye is not simulated: the simulator measures every cube to the millimetre. | the simulator |
+
+### Questions for the organiser
+
+Each says what the simulator does now; questions 1 and 2 are answered. The list F1 – F13 at the top
+of `src/simulator/fire-fighter/game.ts` names the constant behind questions 1 – 13.
+
+1. **Which way does tower X face, and can a cube go in from the back? — Answered by the
+   organiser** (F1, `OPENING`): "Up, toward the hydrant line." The cube slides into X from the
+   hydrant's black line, so the robot goes round and comes down the hydrant line. A cube pushed in
+   from the back — from the yellow square below — does not count: the letter does not show, and the
+   sheet and the console say why. That is what the simulator did before the answer; nothing changed.
+2. **The space between a tower's two side supports — Answered by the organiser** (F2, `TOWER_GAP`,
+   `SUPPORT_WIDTH`): "About 6 cm", as the white square printed on the map. A gripper that holds a
+   cube does not fit, so the robot lets go and pushes the cube in — as the simulator already did
+   (60 mm, 5 mm of room on each side of the cube). Still open about the tower, if it matters: the
+   rules' photos show thin plywood plates, and a cube that almost fills the gap between them, where
+   the simulator has solid sides 2.25 cm thick (with the organiser's 10.5 cm). Thin sides would
+   change where the robot can turn near tower A ("The tower and the letter" above). And are the
+   cube's edges rounded enough to guide it in when it is a little off the middle?
+3. **The tower's height** (F3, `TOWER_HEIGHT`): the simulator assumes 10 cm. Is the flap high
+   enough for a 7 cm cube, and how low does its lever hang?
+4. **When does the letter show?** (F4, `LETTER_AREA`) The white dashed square can be read three
+   ways: its inner edge (55.1 × 55.8 mm: 2.5 mm of room across, 2.9 along), its centre line
+   (60.0 × 60.7 mm: 5.0 / 5.35) or its outer edge (64.9 × 65.6 mm: 7.47 / 7.82). The simulator takes
+   the outer edge, the dashed line included. Which does a referee use? And: a cube pushed past the
+   middle, towards the back (8 mm or more) — does the letter still show? The simulator: no.
+5. **The robot's gripper and the supports** (F5): a gripper that holds a cube from both sides does
+   not fit the 6 cm gap. Is that intended — must the robot push the cube in? (The rules say "Slide
+   the cube between the two side supports … Release the cube".) The organiser's answer to question 2
+   says the robot lets go and pushes the cube in; whether that is the intended way is still asked.
+6. **The T bars at M, A, K and E** (F6): with a claw like the simulator's mBot2 (8.2 cm ahead of the
+   line sensor), the claw would be 2.2 – 2.5 cm inside the tower when the sensor reaches the bar.
+   Are the bars meant as the place to stop?
+7. **"Collect" the yellow cube** (F7): picking it up only, or also pushing it off its square? The
+   simulator: either.
+8. **What is a delivery?** (F8) The simulator: a cube under any tower with its letter showing and
+   the robot no longer touching it — also a cube under the wrong tower (the rules: "A cube at the
+   wrong tower must be moved"), so the yellow cube put under K first breaks the yellow rule. Touching
+   or nudging a cube that is already under a tower is not a new delivery; taking it out and pushing
+   it in again is. Is that how a referee counts "before making another delivery"?
+9. **A cube the robot still touches at the end** (F9): the simulator scores it 0 (it reads "move
+   clear" as "no longer touching"). Right?
+10. **A tower that moved but still touches its picture square, with a correct cube under it**
+    (F10): 20 points (the rules: "A correct delivery can still earn all 20 points"). The simulator
+    judges the letter where the tower now stands.
+11. **The rules file** (F11): may the website publish it on the category page? It says "Proposed
+    scoring for organizer review". Until then the Rules window says "The scoring is a proposal the
+    organiser has not confirmed yet", and no file is linked.
+12. **Restarts** (F12): the rules name none. The simulator has no Restart button.
+13. **The start** (F13): anywhere inside the Fire Station tile, facing any way? The simulator puts
+    the robot facing up on the black line, and lets a student move it inside the tile.
+14. **The cubes' places**: in the middle of each marked square? The yellow cube in the middle of the
+    red corner marks (5.6 mm below the middle of its red frame)?
+15. **The towers' weight** (`TOWER_MASS`): a robot that bumps a tower makes it slide in the
+    simulator. Are the real towers light enough to slide? Fixed to the mat?
+16. **The ages**: the rules say 8–10, the Drive folder "8-9 yo"; the site keeps 8–10 (as the
+    organiser said earlier).
+17. **The map**: the hydrant stem is 3.87 mm right of the middle of tower X (in the simulator a cube
+    that follows it has 1.13 mm to spare), and the lower T bar of the right bay lies 2.1 mm over the
+    bay picture. Intended?
+
+### What to change, and where
+
+| To change … | Change … |
+| --- | --- |
+| a measure of the field (a line, a tile, a tower, a cube's square) | its constant in `src/simulator/fire-fighter/field.ts`, with its source; `field.test.ts` compares the print file's numbers. The game, the Zones view, the Rules window and the field list read it from there |
+| which way a tower opens | `OPENING` in `field.ts`, one value per tower (F1). The referee and the Rules window follow by themselves; the examples that use that tower must take another route: `samples.test.ts` fails first |
+| the room between a tower's sides, or its size | `TOWER_GAP`, `TOWER_WIDTH`, `TOWER_DEPTH` in `field.ts` (`SUPPORT_WIDTH` follows); `TOWER_HEIGHT`, `FLAP_BOTTOM` for the heights. Then measure the examples again (`samples.test.ts`) and the numbers of "The tower and the letter" |
+| when the letter shows | `LETTER_AREA` in `field.ts` (F4); the referee's `letterShows()` in `game.ts` |
+| a rule the organiser decides | the constant or the referee in `game.ts` (its list F1 – F13 says which), then the sentence in `src/simulator/ui/fire-fighter/rules.ts` — its test compares every number with the constants. Move a sentence from "What this simulator assumes" into the rules part once it is decided, mark it as the organiser's answer, and change the lists here |
+| the points, the penalty, the match time | `DELIVERY_POINTS`, `MOVED_TOWER_PENALTY`, `MATCH_DURATION` in `game.ts` (`MAX_SCORE` follows) |
+| a sentence of the referee | `game.ts` (`SAY`, the score sheet's lines); `game.test.ts` holds each one |
+| a word of the screen | `src/simulator/ui/fire-fighter/words.ts`; the list "The field": `SetupList.tsx` |
+| an example | `samples.ts` (and `sample-catalog.ts` for a new id, title or level), `samples.test.ts`, the tables here; the id begins with `fighter-`. Then its group in `content/simulator-codes.ts` and the same lines in `scripts/generate-simulator-codes.mjs`. Do not write the title of an example, or a sentence of its text, anywhere else: the guard (`client-guard.test.ts`) fails. The screens say "tower X", never "the X tower" (a title says that), and never "Two red cubes" or "First grab" |
+| the text on the cards that lead to it, the category's name and ages | the `simulator` entry of the category `fire-fighter` in `content/seasons.ts` |
+| the rules file, once the organiser allows it | put it in `public/downloads/` and add a `downloads` entry to the category in `content/seasons.ts` ("Rules, scoresheets and other downloads" above); take the sentence "No `downloads`" out of its comment and change the test "Fire Fighter: … no download" in `src/simulator/ui/site-section.test.ts`; the Rules window can then link it (`rulesNoteLink`, as Locker Room's does) |
+
+A game with rigid groups must not put bodies back with a restart or move them with
+`RefereeCall.removeBodies` / `restoreBodies`: those move one member of a group alone (the comment
+of "Rigid groups" in `core/engine.ts` says so). Fire Fighter has no restarts and removes nothing.
+
+### Known limits of Fire Fighter
+
+- **The scoring is a proposal** (question 11), and many points of the rules are open (the list
+  above); every choice is in the second part of the Rules window.
+- **The robot is perfect** — no wheel slip, no sensor noise. The examples drive by distance: here
+  they score exactly, on a real robot they will drift. Turned 1° at the start, the scoring ones lose
+  everything ("The examples, as measured").
+- **A tower slides but never turns or tips**, and a cube never tips: the engine moves a pushed thing
+  straight. The rules' "A tower may slide or turn" is half simulated.
+- **The claw does not stall** against a support: opened inside a tower it pushes the tower, and a
+  claw closed around a support drags the tower when the robot turns ("The tower and the letter").
+- **The flap is only drawn**: a raised claw would pass through it, and the letter follows the
+  rule of "The tower and the letter", not a lever a cube lifts.
+- **The sides of a tower are solid**, 2.25 cm thick (the rules' photos show thin plates: question
+  2): where the robot can turn near tower A depends on it.
+- **The pictures on the mat** are read by the line sensor from the picture in the browser: the
+  Fire Station picture has dark spots that read as a line (the line follower drives 11 cm before it
+  looks). Most tests read the drawn stand-in, in which a picture is one flat colour; the examples
+  are played on the picture too.
+- **Not simulated**: a referee's judgement by eye (every cube is measured to the millimetre), the
+  rounds and how many runs a team has, the real flap's lever.
+- **Not tried on a real phone or Safari**, nor with a screen reader: the page was checked in
+  Chromium only, at 1440 and 390 px wide.
+
+---
+
 ## Deploying
 
 The site is designed for Vercel, the same platform already hosting the 2026 team portal.
@@ -2797,7 +3218,7 @@ content/            All editable text and data
 public/
   gallery/          Competition photos, by year and category
   downloads/        Rules, scoresheets, STL archives
-  simulator/        Pictures of the five mats, for the simulators (Fire Rescue Junior and Senior share one)
+  simulator/        Pictures of the six mats, for the simulators (Fire Rescue Junior and Senior share one)
 scripts/
   fetch-legacy-assets.mjs
   generate-simulator-codes.mjs   Makes new member codes for the simulator
@@ -2805,5 +3226,5 @@ src/
   app/              Pages and routing
   components/       Header, Footer, Gallery, shared UI
   lib/gallery.ts    Reads the photo folders
-  simulator/        The simulators: Fire Rescue Junior and Senior, Fire Chief, Warehouse Sort, Locker Room (mBot2) and Fire Cadet (mTiny) (see their sections above)
+  simulator/        The simulators: Fire Rescue Junior and Senior, Fire Chief, Warehouse Sort, Locker Room, Fire Fighter (mBot2) and Fire Cadet (mTiny) (see their sections above)
 ```

@@ -673,6 +673,10 @@ describe('the examples stay on the server', () => {
       'src/simulator/ui/fire-cadet/MatchBar.tsx',
       'src/simulator/ui/fire-cadet/PlanningClock.tsx',
       'src/simulator/ui/fire-cadet/RulesWindow.tsx',
+      // Fire Fighter: its loader, its screen (the general one, filled with this game) and its list of the one setup
+      'src/simulator/ui/fire-fighter/FireFighterSimulator.tsx',
+      'src/simulator/ui/fire-fighter/FireFighterLoader.tsx',
+      'src/simulator/ui/fire-fighter/SetupList.tsx',
     ]) {
       assert.ok(roots.client.includes(screen), `${screen} begins with 'use client'`);
     }
@@ -683,6 +687,7 @@ describe('the examples stay on the server', () => {
       ['src/app/simulator/fire-chief/page.tsx', 'src/simulator/ui/fire-chief/FireChiefLoader.tsx', 'src/simulator/ui/fire-chief/FireChiefSimulator.tsx', 'src/simulator/fire-chief/game.ts'],
       ['src/app/simulator/warehouse-sort/page.tsx', 'src/simulator/ui/warehouse-sort/WarehouseSortLoader.tsx', 'src/simulator/ui/warehouse-sort/WarehouseSortSimulator.tsx', 'src/simulator/warehouse-sort/game.ts'],
       ['src/app/simulator/locker-room/page.tsx', 'src/simulator/ui/locker-room/LockerRoomLoader.tsx', 'src/simulator/ui/locker-room/LockerRoomSimulator.tsx', 'src/simulator/locker-room/game.ts'],
+      ['src/app/simulator/fire-fighter/page.tsx', 'src/simulator/ui/fire-fighter/FireFighterLoader.tsx', 'src/simulator/ui/fire-fighter/FireFighterSimulator.tsx', 'src/simulator/fire-fighter/game.ts'],
     ]) {
       assert.ok(roots.pages.includes(page), page);
       const fromPage = reachableFrom(graph, page);
@@ -773,6 +778,20 @@ describe('the examples stay on the server', () => {
       'src/simulator/ui/fire-cadet/planning-clock.ts',
     ]) {
       assert.ok(cadetScreen.has(file), `the Fire Cadet screen -> ${file}`);
+    }
+    // ... and so has the Fire Fighter screen: its words, its rules window, its list of the one setup ("The field"),
+    // and the field, the robot and the game it plays (field.ts and game.ts are reached by the page: neither may
+    // import a list of examples or an example - the loop over the pages above checks that)
+    const fighterScreen = reachableFrom(graph, 'src/simulator/ui/fire-fighter/FireFighterSimulator.tsx');
+    for (const file of [
+      'src/simulator/ui/fire-fighter/words.ts',
+      'src/simulator/ui/fire-fighter/rules.ts',
+      'src/simulator/ui/fire-fighter/SetupList.tsx',
+      'src/simulator/fire-fighter/field.ts',
+      'src/simulator/fire-fighter/robot.ts',
+      'src/simulator/fire-fighter/game.ts',
+    ]) {
+      assert.ok(fighterScreen.has(file), `the Fire Fighter screen -> ${file}`);
     }
     // the page that lists the simulators is a page of the website like any other
     assert.ok(roots.pages.includes('src/app/simulator/page.tsx'));
