@@ -98,6 +98,8 @@ export function inkOn(c: RGB): string {
  * "wall:A1-B1" -> "the wall between A1 and B1", "wall:top" -> "the top wall".
  * Locker Room: "cube:team-red" -> "the RED team cube", "token:A" -> "the token of zone A",
  * "wall:gate" -> "the stadium gate" (no other game has bodies with such names).
+ * Fire Fighter: its four red cubes are alike ("any red cube"), so "cube:red-left-upper" ... ->
+ * "a red cube"; "cube:yellow" -> "the yellow cube"; a side support "tower:K:left" -> "tower K".
  */
 export function bodyName(bodyId: string, tableEdge = 'the table wall'): string {
   if (bodyId === 'wall') return tableEdge;
@@ -105,6 +107,7 @@ export function bodyName(bodyId: string, tableEdge = 'the table wall'): string {
   if (!name) return bodyId;
   if (kind === 'tower') return `tower ${name}`;
   if (kind === 'cube' && /^team-[a-z]+$/.test(name)) return `the ${name.slice(5).toUpperCase()} team cube`;
+  if (kind === 'cube' && /^red-(left|right)-(upper|lower)$/.test(name)) return 'a red cube';
   if (kind === 'token') return `the token of zone ${name}`;
   if (kind === 'wall' && name === 'gate') return 'the stadium gate';
   if (kind === 'wall') {

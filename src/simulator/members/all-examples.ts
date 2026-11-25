@@ -4,8 +4,9 @@
  * levels. This is what the server hands out from (see ./unlock.ts).
  *
  * Server only. This file brings the samples.ts and the sample-catalog.ts of every game along
- * (../fire-rescue, ../fire-chief, ../warehouse-sort, ../locker-room and ../fire-cadet), so nothing
- * of the simulator screen may import it (a test, ./client-guard.test.ts, watches over this).
+ * (../fire-rescue, ../fire-chief, ../warehouse-sort, ../locker-room, ../fire-cadet and
+ * ../fire-fighter), so nothing of the simulator screen may import it (a test,
+ * ./client-guard.test.ts, watches over this).
  *
  * A game is named here the way its page names it when it asks the server ("game" in the
  * request), which is also the id of the game in its game.ts.
@@ -19,6 +20,8 @@ import { EXAMPLE_LEVELS as FIRE_CADET_LEVELS, SAMPLE_CATALOG as FIRE_CADET_CATAL
 import { getSampleProgram as fireCadetProgram } from '../fire-cadet/samples';
 import { EXAMPLE_LEVELS as FIRE_CHIEF_LEVELS, SAMPLE_CATALOG as FIRE_CHIEF_CATALOG } from '../fire-chief/sample-catalog';
 import { getSampleProgram as fireChiefProgram } from '../fire-chief/samples';
+import { EXAMPLE_LEVELS as FIRE_FIGHTER_LEVELS, SAMPLE_CATALOG as FIRE_FIGHTER_CATALOG } from '../fire-fighter/sample-catalog';
+import { getSampleProgram as fireFighterProgram } from '../fire-fighter/samples';
 import { EXAMPLE_LEVELS as FIRE_RESCUE_LEVELS, SAMPLE_CATALOG as FIRE_RESCUE_CATALOG } from '../fire-rescue/sample-catalog';
 import { getSampleProgram as fireRescueProgram } from '../fire-rescue/samples';
 import { EXAMPLE_LEVELS as LOCKER_ROOM_LEVELS, SAMPLE_CATALOG as LOCKER_ROOM_CATALOG } from '../locker-room/sample-catalog';
@@ -86,5 +89,16 @@ export const FIRE_CADET = {
   levels: FIRE_CADET_LEVELS,
 };
 
+/**
+ * Fire Fighter (MakeX Lebanon, Season 2027, the mBot2, ages 8-10): its six examples, ordered like
+ * the list in ../fire-fighter/sample-catalog.ts, under headings of its own. Every id starts with
+ * "fighter-".
+ */
+export const FIRE_FIGHTER = {
+  game: 'fire-fighter',
+  examples: inCatalogOrder('Fire Fighter', FIRE_FIGHTER_CATALOG, fireFighterProgram),
+  levels: FIRE_FIGHTER_LEVELS,
+};
+
 /** Every game that has examples. A request to the server names one of them (or none, which means Fire Rescue). */
-export const ALL_GAMES = [FIRE_RESCUE, FIRE_CHIEF, WAREHOUSE_SORT, LOCKER_ROOM, FIRE_CADET];
+export const ALL_GAMES = [FIRE_RESCUE, FIRE_CHIEF, WAREHOUSE_SORT, LOCKER_ROOM, FIRE_CADET, FIRE_FIGHTER];

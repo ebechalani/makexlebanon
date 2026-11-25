@@ -771,20 +771,24 @@ export const PROP_MIN_PIXELS = 5;
 
 /**
  * Draw what the referee holds or has put on the robot, over the robot (Locker Room: the Team Box
- * on top of it, the colour card in front of it). A game whose referee has none (World.props left
- * out) draws nothing here.
+ * on top of it, the colour card in front of it), or has standing on the mat (Fire Fighter: the
+ * letter flap of each tower). A game whose referee has none (World.props left out) draws nothing
+ * here.
  *
  * Something on top of the robot is drawn see-through, so that the robot - its CyberPi and its
  * LEDs - can still be seen under it. Each prop has its name written on it (the box) or beside it
- * (a card is too thin for letters), always upright.
+ * (a card is too thin for letters), always upright: 11 px high on the screen at any zoom, or -
+ * for a prop that gives RefereeProp.labelMm (a tower's letter) - as high as that on the mat, so
+ * that it grows and shrinks with the stage like the flap it is written on.
  */
 function drawProps(ctx: CanvasRenderingContext2D, sim: StageSim, view: StageView, devicePerMm: number): void {
   const props = sim.world.props;
   if (!props || props.length === 0) return;
   const pose = sim.world.robot.pose;
   const minThickness = PROP_MIN_PIXELS / view.scale;
-  const fontSize = 11 / view.scale;
+  const screenFontSize = 11 / view.scale;
   for (const prop of props) {
+    const fontSize = prop.labelMm ?? screenFontSize;
     const box = propBox(prop, pose);
     const thin = Math.min(box.w, box.l) < minThickness;
     const w = Math.max(box.w, thin && box.w <= box.l ? minThickness : 0);

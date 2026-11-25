@@ -146,6 +146,18 @@ export interface Body {
   mass: number;
   /** where the referee puts it back (restart rule) */
   home: BodyHome;
+  /**
+   * Bodies with the same group are ONE rigid piece made of several boxes (Fire Fighter: the two
+   * side supports of a letter tower). Whatever pushes one of them moves all of them by the same
+   * amount; what stops one stops all (the table wall, a fixed wall, a body backed by one); they
+   * never push each other. A group never turns: no push turns a body, and the engine's helpers
+   * that turn a body (the open fingers that straighten one between them, fixed sticks that swing
+   * one round) leave members alone. Contacts with a member are decided by the side that met, not
+   * by speed (core/engine.ts, "Rigid groups"). A member must not be grippable, nor stand on a
+   * platform: the claw would carry that one part away, and it would come down from the platform
+   * alone. Left out by every game before Fire Fighter.
+   */
+  group?: string;
 }
 
 /**
@@ -474,6 +486,12 @@ export interface RefereeProp {
   h: number;
   /** what a front colour sensor that looks at it reads (left out: the sensor does not see it) */
   colorName?: SensorColor;
+  /**
+   * how high the letters of its label are, in mm of the mat, so that they grow and shrink with
+   * the stage (Fire Fighter: the letter on a tower's flap). Left out: 11 px on the screen at any
+   * zoom, as before - every game before Fire Fighter.
+   */
+  labelMm?: number;
 }
 
 export type SimStatus = 'ready' | 'running' | 'finished';

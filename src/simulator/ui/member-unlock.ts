@@ -100,7 +100,7 @@ function readList<T extends { id: string }>(items: unknown[], read: (value: unkn
  * of the games - `Game.id` - but a page says which examples it wants by itself: see
  * ExamplesSource.)
  */
-export const EXAMPLES_GAMES = ['fire-rescue', 'fire-chief', 'warehouse-sort', 'locker-room', 'fire-cadet'] as const;
+export const EXAMPLES_GAMES = ['fire-rescue', 'fire-chief', 'warehouse-sort', 'locker-room', 'fire-cadet', 'fire-fighter'] as const;
 export type ExamplesGame = (typeof EXAMPLES_GAMES)[number];
 
 /** Where to ask for examples, and for which game's. */

@@ -117,6 +117,19 @@ export const seasons: Season[] = [
         ageRange: '8–10 years',
         platform: 'mBot2',
         summary: 'The robot rolls out on its own. Same city — higher stakes.',
+        // (no `menuName`: "Fire Fighter" is short. No `downloads`: the rules file is not published
+        // here - its scoring is "Proposed scoring for organizer review", and the organiser has not
+        // said yet whether the website may publish it; the simulator's Rules window tells the rules.
+        // The ages stay 8–10, as the rules say and the organiser confirmed. "As the rules propose":
+        // the simulator plays that proposed scoring. See "The Fire Fighter simulator" in the README.)
+        simulator: {
+          href: '/simulator/fire-fighter',
+          summary:
+            'Build a program with mBlock-style blocks and watch the mBot2 carry the cubes to the letter towers on ' +
+            'the Fire Fighter mat — four red cubes to M, A, K and E, the yellow one to X — scored as the rules ' +
+            'propose. It runs in the browser: no robot and no installation needed.',
+          mat: '/simulator/fire-fighter/mat.webp',
+        },
       },
       // Fire Rescue (11–13 years) was split by the organiser into two categories: "a category 10-12
       // yo where the water buckets will be randomised position everything else at its place. 13-15

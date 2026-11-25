@@ -14,6 +14,8 @@
  *    same robot. One hover text is its own: its mat has white lines on black.
  *  - Locker Room (Capelli Starter) shows the palette of Warehouse Sort - the same robot - with its
  *    hover texts; the one of "object detected at claw" also names the referee's colour card.
+ *  - Fire Fighter shows exactly the palette of Fire Rescue - the same robot, black lines on white.
+ *    Two hover texts are its own: its gripper takes cubes (worded as Warehouse Sort's).
  *  - The real Blockly library accepts both palettes (it is loaded with a pretend browser, jsdom).
  */
 import assert from 'node:assert/strict';
@@ -23,6 +25,7 @@ import { before, describe, it, test } from 'node:test';
 
 import { DEFAULT_ROBOT_CONFIG } from '../core/robot';
 import { fireChiefGame } from '../fire-chief/game';
+import { fireFighterGame } from '../fire-fighter/game';
 import { fireRescueGame } from '../fire-rescue/game';
 import { lockerRoomGame } from '../locker-room/game';
 import { warehouseSortGame } from '../warehouse-sort/game';
@@ -309,7 +312,7 @@ describe('the palette of Warehouse Sort', () => {
   });
 
   it('says in its own hover text that the line is the white line on the black mat; no other game changes', () => {
-    assert.deepEqual(Object.keys(PALETTE_TOOLTIPS), ['warehouse-sort', 'locker-room']);
+    assert.deepEqual(Object.keys(PALETTE_TOOLTIPS), ['warehouse-sort', 'locker-room', 'fire-fighter']);
     assert.deepEqual(Object.keys(PALETTE_TOOLTIPS['warehouse-sort'] ?? {}), ['sensing_quadrgb_probe_detects', 'gripper_claw', 'sensing_claw_object_detected']);
     assert.equal(
       paletteTooltip('sensing_quadrgb_probe_detects', 'warehouse-sort'),
@@ -317,7 +320,7 @@ describe('the palette of Warehouse Sort', () => {
     );
     // the catalog's text stays what Fire Rescue and Fire Chief show
     assert.equal(getBlockDef('sensing_quadrgb_probe_detects')?.tooltip, 'True when this probe is over the dark line (or over the light background).');
-    for (const game of ['fire-rescue', 'fire-chief', undefined, 'some-future-game']) {
+    for (const game of ['fire-rescue', 'fire-chief', 'fire-fighter', undefined, 'some-future-game']) {
       assert.equal(paletteTooltip('sensing_quadrgb_probe_detects', game), undefined, String(game));
     }
     assert.equal(paletteTooltip('sensing_quadrgb_deviation', 'warehouse-sort'), undefined);
@@ -370,9 +373,37 @@ describe('the palette of Locker Room', () => {
   });
 });
 
+describe('the palette of Fire Fighter', () => {
+  it('is the palette of Fire Rescue, to the last default value: the same robot with the same parts', () => {
+    assert.equal(fireFighterGame.id, 'fire-fighter');
+    assert.equal(isPaletteId('fire-fighter'), true);
+    assert.equal(paletteOf('fire-fighter'), 'fire-fighter');
+    assert.deepEqual(paletteCategories('fire-fighter'), paletteCategories('fire-rescue'));
+    assert.equal(fingerprint(paletteToolbox('fire-fighter')), FIRE_RESCUE_TOOLBOX_FINGERPRINT);
+    assert.deepEqual(paletteBlockTypes('fire-fighter'), paletteBlockTypes('fire-rescue'));
+    assert.ok(JSON.stringify(paletteToolbox('fire-fighter')).includes('See the real mBlock code'));
+    // the robot of the game is Fire Rescue's mBot2, and its line sensor sees dark lines (no light line learned)
+    assert.deepEqual(fireFighterGame.robotConfig, DEFAULT_ROBOT_CONFIG);
+    assert.equal(fireFighterGame.robotConfig?.quadRgb.lightLine, undefined);
+  });
+
+  it('speaks of cubes in the two claw texts, worded as in Warehouse Sort; the line texts stay the catalog\'s', () => {
+    assert.deepEqual(Object.keys(PALETTE_TOOLTIPS['fire-fighter'] ?? {}), ['gripper_claw', 'sensing_claw_object_detected']);
+    assert.equal(paletteTooltip('gripper_claw', 'fire-fighter'), paletteTooltip('gripper_claw', 'warehouse-sort'));
+    assert.equal(paletteTooltip('gripper_claw', 'fire-fighter'), getBlockDef('gripper_claw')?.tooltip?.replace('a bucket or a person', 'a cube'));
+    assert.equal(paletteTooltip('sensing_claw_object_detected', 'fire-fighter'), 'True when there is a cube in (or just in front of) the claw.');
+    assert.equal(paletteTooltip('sensing_quadrgb_probe_detects', 'fire-fighter'), undefined);
+    // no hover text of its palette names the buckets, persons or buildings of Fire Rescue
+    for (const type of paletteBlockTypes('fire-fighter')) {
+      const text = paletteTooltip(type, 'fire-fighter') ?? getBlockDef(type)?.tooltip ?? '';
+      assert.ok(!/bucket|person|people|building/i.test(text), `${type}: ${text}`);
+    }
+  });
+});
+
 describe('palettes and games', () => {
   it('there is one palette per game, named by the id of the game', () => {
-    assert.deepEqual([...PALETTE_IDS].sort(), [fireChiefGame.id, fireRescueGame.id, warehouseSortGame.id, lockerRoomGame.id].sort());
+    assert.deepEqual([...PALETTE_IDS].sort(), [fireChiefGame.id, fireRescueGame.id, warehouseSortGame.id, lockerRoomGame.id, fireFighterGame.id].sort());
     for (const id of PALETTE_IDS) assert.ok(isPaletteId(id));
     assert.equal(isPaletteId('fire'), false);
     assert.equal(isPaletteId(undefined), false);
@@ -421,6 +452,7 @@ describe('palettes and games', () => {
       'fire-chief': fireChiefGame.robotConfig ?? DEFAULT_ROBOT_CONFIG,
       'warehouse-sort': warehouseSortGame.robotConfig ?? DEFAULT_ROBOT_CONFIG,
       'locker-room': lockerRoomGame.robotConfig ?? DEFAULT_ROBOT_CONFIG,
+      'fire-fighter': fireFighterGame.robotConfig ?? DEFAULT_ROBOT_CONFIG,
     };
     for (const id of PALETTE_IDS) {
       const robot = robots[id];
@@ -588,6 +620,15 @@ describe('the editor factory', () => {
     }
     assert.equal(tipOf('sensing_quadrgb_deviation'), getBlockDef('sensing_quadrgb_deviation')?.tooltip);
     room.dispose();
+  });
+
+  test('Fire Fighter: the palette of Fire Rescue, with its two hover texts about cubes in its editor', () => {
+    const fighter = createEditor(Blockly, 'own', { sounds: false, palette: fireFighterGame.id });
+    assert.deepEqual(categoryNames(fighter), FIRE_RESCUE_PINNED.map((category) => category.name));
+    const tipOf = (type: string): unknown => Blockly.Tooltip.getTooltipOfObject(Blockly.serialization.blocks.append({ type } as never, fighter));
+    for (const type of ['gripper_claw', 'sensing_claw_object_detected']) assert.equal(tipOf(type), paletteTooltip(type, 'fire-fighter'), type);
+    assert.equal(tipOf('sensing_quadrgb_probe_detects'), getBlockDef('sensing_quadrgb_probe_detects')?.tooltip);
+    fighter.dispose();
   });
 
   test('Blockly accepts every entry of the Fire Chief palette, and draws the new blocks with their texts', () => {

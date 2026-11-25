@@ -18,6 +18,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: '/simulator/warehouse-sort', priority: 0.7 },
     { path: '/simulator/locker-room', priority: 0.7 },
     { path: '/simulator/fire-cadet', priority: 0.7 },
+    { path: '/simulator/fire-fighter', priority: 0.7 },
     { path: '/workshops', priority: 0.6 },
     { path: '/kits', priority: 0.6 },
     { path: '/media', priority: 0.6 },
