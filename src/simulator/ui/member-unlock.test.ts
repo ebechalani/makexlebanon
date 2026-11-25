@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import { before, describe, test } from 'node:test';
 
 import { readCards } from '../fire-cadet/cards';
-import { ALL_GAMES, FIRE_CADET, FIRE_CHIEF, FIRE_RESCUE, LOCKER_ROOM, WAREHOUSE_SORT } from '../members/all-examples';
+import { ALL_GAMES, FIRE_CADET, FIRE_CHIEF, FIRE_FIGHTER, FIRE_RESCUE, LOCKER_ROOM, WAREHOUSE_SORT } from '../members/all-examples';
 import { fingerprintOf } from '../members/code-fingerprint.mjs';
 import { normalizeCode } from '../members/code-format.mjs';
 import { GAME_WHEN_NONE_IS_NAMED, handleUnlockRequest, type UnlockSetup } from '../members/unlock';
@@ -50,6 +50,7 @@ const CHIEF: ExamplesSource = { unlockUrl: '/u', game: 'fire-chief' };
 const SORT: ExamplesSource = { unlockUrl: '/u', game: 'warehouse-sort' };
 const LOCKER: ExamplesSource = { unlockUrl: '/u', game: 'locker-room' };
 const CADET: ExamplesSource = { unlockUrl: '/u', game: 'fire-cadet' };
+const FIGHTER: ExamplesSource = { unlockUrl: '/u', game: 'fire-fighter' };
 
 const STARTER = { id: 'starter', title: 'Starter', about: 'first steps' };
 const HARDER = { id: 'harder', title: 'Harder', about: 'one whole mission' };
@@ -510,6 +511,52 @@ describe('two games behind one address', () => {
     assert.deepEqual(await requestUnlock(CADET, CODE, before), { kind: 'unreachable' });
     const beforeCadet = pretendServer({ ...setup, games: [FIRE_RESCUE, FIRE_CHIEF, WAREHOUSE_SORT, LOCKER_ROOM] });
     for (const code of [CODE, ADVANCED_CODE, 'FIRE-CCCC-4444', null]) assert.deepEqual(await requestUnlock(CADET, code, beforeCadet.fetch), { kind: 'unreachable' }, String(code));
+    // the code is kept in the one place of every game: a code typed in another game works here too
+    assert.equal(SAVED_CODE_KEY, storageKey('fire-rescue', 'member-code'));
+  });
+
+  test('Fire Fighter: the page names its game; a visitor gets 5 cards and 3 to open, a member code opens all 5, an advanced code shows 6 - and never a word of another game', async () => {
+    const server = pretendServer(setup);
+    const counts: string[] = [];
+    const all = ids(FIRE_FIGHTER.examples);
+    for (const code of [null, CODE, ADVANCED_CODE]) {
+      const outcome = await requestUnlock(FIGHTER, code, server.fetch);
+      assert.ok(outcome.kind === 'examples');
+      assert.equal(outcome.member, code !== null);
+      counts.push(`${outcome.cards.length} / ${outcome.examples.length}`);
+      // the cards and the examples of the organiser's rule: the three starters open to everyone, the advanced one for advanced codes only
+      assert.deepEqual(ids(outcome.cards), code === ADVANCED_CODE ? all : all.slice(0, 5));
+      assert.deepEqual(ids(outcome.examples), code === null ? all.slice(0, 3) : code === CODE ? all.slice(0, 5) : all);
+      const got = JSON.stringify(outcome);
+      for (const example of [...FIRE_RESCUE.examples, ...FIRE_CHIEF.examples, ...WAREHOUSE_SORT.examples, ...LOCKER_ROOM.examples, ...FIRE_CADET.examples]) {
+        assert.ok(!got.includes(`"${example.id}"`) && !got.includes(example.title), `nothing about ${example.id}`);
+      }
+      if (code !== ADVANCED_CODE) {
+        for (const secret of ['fighter-whole-mission', FIRE_FIGHTER.examples[5].title, 'dvanced', FIRE_FIGHTER.levels[2].about]) assert.ok(!got.includes(secret), `${code ?? 'a visitor'} does not get "${secret}"`);
+        assert.deepEqual(
+          outcome.levels.map((level) => level.title),
+          ['Starter', 'Intermediate'],
+        );
+      }
+      // every opened example arrives whole: its card, its description, and its blocks as samples.ts wrote them
+      for (const opened of outcome.examples) assert.deepEqual(opened, FIRE_FIGHTER.examples.find((example) => example.id === opened.id), opened.id);
+    }
+    assert.deepEqual(counts, ['5 / 3', '5 / 5', '6 / 6']);
+    assert.deepEqual(server.sent, ['{"game":"fire-fighter"}', `{"game":"fire-fighter","code":"${CODE}"}`, `{"game":"fire-fighter","code":"${ADVANCED_CODE}"}`]);
+    // an answer about another game - or one without a name - is no answer for this page
+    for (const named of [{ game: 'fire-rescue' }, { game: 'fire-chief' }, { game: 'warehouse-sort' }, { game: 'locker-room' }, { game: 'fire-cadet' }, {}]) {
+      const other = (async () => Response.json({ ...answer(false, [], []), ...named })) as unknown as typeof fetch;
+      assert.deepEqual(await requestUnlock(FIGHTER, null, other), { kind: 'unreachable' }, JSON.stringify(named));
+    }
+    // a server of before Fire Fighter does not know the game: "unknown-game" is no "wrong code"
+    const before = (async () => Response.json({ ok: false, reason: 'unknown-game' }, { status: 400 })) as unknown as typeof fetch;
+    assert.deepEqual(await requestUnlock(FIGHTER, CODE, before), { kind: 'unreachable' });
+    const beforeFighter = pretendServer({ ...setup, games: [FIRE_RESCUE, FIRE_CHIEF, WAREHOUSE_SORT, LOCKER_ROOM, FIRE_CADET] });
+    for (const code of [CODE, ADVANCED_CODE, null]) assert.deepEqual(await requestUnlock(FIGHTER, code, beforeFighter.fetch), { kind: 'unreachable' }, String(code));
+    // ... and the other five pages are answered by that server as by today's
+    for (const from of [RESCUE, CHIEF, SORT, LOCKER, CADET]) {
+      for (const code of [null, CODE, ADVANCED_CODE]) assert.deepEqual(await requestUnlock(from, code, beforeFighter.fetch), await requestUnlock(from, code, server.fetch), `${from.game}, ${code ?? 'no code'}`);
+    }
     // the code is kept in the one place of every game: a code typed in another game works here too
     assert.equal(SAVED_CODE_KEY, storageKey('fire-rescue', 'member-code'));
   });

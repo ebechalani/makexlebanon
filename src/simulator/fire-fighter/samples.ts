@@ -77,8 +77,12 @@
  *                           on the middle of the white dashed square (within 0.1 mm at every tower)
  *       backward 6 cm       the robot moves clear: the delivery counts now (./game.ts F8, F9)
  *       gripper open        ready for the next cube
- *     Backing off 5.0 cm is not enough: the closing claw grabs the cube again, the robot pushes it
- *     with the cube in its claw and pulls it back out (5.05 cm is enough; samples.test.ts tries both).
+ *     Exactly 5 cm is a knife edge: it frees a cube that sits exactly in the middle of the claw
+ *     (./game.test.ts), but the yellow cube of these examples sits 0.03 mm deeper (the
+ *     claw closed after 189.30 mm of driving, 0.03 mm more than the 189.27 mm to the middle of the
+ *     cube): backing off 5.0 cm, the tips are still over the back of the cube, the claw grabs it again
+ *     and the robot pulls it back out of the tower (5.05 cm is enough; samples.test.ts tries both).
+ *     Hence "more than 5 cm" in the notes and the texts.
  *
  * The simulated robot is perfect (no wheel slip), so driving by distance is exact here. A real
  * robot drifts: it has to find the lines again on its way. These programs need the robot where the
@@ -156,7 +160,7 @@ export const ALL_FOUR_ON_THE_LINE = 15;
 /**
  * From the T, this far (cm) puts the claw around the yellow cube. The robot stops at the T with its
  * middle at y 1000.8 (its sensor on the lower edge of the T bar, y 916.0): 31.4 mm more put the middle
- * of the claw 0.3 mm short of the middle of the cube.
+ * of the claw 0.3 mm past the middle of the cube.
  */
 export const T_TO_YELLOW_CM = 3.14;
 
@@ -227,7 +231,7 @@ export const RIGHT_BAY = {
 /**
  * The ways of the whole mission between the parts above (cm): from tower X (the robot's middle at
  * y 372.3 after the delivery) left to the left line, and down to the upper red cube of the left bay
- * (y 573.7); from tower M (y 862.9) right along to the right line; up to the lower red cube of the
+ * (y 573.7); from tower M (y 862.9) to the right line; up to the lower red cube of the
  * right bay (y 693.1); and, after tower A (y 863.0), up to the upper red cube of the right bay
  * (y 561.3).
  */
@@ -429,7 +433,7 @@ const firstGrab: SampleProgram = {
 const lineToT: SampleProgram = {
   ...exampleCard('fighter-line-to-t'),
   description:
-    `A line follower. First the robot drives ${PAST_THE_PICTURE_CM} cm, until its line sensor is past the picture of the Fire Station: the picture has dark spots that are not a line. ` +
+    `A line follower. First the robot drives ${PAST_THE_PICTURE_CM} cm: then its line sensor is past the picture of the Fire Station. That picture has dark spots that are not a line. ` +
     'Then it follows the black line up. ' +
     'Both middle probes (L1 and R1) on the line: drive on. The line under a left probe: steer left. Under a right probe: steer right. ' +
     `All four probes on black: the robot is at the T. It drives ${T_TO_YELLOW_CM} cm more and closes the claw on the yellow cube. ` +
@@ -492,8 +496,9 @@ const lineToT: SampleProgram = {
 // pushed 45.0 mm); 5 mm up 0 (the claw took the cube 5 mm deeper, so backing off 5.5 cm is not
 // enough: the claw grabs the cube again and pulls it back out); 5 mm down 20; turned 1 degree
 // either way 0 (tower X is pushed 45.5 mm).
-// The trap of its note: backing off 5.0 cm before the claw closes is not enough - the claw grabs the
-// cube again, and the robot pulls it back out (0 points); 5.05 cm is enough.
+// The trap of its note: backing off 5.0 cm before the claw closes is not enough here (the cube sits
+// 0.03 mm deeper than the middle of the claw) - the claw grabs the cube again, and the robot pulls it
+// back out (0 points); 5.05 cm is enough.
 
 const yellowX: SampleProgram = {
   ...exampleCard('fighter-yellow-x'),
@@ -503,8 +508,7 @@ const yellowX: SampleProgram = {
     'So the robot takes the cube and drives round the hydrant picture, to come down from above. ' +
     'A cube pushed into the back of a tower does not count. ' +
     'A claw that holds a cube is too wide for the tower. ' +
-    `So the robot lets the cube go 1 cm before the tower and backs off ${DELIVERY.backOff} cm. ` +
-    'Then it closes its empty claw, which is narrow enough, and pushes the cube into the white dashed square. ' +
+    `So it lets go 1 cm before the tower and backs off ${DELIVERY.backOff} cm. Then it closes its empty claw and pushes the cube into the white dashed square. ` +
     'The letter X shows: 20 points, in 12 seconds. ' +
     'Back off more than 5 cm before you close the claw: closed sooner, it grabs the cube again. ' +
     'The robot drives by distance only: start it exactly where the simulator puts it.',
@@ -620,7 +624,7 @@ const wholeMission: SampleProgram = {
       ...upperLeftCubeToE('right'),
       ...lowerLeftCubeToM(),
       note(turn('left', 90), 'Face right.'),
-      note(moveCm('forward', MISSION_WAYS.mToRightLine), 'All the way along to the right line.'),
+      note(moveCm('forward', MISSION_WAYS.mToRightLine), 'All the way to the right line.'),
       note(turn('left', 90), 'Face up, on the right line.'),
       note(moveCm('forward', MISSION_WAYS.upToLowerRight), 'Up the right line, to the lower red cube.'),
       ...lowerRightCubeToA('right'),
