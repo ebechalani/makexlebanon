@@ -1703,7 +1703,7 @@ times and the same lines of the score sheet as the same match in Warehouse Sort 
 are French (`src/simulator/robot-en-fete/game.test.ts` plays every example on every arrangement in
 both and compares them). Everything on its page is French: the buttons, the messages, the Rules
 window, the score sheet, the console, "Tester sur plusieurs dispositions", the Cube colours panel
-("Couleurs des cubes"), the six examples, the blocks ("avancer de … cm", "pince ouvre") and
+("Couleurs des cubes"), the six examples, the blocks ("avancer de … cm", "la pince s’ouvre") and
 Blockly's own words ("Créer une variable", "Mes blocs"). The French speaks to the student with
 "tu", and writes French numbers: `18,9 cm`, `1:23,4`, `0,5×`.
 

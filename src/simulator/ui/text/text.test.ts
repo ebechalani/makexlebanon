@@ -276,6 +276,9 @@ test('French plurals: the first form for 0 and 1, the second from 2 on - and for
   assert.equal(FR_TEXT.runsCount(1, 24), '1 essai sur 24');
   assert.equal(FR_TEXT.runsCount(24, 24), '24 essais sur 24');
   assert.equal(FR_TEXT.runRestarts(2), ', 2 relances');
+  // (what a screen reader says of the score: "0 point" after a restart, as before a start "5 points")
+  assert.equal(FR_TEXT.scoreLabel(0, 80), `Score${NB}: 0 point sur 80`);
+  assert.equal(FR_TEXT.scoreLabel(5, 80), `Score${NB}: 5 points sur 80`);
 });
 
 // =============================================================================================

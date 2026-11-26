@@ -92,7 +92,8 @@ export const FR_MATCH_TEXT: MatchText = {
   pauseHint: (match) => `Pause (le chrono du ${match} s’arrête aussi)`,
   clockLabel: (match, left) => `Chrono du ${match}${NB}: il reste ${left}`,
   timeWord: 'Temps',
-  scoreLabel: (total, max) => `Score${NB}: ${total} points sur ${max}`,
+  // ("0 point", "5 points": the first form for 0 and 1, as everywhere in French)
+  scoreLabel: (total, max) => `Score${NB}: ${total} ${frPlural(total, 'point', 'points')} sur ${max}`,
   scoreWord: 'Score',
   restartWord: 'Relance',
   finishedWord: 'Terminé',
