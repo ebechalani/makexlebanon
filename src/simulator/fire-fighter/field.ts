@@ -256,9 +256,9 @@ export const TOWER_DEPTH = 40;
 export const TOWER_GAP = 60;
 /** Each side support is (105 - 60) / 2 = 22.5 mm thick: it follows from the two sizes above (ASSUMPTION: solid, the rules' photos show thin plates). */
 export const SUPPORT_WIDTH = (TOWER_WIDTH - TOWER_GAP) / 2;
-/** ASSUMPTION: 10 cm high (in the rules' photos the side plates are about 1.4 times as high as the 7 cm cube). */
+/** ORGANISER: "Tower height is 10 cm" (in the rules' photos the side plates are about 1.4 times as high as the 7 cm cube). */
 export const TOWER_HEIGHT = 100;
-/** ASSUMPTION: each support is as light as a cube (light plywood): a robot that bumps a tower slides it. */
+/** ORGANISER: the towers "can slide". ASSUMPTION: each support is as light as a cube (light plywood), so a robot that bumps a tower slides it. */
 export const TOWER_MASS = 1;
 
 /** The heights of the drawn flap with the letter: from just above a cube (7 cm) to the top of the tower. */
@@ -335,7 +335,8 @@ export function supportMiddle(tower: TowerId, side: 'left' | 'right'): Vec2 {
 }
 
 /**
- * THE LETTER AREA (ASSUMPTION, open question 4 to the organiser): a cube makes the letter show only
+ * THE LETTER AREA (ORGANISER: only when the whole cube is inside the white dashed square - "yes";
+ * ASSUMPTION: measured to the outer edge of the dashes, question 4): a cube makes the letter show only
  * when its whole base is inside the white dashed square measured to the OUTER edge of its dashes,
  * 64.939 x 65.639 mm - the dashed line itself counts. (Its inner edge would leave 55.061 x 55.761 mm,
  * its centre line 60.000 x 60.700 mm.)

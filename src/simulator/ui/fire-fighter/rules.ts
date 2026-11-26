@@ -120,21 +120,23 @@ export const FIRE_FIGHTER_RULES: RulesSection[] = [
 /** The second part of the window: what the simulator had to choose because the rules and the organiser do not say it. */
 export const FIRE_FIGHTER_ASSUMPTIONS: RulesPart = {
   title: 'What this simulator assumes',
-  note: "Choices of the simulator, not rules, except what the organiser gave: the tower's size and the room between its sides.",
+  note: "Choices of the simulator, not rules, except the lines that say they are the organiser's.",
   sections: [
     {
       title: 'The towers',
       items: [
         `A tower is ${cm(TOWER_WIDTH)} cm wide and ${cm(TOWER_DEPTH)} cm deep (the organiser's size).`,
         `Its two sides stand ${cm(TOWER_GAP)} cm apart, as wide as the white dashed square (the organiser's answer: "about ${cm(TOWER_GAP)} cm").`,
-        `Here the sides are ${cm(SUPPORT_WIDTH)} cm thick and ${cm(TOWER_HEIGHT)} cm high.`,
-        'A tower can slide when the robot pushes it. It never turns and never falls over: the simulator cannot turn or tip things.',
+        `A tower is ${cm(TOWER_HEIGHT)} cm high (the organiser's answer).`,
+        `Here the sides are ${cm(SUPPORT_WIDTH)} cm thick.`,
+        "A tower can slide when the robot pushes it (the organiser's answer). It never turns and never falls over: the simulator cannot turn or tip things.",
       ],
     },
     {
       title: 'The letter',
       items: [
-        "The letter shows when the cube went in through the tower's opening and its whole bottom is inside the white dashed square. The dashed line counts as inside.",
+        "The letter shows only when the whole bottom of the cube is inside the white dashed square (the organiser's answer). The dashed line counts as inside.",
+        "The cube must also have gone in through the tower's opening.",
         'A cube that goes in from the back of a tower does not count.',
         `The cube may be up to ${mmDown(ROOM_ALONG_OPENING)} mm off the middle towards the opening or the back. Sideways it has ${mmDown(ROOM_ACROSS)} mm on each side: more, and it can catch a side and push the tower away.`,
         'A cube always stands upright here.',
@@ -152,7 +154,7 @@ export const FIRE_FIGHTER_ASSUMPTIONS: RulesPart = {
       title: 'The cubes',
       items: [
         'Each cube starts in the middle of its marked square.',
-        'The robot has taken the yellow cube when its claw holds it, or when the middle of the cube has left its red square.',
+        "The robot has taken the yellow cube when its claw holds it, or when the middle of the cube has left its red square (the organiser's answer).",
         'A delivery counts when the letter shows and no part of the robot touches the cube.',
         'A cube the robot still touches at the end scores 0: the robot must move clear.',
         'Touching or nudging a cube that is already under a tower is not a new delivery; taking it out and pushing it in again is.',
