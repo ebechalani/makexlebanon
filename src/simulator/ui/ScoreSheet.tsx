@@ -12,10 +12,12 @@
  */
 import type { ReactNode } from 'react';
 import type { FinishReason, RestartRules, ScoreLine, ScoreReport } from '../core/types';
-import { finishText, formatRefereeTime, formatStamp, type TimeText } from './format';
+import type { TimeText } from './format';
 import { CheckIcon, CrossIcon } from './icons';
-import { finishHeadline, finishSentence, restartSummary } from './match-words';
 import { capital, DEFAULT_WORDS, type ScreenWords } from './screen-words';
+import { useScreenText } from './text/context';
+import { EN_TEXT } from './text/en';
+import type { CoreText, MatchOver } from './text/types';
 import type { RunState } from './useSimulation';
 
 /**
@@ -40,22 +42,28 @@ export function linePoints(line: Pick<ScoreLine, 'points' | 'max' | 'ok'>): stri
   return lineMark(line) === 'note' ? '' : String(line.points);
 }
 
-/** The time a line was earned, as the referee wrote it down; empty for a line that has none. */
-export function lineTime(line: Pick<ScoreLine, 'time'>): string {
-  return typeof line.time === 'number' && Number.isFinite(line.time) ? formatRefereeTime(line.time) : '';
+/**
+ * The time a line was earned, as the referee wrote it down; empty for a line that has none.
+ * (`text`: the word table of the screen, whose referee times are written as the referee writes
+ * them - left out: the English one, the context's default too.)
+ */
+export function lineTime(line: Pick<ScoreLine, 'time'>, text: Pick<CoreText, 'refereeTime'> = EN_TEXT): string {
+  return typeof line.time === 'number' && Number.isFinite(line.time) ? text.refereeTime(line.time) : '';
 }
 
-const MARK_STYLE: Record<LineMark, { ring: string; name: string }> = {
-  done: { ring: 'bg-emerald-100 text-emerald-700', name: 'done' },
-  'not-done': { ring: 'bg-slate-100 text-ink-400', name: 'not done' },
-  penalty: { ring: 'bg-rose-100 text-rose-700', name: 'penalty' },
-  note: { ring: 'bg-amber-100 text-amber-800', name: 'note' },
+/** How a line is marked: its colours (its name, for a screen reader, is in the word table: `markNames`). */
+const MARK_STYLE: Record<LineMark, { ring: string }> = {
+  done: { ring: 'bg-emerald-100 text-emerald-700' },
+  'not-done': { ring: 'bg-slate-100 text-ink-400' },
+  penalty: { ring: 'bg-rose-100 text-rose-700' },
+  note: { ring: 'bg-amber-100 text-amber-800' },
 };
 
 function LineRow({ line }: { line: ScoreLine }) {
+  const text = useScreenText();
   const mark = lineMark(line);
   const points = linePoints(line);
-  const time = lineTime(line);
+  const time = lineTime(line, text);
   const pointsText = points !== '' && (
     <span
       className={
@@ -78,7 +86,7 @@ function LineRow({ line }: { line: ScoreLine }) {
         ) : (
           <CrossIcon className="h-3.5 w-3.5" />
         )}
-        <span className="sr-only">{MARK_STYLE[mark].name}</span>
+        <span className="sr-only">{text.markNames[mark]}</span>
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-ink-800">{line.label}</p>
@@ -90,8 +98,8 @@ function LineRow({ line }: { line: ScoreLine }) {
         // the referee wrote down the moment this line was earned (a ranking by time uses it): it stands under the points
         <span className="flex shrink-0 flex-col items-end">
           {pointsText}
-          <span className="font-mono text-[11px] tabular-nums text-ink-500" title="The time on the clock when this line was earned">
-            <span className="sr-only">earned at </span>
+          <span className="font-mono text-[11px] tabular-nums text-ink-500" title={text.lineEarnedHint}>
+            <span className="sr-only">{text.earnedAt}</span>
             {time}
           </span>
         </span>
@@ -114,15 +122,16 @@ export interface ScoreSheetProps {
 }
 
 export function ScoreSheet({ score, words = DEFAULT_WORDS, ending = null }: ScoreSheetProps) {
+  const text = useScreenText();
   const missions = score.lines.filter((line) => line.max > 0);
   const penalties = score.lines.filter((line) => line.max === 0);
-  const totalTime = typeof score.time === 'number' && Number.isFinite(score.time) ? formatRefereeTime(score.time) : '';
+  const totalTime = typeof score.time === 'number' && Number.isFinite(score.time) ? text.refereeTime(score.time) : '';
   const howItEnded = ending?.trim() ?? '';
   return (
     <div>
       {howItEnded !== '' && (
         <p className="mb-1 rounded-md bg-brand-50 px-2 py-1.5 text-xs leading-snug text-ink-800" data-ending>
-          <span className="font-bold">{`How the ${words.match} ended: `}</span>
+          <span className="font-bold">{text.howEnded(words.match)}</span>
           {howItEnded}
         </p>
       )}
@@ -142,7 +151,7 @@ export function ScoreSheet({ score, words = DEFAULT_WORDS, ending = null }: Scor
         </>
       )}
       <div className="mt-2 flex items-baseline justify-between border-t-2 border-slate-200 pt-2">
-        <span className="text-sm font-bold text-ink-800">Total</span>
+        <span className="text-sm font-bold text-ink-800">{text.total}</span>
         <span className="font-mono text-lg font-bold tabular-nums text-ink-900">
           {score.total} <span className="text-sm font-medium text-ink-500">/ {score.max}</span>
         </span>
@@ -150,7 +159,7 @@ export function ScoreSheet({ score, words = DEFAULT_WORDS, ending = null }: Scor
       {totalTime !== '' && (
         <p className="flex items-baseline justify-between gap-3 text-xs text-ink-600" data-score-time>
           {/* (said as what the rules of the game say: a game that records times ranks equal points by them) */}
-          <span>Time of this score - with equal points, the rules rank the shorter time higher</span>
+          <span>{text.scoreTimeNote}</span>
           <span className="shrink-0 font-mono font-bold tabular-nums text-ink-900">{totalTime}</span>
         </p>
       )}
@@ -211,16 +220,19 @@ export function StatusLine({
   restartRules,
   restartsLeft,
   words = DEFAULT_WORDS,
-  timeText = formatStamp,
+  timeText: ownTimeText,
   briefEnding = false,
   readyHint,
   placingProblem,
   onShowSheet,
 }: StatusLineProps) {
+  const text = useScreenText();
+  // (left out: the times of the word table - the rounded time stamps)
+  const timeText = ownTimeText ?? text.moment;
   const missions = score.lines.filter((line) => line.max > 0 && line.id !== 'bonus');
   const done = missions.filter((line) => line.ok).length;
   // (once a match is over, how many restarts are left is no news: a brief ending leaves it out)
-  const penaltyNote = restartSummary(restarts, { penalty: restartPenalty, rules: restartRules }, briefEnding && runState === 'finished' ? undefined : restartsLeft);
+  const penaltyNote = text.restartSummary(restarts, { penalty: restartPenalty, rules: restartRules }, briefEnding && runState === 'finished' ? undefined : restartsLeft);
   const Match = capital(words.match);
   // (Below, a sentence with a word of the game in it is written as ONE piece of text, `...${word}...`,
   // not as text around a {word}: the browser fits the letters of each piece of text on their own,
@@ -247,65 +259,36 @@ export function StatusLine({
     tone = 'border-brand-200 bg-brand-50 text-ink-900';
     // (what the referee is doing right now, where a game says it - ScoreReport.now - in place of
     // the count of goals: a robot that stands still for seconds is waiting for the referee)
-    content = score.now ? (
-      <>
-        <span className="font-bold">{`${Match} running.`}</span> {score.now}
-        {penaltyNote && <span className="font-semibold text-amber-800"> {penaltyNote}.</span>}
-      </>
-    ) : (
-      <>
-        <span className="font-bold">{`${Match} running.`}</span> {done} of {missions.length}
-        {` ${words.goals} complete.`}
-        {penaltyNote && <span className="font-semibold text-amber-800"> {penaltyNote}.</span>}
-      </>
-    );
+    const penalty = penaltyNote && <span className="font-semibold text-amber-800"> {penaltyNote}.</span>;
+    content = score.now ? text.statusRunningNow(Match, score.now, penalty) : text.statusRunning(Match, done, missions.length, words.goals, penalty);
   } else if (runState === 'paused') {
     tone = 'border-amber-300 bg-amber-50 text-amber-950';
-    content = (
-      <>
-        <span className="font-bold">Paused</span> at {timeText(time)}
-        {`. The ${words.match} clock is paused too.`}
-      </>
-    );
+    content = text.statusPaused(timeText(time), words.match);
   } else if (runState === 'stopped') {
     tone = 'border-slate-300 bg-slate-200 text-ink-800';
     showSheet = true;
-    content = (
-      <>
-        <span className="font-bold">Stopped by you</span> at {timeText(time)} - no final score (so far {points}). Start tries again, Reset puts the
-        field back.
-      </>
-    );
+    content = text.statusStopped(timeText(time), points);
   } else {
     const perfect = score.total >= score.max;
     tone = perfect ? 'border-emerald-300 bg-emerald-50 text-emerald-950' : 'border-brand-300 bg-brand-100 text-ink-900';
     showSheet = true;
-    content = (
-      <>
-        <span className="font-bold">{`${Match} over.`}</span>{' '}
-        {finishDetail ? (
-          // the referee ended the match: its own sentence says why (and when) - in a brief ending its first words only
-          <>
-            {briefEnding ? finishHeadline(finishDetail) : finishSentence(finishReason, finishDetail, time, timeText)} Final score: {points}
-          </>
-        ) : (
-          <>
-            {finishText(finishReason)} at {timeText(time)}. Final score: {points}
-          </>
-        )}
-        {perfect ? ' - a perfect run!' : score.complete ? ` - every ${words.goal} complete.` : ''}
-        {penaltyNote && ` (${penaltyNote})`}
-      </>
-    );
-    if (briefEnding) {
-      // (the very words of `content` above, piece by piece: a test holds the two together)
-      wholeEnding =
-        `${Match} over. ` +
-        (finishDetail ? `${finishHeadline(finishDetail)} Final score: ` : `${finishText(finishReason)} at ${timeText(time)}. Final score: `) +
-        `${score.total} / ${score.max}` +
-        (perfect ? ' - a perfect run!' : score.complete ? ` - every ${words.goal} complete.` : '') +
-        (penaltyNote ? ` (${penaltyNote})` : '');
-    }
+    const over: MatchOver = {
+      Match,
+      // the referee ended the match: its own sentence says why (and when) - in a brief ending its first words only
+      ending: finishDetail ? (briefEnding ? text.finishHeadline(finishDetail) : text.finishSentence(finishReason, finishDetail, time, timeText)) : null,
+      reason: text.finishText(finishReason),
+      time: timeText(time),
+      total: score.total,
+      max: score.max,
+      perfect,
+      complete: score.complete,
+      goal: words.goal,
+      goals: words.goals,
+      penaltyNote,
+    };
+    content = text.statusOver(over, points);
+    // (the very words of `content` above, piece by piece: a test holds the two together)
+    if (briefEnding) wholeEnding = text.statusOverText(over);
   }
 
   // A brief ending keeps to two lines where the stage stands beside the blocks ("lg:"): there the
@@ -327,7 +310,7 @@ export function StatusLine({
           onClick={onShowSheet}
           className="shrink-0 rounded-lg border border-current/30 bg-white/70 px-2.5 py-1 text-xs font-bold hover:bg-white"
         >
-          Score sheet
+          {text.scoreSheet}
         </button>
       )}
     </div>

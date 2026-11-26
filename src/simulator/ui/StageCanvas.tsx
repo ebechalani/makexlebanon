@@ -23,6 +23,7 @@ import type { Vec2 } from '../core/geometry';
 import type { Pose, Simulation, ZoneOverlay } from '../core/types';
 import { drawStage, fitView, MatPainter, robotHit, STAGE_MARGIN, viewToMat, type StageOptions, type StagePainters, type StageView } from './render';
 import { addRulerPoint, dragRulerPoint, isRulerClick, rulerClick, rulerHold, type Ruler, type RulerHold, type RulerPointer } from './ruler';
+import { useScreenText } from './text/context';
 import type { Trail } from './trail';
 
 export interface StageCanvasProps {
@@ -104,9 +105,13 @@ function StageCanvasImpl(props: StageCanvasProps) {
   /** the press that is going on while the ruler is on (pointer down, not yet up) */
   const rulerPressRef = useRef<RulerPress | null>(null);
 
+  // (the numbers of the ruler on the mat are written in the words of the screen)
+  const text = useScreenText();
   const propsRef = useRef(props);
+  const textRef = useRef(text);
   useEffect(() => {
     propsRef.current = props;
+    textRef.current = text;
     rulerRef.current = props.ruler;
     dirtyRef.current = true;
   });
@@ -178,6 +183,7 @@ function StageCanvasImpl(props: StageCanvasProps) {
           ghost: p.ghost,
           ruler: rulerRef.current,
           painters: p.painters,
+          text: textRef.current,
         });
       }),
     [painter, simRef, subscribeFrame, trail],
@@ -422,13 +428,7 @@ function StageCanvasImpl(props: StageCanvasProps) {
         ref={canvasRef}
         tabIndex={0}
         role="img"
-        aria-label={
-          props.ruler
-            ? 'Competition mat seen from above. The ruler is on: a click on the mat sets a point. The measurement is written next to the mat.'
-            : props.placing
-              ? 'Competition mat seen from above. The robot can be placed: drag it, or use the arrow keys to move and Q or E to turn.'
-              : 'Competition mat seen from above, with the robot and the game elements.'
-        }
+        aria-label={props.ruler ? text.matRuler : props.placing ? text.matPlacing : text.matWatching}
         // (the frame around the stage clips whatever is drawn outside the canvas, so the focus ring is drawn inside its edge)
         className="absolute inset-0 h-full w-full rounded-card focus-visible:outline-4 focus-visible:-outline-offset-4 focus-visible:outline-brand-400"
         onPointerDown={onPointerDown}

@@ -41,9 +41,9 @@ import type {
   Simulation,
 } from '../core/types';
 import { PROBE_NAMES, SERVO_PORTS } from '../core/types';
-import { appendLog, describeEvent, restartFacts, type LogLine } from './format';
+import { appendLog, restartFacts, type LogLine } from './format';
 import { hasHatBlock, hasRunnableScript } from './program-file';
-import { capital } from './screen-words';
+import { useScreenText } from './text/context';
 import { Trail } from './trail';
 
 // =============================================================================================
@@ -206,6 +206,8 @@ function takeSnapshot<S>(sim: Simulation<S>, runState: RunState): UiSnapshot {
 
 export function useSimulation<S>(options: UseSimulationOptions<S>): SimulationController<S> {
   const { game, robotConfig, scenario } = options;
+  // the console speaks the language of the screen (a hook outside any word table - Fire Cadet's - speaks English)
+  const text = useScreenText();
 
   // the latest callbacks, readable from the animation loop without restarting it
   const optionsRef = useRef(options);
@@ -293,7 +295,7 @@ export function useSimulation<S>(options: UseSimulationOptions<S>): SimulationCo
         }
         if (event.type === 'restart') trail.breakLine();
         // (a restart line says what a restart does in this game and how many are left after it)
-        const line = describeEvent(event, {
+        const line = text.describeEvent(event, {
           ...restartFacts(game),
           left: simRef.current.restartsLeft,
           match: optionsRef.current.matchWord,
@@ -303,7 +305,7 @@ export function useSimulation<S>(options: UseSimulationOptions<S>): SimulationCo
         if (line) addLog(line);
       }
     },
-    [addLog, game, playTone, trail],
+    [addLog, game, playTone, trail, text],
   );
 
   // ------------------------------------------------------------------ the animation loop
@@ -415,7 +417,7 @@ export function useSimulation<S>(options: UseSimulationOptions<S>): SimulationCo
     tickDebtRef.current = 0;
 
     logsRef.current = [];
-    addLog({ time: 0, level: 'info', text: `Start! ${capital(optionsRef.current.scenarioWord ?? 'combination')} ${game.encodeScenario(scenarioRef.current)}.` });
+    addLog({ time: 0, level: 'info', text: text.startLine(optionsRef.current.scenarioWord, game.encodeScenario(scenarioRef.current)) });
     // (the two warnings are about blocks: a game with an interpreter of its own - Fire Cadet's
     // coding cards - says on its own screen what its program lacks)
     const blockProgram = game.createVM === undefined;
@@ -423,13 +425,13 @@ export function useSimulation<S>(options: UseSimulationOptions<S>): SimulationCo
       addLog({
         time: 0,
         level: 'warn',
-        text: 'Nothing will happen: the program has no yellow "when CyberPi starts up" block to begin with.',
+        text: text.noStartHat,
       });
     } else if (blockProgram && !hasRunnableScript(program)) {
       addLog({
         time: 0,
         level: 'warn',
-        text: 'Nothing will happen: no block is snapped under a yellow "when ..." block yet.',
+        text: text.nothingSnapped,
       });
     }
     handleEvents(sim.drainEvents());
@@ -438,14 +440,14 @@ export function useSimulation<S>(options: UseSimulationOptions<S>): SimulationCo
     runStateRef.current = 'running';
     publish();
     return true;
-  }, [addLog, build, game, handleEvents, publish, trail]);
+  }, [addLog, build, game, handleEvents, publish, trail, text]);
 
   const stop = useCallback(() => {
     if (runStateRef.current !== 'running' && runStateRef.current !== 'paused') return;
     runStateRef.current = 'stopped';
-    addLog({ time: simRef.current.world.time, level: 'info', text: 'Stopped by you. Press Start to try again.' });
+    addLog({ time: simRef.current.world.time, level: 'info', text: text.stoppedByYou });
     publish();
-  }, [addLog, publish]);
+  }, [addLog, publish, text]);
 
   const pause = useCallback(() => {
     if (runStateRef.current !== 'running') return;
@@ -551,14 +553,14 @@ export function useSimulation<S>(options: UseSimulationOptions<S>): SimulationCo
         addLog({
           time: 0,
           level: 'warn',
-          text: 'The mat picture could not be loaded: the floor sensors use the simplified drawing of the mat.',
+          text: text.matPictureFailed,
         });
         publishNowRef.current = true;
       });
     return () => {
       cancelled = true;
     };
-  }, [addLog, game, reset]);
+  }, [addLog, game, reset, text]);
 
   return {
     simRef,

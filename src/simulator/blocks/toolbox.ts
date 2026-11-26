@@ -19,9 +19,17 @@
  *
  * One category starts with a few words and a button: Gripper. Real mBlock has no such category
  * (its blocks are shortcuts made for the simulator), and the button shows the code they stand for.
+ *
+ * In French (the page of Robot en fête 2027) the palette is the same palette with French words:
+ * paletteToolbox(gameId, 'fr') gives the categories their French names, the Gripper category its
+ * French lines and button, and the white bubbles of words their French default texts (./fr.ts).
+ * The blocks themselves turn French in a French workspace (./register.ts, ./locale.ts). Left out,
+ * the language is English: every English page, and every test, gets exactly what it always got.
  */
 import { BLOCKS, CATEGORIES, fieldArgs, fieldDefault, getBlockDef, getCategory, valueInputs } from './catalog';
 import type { CategoryId, ShadowSpec } from './catalog';
+import { FR_CATEGORY_NAMES, FR_DEFAULT_TEXTS, FR_TOOLBOX } from './fr';
+import type { BlockLocale } from './locale';
 import { DEFAULT_PALETTE, paletteCategories } from './palettes';
 
 // =============================================================================================
@@ -104,22 +112,50 @@ const CATEGORY_INTRO: Partial<Record<CategoryId, ToolboxItem[]>> = {
   ],
 };
 
+/** The same in French. */
+const FRENCH_CATEGORY_INTRO: Partial<Record<CategoryId, ToolboxItem[]>> = {
+  gripper: [
+    { kind: 'label', text: FR_TOOLBOX.gripperIntro1 },
+    { kind: 'sep', gap: LINE_GAP },
+    { kind: 'label', text: FR_TOOLBOX.gripperIntro2 },
+    { kind: 'button', text: FR_TOOLBOX.seeMblockCode, callbackkey: GRIPPER_CODE_CALLBACK },
+  ],
+};
+
+/** The words of the entry of the right-click menu of a Gripper block, in this language. */
+export function seeMblockCode(locale: BlockLocale = 'en'): string {
+  return locale === 'fr' ? FR_TOOLBOX.seeMblockCode : SEE_MBLOCK_CODE;
+}
+
+/** The name of a category in this language. */
+export function categoryName(id: CategoryId, locale: BlockLocale = 'en'): string {
+  const name = getCategory(id).name;
+  return locale === 'fr' ? (FR_CATEGORY_NAMES[id] ?? name) : name;
+}
+
 // =============================================================================================
 // Builders
 // =============================================================================================
 
-/** The white bubble for a slot. */
-export function shadowFor(spec: ShadowSpec): ToolboxShadow {
+/** What a bubble of words holds before anything is typed, in this language ("apple" / "pomme"; "makeblock" in both). */
+export function defaultText(value: string, locale: BlockLocale = 'en'): string {
+  return locale === 'fr' && Object.prototype.hasOwnProperty.call(FR_DEFAULT_TEXTS, value) ? FR_DEFAULT_TEXTS[value] : value;
+}
+
+/** The white bubble for a slot (a bubble of words gets its default text in the language of the palette). */
+export function shadowFor(spec: ShadowSpec, locale: BlockLocale = 'en'): ToolboxShadow {
   return spec.kind === 'number'
     ? { type: 'math_number', fields: { NUM: spec.value } }
-    : { type: 'text', fields: { TEXT: spec.value } };
+    : { type: 'text', fields: { TEXT: defaultText(spec.value, locale) } };
 }
 
 /**
  * Toolbox entry of one catalog block, with its default bubbles.
  * `fields` lets you preset dropdowns (e.g. the variable to show in a "set ... to" block).
+ * `locale`: the language of the default texts of its bubbles of words (the stored values of its
+ * menus are the same in every language).
  */
-export function toolboxBlock(type: string, fields?: Record<string, unknown>): ToolboxBlock {
+export function toolboxBlock(type: string, fields?: Record<string, unknown>, locale: BlockLocale = 'en'): ToolboxBlock {
   const def = getBlockDef(type);
   if (!def) throw new Error(`toolboxBlock: "${type}" is not in the block catalog.`);
   const entry: ToolboxBlock = { kind: 'block', type };
@@ -136,20 +172,21 @@ export function toolboxBlock(type: string, fields?: Record<string, unknown>): To
 
   const inputs: Record<string, { shadow: ToolboxShadow }> = {};
   for (const arg of valueInputs(def)) {
-    if (arg.shadow) inputs[arg.name] = { shadow: shadowFor(arg.shadow) };
+    if (arg.shadow) inputs[arg.name] = { shadow: shadowFor(arg.shadow, locale) };
   }
   if (Object.keys(inputs).length > 0) entry.inputs = inputs;
   return entry;
 }
 
 /** What one static category shows: its few words (if it has any), then its blocks in catalog order, with gaps between groups. */
-export function categoryContents(id: CategoryId): ToolboxItem[] {
-  const items: ToolboxItem[] = (CATEGORY_INTRO[id] ?? []).map((item) => ({ ...item }));
+export function categoryContents(id: CategoryId, locale: BlockLocale = 'en'): ToolboxItem[] {
+  const intro = locale === 'fr' ? FRENCH_CATEGORY_INTRO : CATEGORY_INTRO;
+  const items: ToolboxItem[] = (intro[id] ?? []).map((item) => ({ ...item }));
   let blocks = 0;
   for (const def of BLOCKS) {
     if (def.category !== id || def.hidden) continue;
     if (def.gapBefore && blocks > 0) items.push({ kind: 'sep', gap: GROUP_GAP });
-    items.push(toolboxBlock(def.type));
+    items.push(toolboxBlock(def.type, undefined, locale));
     blocks++;
   }
   return items;
@@ -160,20 +197,22 @@ export function categoryContents(id: CategoryId): ToolboxItem[] {
  * more than any one game shows. With a list of category ids: only those categories, in the order
  * you list them (for example a beginner set that starts with Events and the chassis and leaves
  * the sensors out). For the palette of a game use paletteToolbox().
+ * `locale`: the language of its words (category names, the lines of the Gripper category, the
+ * default texts of the bubbles); left out, English.
  */
-export function buildToolbox(only?: CategoryId[]): ToolboxJson {
+export function buildToolbox(only?: CategoryId[], locale: BlockLocale = 'en'): ToolboxJson {
   const contents: ToolboxCategory[] = [];
   const wanted = only ? only.map((id) => getCategory(id)) : CATEGORIES;
   for (const category of wanted) {
     if (contents.some((entry) => entry.toolboxitemid === category.id)) continue; // listed twice
     const entry: ToolboxCategory = {
       kind: 'category',
-      name: category.name,
+      name: locale === 'fr' ? categoryName(category.id, locale) : category.name,
       colour: category.colour,
       toolboxitemid: category.id,
     };
     if (category.custom) entry.custom = category.custom;
-    else entry.contents = categoryContents(category.id);
+    else entry.contents = categoryContents(category.id, locale);
     contents.push(entry);
   }
   return { kind: 'categoryToolbox', contents };
@@ -183,9 +222,14 @@ export function buildToolbox(only?: CategoryId[]): ToolboxJson {
  * The palette of a game (give Game.id: 'fire-rescue', 'fire-chief', 'warehouse-sort',
  * 'locker-room'): the categories ./palettes.ts lists for it. Left out, or a game without a palette
  * of its own: the palette of Fire Rescue.
+ *
+ * `locale`: the language of the palette's words - 'fr' for the page of Robot en fête 2027
+ * (paletteToolbox('robot-en-fete', 'fr'): the palette of Warehouse Sort in French). Left out:
+ * English, on purpose: an editor that forgets to say 'fr' shows a WHOLLY English palette, which
+ * the tests of the French page catch, never a palette with a few words of each language.
  */
-export function paletteToolbox(gameId?: string): ToolboxJson {
-  return buildToolbox(paletteCategories(gameId));
+export function paletteToolbox(gameId?: string, locale: BlockLocale = 'en'): ToolboxJson {
+  return buildToolbox(paletteCategories(gameId), locale);
 }
 
 /**

@@ -35,6 +35,9 @@
  * loaded from a file) still shows and runs; a block for a part the robot does not have does
  * nothing and says so in the console.
  *
+ *   Robot en fête 2027   Warehouse Sort in French: the palette and the hover texts of Warehouse
+ *                 Sort, through LANGUAGE_VERSIONS below (in French: ./fr.ts).
+ *
  * Plain data: no Blockly, no DOM.
  */
 import { GRIPPER_SHORTCUT, type CategoryId } from './catalog';
@@ -109,9 +112,29 @@ export const GAME_VERSIONS: Readonly<Record<string, PaletteId>> = {
   'fire-rescue-junior': 'fire-rescue',
 };
 
-/** The game a version is a version of (GAME_VERSIONS), or undefined for any other id. */
+/**
+ * Games that are a game above in another language: the same robot, field, referee and blocks -
+ * only the words on the screen and on the blocks are another language's. For its palette, its
+ * hover texts and its programs such a game is a version of that game, exactly as the games of
+ * GAME_VERSIONS (versionOf below): a program saved on one page opens on the other as a program
+ * of the same game. Its words are the job of the screen (../ui/text) and of the blocks (./fr.ts,
+ * ./locale.ts): the palette itself is the same, paletteToolbox(gameId, 'fr') gives it French words.
+ *
+ *   robot-en-fete   Robot en fête 2027: Warehouse Sort in French (a category of its own, outside
+ *                   the seasons).
+ *
+ * (A list of its own, not one more line of GAME_VERSIONS: that list is the list of the games that
+ * are another version of the same competition, and a test of Fire Rescue Junior pins it.)
+ */
+export const LANGUAGE_VERSIONS: Readonly<Record<string, PaletteId>> = {
+  'robot-en-fete': 'warehouse-sort',
+};
+
+/** The game a version is a version of (GAME_VERSIONS, LANGUAGE_VERSIONS), or undefined for any other id. */
 export function versionOf(gameId: string | undefined): PaletteId | undefined {
-  return typeof gameId === 'string' && Object.prototype.hasOwnProperty.call(GAME_VERSIONS, gameId) ? GAME_VERSIONS[gameId] : undefined;
+  if (typeof gameId !== 'string') return undefined;
+  if (Object.prototype.hasOwnProperty.call(GAME_VERSIONS, gameId)) return GAME_VERSIONS[gameId];
+  return Object.prototype.hasOwnProperty.call(LANGUAGE_VERSIONS, gameId) ? LANGUAGE_VERSIONS[gameId] : undefined;
 }
 
 /**

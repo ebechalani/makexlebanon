@@ -6,9 +6,9 @@
  */
 import { useRef, useState } from 'react';
 import { ExamplesDialog } from './ExamplesDialog';
-import { EXAMPLES_WORDS } from './examples-words';
 import { ExamplesIcon, NewFileIcon, OpenIcon, RedoIcon, SaveIcon, UndoIcon } from './icons';
 import type { ExampleProgram } from './member-unlock';
+import { useScreenText } from './text/context';
 import type { MemberExamples } from './useMemberExamples';
 import { button } from './widgets';
 
@@ -33,6 +33,7 @@ const TOOL = `${button.ghost} max-sm:gap-1 max-sm:px-1.5`;
 
 export function EditorToolbar(props: EditorToolbarProps) {
   const { ready, examples } = props;
+  const text = useScreenText();
   const [examplesOpen, setExamplesOpen] = useState(false);
   // (what the button says when the pointer rests on it must be true for this visitor)
   const canLoadExamples = Object.keys(examples.available).length > 0;
@@ -48,10 +49,10 @@ export function EditorToolbar(props: EditorToolbarProps) {
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-0.5 border-b border-slate-200 bg-white px-2 py-1.5 sm:gap-1" role="toolbar" aria-label="Program">
-      <button type="button" className={TOOL} onClick={props.onNew} disabled={!ready} title="Start a new, empty program">
+    <div className="flex flex-wrap items-center gap-0.5 border-b border-slate-200 bg-white px-2 py-1.5 sm:gap-1" role="toolbar" aria-label={text.toolbarLabel}>
+      <button type="button" className={TOOL} onClick={props.onNew} disabled={!ready} title={text.newHint}>
         <NewFileIcon className="h-4 w-4" />
-        New
+        {text.newButton}
       </button>
 
       <button
@@ -64,10 +65,10 @@ export function EditorToolbar(props: EditorToolbarProps) {
           setExamplesOpen(true);
         }}
         disabled={!ready}
-        title={canLoadExamples ? EXAMPLES_WORDS.buttonHint : EXAMPLES_WORDS.buttonHintLocked}
+        title={canLoadExamples ? text.examplesWords.buttonHint : text.examplesWords.buttonHintLocked}
       >
         <ExamplesIcon className="h-4 w-4" />
-        Examples
+        {text.examplesButton}
       </button>
       {examplesOpen && (
         <ExamplesDialog
@@ -80,9 +81,9 @@ export function EditorToolbar(props: EditorToolbarProps) {
         />
       )}
 
-      <button type="button" className={TOOL} onClick={() => fileRef.current?.click()} disabled={!ready} title="Open a program file from this computer">
+      <button type="button" className={TOOL} onClick={() => fileRef.current?.click()} disabled={!ready} title={text.openHint}>
         <OpenIcon className="h-4 w-4" />
-        Open
+        {text.openButton}
       </button>
       <input
         ref={fileRef}
@@ -97,24 +98,24 @@ export function EditorToolbar(props: EditorToolbarProps) {
           event.target.value = '';
         }}
       />
-      <button type="button" className={TOOL} onClick={props.onSave} disabled={!ready} title="Save the program as a file on this computer">
+      <button type="button" className={TOOL} onClick={props.onSave} disabled={!ready} title={text.saveHint}>
         <SaveIcon className="h-4 w-4" />
-        Save
+        {text.saveButton}
       </button>
 
       <span className="mx-1 h-6 w-px bg-slate-200 max-sm:hidden" aria-hidden="true" />
 
-      <button type="button" className={TOOL} onClick={props.onUndo} disabled={!ready || !props.canUndo} aria-label="Undo" title="Undo (Ctrl+Z)">
+      <button type="button" className={TOOL} onClick={props.onUndo} disabled={!ready || !props.canUndo} aria-label={text.undo} title={text.undoHint}>
         <UndoIcon className="h-4 w-4" />
-        <span className="hidden xl:inline">Undo</span>
+        <span className="hidden xl:inline">{text.undo}</span>
       </button>
-      <button type="button" className={TOOL} onClick={props.onRedo} disabled={!ready || !props.canRedo} aria-label="Redo" title="Redo (Ctrl+Shift+Z)">
+      <button type="button" className={TOOL} onClick={props.onRedo} disabled={!ready || !props.canRedo} aria-label={text.redo} title={text.redoHint}>
         <RedoIcon className="h-4 w-4" />
-        <span className="hidden xl:inline">Redo</span>
+        <span className="hidden xl:inline">{text.redo}</span>
       </button>
 
-      <span className="ml-auto hidden pr-1 text-xs text-ink-500 xl:inline" title="Your blocks are saved in this browser a moment after every change.">
-        {ready ? `${props.blocks} block${props.blocks === 1 ? '' : 's'} · saved automatically` : 'Loading…'}
+      <span className="ml-auto hidden pr-1 text-xs text-ink-500 xl:inline" title={text.autosaveHint}>
+        {ready ? text.blockCount(props.blocks) : text.toolbarLoading}
       </span>
     </div>
   );

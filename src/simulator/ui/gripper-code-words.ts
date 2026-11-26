@@ -6,6 +6,9 @@
  * palette (the two lines and the button at the top of the Gripper category) are with the palette,
  * in ../blocks/toolbox.ts; the sentence in the tooltips is in ../blocks/catalog.ts.
  *
+ * The window reads these through the word table of the screen (./text/gripper.tsx: the English
+ * member IS what is here; the French page gets the French twin, FR_GRIPPER_TEXT, there).
+ *
  * Plain TypeScript (no DOM, no Blockly), so it can be unit-tested under Node.
  */
 import type { GripperChange } from '../blocks/gripper-original';

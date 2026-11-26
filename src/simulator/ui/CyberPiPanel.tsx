@@ -9,6 +9,7 @@ import { useState, type ReactNode } from 'react';
 import type { ButtonName, RGB, ScreenLabel } from '../core/types';
 import { rgbCss, wrapScreenLines } from './format';
 import { SoundIcon } from './icons';
+import { useScreenText } from './text/context';
 import { toggleClass } from './widgets';
 
 /** The real screen is 128 x 128 pixels; it is drawn a little larger here. */
@@ -78,6 +79,7 @@ export interface CyberPiPanelProps {
 }
 
 export function CyberPiPanel({ lines, labels, leds, onButton, soundOn, onSound }: CyberPiPanelProps) {
+  const text = useScreenText();
   // like the real screen: long lines wrap, and when the screen is full the oldest rows scroll away
   const visibleLines = wrapScreenLines(lines, SCREEN_COLUMNS).slice(-Math.floor(SCREEN_PIXELS / LINE_HEIGHT));
   const size = SCREEN_PIXELS * SCREEN_ZOOM;
@@ -87,23 +89,23 @@ export function CyberPiPanel({ lines, labels, leds, onButton, soundOn, onSound }
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center justify-center gap-4 rounded-card bg-ink-800 p-3">
         {/* joystick */}
-        <div className="grid grid-cols-3 gap-1" role="group" aria-label="Joystick">
+        <div className="grid grid-cols-3 gap-1" role="group" aria-label={text.joystick}>
           <span />
-          <HoldButton name="up" label="Joystick up" onButton={onButton} className={arrow}>
+          <HoldButton name="up" label={text.joystickUp} onButton={onButton} className={arrow}>
             ▲
           </HoldButton>
           <span />
-          <HoldButton name="left" label="Joystick left" onButton={onButton} className={arrow}>
+          <HoldButton name="left" label={text.joystickLeft} onButton={onButton} className={arrow}>
             ◀
           </HoldButton>
-          <HoldButton name="middle" label="Joystick pressed in the middle" onButton={onButton} className={arrow}>
+          <HoldButton name="middle" label={text.joystickMiddle} onButton={onButton} className={arrow}>
             ●
           </HoldButton>
-          <HoldButton name="right" label="Joystick right" onButton={onButton} className={arrow}>
+          <HoldButton name="right" label={text.joystickRight} onButton={onButton} className={arrow}>
             ▶
           </HoldButton>
           <span />
-          <HoldButton name="down" label="Joystick down" onButton={onButton} className={arrow}>
+          <HoldButton name="down" label={text.joystickDown} onButton={onButton} className={arrow}>
             ▼
           </HoldButton>
           <span />
@@ -115,7 +117,7 @@ export function CyberPiPanel({ lines, labels, leds, onButton, soundOn, onSound }
             className="relative overflow-hidden rounded-md bg-black font-mono text-white ring-2 ring-ink-600"
             style={{ width: size, height: size }}
             role="log"
-            aria-label="CyberPi screen"
+            aria-label={text.cyberPiScreen}
           >
             <div className="absolute inset-x-0 top-0 px-1" style={{ fontSize: 11 * SCREEN_ZOOM, lineHeight: `${LINE_HEIGHT * SCREEN_ZOOM}px` }}>
               {visibleLines.map((line, i) => (
@@ -139,11 +141,11 @@ export function CyberPiPanel({ lines, labels, leds, onButton, soundOn, onSound }
             ))}
             {lines.length === 0 && labels.length === 0 && (
               <span className="absolute inset-0 flex items-center justify-center px-3 text-center font-sans text-xs text-ink-400">
-                Use a &quot;print&quot; block to write here
+                {text.printHere}
               </span>
             )}
           </div>
-          <div className="flex gap-1.5" role="img" aria-label="The five LEDs of the CyberPi">
+          <div className="flex gap-1.5" role="img" aria-label={text.leds}>
             {[0, 1, 2, 3, 4].map((i) => {
               const led = leds[i] ?? { r: 0, g: 0, b: 0 };
               const lit = led.r + led.g + led.b > 24;
@@ -159,21 +161,21 @@ export function CyberPiPanel({ lines, labels, leds, onButton, soundOn, onSound }
         </div>
 
         {/* buttons A and B */}
-        <div className="flex flex-col gap-2" role="group" aria-label="Buttons">
-          <HoldButton name="a" label="Button A" onButton={onButton} className="h-11 w-11 rounded-full text-base">
+        <div className="flex flex-col gap-2" role="group" aria-label={text.buttons}>
+          <HoldButton name="a" label={text.buttonA} onButton={onButton} className="h-11 w-11 rounded-full text-base">
             A
           </HoldButton>
-          <HoldButton name="b" label="Button B" onButton={onButton} className="h-11 w-11 rounded-full text-base">
+          <HoldButton name="b" label={text.buttonB} onButton={onButton} className="h-11 w-11 rounded-full text-base">
             B
           </HoldButton>
         </div>
       </div>
 
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs text-ink-500">Hold a button down to press it on the robot.</p>
+        <p className="text-xs text-ink-500">{text.holdHint}</p>
         <button type="button" aria-pressed={soundOn} onClick={() => onSound(!soundOn)} className={toggleClass(soundOn)}>
           <SoundIcon className="h-4 w-4" on={soundOn} />
-          Sound {soundOn ? 'on' : 'off'}
+          {text.soundButton(soundOn)}
         </button>
       </div>
     </div>

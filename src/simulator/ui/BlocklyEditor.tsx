@@ -10,14 +10,21 @@
  *
  * The blocks are saved to the browser's storage a moment after every change, so a refresh or a
  * closed tab does not lose the student's work.
+ *
+ * The editor speaks the language of the screen (./text: `useScreenText().locale`): on the French
+ * page of Robot en fête 2027 its palette, its blocks and Blockly's own words are French, and its
+ * number bubbles read a decimal comma (../blocks/locale.ts). Blockly's French file is fetched only
+ * there, as a chunk of its own: an English page never loads it.
  */
 import { memo, useEffect, useRef, useState } from 'react';
 import type * as BlocklyModule from 'blockly';
 import { createEditor, type BlocklyApi, type GripperCodeHandler } from '../blocks';
+import { blocklyMessagesOf } from '../blocks/locale';
 import type { ProgramJson } from '../core/types';
-import { isProgramJson, retiredBlocksNote, withoutRetiredBlocks } from './program-file';
+import { isProgramJson, withoutRetiredBlocks } from './program-file';
 import { programFitScale } from './program-view';
 import { loadJson, saveJson } from './storage';
+import { useScreenText } from './text/context';
 
 export interface BlocklyEditorHandle {
   /** the blocks as they are right now */
@@ -119,6 +126,13 @@ function BlocklyEditorImpl(props: BlocklyEditorProps) {
   });
   const [phase, setPhase] = useState<'loading' | 'ready' | 'failed'>('loading');
   const { storageKey, mediaPath, palette } = props;
+  // the words of the screen, and the language of the blocks (read once, when the editor is made)
+  const text = useScreenText();
+  const textRef = useRef(text);
+  useEffect(() => {
+    textRef.current = text;
+  });
+  const locale = text.locale;
 
   useEffect(() => {
     let disposed = false;
@@ -130,6 +144,8 @@ function BlocklyEditorImpl(props: BlocklyEditorProps) {
 
     const setUp = async () => {
       const Blockly: BlocklyApi = await import('blockly');
+      // Blockly's own words in French (only the French page fetches them)
+      const frenchMessages = locale === 'fr' ? blocklyMessagesOf(await import('blockly/msg/fr')) : undefined;
       const host = hostRef.current;
       if (disposed || !host) return;
 
@@ -143,6 +159,9 @@ function BlocklyEditorImpl(props: BlocklyEditorProps) {
         sounds: false,
         // the blocks this game's robot can use
         palette,
+        // in the language of the screen
+        locale,
+        frenchMessages,
         // The button of the Gripper palette and the right-click entry of the Gripper blocks. An
         // editor that was given nobody to show that code gets neither: the entry would open nothing.
         onGripperCode: propsRef.current.onGripperCode ? (at) => propsRef.current.onGripperCode?.(at) : undefined,
@@ -161,7 +180,7 @@ function BlocklyEditorImpl(props: BlocklyEditorProps) {
       // program for one such block, and the saved work would be gone)
       const saved = loadJson(storageKey, isProgramJson);
       const kept = saved ? withoutRetiredBlocks(saved) : null;
-      let savedNote = kept ? retiredBlocksNote(kept, 'your saved program') : null;
+      let savedNote = kept ? textRef.current.retiredBlocksNote(kept, 'your saved program') : null;
       const first = kept?.program ?? propsRef.current.initialProgram();
       try {
         serializer.load(first, ws, { recordUndo: false });
@@ -274,14 +293,14 @@ function BlocklyEditorImpl(props: BlocklyEditorProps) {
       workspace?.dispose();
       workspace = null;
     };
-  }, [mediaPath, palette, storageKey]);
+  }, [mediaPath, palette, storageKey, locale]);
 
   return (
     <div className="relative h-full w-full">
       <div ref={hostRef} className="mbot2-blockly absolute inset-0" />
       {phase !== 'ready' && (
         <div className="absolute inset-0 flex items-center justify-center bg-slate-50 text-sm text-ink-500" role="status">
-          {phase === 'loading' ? 'Loading the blocks…' : 'The block editor could not be loaded. Please reload the page.'}
+          {phase === 'loading' ? text.editorLoading : text.editorFailed}
         </div>
       )}
     </div>

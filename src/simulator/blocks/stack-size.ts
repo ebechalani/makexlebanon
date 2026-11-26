@@ -6,10 +6,16 @@
  *   - the "original code" of the Gripper blocks (./gripper-original.ts), which adds My Blocks to a
  *     student's program and has to put them beside what is already there.
  *
+ * A French workspace (Robot en fête 2027) draws the same blocks with French rows, which are often
+ * longer: give the Sizer (or estimateStackWidth) the locale 'fr' and it counts the French words
+ * (./fr.ts). Left out, English: the widths every English program has always had.
+ *
  * Plain TypeScript: no DOM, no Blockly.
  */
 import { getBlockDef } from './catalog';
-import type { BlockArg } from './catalog';
+import type { BlockArg, BlockDef } from './catalog';
+import { FR_BLOCKS, FR_DEFAULT_TEXTS } from './fr';
+import type { BlockLocale } from './locale';
 import type { BlockJson, VariableJson } from '../core/types';
 
 /** Where the first script is put, and the free space between two scripts (workspace pixels). */
@@ -50,6 +56,12 @@ const NOTE_ICON = 30;
 
 const letters = (text: string): number => text.length * CHAR_WIDTH;
 
+/** The words of Blockly's own blocks that a row shows, per language (Blockly.Msg: ./locale.ts). */
+const BUILT_IN_WORDS: Readonly<Record<BlockLocale, { define: string; with: string; return: string; if: string; false: string }>> = {
+  en: { define: 'define', with: 'with:', return: 'return', if: 'if', false: 'false' },
+  fr: { define: 'définir', with: 'avec :', return: 'retourner', if: 'si', false: 'faux' },
+};
+
 /** A note on a block as Blockly saves it: closed (only the "?" icon shows) until it is clicked. */
 export function noteState(text: string): { text: string; pinned: boolean; width: number; height: number } {
   const lines = Math.max(2, Math.ceil(text.length / 30));
@@ -61,13 +73,36 @@ export function noteState(text: string): { text: string; pinned: boolean; width:
  * top block. The program builder uses it to place the scripts; a check against the real editor
  * makes sure the guess is never too small.
  */
-export function estimateStackWidth(top: BlockJson, variables: VariableJson[] = []): number {
-  return new Sizer(new Map(variables.map((v) => [v.id, v.name]))).stack(top);
+export function estimateStackWidth(top: BlockJson, variables: VariableJson[] = [], locale: BlockLocale = 'en'): number {
+  return new Sizer(new Map(variables.map((v) => [v.id, v.name])), locale).stack(top);
 }
 
-/** Estimates how wide blocks are drawn (see the constants above). */
+/** Estimates how wide blocks are drawn (see the constants above), in the words of a language. */
 export class Sizer {
-  constructor(private readonly variableNames: Map<string, string>) {}
+  constructor(
+    private readonly variableNames: Map<string, string>,
+    private readonly locale: BlockLocale = 'en',
+  ) {}
+
+  /** The text of row `index` of a block (0 = its first row) in the language of the sizer. */
+  private message(def: BlockDef, index: number): string {
+    const english = index === 0 ? def.message : (def.rows?.[index - 1]?.message ?? '');
+    if (this.locale !== 'fr') return english;
+    const french = FR_BLOCKS[def.type];
+    return (index === 0 ? french?.message : french?.rows?.[index - 1]) ?? english;
+  }
+
+  /** What a menu shows for its value, in the language of the sizer. */
+  private optionText(def: BlockDef, arg: Extract<BlockArg, { type: 'field_dropdown' }>, stored: unknown): string {
+    const index = Math.max(0, arg.options.findIndex(([, value]) => value === stored));
+    const english = arg.options[index][0];
+    return this.locale === 'fr' ? (FR_BLOCKS[def.type]?.options?.[arg.name]?.[index] ?? english) : english;
+  }
+
+  /** A default word (a variable's name, a text) in the language of the sizer. */
+  private word(text: string): string {
+    return this.locale === 'fr' && Object.prototype.hasOwnProperty.call(FR_DEFAULT_TEXTS, text) ? FR_DEFAULT_TEXTS[text] : text;
+  }
 
   /** Width of a stack of blocks: its widest block, the blocks nested inside C-shaped blocks included. */
   stack(first: BlockJson | undefined): number {
@@ -79,12 +114,13 @@ export class Sizer {
   private block(block: BlockJson): number {
     const def = getBlockDef(block.type);
     if (!def) return this.builtIn(block);
-    let widest = this.row(block, def.message, def.args);
+    const first = this.message(def, 0);
+    let widest = this.row(block, def, first, def.args);
     if (block.icons) widest += NOTE_ICON;
     if (def.shape === 'reporter' || def.shape === 'boolean') widest += VALUE_ENDS;
-    else if (/^%\d/.test(def.message) && def.args.length > 0 && def.args[0].type !== 'input_value') widest += LEADING_FIELD;
-    for (const row of def.rows ?? []) {
-      widest = Math.max(widest, this.row(block, row.message, row.args ?? []));
+    else if (/^%\d/.test(first) && def.args.length > 0 && def.args[0].type !== 'input_value') widest += LEADING_FIELD;
+    for (const [i, row] of (def.rows ?? []).entries()) {
+      widest = Math.max(widest, this.row(block, def, this.message(def, i + 1), row.args ?? []));
       for (const arg of row.args ?? []) {
         if (arg.type === 'input_statement') widest = Math.max(widest, C_BLOCK_MIN, INDENT + this.stack(block.inputs?.[arg.name]?.block));
       }
@@ -93,7 +129,7 @@ export class Sizer {
   }
 
   /** One row of a catalog block: its words, fields and value slots side by side. */
-  private row(block: BlockJson, message: string, args: BlockArg[]): number {
+  private row(block: BlockJson, def: BlockDef, message: string, args: BlockArg[]): number {
     const parts: number[] = [];
     for (const label of message.split(/%\d+/)) {
       if (label.trim() !== '') parts.push(letters(label.trim()));
@@ -105,18 +141,15 @@ export class Sizer {
         case 'input_value':
           parts.push(this.slot(block, arg.name));
           break;
-        case 'field_dropdown': {
-          const stored = block.fields?.[arg.name];
-          const option = arg.options.find(([, value]) => value === stored) ?? arg.options[0];
-          parts.push(letters(option[0]) + DROPDOWN_EXTRA);
+        case 'field_dropdown':
+          parts.push(letters(this.optionText(def, arg, block.fields?.[arg.name])) + DROPDOWN_EXTRA);
           break;
-        }
         case 'field_input':
-          parts.push(letters(String(block.fields?.[arg.name] ?? arg.text)) + BUBBLE_EXTRA);
+          parts.push(letters(String(block.fields?.[arg.name] ?? this.word(arg.text))) + BUBBLE_EXTRA);
           break;
         case 'field_variable': {
           const ref = block.fields?.[arg.name] as { id?: string } | undefined;
-          parts.push(letters(this.variableNames.get(ref?.id ?? '') ?? arg.variable) + DROPDOWN_EXTRA);
+          parts.push(letters(this.variableNames.get(ref?.id ?? '') ?? this.word(arg.variable)) + DROPDOWN_EXTRA);
           break;
         }
         case 'field_colour':
@@ -144,28 +177,29 @@ export class Sizer {
   /** Blockly's own blocks: my-block definitions and calls, plain variable blocks. */
   private builtIn(block: BlockJson): number {
     const state = (block.extraState ?? {}) as { name?: unknown; params?: unknown };
+    const words = BUILT_IN_WORDS[this.locale];
     switch (block.type) {
       case 'procedures_defnoreturn':
       case 'procedures_defreturn': {
         const params = Array.isArray(state.params) ? state.params.map((p) => String((p as { name?: unknown }).name ?? '')) : [];
-        const title = `define ${String(block.fields?.NAME ?? '')}${params.length > 0 ? ` with: ${params.join(', ')}` : ''}`;
+        const title = `${words.define} ${String(block.fields?.NAME ?? '')}${params.length > 0 ? ` ${words.with} ${params.join(', ')}` : ''}`;
         let widest = letters(title) + BUBBLE_EXTRA + DEFINITION_ICONS + ROW_PADDING;
         widest = Math.max(widest, INDENT + this.stack(block.inputs?.STACK?.block));
-        if (block.type === 'procedures_defreturn') widest = Math.max(widest, this.sum([letters('return'), this.slot(block, 'RETURN')]) + INDENT);
+        if (block.type === 'procedures_defreturn') widest = Math.max(widest, this.sum([letters(words.return), this.slot(block, 'RETURN')]) + INDENT);
         return widest;
       }
       case 'procedures_callnoreturn':
       case 'procedures_callreturn': {
         const params = Array.isArray(state.params) ? state.params.map(String) : [];
         // the name on the first row, then one row per value: "name" (value)
-        let widest = this.sum([letters(`${String(state.name ?? '')}${params.length > 0 ? ' with:' : ''}`)]);
+        let widest = this.sum([letters(`${String(state.name ?? '')}${params.length > 0 ? ` ${words.with}` : ''}`)]);
         params.forEach((param, i) => (widest = Math.max(widest, this.sum([letters(param), this.slot(block, `ARG${i}`)]))));
         return widest;
       }
       case 'procedures_ifreturn':
-        return this.sum([letters('if'), this.slot(block, 'CONDITION'), letters('return'), this.slot(block, 'VALUE')]);
+        return this.sum([letters(words.if), this.slot(block, 'CONDITION'), letters(words.return), this.slot(block, 'VALUE')]);
       case 'logic_boolean':
-        return this.sum([letters('false') + DROPDOWN_EXTRA]);
+        return this.sum([letters(words.false) + DROPDOWN_EXTRA]);
       default: {
         // anything else: its fields and slots side by side
         const parts: number[] = [letters(block.type)];

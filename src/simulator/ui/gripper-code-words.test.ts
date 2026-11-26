@@ -1,6 +1,7 @@
 /**
  * What the window "Inside the Gripper blocks" says (./gripper-code-words.ts): the sentences at
- * its top and the answers of its two buttons.
+ * its top and the answers of its two buttons - in English, and in French (./text/gripper.tsx,
+ * the page of Robot en fête 2027).
  */
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
@@ -10,6 +11,7 @@ import { DEFAULT_ROBOT_CONFIG } from '../core/robot';
 import type { ProgramJson } from '../core/types';
 import { addedMessage, convertedMessage, GRIPPER_CODE_WORDS, gripperCodeIntro } from './gripper-code-words';
 import { blankProgram } from './program-file';
+import { EN_GRIPPER_TEXT, FR_GRIPPER_TEXT } from './text/gripper';
 
 /** The blank program with some Gripper blocks under the yellow block. */
 function withGripperBlocks(actions: Array<'open' | 'close'>): ProgramJson {
@@ -58,5 +60,61 @@ describe('the words of the window "Inside the Gripper blocks"', () => {
     const three = convertedMessage(convertGripperBlocks(withGripperBlocks(['close', 'open', 'close']), DEFAULT_ROBOT_CONFIG));
     assert.match(three, /^3 Gripper blocks were replaced by their My Blocks\./);
     assert.match(three, /Undo brings the Gripper blocks back\.$/);
+  });
+});
+
+describe('the window in the word table of the screen (./text/gripper.tsx): English is these words, French their twin', () => {
+  const NB = ' ';
+
+  test('English: the strings and the three functions of this file, and the two picture descriptions as the window wrote them', () => {
+    for (const [key, value] of Object.entries(GRIPPER_CODE_WORDS)) assert.equal(EN_GRIPPER_TEXT[key as keyof typeof GRIPPER_CODE_WORDS], value, key);
+    assert.equal(EN_GRIPPER_TEXT.intro, gripperCodeIntro);
+    assert.equal(EN_GRIPPER_TEXT.addedMessage, addedMessage);
+    assert.equal(EN_GRIPPER_TEXT.convertedMessage, convertedMessage);
+    assert.equal(EN_GRIPPER_TEXT.blockPicture('gripper opens until done'), 'Gripper block: gripper opens until done');
+    assert.equal(EN_GRIPPER_TEXT.codePicture(['define gripper opens', 'wait 0.4 seconds']), 'My Block: define gripper opens, wait 0.4 seconds');
+    // the same keys in both languages
+    assert.deepEqual(Object.keys(FR_GRIPPER_TEXT).sort(), Object.keys(EN_GRIPPER_TEXT).sort());
+  });
+
+  test('French: the title, the sentences at the top (with the servos of the robot), the buttons', () => {
+    assert.equal(FR_GRIPPER_TEXT.title, 'À l’intérieur des blocs de la pince');
+    assert.equal(FR_GRIPPER_TEXT.addButton, 'Ajouter ces blocs à mon programme');
+    assert.equal(FR_GRIPPER_TEXT.convertButton, 'Montrer mon programme à la manière de mBlock');
+    assert.equal(FR_GRIPPER_TEXT.codeHeading, `La même chose dans mBlock${NB}: un bloc de «${NB}Mes blocs${NB}» que tu fais toi-même`);
+    const intro = FR_GRIPPER_TEXT.intro(DEFAULT_ROBOT_CONFIG);
+    assert.equal(intro.length, 3);
+    assert.equal(intro[0], `mBlock n’a pas de catégorie Pince${NB}: les blocs de la pince sont des raccourcis que seul ce simulateur a.`);
+    assert.equal(intro[2], 'Sur ce robot, le servo S1 bouge le bras et le servo S2 bouge la pince.');
+    assert.equal(FR_GRIPPER_TEXT.blockPicture('la pince s’ouvre jusqu’à la fin'), `Bloc de la pince${NB}: la pince s’ouvre jusqu’à la fin`);
+    assert.equal(FR_GRIPPER_TEXT.codePicture(['définir la pince s’ouvre', 'attendre 0,4 secondes']), `Mon bloc${NB}: définir la pince s’ouvre, attendre 0,4 secondes`);
+    for (const text of [...Object.values(FR_GRIPPER_TEXT).filter((v): v is string => typeof v === 'string'), ...intro]) {
+      assert.ok(!/ [:;!?»]|« |'|\.\.\./.test(text), text);
+      assert.ok(!/\b(vous|votre|vos)\b/i.test(text), text);
+    }
+  });
+
+  test('French: what the two buttons say, with the French My Blocks (one form for 0 and 1, the other from 2 on)', () => {
+    const first = addGripperMyBlocks(blankProgram(), DEFAULT_ROBOT_CONFIG, 'fr');
+    const undo = `Ferme cette fenêtre pour les voir${NB}; tu les trouves aussi dans «${NB}Mes blocs${NB}». Annuler les enlève de nouveau.`;
+    assert.equal(FR_GRIPPER_TEXT.addedMessage(first), `5 blocs ont été ajoutés à ton programme. ${undo}`);
+    assert.equal(
+      FR_GRIPPER_TEXT.addedMessage(addGripperMyBlocks(first.program, DEFAULT_ROBOT_CONFIG, 'fr')),
+      `Rien n’a été ajouté${NB}: les 5 blocs sont déjà dans ton programme. Regarde dans «${NB}Mes blocs${NB}».`,
+    );
+    const some = addGripperMyBlocks(convertGripperBlocks(withGripperBlocks(['close', 'open']), DEFAULT_ROBOT_CONFIG, 'fr').program, DEFAULT_ROBOT_CONFIG, 'fr');
+    assert.equal(
+      FR_GRIPPER_TEXT.addedMessage(some),
+      `3 blocs ont été ajoutés à ton programme${NB}: le bras monte, le bras descend et le bras va à la hauteur. Les 2 autres étaient déjà là. ${undo}`,
+    );
+    assert.equal(FR_GRIPPER_TEXT.addedMessage({ added: ['le bras descend'], myBlocks: first.myBlocks }), `1 bloc a été ajouté à ton programme${NB}: le bras descend. Les 4 autres étaient déjà là. ${undo}`);
+    assert.match(FR_GRIPPER_TEXT.addedMessage({ added: first.added.slice(0, 4), myBlocks: first.myBlocks }), /^4 blocs ont été ajoutés .* L’autre était déjà là\. /);
+
+    assert.equal(FR_GRIPPER_TEXT.convertedMessage(convertGripperBlocks(blankProgram(), DEFAULT_ROBOT_CONFIG, 'fr')), `Ton programme n’a pas de blocs de la pince${NB}: il n’y a rien à changer.`);
+    assert.equal(
+      FR_GRIPPER_TEXT.convertedMessage(convertGripperBlocks(withGripperBlocks(['close']), DEFAULT_ROBOT_CONFIG, 'fr')),
+      `1 bloc de la pince a été remplacé par son bloc de «${NB}Mes blocs${NB}». Ferme cette fenêtre pour voir ton programme. Annuler fait revenir les blocs de la pince.`,
+    );
+    assert.match(FR_GRIPPER_TEXT.convertedMessage(convertGripperBlocks(withGripperBlocks(['close', 'open', 'close']), DEFAULT_ROBOT_CONFIG, 'fr')), /^3 blocs de la pince ont été remplacés par leurs blocs de « Mes blocs »\. /);
   });
 });
