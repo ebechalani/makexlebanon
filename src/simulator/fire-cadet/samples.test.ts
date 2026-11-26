@@ -28,6 +28,7 @@ import type { BatchResult } from '../core/batch';
 import { EXAMPLE_LEVELS as FIRE_CHIEF_LEVELS, SAMPLE_CATALOG as FIRE_CHIEF_CATALOG } from '../fire-chief/sample-catalog';
 import { EXAMPLE_LEVELS as FIRE_RESCUE_LEVELS, SAMPLE_CATALOG as FIRE_RESCUE_CATALOG } from '../fire-rescue/sample-catalog';
 import { EXAMPLE_LEVELS as LOCKER_ROOM_LEVELS, SAMPLE_CATALOG as LOCKER_ROOM_CATALOG } from '../locker-room/sample-catalog';
+import { EXAMPLE_LEVELS as ROBOT_EN_FETE_LEVELS, SAMPLE_CATALOG as ROBOT_EN_FETE_CATALOG } from '../robot-en-fete/sample-catalog';
 import { EXAMPLE_LEVELS as WAREHOUSE_SORT_LEVELS, SAMPLE_CATALOG as WAREHOUSE_SORT_CATALOG } from '../warehouse-sort/sample-catalog';
 import { cardRowProgram, cardsFromText, cardsToText, expand, isNumberCard, readCards, rowProblem, rowSeconds, rowTicks, timesOf } from './cards';
 import { PLACES } from './field';
@@ -260,6 +261,12 @@ describe('the list of the examples', () => {
     const otherAbouts = [...FIRE_RESCUE_LEVELS, ...FIRE_CHIEF_LEVELS, ...WAREHOUSE_SORT_LEVELS, ...LOCKER_ROOM_LEVELS].map((level) => level.about);
     assert.equal(otherAbouts.length, 12);
     assert.equal(new Set([...otherAbouts, ...EXAMPLE_LEVELS.map((level) => level.about)]).size, 15);
+    // ... nor those of Robot en fête 2027, which came later (its own test checks it against every game)
+    for (const card of ROBOT_EN_FETE_CATALOG) {
+      assert.ok(!ids.has(card.id) && !titles.has(card.title.toLowerCase()), card.id);
+      assert.ok(!card.id.startsWith('cadet-'), card.id);
+    }
+    for (const level of EXAMPLE_LEVELS) assert.ok(!ROBOT_EN_FETE_LEVELS.some((other) => other.about === level.about), level.about);
   });
 
   test('every program is a valid row of cards for one practice map: readCards gives it back unchanged, and "field" reads as that map', () => {

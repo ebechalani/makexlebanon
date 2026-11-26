@@ -11,7 +11,14 @@ export function PageHero({
   lead,
   breadcrumbs,
   children,
+  lang,
 }: {
+  /**
+   * The language of the eyebrow, the title, the lead and the children, when it is not the site's
+   * (the French page of Robot en fête 2027: "fr"). The breadcrumbs keep the site's language: they
+   * are the website's own path. Left out: no attribute at all, as on every other page.
+   */
+  lang?: string;
   eyebrow?: string;
   title: string;
   lead?: string;
@@ -47,18 +54,26 @@ export function PageHero({
         ) : null}
 
         {eyebrow ? (
-          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-brand-300">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-brand-300" lang={lang}>
             {eyebrow}
           </p>
         ) : null}
 
-        <h1 className="max-w-4xl text-3xl leading-tight sm:text-4xl lg:text-5xl">{title}</h1>
+        <h1 className="max-w-4xl text-3xl leading-tight sm:text-4xl lg:text-5xl" lang={lang}>
+          {title}
+        </h1>
 
         {lead ? (
-          <p className="mt-5 max-w-2xl text-lg leading-relaxed text-white/70 text-pretty">{lead}</p>
+          <p className="mt-5 max-w-2xl text-lg leading-relaxed text-white/70 text-pretty" lang={lang}>
+            {lead}
+          </p>
         ) : null}
 
-        {children ? <div className="mt-8">{children}</div> : null}
+        {children ? (
+          <div className="mt-8" lang={lang}>
+            {children}
+          </div>
+        ) : null}
       </Container>
     </div>
   );

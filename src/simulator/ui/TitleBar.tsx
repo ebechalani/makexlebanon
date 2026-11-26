@@ -9,11 +9,12 @@
  */
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { useScreenText } from './text/context';
-import type { ScreenText } from './text/types';
+import { POWERED_BY } from './powered-by';
+import { useTitleText } from './text/title-context';
+import type { TitleText } from './text/types';
 
 /** The pages above the simulator on the website: the Simulator page lists all the simulators. */
-const parentPages = (text: ScreenText): Array<{ label: string; href: string }> => [
+const parentPages = (text: TitleText): Array<{ label: string; href: string }> => [
   { label: text.homeCrumb, href: '/' },
   { label: text.simulatorCrumb, href: '/simulator' },
 ];
@@ -34,7 +35,8 @@ export interface TitleBarProps {
 }
 
 export function TitleBar({ title, wrapOnPhone = false, robot = 'mBot2', children }: TitleBarProps) {
-  const text = useScreenText();
+  // (the title row is on every loading screen: it reads its own words of the table, not the whole table - ./text/title-context.tsx)
+  const text = useTitleText();
   const PARENT_PAGES = parentPages(text);
   return (
     <div className="relative z-30 flex shrink-0 flex-wrap items-center gap-x-2 gap-y-0.5 border-b border-white/10 bg-ink-950 px-3 py-1.5 text-white sm:h-12 sm:flex-nowrap sm:px-4 sm:py-0">
@@ -71,11 +73,11 @@ export function TitleBar({ title, wrapOnPhone = false, robot = 'mBot2', children
   );
 }
 
-/** Who the simulator is powered by. Shown on every simulator page, also while it loads. */
-export const POWERED_BY = 'RoboHolic Robotics Academy';
+/** Who the simulator is powered by (./powered-by.ts). Shown on every simulator page, also while it loads. */
+export { POWERED_BY };
 
 function PoweredBy({ className }: { className: string }) {
-  const text = useScreenText();
+  const text = useTitleText();
   return (
     <p className={`text-[11px] leading-tight text-white/60 ${className}`} data-powered-by>
       {text.poweredBy}<span className="font-semibold text-white/85">{POWERED_BY}</span>

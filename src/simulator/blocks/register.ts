@@ -594,3 +594,15 @@ export function createEditor(Blockly: BlocklyApi, container: Element | string, o
   else workspace.registerButtonCallback(GRIPPER_CODE_CALLBACK, () => {});
   return workspace;
 }
+
+/**
+ * Close an editor made by createEditor. A French editor puts Blockly's own words back into English
+ * as it goes (./locale.ts): they are one object for the whole site, and the next Blockly a visitor
+ * meets without a reload may set none of its own - the starter blocks of a training lesson
+ * (src/components/RobotLab.tsx) would say "répéter 4 fois". An English editor is just disposed.
+ */
+export function disposeEditor(Blockly: BlocklyApi, workspace: BlocklyModule.WorkspaceSvg): void {
+  const french = localeOfWorkspace(workspace) === 'fr';
+  workspace.dispose();
+  if (french) applyBlocklyMessages(Blockly, 'en');
+}

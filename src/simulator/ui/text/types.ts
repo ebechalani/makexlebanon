@@ -3,8 +3,9 @@
  *
  * The screen (../SimulatorApp.tsx and its parts) is the same for every game and, since Robot en
  * fête 2027, for two languages. A shared part of the screen gets every text, number and time it
- * shows from this table - `const text = useScreenText();` (./context.tsx) - and from nowhere
- * else. The English page sets no table: the context gives the English one by default, and the
+ * shows from this table - `const text = useScreenText();` (./context.tsx; the title row, which is
+ * on every loading screen, reads its own part of it: `useTitleText()`, ./title-context.tsx) - and
+ * from nowhere else. The English page sets no table: the context gives the English one, and the
  * English page runs the very same code it always ran (EN_TEXT holds today's strings, moved, and
  * today's text functions themselves). Only the French page sets one: `<SimulatorApp locale="fr">`.
  *

@@ -20,6 +20,7 @@ import { cmText, rulerLabels, rulerReading, rulerText, turnText } from '../ruler
 import { capital, scoreSheetSummary } from '../screen-words';
 import { readyHint, sizeButtonHint } from '../stage-view';
 import { homeButtonWords } from '../start-pose';
+import { EN_TITLE_TEXT } from './en-title';
 import { EN_GRIPPER_TEXT } from './gripper';
 import type { MatchOver, ScreenText } from './types';
 
@@ -56,12 +57,8 @@ export const EN_TEXT: ScreenText = {
   percent: (share) => `${Math.round(share * 100)}%`,
   averageScore: (value) => value.toFixed(1),
 
-  // ---- the title row (TitleBar.tsx)
-  breadcrumb: 'Breadcrumb',
-  homeCrumb: 'Home',
-  simulatorCrumb: 'Simulator',
-  simulatorTitle: (title) => <>{title} simulator </>,
-  poweredBy: 'Powered by ',
+  // ---- the title row (TitleBar.tsx): a file of its own, which the title row reads without this table (./title-context.tsx)
+  ...EN_TITLE_TEXT,
 
   // ---- the screen (SimulatorApp.tsx)
   notAllowed: (startZoneName) => `The robot must be completely inside the ${startZoneName}.`,

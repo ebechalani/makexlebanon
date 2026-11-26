@@ -36,7 +36,7 @@ import { addGripperMyBlocks, convertGripperBlocks, gripperDefinitionProgram, gri
 import { applyBlocklyMessages, blocklyMessagesOf, localeOfWorkspace, setWorkspaceLocale, withBlocklyMessage } from './locale';
 import { withDecimalPoint } from './number-field';
 import { GAME_VERSIONS, LANGUAGE_VERSIONS, PALETTE_IDS, PALETTE_TOOLTIPS, paletteCategories, paletteOf, paletteTooltip, versionOf } from './palettes';
-import { createEditor, frenchBlockJson, GRIPPER_CODE_MENU_ID, MAKE_LIST_CALLBACK, registerBlocks, variablesFlyout, type BlocklyApi } from './register';
+import { createEditor, disposeEditor, frenchBlockJson, GRIPPER_CODE_MENU_ID, MAKE_LIST_CALLBACK, registerBlocks, variablesFlyout, type BlocklyApi } from './register';
 import { estimateStackWidth } from './stack-size';
 import { buildToolbox, paletteToolbox, SEE_MBLOCK_CODE, TOOLBOX, toolboxBlock, toolboxBlockTypes, type ToolboxJson } from './toolbox';
 
@@ -634,5 +634,24 @@ describe('a French workspace (real Blockly)', () => {
     // a word changed for one call comes back
     withBlocklyMessage(Blockly, 'NEW_VARIABLE_TITLE', 'x', () => assert.equal(msg.NEW_VARIABLE_TITLE, 'x'));
     assert.equal(msg.NEW_VARIABLE_TITLE, 'New variable name:');
+  });
+
+  test("a French editor that is closed puts Blockly's own words back into English (a lesson's starter blocks set none of their own)", () => {
+    const msg = Blockly.Msg as Record<string, string>;
+    const blocklyEnglish = createRequire(import.meta.url)('blockly/msg/en') as Record<string, string>;
+    const frenchEditor = createEditor(Blockly, 'fr2', { sounds: false, palette: ROBOT_EN_FETE, locale: 'fr', frenchMessages: blocklyFrench });
+    // ("repeat %1 times": Blockly's own block, which the lesson player of the training pages shows)
+    assert.equal(msg.CONTROLS_REPEAT_TITLE, blocklyFrench.CONTROLS_REPEAT_TITLE);
+    assert.notEqual(msg.CONTROLS_REPEAT_TITLE, blocklyEnglish.CONTROLS_REPEAT_TITLE);
+    disposeEditor(Blockly, frenchEditor);
+    assert.deepEqual({ ...msg }, englishMessages);
+    assert.equal(msg.CONTROLS_REPEAT_TITLE, blocklyEnglish.CONTROLS_REPEAT_TITLE);
+    assert.equal(document.querySelector('#fr2 .blocklySvg'), null, 'the French editor is gone');
+    // an English editor is only disposed: Blockly's words stay as they are
+    const englishEditor = createEditor(Blockly, 'en2', { sounds: false, palette: 'warehouse-sort' });
+    const before = { ...msg };
+    disposeEditor(Blockly, englishEditor);
+    assert.deepEqual({ ...msg }, before);
+    assert.equal(document.querySelector('#en2 .blocklySvg'), null, 'the English editor is gone');
   });
 });

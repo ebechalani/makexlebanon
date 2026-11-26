@@ -1,11 +1,14 @@
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
-import { simulatorSeasons } from '@content/seasons';
+import type { ReactNode } from 'react';
+import { simulatorSeasons, type SimulatorCard } from '@content/seasons';
 import { site } from '@content/site';
+import { standaloneCategories } from '@content/standalone';
 import { PageHero } from '@/components/PageHero';
 import { ArrowIcon, Badge, Container } from '@/components/ui';
-import { POWERED_BY } from '@/simulator/ui/TitleBar';
+// (a plain file that imports nothing: the title row itself, @/simulator/ui/TitleBar, would bring its client code onto this page)
+import { POWERED_BY } from '@/simulator/ui/powered-by';
 
 const PATH = '/simulator';
 const TITLE = 'Robot simulators';
@@ -14,7 +17,8 @@ const DESCRIPTION =
   'MakeX Lebanon mission in the browser: the Season 2026 category Locker Room (Capelli, ages 13–15) and ' +
   'Warehouse Sort, the beginner mission of the Inspire category (Season 2026), and the 2027 categories ' +
   'Fire Cadet (mTiny, ages 4–7), Fire Fighter (ages 8–10), Fire Rescue Junior (ages 10–12), Fire Rescue Senior ' +
-  '(ages 13–15) and Fire Chief (ages 14–17). Free, nothing to install.';
+  '(ages 13–15) and Fire Chief (ages 14–17). And Robot en fête 2027, the French version of Warehouse Sort. ' +
+  'Free, nothing to install.';
 
 /**
  * The site's share card (src/app/opengraph-image.tsx). A page that sets its own `openGraph`
@@ -54,6 +58,11 @@ export const metadata: Metadata = {
  * here: the seasons, names, labels, sentences, addresses and pictures all come from
  * `simulatorSeasons()` in content/seasons.ts, so a simulator added there appears here by itself.
  *
+ * After the seasons, one part for each category of its own (content/standalone.ts): Robot en
+ * fête 2027, in French. That part is in its category's language (lang="fr"), and so are all the
+ * words of its card, which come from the same entry: a card is given all its words (CardWords),
+ * so that none of them can fall back to the English of the other cards.
+ *
  * A card is one link to the simulator (the picture, the name and the sentences), so it can be
  * clicked anywhere. The "About <category>" link is a separate link under the card: a link may
  * not hold another link.
@@ -80,60 +89,32 @@ export default function SimulatorPage() {
                 </h2>
 
                 <ul className="mt-8 grid gap-6 md:grid-cols-2">
-                  {simulators.map((simulator) => {
-                    const summaryId = `simulator-${simulator.href.split('/').pop()}-summary`;
-                    const open = `Open the ${simulator.name} simulator`;
-                    return (
-                      <li key={simulator.href} className="flex flex-col">
-                        <Link
-                          href={simulator.href}
-                          aria-label={open}
-                          aria-describedby={summaryId}
-                          className="group flex flex-1 flex-col overflow-hidden rounded-card bg-white ring-1 ring-slate-200 transition-shadow hover:shadow-lg hover:ring-brand-300 focus-visible:outline-offset-4"
-                        >
-                          {simulator.mat ? (
-                            // (the mat of the simulator, seen from above)
-                            <div className="bg-slate-100 p-5 sm:p-6">
-                              <Image
-                                src={simulator.mat}
-                                alt={`The mat of the ${simulator.name} simulator, seen from above`}
-                                width={640}
-                                height={640}
-                                sizes="(min-width: 768px) 20rem, 80vw"
-                                className="mx-auto h-auto w-full max-w-xs rounded-md bg-white shadow-md ring-1 ring-slate-300 transition-transform duration-300 group-hover:scale-[1.03]"
-                              />
-                            </div>
-                          ) : null}
+                  {simulators.map((simulator) => (
+                    <CardItem key={simulator.href} simulator={simulator} words={englishCardWords(simulator.name)} />
+                  ))}
+                </ul>
+              </section>
+            ))}
 
-                          <div className="flex flex-1 flex-col p-6">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <Badge>{simulator.labels[0]}</Badge>
-                              <Badge tone="neutral">{simulator.labels[1]}</Badge>
-                            </div>
-                            <h3 className="mt-4 text-xl text-ink-900 group-hover:text-brand-700">{simulator.name} simulator</h3>
-                            <p id={summaryId} className="mt-2 flex-1 text-sm leading-relaxed text-ink-600 text-pretty">
-                              {simulator.summary}
-                            </p>
-                            {/* (what the whole card does, so that it reads as a link) */}
-                            <span className="mt-6 inline-flex items-center gap-2 self-start rounded-lg bg-brand-500 px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors group-hover:bg-brand-600">
-                              {open}
-                              <ArrowIcon className="transition-transform group-hover:translate-x-0.5" />
-                            </span>
-                          </div>
-                        </Link>
+            {/* the categories of their own, after the seasons: each part in its category's language */}
+            {standaloneCategories.map((category) => (
+              <section key={category.slug} aria-labelledby={`category-${category.slug}`} lang={category.lang}>
+                <h2 id={`category-${category.slug}`} className="border-b border-slate-200 pb-5 text-2xl text-ink-900 sm:text-3xl">
+                  {category.name}
+                </h2>
 
-                        {simulator.about ? (
-                          <Link
-                            href={simulator.about}
-                            className="group mt-3 inline-flex min-h-9 items-center gap-2 self-start py-1.5 text-sm font-semibold text-brand-600 hover:text-brand-700"
-                          >
-                            About {simulator.name}
-                            <ArrowIcon className="transition-transform group-hover:translate-x-0.5" />
-                          </Link>
-                        ) : null}
-                      </li>
-                    );
-                  })}
+                <ul className="mt-8 grid gap-6 md:grid-cols-2">
+                  <CardItem
+                    simulator={{
+                      name: category.name,
+                      href: category.simulator.href,
+                      summary: category.simulator.summary,
+                      mat: category.simulator.mat,
+                      labels: category.simulator.card.labels,
+                      about: `/${category.slug}`,
+                    }}
+                    words={category.simulator.card}
+                  />
                 </ul>
               </section>
             ))}
@@ -146,5 +127,83 @@ export default function SimulatorPage() {
         </Container>
       </div>
     </>
+  );
+}
+
+/** The words of a card. Every one is given, so that a card in another language cannot fall back to English. */
+type CardWords = {
+  /** the name of the card */
+  heading: ReactNode;
+  /** what the whole card does: its name for a screen reader, and the hint at its foot */
+  open: string;
+  /** what its picture shows */
+  matAlt: string;
+  /** the link to the category's own page, under the card */
+  about: ReactNode;
+};
+
+/** The words of a card of a season: "Fire Chief simulator", "Open the Fire Chief simulator", "About Fire Chief". */
+function englishCardWords(name: string): CardWords {
+  // (the name and the link keep the pieces of text they always had: "<name>" " simulator", "About " "<name>")
+  return {
+    heading: <>{name} simulator</>,
+    open: `Open the ${name} simulator`,
+    matAlt: `The mat of the ${name} simulator, seen from above`,
+    about: <>About {name}</>,
+  };
+}
+
+/** One card: a link to the simulator, and under it the link to its category's page (when it has one). */
+function CardItem({ simulator, words }: { simulator: SimulatorCard; words: CardWords }) {
+  const summaryId = `simulator-${simulator.href.split('/').pop()}-summary`;
+  return (
+    <li className="flex flex-col">
+      <Link
+        href={simulator.href}
+        aria-label={words.open}
+        aria-describedby={summaryId}
+        className="group flex flex-1 flex-col overflow-hidden rounded-card bg-white ring-1 ring-slate-200 transition-shadow hover:shadow-lg hover:ring-brand-300 focus-visible:outline-offset-4"
+      >
+        {simulator.mat ? (
+          // (the mat of the simulator, seen from above)
+          <div className="bg-slate-100 p-5 sm:p-6">
+            <Image
+              src={simulator.mat}
+              alt={words.matAlt}
+              width={640}
+              height={640}
+              sizes="(min-width: 768px) 20rem, 80vw"
+              className="mx-auto h-auto w-full max-w-xs rounded-md bg-white shadow-md ring-1 ring-slate-300 transition-transform duration-300 group-hover:scale-[1.03]"
+            />
+          </div>
+        ) : null}
+
+        <div className="flex flex-1 flex-col p-6">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge>{simulator.labels[0]}</Badge>
+            <Badge tone="neutral">{simulator.labels[1]}</Badge>
+          </div>
+          <h3 className="mt-4 text-xl text-ink-900 group-hover:text-brand-700">{words.heading}</h3>
+          <p id={summaryId} className="mt-2 flex-1 text-sm leading-relaxed text-ink-600 text-pretty">
+            {simulator.summary}
+          </p>
+          {/* (what the whole card does, so that it reads as a link) */}
+          <span className="mt-6 inline-flex items-center gap-2 self-start rounded-lg bg-brand-500 px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors group-hover:bg-brand-600">
+            {words.open}
+            <ArrowIcon className="transition-transform group-hover:translate-x-0.5" />
+          </span>
+        </div>
+      </Link>
+
+      {simulator.about ? (
+        <Link
+          href={simulator.about}
+          className="group mt-3 inline-flex min-h-9 items-center gap-2 self-start py-1.5 text-sm font-semibold text-brand-600 hover:text-brand-700"
+        >
+          {words.about}
+          <ArrowIcon className="transition-transform group-hover:translate-x-0.5" />
+        </Link>
+      ) : null}
+    </li>
   );
 }

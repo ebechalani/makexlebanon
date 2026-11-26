@@ -28,6 +28,7 @@ import { allScenarios } from '../../warehouse-sort/scenario';
 import { warehouseSortGame } from '../../warehouse-sort/game';
 import { WAREHOUSE_SORT_ROBOT } from '../../warehouse-sort/robot';
 import { DEFAULT_ROBOT_CONFIG } from '../../core/robot';
+import { gripper, program, script, whenStart } from '../../vm/builder';
 import * as batchWords from '../batch-words';
 import * as examplesWords from '../examples-words';
 import * as format from '../format';
@@ -41,6 +42,8 @@ import * as stageView from '../stage-view';
 import * as startPose from '../start-pose';
 import { ScreenTextContext, useScreenText } from './context';
 import { EN_TEXT } from './en';
+import { EN_TITLE_TEXT } from './en-title';
+import { ScreenTextContext as TitleContext, useTitleText } from './title-context';
 import { FR_TEXT } from './fr';
 import { FR_COLOUR_NAMES, frSensorValue } from './fr-common';
 import { FR_CONSOLE_NOT_ON_THIS_PAGE, FR_CONSOLE_PATTERNS, frConsoleLine } from './fr-console';
@@ -172,8 +175,27 @@ test('English: the context gives the English table where no page sets one, and t
   const Probe = () => createElement('span', null, useScreenText().locale);
   assert.equal(renderToStaticMarkup(createElement(Probe)), '<span>en</span>');
   assert.equal(renderToStaticMarkup(createElement(ScreenTextContext.Provider, { value: FR_TEXT }, createElement(Probe))), '<span>fr</span>');
-  // the first line of the context file is 'use client' (a page that is a Server Component reaches it through TitleBar.tsx)
+  const Table = () => createElement('span', null, useScreenText() === EN_TEXT ? 'EN_TEXT' : 'another');
+  assert.equal(renderToStaticMarkup(createElement(Table)), '<span>EN_TEXT</span>');
+  // the title row reads the same context, with its own English words to fall back on (one provider sets both)
+  assert.equal(ScreenTextContext, TitleContext);
+  const Title = () => createElement('span', null, useTitleText().homeCrumb);
+  assert.equal(renderToStaticMarkup(createElement(Title)), '<span>Home</span>');
+  assert.equal(renderToStaticMarkup(createElement(ScreenTextContext.Provider, { value: FR_TEXT }, createElement(Title))), '<span>Accueil</span>');
+  for (const [key, value] of Object.entries(EN_TITLE_TEXT)) assert.equal(EN_TEXT[key as keyof ScreenText], value, key);
+  // the first line of both context files is 'use client' (a page that is a Server Component reaches them through TitleBar.tsx)
   assert.match(readFileSync(path.join(HERE, 'context.tsx'), 'utf8'), /^'use client';\n/);
+  assert.match(readFileSync(path.join(HERE, 'title-context.tsx'), 'utf8'), /^'use client';\n/);
+});
+
+test('English: the title row stays small - every loading screen and the Simulator page get it before anything else', () => {
+  // (the whole table imports every text function, the block catalog with them: the title row imports none of it)
+  const imports = (file: string) =>
+    [...readFileSync(path.join(HERE, file), 'utf8').matchAll(/^import (?!type )[^;]*? from '([^']+)';$/gm)].map((m) => m[1]);
+  assert.deepEqual(imports('../TitleBar.tsx'), ['next/link', './powered-by', './text/title-context']);
+  assert.deepEqual(imports('../powered-by.ts'), []);
+  assert.deepEqual(imports('title-context.tsx'), ['react', './en-title']);
+  assert.deepEqual(imports('en-title.tsx'), []);
 });
 
 test('English: the sentences moved into the table are the ones the screen always said', () => {
@@ -309,7 +331,7 @@ test('French sentences: the status line as one sentence, the title row, the cons
 });
 
 test('French: a program file of another game names that game and its groups of blocks in French; Warehouse Sort is no other game', () => {
-  const gripperBlock = { blocks: { languageVersion: 0, blocks: [{ type: 'event_cyberpi_start', id: 'a', next: { block: { type: 'gripper_open', id: 'b' } } }] } };
+  const gripperBlock = program([script(whenStart(), [gripper('open')])]);
   const note = FR_TEXT.otherGameNote(gripperBlock, 'fire-rescue', 'fire-chief');
   assert.equal(note, `Ce programme a été enregistré dans le simulateur Fire Rescue Senior. 1 de ses blocs sert à des pièces que ce robot n’a pas (Pince)${NB}: il ne marche pas ici.`);
   assert.equal(FR_TEXT.otherGameNote({}, 'fire-chief', 'warehouse-sort'), 'Ce programme a été enregistré dans le simulateur Fire Chief. Tous ses blocs marchent aussi ici.');
@@ -580,7 +602,7 @@ function frenchTexts(): Array<[string, string]> {
     cleanLineName: () => T.cleanLineName('Aucune pénalité', 'Cube bleu'),
     runRestarts: () => [T.runRestarts(1), T.runRestarts(2)],
     watchLabel: () => T.watchLabel('disposition', 'VR-BR'),
-    endSentence: () => [T.endSentence({ finishReason: 'time', finishDetail: null, time: 90, restarts: 0 }, T.moment), T.endSentence({ finishReason: 'time', finishDetail: null, time: 90, restarts: 2 }, T.moment)],
+    endSentence: () => [T.endSentence({ finishReason: 'time', time: 90, restarts: 0 }, T.moment), T.endSentence({ finishReason: 'time', time: 90, restarts: 2 }, T.moment)],
     probeTitle: () => T.probeTitle('L2', T.probeHint.L2),
     sensorColour: () => T.sensorColour('red'),
     probeLight: () => T.probeLight('12'),
@@ -594,7 +616,8 @@ function frenchTexts(): Array<[string, string]> {
     sensorSummary: () => T.sensorSummary(parts, { lineStatus: 6, ultrasonicCm: 7, frontColor: 'red', fanOn: false }),
     sensorsViewHint: () => T.sensorsViewHint(parts),
     soundButton: () => [T.soundButton(true), T.soundButton(false)],
-    cyberPiSummary: () => [T.cyberPiSummary(['Cube : red'], true), T.cyberPiSummary([], false)],
+    // (a printed text is the program's own: a text without punctuation, so that only the frame is checked)
+    cyberPiSummary: () => [T.cyberPiSummary(['Bonjour red'], true), T.cyberPiSummary([], false)],
     startLine: () => T.startLine('disposition', 'VR-BR'),
     describeEvent: () =>
       (

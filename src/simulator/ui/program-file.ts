@@ -197,10 +197,12 @@ export function gameNameFromId(gameId: string): string {
  * Rescue game of before the split, 'fire-rescue' (so that the work saved on the Fire Rescue page
  * is found again on the Senior page), and the website has no page called "Fire Rescue" any more.
  * A file saved on that page before the split is named after the Senior page too: it is the same
- * game, and its old address leads there.
+ * game, and its old address leads there. Robot en fête 2027 is a French name, with its accent and
+ * its year: its id cannot say it ("Robot En Fete").
  */
 const GAME_NAMES: Readonly<Record<string, string>> = {
   'fire-rescue': 'Fire Rescue Senior',
+  'robot-en-fete': 'Robot en fête 2027',
 };
 
 /** The name of a game as its page shows it in the title row: "Fire Rescue Senior", "Fire Rescue Junior", "Fire Chief". */

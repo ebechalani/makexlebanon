@@ -41,6 +41,7 @@ import { RasterMatSampler } from '../core/mat';
 import { createSimulation } from '../core/simulation';
 import type { BlockJson, Game, MatSampler, ProgramJson, RGB, ScoreLine, SimEvent, Simulation } from '../core/types';
 import { SAMPLE_CATALOG as FIRE_RESCUE_CATALOG } from '../fire-rescue/sample-catalog';
+import { SAMPLE_CATALOG as ROBOT_EN_FETE_CATALOG } from '../robot-en-fete/sample-catalog';
 import { supportsBlock } from '../vm';
 import { changeVar, forever, move, probeDetects, program, script, setVar, waitUntil, whenStart } from '../vm/builder';
 import {
@@ -510,6 +511,11 @@ describe('the list of the examples', () => {
     }
     for (const card of SAMPLE_CATALOG) assert.match(card.id, /^chief-[a-z]+(-[a-z]+)*$/, card.id);
     for (const card of FIRE_RESCUE_CATALOG) assert.ok(!card.id.startsWith('chief-'), card.id);
+    // ... nor by an example of Robot en fête 2027, the game that came last (its own test checks it against every game)
+    for (const card of ROBOT_EN_FETE_CATALOG) {
+      assert.ok(!ids.has(card.id) && !titles.has(card.title.toLowerCase()), card.id);
+      assert.ok(!card.id.startsWith('chief-'), card.id);
+    }
   });
 
   test('every description says, in plain sentences, what the program does, what it scores and what to try', () => {

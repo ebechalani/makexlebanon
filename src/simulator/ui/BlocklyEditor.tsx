@@ -18,7 +18,7 @@
  */
 import { memo, useEffect, useRef, useState } from 'react';
 import type * as BlocklyModule from 'blockly';
-import { createEditor, type BlocklyApi, type GripperCodeHandler } from '../blocks';
+import { createEditor, disposeEditor, type BlocklyApi, type GripperCodeHandler } from '../blocks';
 import { blocklyMessagesOf } from '../blocks/locale';
 import type { ProgramJson } from '../core/types';
 import { isProgramJson, withoutRetiredBlocks } from './program-file';
@@ -141,9 +141,11 @@ function BlocklyEditorImpl(props: BlocklyEditorProps) {
     let observer: ResizeObserver | null = null;
     let saveNow: (() => void) | null = null;
     let flashTimer: ReturnType<typeof setTimeout> | null = null;
+    let blockly: BlocklyApi | null = null;
 
     const setUp = async () => {
       const Blockly: BlocklyApi = await import('blockly');
+      blockly = Blockly;
       // Blockly's own words in French (only the French page fetches them)
       const frenchMessages = locale === 'fr' ? blocklyMessagesOf(await import('blockly/msg/fr')) : undefined;
       const host = hostRef.current;
@@ -290,7 +292,8 @@ function BlocklyEditorImpl(props: BlocklyEditorProps) {
       if (flashTimer) clearTimeout(flashTimer);
       observer?.disconnect();
       propsRef.current.onReady(null);
-      workspace?.dispose();
+      // (a French editor leaves Blockly's own words English for the next page: ../blocks/register.ts disposeEditor)
+      if (workspace && blockly) disposeEditor(blockly, workspace);
       workspace = null;
     };
   }, [mediaPath, palette, storageKey, locale]);

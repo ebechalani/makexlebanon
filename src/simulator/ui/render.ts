@@ -32,7 +32,6 @@ import {
 import { inkOn, parseHex, rgbCss, shade } from './format';
 import { SENSOR_COLOR_CSS } from './robot-parts';
 import type { Ruler, RulerLabel } from './ruler';
-import { EN_TEXT } from './text/en';
 import type { StageText } from './text/types';
 import type { Trail } from './trail';
 
@@ -1442,7 +1441,8 @@ export interface StagePainters {
   robot?(ctx: CanvasRenderingContext2D, sim: StageSim, view: StageView): void;
 }
 
-export interface StageScene {
+/** What every picture of the stage is drawn from (StageScene adds the ruler). */
+interface StageSceneParts {
   sim: StageSim;
   view: StageView;
   options: StageOptions;
@@ -1453,17 +1453,17 @@ export interface StageScene {
   placing: boolean;
   /** where the student is trying to put the robot although it does not fit there */
   ghost: Pose | null;
-  /** the measuring line, while the ruler is on (null = no ruler) */
-  ruler: Ruler | null;
   /** the game's own drawings (left out: everything is drawn as for the mBot2 games) */
   painters?: StagePainters;
-  /**
-   * The words of the screen the numbers of the ruler are written in: the screen's word table
-   * (./text/types.ts; StageCanvas.tsx passes it). Left out: the English table - the one the
-   * context of the screen gives by default too.
-   */
-  text?: StageWords;
 }
+
+/**
+ * A picture of the stage: its parts, and the measuring line while the ruler is on (null = no
+ * ruler). The numbers of the ruler are written in the words of the screen - the screen's word
+ * table (./text/types.ts), which StageCanvas.tsx passes - so a scene with a ruler must say them:
+ * there is no English default (a French screen would write "32.5 cm" without a word of warning).
+ */
+export type StageScene = (StageSceneParts & { ruler: null; text?: StageWords }) | (StageSceneParts & { ruler: Ruler; text: StageWords });
 
 /** What the stage writes on the mat in the words of the screen. */
 type StageWords = Pick<StageText, 'rulerLabels'>;
@@ -1538,5 +1538,5 @@ export function drawStage(ctx: CanvasRenderingContext2D, scene: StageScene): voi
   if (sensors) drawProbes(ctx, sim, sensors);
   if (sensors && beam) drawUltrasonicLabel(ctx, sim, sensors, beam, view);
   if (scene.ghost) drawGhost(ctx, sim.robotConfig, scene.ghost, view);
-  if (scene.ruler) drawRuler(ctx, scene.ruler, view, scene.text ?? EN_TEXT);
+  if (scene.ruler !== null) drawRuler(ctx, scene.ruler, view, scene.text);
 }

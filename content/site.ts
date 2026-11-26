@@ -3,9 +3,10 @@
  * Edit this file to change contact details, links, and navigation.
  */
 
-// (seasons.ts imports nothing, so there is no import cycle; it is plain data, which the menu of
-// every page then carries: the Header is a client component)
+// (seasons.ts and standalone.ts import nothing, so there is no import cycle; they are plain data,
+// which the menu of every page then carries: the Header is a client component)
 import { simulatorSeasons } from './seasons';
+import { standaloneCategories, type StandaloneCategory } from './standalone';
 
 export const site = {
   name: 'MakeX Lebanon',
@@ -64,9 +65,14 @@ export type NavItem = {
  * The dropdown of "Simulator": the Simulator page, then every simulator in the order of that page
  * (Season 2026 first), as "Warehouse Sort — Season 2026". Built from `simulatorSeasons()`, the
  * list the page shows, so a simulator added in content/seasons.ts appears here by itself, in its
- * season's place. (The sections can be handed in, for the tests.)
+ * season's place. After the seasons, as on the page, the categories of their own
+ * (content/standalone.ts), each with its line: "Robot en fête 2027 — in French". (The sections and
+ * the categories can be handed in, for the tests.)
  */
-export function simulatorMenu(sections = simulatorSeasons()): NonNullable<NavItem['children']> {
+export function simulatorMenu(
+  sections = simulatorSeasons(),
+  standalone: StandaloneCategory[] = standaloneCategories,
+): NonNullable<NavItem['children']> {
   return [
     { label: 'All simulators', href: '/simulator' },
     ...sections.flatMap((section) =>
@@ -75,6 +81,7 @@ export function simulatorMenu(sections = simulatorSeasons()): NonNullable<NavIte
         href: simulator.href,
       })),
     ),
+    ...standalone.map((category) => ({ label: category.simulator.menuLabel, href: category.simulator.href })),
   ];
 }
 

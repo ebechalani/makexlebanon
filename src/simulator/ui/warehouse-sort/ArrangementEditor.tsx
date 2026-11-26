@@ -8,24 +8,29 @@
  * There is always exactly one blue cube: blue for another warehouse moves it there (the two
  * cubes swap colours, and a short sentence says so); a change that would leave no blue, no red
  * or no green cube is refused with one plain sentence (./arrangement-panel.ts).
+ *
+ * Its words are a game word list (`words`): left out, the English of Warehouse Sort; the page of
+ * Robot en fête 2027 gives the French ones (../robot-en-fete/arrangement-words.ts).
  */
-import { useState } from 'react';
-import { WAREHOUSES, type WarehouseId } from '../../warehouse-sort/field';
-import { CUBE_FILL, CUBE_LETTER } from '../../warehouse-sort/game';
+import { useMemo, useState } from 'react';
+import { type WarehouseId } from '../../warehouse-sort/field';
+import { CUBE_FILL } from '../../warehouse-sort/game';
 import { CUBE_COLORS, encodeScenario, type CubeColor, type WarehouseSortScenario } from '../../warehouse-sort/scenario';
-import { arrangementInWords, changeCube, WAREHOUSE_ROWS, warehouseName } from './arrangement-panel';
+import { arrangementPanel, EN_ARRANGEMENT_PANEL, EN_ARRANGEMENT_WORDS, WAREHOUSE_ROWS, type ArrangementPanel, type ArrangementWords } from './arrangement-panel';
 
 
 interface CubeChipsProps {
   warehouse: WarehouseId;
   value: CubeColor;
   onPick: (color: CubeColor) => void;
+  words: ArrangementWords;
+  panel: ArrangementPanel;
 }
 
 /** Three square buttons, red, green and blue, in the colours of the cubes on the stage; the chosen one has a dark ring. The letters make the colours readable without colour vision. */
-function CubeChips({ warehouse, value, onPick }: CubeChipsProps) {
+function CubeChips({ warehouse, value, onPick, words, panel }: CubeChipsProps) {
   return (
-    <div role="radiogroup" aria-label={`Cube in ${warehouseName(warehouse)}`} className="flex gap-1.5">
+    <div role="radiogroup" aria-label={words.chipsLabel(panel.warehouseName(warehouse))} className="flex gap-1.5">
       {CUBE_COLORS.map((color) => {
         const selected = color === value;
         return (
@@ -34,8 +39,8 @@ function CubeChips({ warehouse, value, onPick }: CubeChipsProps) {
             type="button"
             role="radio"
             aria-checked={selected}
-            aria-label={color}
-            title={color}
+            aria-label={words.color(color)}
+            title={words.color(color)}
             onClick={() => onPick(color)}
             style={{ background: CUBE_FILL[color] }}
             data-cube={`${warehouse}-${color}`}
@@ -45,7 +50,7 @@ function CubeChips({ warehouse, value, onPick }: CubeChipsProps) {
               (selected ? 'ring-2 ring-ink-900 ring-offset-2' : 'opacity-40 hover:opacity-80')
             }
           >
-            {CUBE_LETTER[color]}
+            {words.letter(color)}
           </button>
         );
       })}
@@ -56,9 +61,12 @@ function CubeChips({ warehouse, value, onPick }: CubeChipsProps) {
 export interface ArrangementEditorProps {
   scenario: WarehouseSortScenario;
   onChange: (next: WarehouseSortScenario) => void;
+  /** the words of the panel; left out: the English of Warehouse Sort */
+  words?: ArrangementWords;
 }
 
-export function ArrangementEditor({ scenario, onChange }: ArrangementEditorProps) {
+export function ArrangementEditor({ scenario, onChange, words = EN_ARRANGEMENT_WORDS }: ArrangementEditorProps) {
+  const panel = useMemo(() => (words === EN_ARRANGEMENT_WORDS ? EN_ARRANGEMENT_PANEL : arrangementPanel(words)), [words]);
   // the sentence of a refused change, or of a change that changed a second cube (the blue cube
   // moved); it belongs to the arrangement it was said about - a random or a default arrangement,
   // or a code, makes it go away
@@ -68,7 +76,7 @@ export function ArrangementEditor({ scenario, onChange }: ArrangementEditorProps
 
   const pick = (warehouse: WarehouseId, color: CubeColor) => {
     if (scenario.cubes[warehouse] === color) return;
-    const change = changeCube(scenario, warehouse, color);
+    const change = panel.changeCube(scenario, warehouse, color);
     if (!change.ok) {
       setSaid({ text: change.problem, refused: true, code });
       return;
@@ -79,21 +87,21 @@ export function ArrangementEditor({ scenario, onChange }: ArrangementEditorProps
 
   return (
     <fieldset className="rounded-lg border border-slate-200 p-2.5">
-      <legend className="px-1 text-xs font-bold uppercase tracking-wide text-ink-500">The cubes in the warehouses</legend>
+      <legend className="px-1 text-xs font-bold uppercase tracking-wide text-ink-500">{words.legend}</legend>
       {/* the four warehouses as they lie on the mat: two at the top, two at the bottom */}
       <div className="grid grid-cols-2 gap-2" data-warehouse-grid>
         {WAREHOUSE_ROWS.flat().map((warehouse) => (
           <div key={warehouse} className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 rounded-md bg-slate-50 px-2 py-1.5">
             <span className="text-sm leading-tight text-ink-800">
-              <span className="font-mono font-bold">{warehouse}</span>
-              <span className="block text-xs text-ink-500">{WAREHOUSES[warehouse].place}</span>
+              <span className="font-mono font-bold">{words.warehouse(warehouse)}</span>
+              <span className="block text-xs text-ink-500">{words.place(warehouse)}</span>
             </span>
-            <CubeChips warehouse={warehouse} value={scenario.cubes[warehouse]} onPick={(color) => pick(warehouse, color)} />
+            <CubeChips warehouse={warehouse} value={scenario.cubes[warehouse]} onPick={(color) => pick(warehouse, color)} words={words} panel={panel} />
           </div>
         ))}
       </div>
       <p className="mt-2 text-xs text-ink-600" data-arrangement-words>
-        {arrangementInWords(scenario)}.
+        {panel.arrangementInWords(scenario)}.
       </p>
       {shown?.refused && (
         <p role="alert" className="mt-1 text-xs font-medium text-rose-700" data-arrangement-problem>
