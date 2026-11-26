@@ -4,7 +4,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { simulatorSeasons, type SimulatorCard } from '@content/seasons';
 import { site } from '@content/site';
-import { standaloneCategories } from '@content/standalone';
+import { simulatorCategories } from '@content/standalone';
 import { PageHero } from '@/components/PageHero';
 import { ArrowIcon, Badge, Container } from '@/components/ui';
 // (a plain file that imports nothing: the title row itself, @/simulator/ui/TitleBar, would bring its client code onto this page)
@@ -12,12 +12,14 @@ import { POWERED_BY } from '@/simulator/ui/powered-by';
 
 const PATH = '/simulator';
 const TITLE = 'Robot simulators';
+// (written by hand, in the order of the page: Season 2027, then Season 2026, then Robot en fête 2027;
+// unlike the page, the menu and the Training card, it does not follow the data: edit it when a simulator is added)
 const DESCRIPTION =
   'Program a Makeblock mBot2 with mBlock-style blocks, or lay mTiny coding cards, and watch the robot play a ' +
-  'MakeX Lebanon mission in the browser: the Season 2026 category Locker Room (Capelli, ages 13–15) and ' +
-  'Warehouse Sort, the beginner mission of the Inspire category (Season 2026), and the 2027 categories ' +
-  'Fire Cadet (mTiny, ages 4–7), Fire Fighter (ages 8–10), Fire Rescue Junior (ages 10–12), Fire Rescue Senior ' +
-  '(ages 13–15) and Fire Chief (ages 14–17). And Robot en fête 2027 (in French): Tri d’entrepôt, the French ' +
+  'MakeX Lebanon mission in the browser: the 2027 categories Fire Cadet (mTiny, ages 4–7), Fire Fighter ' +
+  '(ages 8–10), Fire Rescue Junior (ages 10–12), Fire Rescue Senior (ages 13–15) and Fire Chief (ages 14–17), ' +
+  'and the Season 2026 category Locker Room (Capelli, ages 13–15) and Warehouse Sort, the beginner mission of ' +
+  'the Inspire category (Season 2026). And Robot en fête 2027 (in French): Tri d’entrepôt, the French ' +
   'version of Warehouse Sort. Free, nothing to install.';
 
 /**
@@ -53,16 +55,22 @@ export const metadata: Metadata = {
 };
 
 /**
- * The Simulator section of the website: one page, one part per season (Season 2026, then
- * Season 2027), and in each part one card per simulator. Nothing about a simulator is written
+ * The Simulator section of the website: one page, one part per season, the newest first (Season
+ * 2027, then Season 2026), and in each part one card per simulator. Nothing about a simulator is written
  * here: the seasons, names, labels, sentences, addresses and pictures all come from
  * `simulatorSeasons()` in content/seasons.ts, so a simulator added there appears here by itself.
  *
- * After the seasons, one part for each category of its own (content/standalone.ts): Robot en
+ * After the seasons, one part for each category of its own that has a simulator
+ * (`simulatorCategories()` in content/standalone.ts, which the menu takes too): Robot en
  * fête 2027, in French, with a card for each of its simulators (today Tri d’entrepôt). That part is
  * in its category's language (lang="fr"), and so are all the words of its cards, which come from
  * the same entry: a card is given all its words (CardWords), so that none of them can fall back to
  * the English of the other cards.
+ *
+ * The heading of each part has an id (season-2027, category-robot-en-fete): the groups of the
+ * Simulator dropdown of the menu lead to it (/simulator#season-2027, simulatorMenu() in
+ * content/site.ts). It keeps the height of the sticky header above it when the page scrolls to
+ * it (scroll-mt-24), also when the menu changes the page without a reload.
  *
  * A card is one link to the simulator (the picture, the name and the sentences), so it can be
  * clicked anywhere. The "About <category>" link is a separate link under the card: a link may
@@ -85,7 +93,7 @@ export default function SimulatorPage() {
           <div className="space-y-16">
             {sections.map(({ year, simulators }) => (
               <section key={year} aria-labelledby={`season-${year}`}>
-                <h2 id={`season-${year}`} className="border-b border-slate-200 pb-5 text-2xl text-ink-900 sm:text-3xl">
+                <h2 id={`season-${year}`} className="scroll-mt-24 border-b border-slate-200 pb-5 text-2xl text-ink-900 sm:text-3xl">
                   Season {year}
                 </h2>
 
@@ -103,10 +111,11 @@ export default function SimulatorPage() {
               Powered by <span className="font-semibold text-ink-700">{POWERED_BY}</span>
             </p>
 
-            {/* the categories of their own, after the seasons: each part in its category's language */}
-            {standaloneCategories.map((category) => (
+            {/* the categories of their own that have a simulator, after the seasons: each part in its
+                category's language (a category without one has no part, as a season without one) */}
+            {simulatorCategories().map((category) => (
               <section key={category.slug} aria-labelledby={`category-${category.slug}`} lang={category.lang}>
-                <h2 id={`category-${category.slug}`} className="border-b border-slate-200 pb-5 text-2xl text-ink-900 sm:text-3xl">
+                <h2 id={`category-${category.slug}`} className="scroll-mt-24 border-b border-slate-200 pb-5 text-2xl text-ink-900 sm:text-3xl">
                   {category.name}
                 </h2>
 

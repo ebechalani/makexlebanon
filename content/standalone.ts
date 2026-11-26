@@ -7,26 +7,28 @@
  * simulator - the same beginner mission, all in French, the blocks included. (A second one,
  * « Logistique intelligente », is to come: it is one more item of `simulators`, and no page needs a
  * change for it.) The category has its own page (/robot-en-fete), a part of its own on the
- * Simulator page after the seasons, with a card for each of its simulators, and each simulator its
- * own page (/simulator/tri-entrepot) and a line in the Simulator dropdown of the menu.
+ * Simulator page after the seasons, with a card for each of its simulators, a group of its own in
+ * the Simulator dropdown of the menu, after the seasons' (its name, then its simulators by their
+ * name), and each simulator its own page (/simulator/tri-entrepot).
  *
  * Nothing here is counted by a season: ./seasons.ts does not import this file, so no season page,
  * no count of categories and no list built from the seasons changes because of it. There is no
  * age group either (the organiser: "pas d'âge affiché").
  *
  * Every text a card or a page shows is here, in the category's language (`lang`), and every one
- * is required: nothing on its page or its cards falls back to English. Only the menu lines are
- * English, as the whole menu of the website is (the names in them are French proper names). (The
- * French texts are those of the design's table, fr-src/4-site.txt, with the review's corrections.
- * Typography: a no-break space (U+00A0) before : ; ! ?)
+ * is required: nothing on its page or its cards falls back to English. The menu around its group
+ * is English, as the whole menu of the website is; the group itself shows only French names, the
+ * category's and its simulators', and says so (lang="fr"). (The French texts are those of the
+ * design's table, fr-src/4-site.txt, with the review's corrections. Typography: a no-break space
+ * (U+00A0) before : ; ! ?)
  *
  * Plain data that imports nothing: content/site.ts builds the menu from it, and the menu is drawn
  * by a client component, so what this file holds goes to every visitor's browser.
  */
 
-/** A simulator of a category of its own: its card on the Simulator page, its part of the category's page, its line in the menu. */
+/** A simulator of a category of its own: its card on the Simulator page, its part of the category's page, its line in the menu (its `name`). */
 export type StandaloneSimulator = {
-  /** its name, the name of its mission, as its title row shows it: « Tri d’entrepôt » */
+  /** its name, the name of its mission, as its title row and its line in the menu show it: « Tri d’entrepôt » */
   name: string;
   /** the simulator's page on this site: /simulator/<slug> */
   href: string;
@@ -49,20 +51,15 @@ export type StandaloneSimulator = {
   };
   /** the heading of its part on the category's page */
   pageTitle: string;
-  /**
-   * its line in the Simulator dropdown of the menu, which is English: "<name> — <category>" (one
-   * dash, as every line there). Both names are French proper names, written as they are.
-   */
-  menuLabel: string;
 };
 
 /** A category of its own, outside every season. */
 export type StandaloneCategory = {
   /** its own page on this site: /<slug> */
   slug: string;
-  /** its name, shown as it is (a proper name: also in the English menu and breadcrumbs) */
+  /** its name, shown as it is (a proper name: also the name of its group in the menu, and in the English breadcrumbs) */
   name: string;
-  /** the language of every text below but the simulators' `menuLabel`: lang="fr" wherever they are shown */
+  /** the language of every text below and of its group in the menu: lang="fr" wherever they are shown (in the English breadcrumbs its name is a proper name, without one) */
   lang: 'fr';
   /** the robot it is played with, e.g. mBot2 */
   platform: string;
@@ -90,7 +87,7 @@ export type StandaloneCategory = {
     /** the words before `poweredBy` (French "Proposé par", as in the title row of its simulators) */
     poweredByLabel: string;
   };
-  /** its simulators, in the order the pages and the menu show them (one card, one part of its page and one menu line each) */
+  /** its simulators, in the order the pages and the menu show them (one card, one part of its page and one line of its menu group each) */
   simulators: StandaloneSimulator[];
 };
 
@@ -138,9 +135,18 @@ export const standaloneCategories: StandaloneCategory[] = [
           labels: ['En français', 'mBot2'],
         },
         pageTitle: 'Essaie le simulateur Tri d’entrepôt',
-        // (a French proper name in the English menu, written as it is, then the category's: one dash, as every line there)
-        menuLabel: 'Tri d’entrepôt — Robot en fête 2027',
       },
     ],
   },
 ];
+
+/**
+ * The categories of their own that have a simulator, in their order: the parts of the Simulator
+ * page after the seasons, and the groups of the Simulator dropdown of the menu after the seasons'
+ * (content/site.ts). A category without a simulator has neither, as a season without one has no
+ * part and no group (`simulatorSeasons()` in ./seasons.ts). (The list can be handed in, for the
+ * tests.)
+ */
+export function simulatorCategories(categories: StandaloneCategory[] = standaloneCategories): StandaloneCategory[] {
+  return categories.filter((category) => category.simulators.length > 0);
+}
