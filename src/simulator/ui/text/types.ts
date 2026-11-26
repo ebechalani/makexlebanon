@@ -7,7 +7,7 @@
  * on every loading screen, reads its own part of it: `useTitleText()`, ./title-context.tsx) - and
  * from nowhere else. The English page sets no table: the context gives the English one, and the
  * English page runs the very same code it always ran (EN_TEXT holds today's strings, moved, and
- * today's text functions themselves). Only the French page sets one: `<SimulatorApp locale="fr">`.
+ * today's text functions themselves). Only the French page sets one: `<SimulatorApp text={FR_TEXT}>`.
  *
  * How a member is written:
  *   - a text with no value in it is a string;

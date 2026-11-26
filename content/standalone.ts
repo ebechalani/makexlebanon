@@ -15,9 +15,10 @@
  * age group either (the organiser: "pas d'âge affiché").
  *
  * Every text a card or a page shows is here, in the category's language (`lang`), and every one
- * is required: nothing on its page or its card falls back to English. Only the menu line is
- * English, as the whole menu of the website is (the names in it are French proper names). (The French texts are those of the design's table,
- * fr-src/4-site.txt. Typography: a no-break space (U+00A0) before : ; ! ?)
+ * is required: nothing on its page or its cards falls back to English. Only the menu lines are
+ * English, as the whole menu of the website is (the names in them are French proper names). (The
+ * French texts are those of the design's table, fr-src/4-site.txt, with the review's corrections.
+ * Typography: a no-break space (U+00A0) before : ; ! ?)
  *
  * Plain data that imports nothing: content/site.ts builds the menu from it, and the menu is drawn
  * by a client component, so what this file holds goes to every visitor's browser.

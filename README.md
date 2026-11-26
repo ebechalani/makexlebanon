@@ -726,7 +726,7 @@ The honest limits:
 npm run test:sim
 ```
 
-It runs about nineteen hundred checks (1,909 at the end of November 2026, with Robot en fête 2027); among them,
+It runs about nineteen hundred checks (1,917 at the end of November 2026, with Tri d’entrepôt); among them,
 every example program of every game is played on the real engine with the real referee and its
 score is compared, and every practice map of Fire Cadet is proved. They also check
 `content/simulator-codes.ts` (a misspelt example id, an example that is on both lists, a

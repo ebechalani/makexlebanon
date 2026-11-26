@@ -101,7 +101,7 @@ export const FR_APP_TEXT: AppText = {
   consoleTitle: 'Console',
   consoleProblems: (count) => frPlural(count, `${count} problème`, `${count} problèmes`),
   consoleMessages: (count) => frPlural(count, `${count} message`, `${count} messages`),
-  scenarioLoaded: (scenario) => `${capital(scenario)} chargée. Appuie sur Démarrer pour voir ce que fait ton programme sur cette disposition.`,
+  scenarioLoaded: (scenario) => `${capital(scenario)} chargée. Appuie sur Démarrer pour voir ce que fait ton programme sur cette ${scenario}.`,
   close: 'Fermer',
 };
 

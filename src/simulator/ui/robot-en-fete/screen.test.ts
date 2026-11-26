@@ -134,6 +134,17 @@ test('page: its address and its French title and description; the loader shows t
   for (const word of ['Home', 'Breadcrumb', 'Powered by', ' simulator']) assert.ok(!row.includes(word), word);
 });
 
+test('a 360 px phone: the French-only rule of the stylesheet gives the four view buttons under the mat less padding - on lang="fr" only', () => {
+  const css = readFileSync(path.join(HERE, '../simulator.css'), 'utf8');
+  const rule = /@container \(max-width: 21\.875rem\) \{\s*\[lang='fr'\] \.mbot2-stage-column \[role='group'\]:first-child > button\[aria-pressed\] \{\s*padding-inline: 0\.4375rem;\s*\}\s*\}/;
+  assert.match(css, rule);
+  // the only rule of the stylesheet that names a language
+  assert.equal(css.match(/\[lang=/g)?.length, 1);
+  // ... and it finds the view buttons: the first group of the row under the mat, buttons that say whether they are on
+  const app = code(read('../SimulatorApp.tsx'));
+  assert.match(app, /<div className="@container">\s*<div className="flex flex-wrap items-center gap-x-3 gap-y-2">\s*<div className="flex items-center gap-1\.5" role="group" aria-label=\{text\.showOnStage\}>\s*<button type="button" aria-pressed=\{view\.overlays\}/);
+});
+
 test('the English page of Warehouse Sort is as it was: no language, no French table, nothing of Robot en fête', () => {
   for (const file of ['../warehouse-sort/WarehouseSortSimulator.tsx', '../warehouse-sort/WarehouseSortLoader.tsx', '../../../app/simulator/warehouse-sort/page.tsx']) {
     const source = code(read(file));

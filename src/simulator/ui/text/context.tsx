@@ -6,9 +6,9 @@
  *
  * Where no page sets a table, the screen reads the English one: every English page - which sets
  * no provider - reads English, as do the tests that draw a part of the screen on its own. The
- * French page sets the French table once, above the whole screen (../SimulatorApp.tsx
- * `locale="fr"`, and the loader of its page: `<ScreenTextContext.Provider value={FR_TEXT}>`). The
- * language of the table is `useScreenText().locale`.
+ * French page hands the French table to the screen, which sets it once, above the whole screen
+ * (../SimulatorApp.tsx `text={FR_TEXT}`; the loading screen of that page sets only the French words
+ * of the title row: ./title-context.tsx). The language of the table is `useScreenText().locale`.
  *
  * (The context itself is made in ./title-context.tsx, which the title row reads without the whole
  * English table: see there. It is the same context object, so one provider sets both.)

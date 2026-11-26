@@ -1,7 +1,8 @@
 /**
- * The French word table of the shared simulator screen (./types.ts): the screen of Robot en fête
- * 2027, the French version of Warehouse Sort. Only that page sets it (`<SimulatorApp locale="fr">`
- * and the loader of its page).
+ * The French word table of the shared simulator screen (./types.ts): the screen of Tri d’entrepôt
+ * (Robot en fête 2027), the French version of Warehouse Sort. Only that page imports it and hands it
+ * to the screen (`<SimulatorApp text={FR_TEXT}>`); its loading screen uses only ./fr-title.tsx. It
+ * also loads the French words of the blocks (../../blocks/fr.ts, through ./fr-stage.tsx).
  *
  * The French speaks to the student with "tu" and uses the infinitive for buttons and commands
  * (design D5). It has a no-break space (U+00A0) before : ; ! ? % » and after «, and a decimal
@@ -17,6 +18,8 @@
  *   ./fr-panels.tsx   the Sensors and CyberPi panels, the console
  *   ./fr-console.tsx  the sentences of the engine and the interpreter
  *   ./fr-stage.tsx    the ruler, the stage, program files
+ *   ./fr-title.tsx    the title row (also alone, on the loading screen)
+ *   ./fr-gripper.tsx  the window "Inside the Gripper blocks"
  */
 import { FR_GRIPPER_TEXT } from './fr-gripper';
 import { frMoment, frNumber, frRefereeTime, frTimeTextOf, NB, withComma } from './fr-common';
