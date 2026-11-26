@@ -32,14 +32,17 @@ const TABLE_EDGE = 'le bord de la table';
 
 /**
  * "cube:W1" -> "le cube E1": the warehouses are E1 – E4 on the French screen, in every sentence
- * (design D6). "wall" -> the edge of the table. (The other bodies of ../format.ts bodyName belong
- * to games that have no French page; they are named "le <kind> <name>".)
+ * (design D6). "wall" -> the edge of the table. "cadre:haut" (and the three other walls of the
+ * frame of Logistique intelligente) -> "le cadre": one frame, whichever side was hit. (The other
+ * bodies are named "le <kind> <name>": "cube:7" -> "le cube 7", the cubes of Logistique
+ * intelligente; those of ../format.ts bodyName belong to games that have no French page.)
  */
 export function frBodyName(bodyId: string, tableEdge = TABLE_EDGE): string {
   if (bodyId === 'wall') return tableEdge;
   const [kind, name] = bodyId.split(':');
   if (!name) return bodyId;
   if (kind === 'cube' && /^W\d$/.test(name)) return `le cube E${name.slice(1)}`;
+  if (kind === 'cadre') return 'le cadre';
   return `le ${kind} ${name}`;
 }
 

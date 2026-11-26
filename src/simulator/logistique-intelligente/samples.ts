@@ -232,7 +232,7 @@ const topCube: SampleProgram = {
     `Le robot lève le bras tout en haut (${ARM_UP}${NB}%) et avance de 32,5 cm, jusqu’à la pile du carré du bas, la plus proche. ` +
     'Sa pince ouverte arrive des deux côtés du cube du dessus, le cube 10. Elle se ferme sur lui. ' +
     `Le robot recule de 10 cm${NB}: le cube 5, dessous, ne bouge pas. ` +
-    'Le capteur de couleur de la pince voit le cube. ' +
+    'Le capteur de couleur de la pince regarde le cube 10. ' +
     `L’écran affiche sa couleur, avec le nom que donne le capteur${NB}: yellow (jaune). ` +
     `Le cube est dans la pince, pas dans un entrepôt${NB}: pas encore de points. Il a fini au bout de 3 secondes. ` +
     `Essaie le bras à 50${NB}%${NB}: la pince prend alors le cube du dessous, et le cube 10 vient avec lui.`,
@@ -347,7 +347,7 @@ const stackUpE6: SampleProgram = {
       turn('right', 90),
       note(moveCm('forward', 33.3), 'Plus haut que la zone de stockage.'),
       turn('left', 90),
-      note(moveCm('forward', 22), 'Au-dessus du carré du haut.'),
+      note(moveCm('forward', 22), 'En face du carré du haut, plus haut que lui.'),
       note(turn('left', 90), 'Maintenant, le robot regarde vers le bas, vers la pile du carré du haut.'),
       note(moveCm('forward', AWAY_CM), AROUND_THE_STACK_NOTE),
       note(gripper('close'), 'La pince se ferme sur le cube 6, tout seul. Le cube 1, dessous, ne bouge pas.'),
@@ -399,7 +399,7 @@ function putTheStackDown(): DefinitionNode {
 const wholeMission: SampleProgram = {
   ...exampleCard('logi-toute-mission'),
   description:
-    'Les dix cubes dans cinq entrepôts. Bras en bas, le robot prend chaque pile par son cube du dessous, et le cube du dessus vient avec. ' +
+    'Les dix cubes dans cinq entrepôts. Bras en bas, le robot prend chaque pile par son cube du dessous, et le cube du dessus vient avec lui. ' +
     'Il porte la pile du carré du bas dans E7, celle de droite dans E8, celle de gauche dans E5, celle du haut dans E6 et celle du centre dans E3. ' +
     'Il roule sur des distances mesurées et tourne d’un quart de tour ou d’un demi-tour. ' +
     `Chaque cube du dessous couvre tout son entrepôt, chaque cube du dessus ne touche que lui${NB}: 500 points, en 57 secondes sur 150. ` +
@@ -447,7 +447,7 @@ const wholeMission: SampleProgram = {
       turn('left', 90),
       note(moveCm('forward', 33.3), 'Plus haut que la zone de stockage.'),
       turn('right', 90),
-      note(moveCm('forward', 21.95), 'Au-dessus du carré du haut.'),
+      note(moveCm('forward', 21.95), 'En face du carré du haut, plus haut que lui.'),
       note(turn('right', 90), 'Maintenant, le robot regarde vers le bas, vers la pile du carré du haut.'),
       call('prendre la pile'),
       note(moveCm('backward', 1.4), 'À la hauteur de l’entrepôt E6.'),

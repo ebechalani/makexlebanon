@@ -16,6 +16,9 @@
  *    hover texts; the one of "object detected at claw" also names the referee's colour card.
  *  - Fire Fighter shows exactly the palette of Fire Rescue - the same robot, black lines on white.
  *    Two hover texts are its own: its gripper takes cubes (worded as Warehouse Sort's).
+ *  - Logistique intelligente (Robot en fête 2027, French only) has a palette of its own with the
+ *    robot of Warehouse Sort: it is in the two lists of the games below; its French words and
+ *    hover texts are tested in ./fr.test.ts.
  *  - The real Blockly library accepts both palettes (it is loaded with a pretend browser, jsdom).
  */
 import assert from 'node:assert/strict';
@@ -28,6 +31,7 @@ import { fireChiefGame } from '../fire-chief/game';
 import { fireFighterGame } from '../fire-fighter/game';
 import { fireRescueGame } from '../fire-rescue/game';
 import { lockerRoomGame } from '../locker-room/game';
+import { logistiqueGame } from '../logistique-intelligente/game';
 import { warehouseSortGame } from '../warehouse-sort/game';
 import { BLOCKS, CATEGORIES, getBlockDef, getCategory, type CategoryId } from './catalog';
 import { DC_MOTOR_MENU, DC_MOTOR_STOP_MENU, UNCONFIRMED_BLOCK_TEXTS, UNCONFIRMED_BLOCK_TYPES, UNCONFIRMED_CATEGORY_NAMES } from './mblock-wording';
@@ -403,7 +407,7 @@ describe('the palette of Fire Fighter', () => {
 
 describe('palettes and games', () => {
   it('there is one palette per game, named by the id of the game', () => {
-    assert.deepEqual([...PALETTE_IDS].sort(), [fireChiefGame.id, fireRescueGame.id, warehouseSortGame.id, lockerRoomGame.id, fireFighterGame.id].sort());
+    assert.deepEqual([...PALETTE_IDS].sort(), [fireChiefGame.id, fireRescueGame.id, warehouseSortGame.id, lockerRoomGame.id, fireFighterGame.id, logistiqueGame.id].sort());
     for (const id of PALETTE_IDS) assert.ok(isPaletteId(id));
     assert.equal(isPaletteId('fire'), false);
     assert.equal(isPaletteId(undefined), false);
@@ -453,6 +457,7 @@ describe('palettes and games', () => {
       'warehouse-sort': warehouseSortGame.robotConfig ?? DEFAULT_ROBOT_CONFIG,
       'locker-room': lockerRoomGame.robotConfig ?? DEFAULT_ROBOT_CONFIG,
       'fire-fighter': fireFighterGame.robotConfig ?? DEFAULT_ROBOT_CONFIG,
+      'logistique-intelligente': logistiqueGame.robotConfig ?? DEFAULT_ROBOT_CONFIG,
     };
     for (const id of PALETTE_IDS) {
       const robot = robots[id];

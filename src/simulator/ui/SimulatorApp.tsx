@@ -160,6 +160,13 @@ export interface SimulatorAppProps<S> {
    */
   restartButton?: boolean;
   /**
+   * How many digits the score of the match controls always has room for, from the first second
+   * (3: Logistique intelligente, whose score goes 0, 50, 100 … 500 - the number does not make
+   * the box grow when it reaches 100). Left out by every game before Logistique intelligente:
+   * the box is as it always was.
+   */
+  scoreDigits?: 3;
+  /**
    * What to tell a student who finds the workspace empty, for a category whose students may look
    * here for blocks they made on another page (Fire Rescue Junior: where the blocks of the Fire
    * Rescue page are - ./fire-rescue-junior/earlier-blocks.ts). Called once, when the screen is
@@ -892,6 +899,7 @@ function SimulatorScreen<S>(props: SimulatorAppProps<S>) {
             restartRules={game.restartRules}
             restartsLeft={snapshot.restartsLeft}
             restartButton={props.restartButton}
+            scoreDigits={props.scoreDigits}
             words={words}
             speed={sim.speed}
             onSpeed={sim.setSpeed}

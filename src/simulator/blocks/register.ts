@@ -337,10 +337,15 @@ function useFrenchNumberBubbles(Blockly: BlocklyApi): void {
 /** The game whose palette an editor shows, per workspace (createEditor writes it down). */
 const workspacePalettes = new WeakMap<BlocklyModule.Workspace, string>();
 
-/** The hover text a block has in a game in French, when that game has its own (FR_PALETTE_TOOLTIPS: the game of Warehouse Sort). */
+/**
+ * The hover text a block has in a game in French, when that game has its own (FR_PALETTE_TOOLTIPS:
+ * the game of Warehouse Sort - Tri d’entrepôt - and Logistique intelligente, whose robot, white
+ * lines and cubes are Warehouse Sort's).
+ */
 function frenchPaletteTooltip(type: string, gameId: string | undefined): string | undefined {
   const { FR_PALETTE_TOOLTIPS } = frenchWords();
-  return paletteOf(gameId) === 'warehouse-sort' && Object.prototype.hasOwnProperty.call(FR_PALETTE_TOOLTIPS, type) ? FR_PALETTE_TOOLTIPS[type] : undefined;
+  const palette = paletteOf(gameId);
+  return (palette === 'warehouse-sort' || palette === 'logistique-intelligente') && Object.prototype.hasOwnProperty.call(FR_PALETTE_TOOLTIPS, type) ? FR_PALETTE_TOOLTIPS[type] : undefined;
 }
 
 /** The game of the editor a block is in (a block in the open palette: the editor of that palette). */

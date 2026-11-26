@@ -37,13 +37,19 @@
  *
  *   Robot en fête 2027   Warehouse Sort in French: the palette and the hover texts of Warehouse
  *                 Sort, through LANGUAGE_VERSIONS below (in French: ./fr.ts).
+ *   Logistique intelligente   the second simulator of Robot en fête 2027 (the regular mission of
+ *                 MakeX Inspire 2024, in French only): the robot of Warehouse Sort, so the
+ *                 categories of Warehouse Sort, as a palette of its own - it is no version of
+ *                 Warehouse Sort (a program saved there is a Warehouse Sort program, not one of
+ *                 this game). No English hover texts: the page is French only, and its French
+ *                 ones are Warehouse Sort's (./register.ts frenchPaletteTooltip).
  *
  * Plain data: no Blockly, no DOM.
  */
 import { GRIPPER_SHORTCUT, type CategoryId } from './catalog';
 
 /** The games that have a palette: the same words as Game.id. */
-export type PaletteId = 'fire-rescue' | 'fire-chief' | 'warehouse-sort' | 'locker-room' | 'fire-fighter';
+export type PaletteId = 'fire-rescue' | 'fire-chief' | 'warehouse-sort' | 'locker-room' | 'fire-fighter' | 'logistique-intelligente';
 
 /** The palette an editor gets when no game is named (and for a game that has no palette of its own). */
 export const DEFAULT_PALETTE: PaletteId = 'fire-rescue';
@@ -58,6 +64,7 @@ export const PALETTES: Record<PaletteId, readonly CategoryId[]> = {
   'warehouse-sort': [...COMMON, 'servo', 'gripper', 'quadrgb', 'ultrasonic', 'colorsensor'],
   'locker-room': [...COMMON, 'servo', 'gripper', 'quadrgb', 'ultrasonic', 'colorsensor'],
   'fire-fighter': [...COMMON, 'servo', 'gripper', 'quadrgb', 'ultrasonic', 'colorsensor'],
+  'logistique-intelligente': [...COMMON, 'servo', 'gripper', 'quadrgb', 'ultrasonic', 'colorsensor'],
 };
 
 /**

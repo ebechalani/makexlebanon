@@ -209,11 +209,14 @@ export function gameNameFromId(gameId: string): string {
  * is found again on the Senior page), and the website has no page called "Fire Rescue" any more.
  * A file saved on that page before the split is named after the Senior page too: it is the same
  * game, and its old address leads there. The game 'robot-en-fete' is the simulator Tri d’entrepôt
- * of Robot en fête 2027, a French name its id cannot say ("Robot En Fete").
+ * of Robot en fête 2027, a French name its id cannot say ("Robot En Fete"); the game
+ * 'logistique-intelligente' is its second simulator, « Logistique intelligente », which its id
+ * would write "Logistique Intelligente".
  */
 const GAME_NAMES: Readonly<Record<string, string>> = {
   'fire-rescue': 'Fire Rescue Senior',
   'robot-en-fete': 'Tri d’entrepôt',
+  'logistique-intelligente': 'Logistique intelligente',
 };
 
 /** The name of a game as its page shows it in the title row: "Fire Rescue Senior", "Fire Rescue Junior", "Fire Chief". */

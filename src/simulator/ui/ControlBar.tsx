@@ -34,6 +34,12 @@ export interface ControlBarProps {
    * every other game.
    */
   restartButton?: boolean;
+  /**
+   * How many digits wide the score's number always is (Logistique intelligente: 3, for 0 … 500),
+   * so that the box does not grow during a match. Left out: as wide as the number it shows (on a
+   * French page the stylesheet keeps room for two: ./simulator.css).
+   */
+  scoreDigits?: number;
   /** the game's words (left out: the words of Fire Rescue) */
   words?: ScreenWords;
   speed: Speed;
@@ -184,7 +190,13 @@ export function ControlBar(props: ControlBarProps) {
           >
             <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-500">{text.scoreWord}</span>
             <span className="flex items-baseline gap-1">
-              <span className={`font-mono text-xl font-bold tabular-nums text-ink-900 @[34rem]:text-2xl`}>{score.total}</span>
+              <span
+                className={`font-mono text-xl font-bold tabular-nums text-ink-900 @[34rem]:text-2xl`}
+                // (an inline width wins over the stylesheet's two digits; its text-align: right stays)
+                style={props.scoreDigits ? { minWidth: `${props.scoreDigits}ch` } : undefined}
+              >
+                {score.total}
+              </span>
               <span className="text-xs font-medium text-ink-500">/ {score.max}</span>
             </span>
           </div>
