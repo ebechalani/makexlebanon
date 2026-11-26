@@ -20,7 +20,7 @@
 import dynamic from 'next/dynamic';
 import { PAGE_FRAME } from '../page-frame';
 import { FR_TITLE_TEXT } from '../text/fr-title';
-import { TitleTextContext } from '../text/title-context';
+import { PoweredByContext, TitleTextContext } from '../text/title-context';
 import { TitleBar } from '../TitleBar';
 import { TRI_ENTREPOT_TITLE } from './title';
 
@@ -45,6 +45,14 @@ const RobotEnFeteSimulator = dynamic(() => import('./RobotEnFeteSimulator'), {
   loading: () => <LoadingScreen />,
 });
 
-export function RobotEnFeteLoader() {
-  return <RobotEnFeteSimulator />;
+/**
+ * `poweredBy`: who the title row names (content/standalone.ts `poweredBy` of Robot en fête 2027,
+ * which the page hands over): set above the loading screen and the screen alike.
+ */
+export function RobotEnFeteLoader({ poweredBy }: { poweredBy: string }) {
+  return (
+    <PoweredByContext.Provider value={poweredBy}>
+      <RobotEnFeteSimulator />
+    </PoweredByContext.Provider>
+  );
 }

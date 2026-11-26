@@ -935,6 +935,7 @@ test('Robot en fête 2027: a category of its own - in no season, with no age gro
     eyebrow: '2027',
     simulatorEyebrow: 'S’entraîner en ligne',
     open: 'Ouvrir le simulateur',
+    poweredByLabel: 'Proposé par',
   });
   assert.equal(
     entry.summary,
@@ -1016,7 +1017,8 @@ test('Robot en fête 2027: its page /robot-en-fete is French (lang="fr" on its t
   assert.match(html, /<p class="[^"]*" lang="fr">2027<\/p>/);
   assert.match(html, /<h1 class="[^"]*" lang="fr">Robot en fête 2027<\/h1>/);
   assert.ok(html.includes(` lang="fr">${entry.summary}</p>`), 'the lead');
-  assert.match(html, /<div class="mt-8" lang="fr"><div class="[^"]*"><span class="[^"]*">mBot2<\/span><\/div><\/div>/);
+  // (the robot, then who it is proposed by: content/standalone.ts `poweredBy`)
+  assert.match(html, /<div class="mt-8" lang="fr"><div class="[^"]*"><span class="[^"]*">mBot2<\/span><\/div><p class="[^"]*">Proposé par <span class="[^"]*">Eddy Bachaalany<\/span><\/p><\/div>/);
   const part = html.slice(html.indexOf('<div lang="fr"><section'));
   assert.ok(part.startsWith('<div lang="fr"><section'), 'the part about the simulator');
   assert.ok(part.includes('>S’entraîner en ligne<') && part.includes('>Essaie le simulateur Tri d’entrepôt</h2>'));
@@ -1125,4 +1127,30 @@ test('README: the section of Tri d’entrepôt (Robot en fête 2027), after Ware
   assert.ok(all.includes('`/simulator` lists the eight simulators') && all.includes('lists the eight simulators of two robots'));
   assert.ok(all.includes("- Robot en fête 2027: `'fete-leave-start'`, `'fete-white-line'`, `'fete-cube-colour'`, `'fete-one-cube'`, `'fete-two-cubes'`, `'fete-all-cubes'`"));
   for (const old of ['six games with examples', 'all six games', 'One address, six games', 'the seven simulators']) assert.ok(!all.includes(old), old);
+});
+
+test('Robot en fête 2027 is proposed by Eddy Bachaalany: its page and its part of the Simulator page name him, not the academy; the season simulators keep the academy', async () => {
+  const fete = standaloneCategories.find((category) => category.slug === 'robot-en-fete');
+  assert.ok(fete);
+  assert.equal(fete.poweredBy, 'Eddy Bachaalany');
+  assert.equal(fete.page.poweredByLabel, 'Proposé par');
+  const { POWERED_BY } = await import('./powered-by');
+  assert.equal(POWERED_BY, 'RoboHolic Robotics Academy');
+
+  // the Simulator page: the academy's credit right after the seasons, then the French part with its own credit
+  const { default: SimulatorPage } = (await import('../../app/simulator/page')) as { default: () => Parameters<typeof renderToStaticMarkup>[0] };
+  const html = renderToStaticMarkup(createElement(SimulatorPage));
+  const french = /<section[^>]*lang="fr"[^>]*>[^]*?<\/section>/.exec(html)?.[0] ?? '';
+  assert.ok(french, 'the French part');
+  assert.match(french, /<p[^>]*>Proposé par <span[^>]*>Eddy Bachaalany<\/span><\/p><\/section>$/);
+  assert.ok(!french.includes('RoboHolic') && !french.includes('Powered by'), french);
+  const academy = html.indexOf('Powered by <span class="font-semibold text-ink-700">RoboHolic Robotics Academy</span>');
+  assert.ok(academy > html.indexOf('Season 2027') && academy < html.indexOf('lang="fr"'), 'the academy credit sits between the seasons and the French part');
+  assert.equal(html.split('RoboHolic').length - 1, 1, 'the academy is named once');
+
+  // the page /robot-en-fete: the credit in its French hero
+  const { default: CategoryPage } = (await import('../../app/robot-en-fete/page')) as { default: () => Parameters<typeof renderToStaticMarkup>[0] };
+  const page = renderToStaticMarkup(createElement(CategoryPage));
+  assert.match(page, /<div class="mt-8" lang="fr">[^]*?<p[^>]*>Proposé par <span[^>]*>Eddy Bachaalany<\/span><\/p><\/div>/);
+  assert.ok(!page.includes('RoboHolic'));
 });

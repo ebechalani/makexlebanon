@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { site } from '@content/site';
+import { standaloneCategories } from '@content/standalone';
 import { RobotEnFeteLoader } from '@/simulator/ui/robot-en-fete/RobotEnFeteLoader';
 
 /**
@@ -62,5 +63,8 @@ export const metadata: Metadata = {
  * page has no PageHero: its heading and breadcrumb are the simulator's slim title row.
  */
 export default function TriEntrepotSimulatorPage() {
-  return <RobotEnFeteLoader />;
+  // (its title row names who Robot en fête 2027 is proposed by, not the academy of the season simulators)
+  const category = standaloneCategories.find((entry) => entry.slug === 'robot-en-fete');
+  if (!category) throw new Error('content/standalone.ts has no Robot en fête 2027');
+  return <RobotEnFeteLoader poweredBy={category.poweredBy} />;
 }

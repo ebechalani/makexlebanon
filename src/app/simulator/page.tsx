@@ -97,6 +97,12 @@ export default function SimulatorPage() {
               </section>
             ))}
 
+            {/* who the season simulators are powered by: the same credit as in their title row (a category
+                of its own, below, names its own in its part) */}
+            <p className="text-sm text-ink-500">
+              Powered by <span className="font-semibold text-ink-700">{POWERED_BY}</span>
+            </p>
+
             {/* the categories of their own, after the seasons: each part in its category's language */}
             {standaloneCategories.map((category) => (
               <section key={category.slug} aria-labelledby={`category-${category.slug}`} lang={category.lang}>
@@ -120,14 +126,14 @@ export default function SimulatorPage() {
                     />
                   ))}
                 </ul>
+
+                {/* who its simulators are powered by: the same name as in their title row (content/standalone.ts) */}
+                <p className="mt-8 text-sm text-ink-500">
+                  {category.page.poweredByLabel} <span className="font-semibold text-ink-700">{category.poweredBy}</span>
+                </p>
               </section>
             ))}
           </div>
-
-          {/* who the simulators are powered by: the same credit as in the title row of every simulator */}
-          <p className="mt-16 text-sm text-ink-500">
-            Powered by <span className="font-semibold text-ink-700">{POWERED_BY}</span>
-          </p>
         </Container>
       </div>
     </>

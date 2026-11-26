@@ -66,6 +66,13 @@ export type StandaloneCategory = {
   lang: 'fr';
   /** the robot it is played with, e.g. mBot2 */
   platform: string;
+  /**
+   * who its simulators are powered by: a name, shown after `page.poweredByLabel` on its own page, in
+   * its part of the Simulator page and in the title row of each of its simulators (also while it
+   * loads: the simulator's page hands it to its loader). It takes the place of the academy that the
+   * season simulators name (src/simulator/ui/powered-by.ts).
+   */
+  poweredBy: string;
   /** one or two sentences: the lead of its own page (and of nothing else) */
   summary: string;
   /** the words of its own page */
@@ -80,6 +87,8 @@ export type StandaloneCategory = {
     simulatorEyebrow: string;
     /** the button that opens a simulator */
     open: string;
+    /** the words before `poweredBy` (French "Proposé par", as in the title row of its simulators) */
+    poweredByLabel: string;
   };
   /** its simulators, in the order the pages and the menu show them (one card, one part of its page and one menu line each) */
   simulators: StandaloneSimulator[];
@@ -94,6 +103,8 @@ export const standaloneCategories: StandaloneCategory[] = [
     name: 'Robot en fête 2027',
     lang: 'fr',
     platform: 'mBot2',
+    // (the organiser's choice: Robot en fête 2027 is proposed by Eddy Bachaalany, not by the academy of the season simulators)
+    poweredBy: 'Eddy Bachaalany',
     summary:
       `La version française de Warehouse Sort${NB}: la même mission pour débutants, entièrement en français, blocs compris. ` +
       'Le robot trie des cubes rouges et verts, laisse le cube bleu à sa place, puis se gare.',
@@ -104,6 +115,7 @@ export const standaloneCategories: StandaloneCategory[] = [
       eyebrow: '2027',
       simulatorEyebrow: 'S’entraîner en ligne',
       open: 'Ouvrir le simulateur',
+      poweredByLabel: 'Proposé par',
     },
     simulators: [
       {

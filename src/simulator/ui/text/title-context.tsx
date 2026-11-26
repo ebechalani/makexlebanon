@@ -33,6 +33,19 @@ export const ScreenTextContext = createContext<ScreenText | null>(null);
  */
 export const TitleTextContext = createContext<TitleText | null>(null);
 
+/**
+ * Who the simulator is powered by, where a page names someone else than the academy of the season
+ * simulators (../powered-by.ts): the loader of a Robot en fête simulator sets the name its page hands
+ * it (content/standalone.ts `poweredBy`), above the loading screen and the screen alike. Empty
+ * (null) everywhere else: the title row names the academy then.
+ */
+export const PoweredByContext = createContext<string | null>(null);
+
+/** The name set in `PoweredByContext`, or null where none is set. */
+export function usePoweredBy(): string | null {
+  return useContext(PoweredByContext);
+}
+
 /** The words of the title row, in the language of the screen (or of the loading screen). */
 export function useTitleText(): TitleText {
   // (both read every time: a hook is never skipped)
