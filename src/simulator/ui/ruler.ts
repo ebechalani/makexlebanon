@@ -374,6 +374,29 @@ function upperSide(heading: number): Vec2 {
  * first: they get the best places.
  */
 export function rulerLabels(ruler: Ruler, style: RulerLabelStyle): RulerLabel[] {
+  return placeRulerLabels(ruler, style, RULER_LABEL_WORDS);
+}
+
+/** How the numbers of the ruler on the mat are written: a length, a turn and the total length. */
+export interface RulerLabelWords {
+  cm(mm: number): string;
+  turn(degrees: number): string;
+  total(mm: number): string;
+}
+
+/** The English numbers of the ruler on the mat (rulerLabels). */
+const RULER_LABEL_WORDS: RulerLabelWords = {
+  cm: cmText,
+  turn: turnText,
+  total: (mm) => `${cmText(mm)} in all`,
+};
+
+/**
+ * rulerLabels with the numbers written in `words`: the places are decided for the texts as they
+ * are written, so a longer text gets a wider box and still covers nothing. (The French screen
+ * writes "32,5 cm" and "90° à droite": ./text/fr-stage.tsx.)
+ */
+export function placeRulerLabels(ruler: Ruler, style: RulerLabelStyle, words: RulerLabelWords): RulerLabel[] {
   const { pieces, turns, arriving, totalMm } = measureRuler(ruler);
   const { fontSize, clearance, bounds } = style;
   const labels: RulerLabel[] = [];
@@ -428,14 +451,14 @@ export function rulerLabels(ruler: Ruler, style: RulerLabelStyle): RulerLabel[] 
   pieces.forEach((piece, i) => {
     const middle = { x: (piece.from.x + piece.to.x) / 2, y: (piece.from.y + piece.to.y) / 2 };
     if (piece.heading === null) {
-      place('piece', cmText(piece.mm), middle, { x: 0, y: -1 }, clearance);
+      place('piece', words.cm(piece.mm), middle, { x: 0, y: -1 }, clearance);
       return;
     }
     // the corner this piece leads to decides the side; the last piece looks back at its own start
     const turn = turns[i + 1] ?? turns[i];
     const right = rightOf(piece.heading);
     const side = !turn || turn === 180 ? upperSide(piece.heading) : turn > 0 ? right : { x: -right.x, y: -right.y };
-    place('piece', cmText(piece.mm), middle, side, clearance * 0.5);
+    place('piece', words.cm(piece.mm), middle, side, clearance * 0.5);
   });
 
   turns.forEach((turn, i) => {
@@ -450,12 +473,12 @@ export function rulerLabels(ruler: Ruler, style: RulerLabelStyle): RulerLabel[] 
     // straight on: a corner without an outer side - the turn is written below the line (for an upright line: on its left)
     const upper = upperSide(after);
     const direction = size < 1e-6 ? { x: -upper.x, y: -upper.y } : { x: out.x / size, y: out.y / size };
-    place('turn', turnText(turn), ruler.points[i], direction, clearance);
+    place('turn', words.turn(turn), ruler.points[i], direction, clearance);
   });
 
   if (pieces.length > 1) {
     const last = pieces[pieces.length - 1];
-    place('total', `${cmText(totalMm)} in all`, last.to, last.heading === null ? { x: 0, y: 1 } : forwardOf(last.heading), clearance);
+    place('total', words.total(totalMm), last.to, last.heading === null ? { x: 0, y: 1 } : forwardOf(last.heading), clearance);
   }
   return labels;
 }

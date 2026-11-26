@@ -31,8 +31,8 @@ export interface WarehouseSortScenario {
   cubes: Record<WarehouseId, CubeColor>;
 }
 
-const LETTER: Record<CubeColor, string> = { red: 'R', green: 'G', blue: 'B' };
-const FROM_LETTER: Record<string, CubeColor> = { R: 'red', G: 'green', B: 'blue' };
+/** The letter of each colour in the codes of Warehouse Sort: "GR-BR". (Robot en fête 2027 writes V for vert: ../robot-en-fete/scenario-words.ts.) */
+export const EN_LETTERS: Record<CubeColor, string> = { red: 'R', green: 'G', blue: 'B' };
 
 /** How many ways there are to colour the three cubes that are not blue (2 x 2 x 2, minus all red and all green). */
 const SORTED_WAYS = 6;
@@ -42,22 +42,79 @@ export const SCENARIO_COUNT = WAREHOUSE_IDS.length * SORTED_WAYS;
 const isCubeColor = (v: unknown): v is CubeColor => v === 'red' || v === 'green' || v === 'blue';
 
 /**
+ * The sentences about an arrangement (scenarioProblems and describeScenario below), so that the
+ * same rules can be said in another language (Robot en fête 2027:
+ * ../robot-en-fete/scenario-words.ts). The English ones are EN_SCENARIO_WORDS.
+ */
+export interface ScenarioWords {
+  /** a warehouse in a sentence: "W2" */
+  warehouse(warehouse: WarehouseId): string;
+  needsCube: string;
+  noBlue: string;
+  manyBlue(blue: number): string;
+  noRed: string;
+  noGreen: string;
+  /** an arrangement that cannot be played, and its problems */
+  cannotPlay(problems: string[]): string;
+  /** one line for people: `where(color)` is the warehouses of that colour, "W2, W4" */
+  describe(where: (color: CubeColor) => string): string;
+}
+
+export const EN_SCENARIO_WORDS: ScenarioWords = {
+  warehouse: (w) => w,
+  needsCube: 'Every warehouse needs a red, a green or a blue cube.',
+  noBlue: 'One cube must be blue.',
+  manyBlue: (blue) => `There are ${blue} blue cubes. Only one cube may be blue.`,
+  noRed: 'At least one cube must be red.',
+  noGreen: 'At least one cube must be green.',
+  cannotPlay: (problems) => `This arrangement cannot be played. ${problems.join(' ')}`,
+  describe: (where) => `Red: ${where('red')}. Green: ${where('green')}. Blue: ${where('blue')} (leave it).`,
+};
+
+/** What a game says about its arrangements, in the words it is given. */
+export interface ScenarioText {
+  /** what is wrong with an arrangement, one plain sentence per problem; an empty list means it can be played */
+  scenarioProblems(s: WarehouseSortScenario): string[];
+  /** one line for people: "Red: W2, W4. Green: W1. Blue: W3 (leave it)." */
+  describeScenario(s: WarehouseSortScenario): string;
+}
+
+/** scenarioProblems and describeScenario in these words. (Which arrangements can be played does not depend on the words.) */
+export function scenarioText(words: ScenarioWords): ScenarioText {
+  function scenarioProblems(s: WarehouseSortScenario): string[] {
+    if (!s || typeof s !== 'object' || !s.cubes || typeof s.cubes !== 'object') {
+      return [words.needsCube];
+    }
+    const colors = WAREHOUSE_IDS.map((w) => s.cubes[w]);
+    if (!colors.every(isCubeColor)) return [words.needsCube];
+    const out: string[] = [];
+    const blue = colors.filter((c) => c === 'blue').length;
+    if (blue === 0) out.push(words.noBlue);
+    if (blue > 1) out.push(words.manyBlue(blue));
+    if (!colors.includes('red')) out.push(words.noRed);
+    if (!colors.includes('green')) out.push(words.noGreen);
+    return out;
+  }
+  function describeScenario(s: WarehouseSortScenario): string {
+    const problems = scenarioProblems(s);
+    if (problems.length > 0) return words.cannotPlay(problems);
+    const where = (color: CubeColor) =>
+      WAREHOUSE_IDS.filter((w) => s.cubes[w] === color)
+        .map((w) => words.warehouse(w))
+        .join(', ');
+    return words.describe(where);
+  }
+  return { scenarioProblems, describeScenario };
+}
+
+const EN_TEXT = scenarioText(EN_SCENARIO_WORDS);
+
+/**
  * What is wrong with an arrangement, one plain sentence per problem; an empty list means it can
  * be played.
  */
 export function scenarioProblems(s: WarehouseSortScenario): string[] {
-  if (!s || typeof s !== 'object' || !s.cubes || typeof s.cubes !== 'object') {
-    return ['Every warehouse needs a red, a green or a blue cube.'];
-  }
-  const colors = WAREHOUSE_IDS.map((w) => s.cubes[w]);
-  if (!colors.every(isCubeColor)) return ['Every warehouse needs a red, a green or a blue cube.'];
-  const out: string[] = [];
-  const blue = colors.filter((c) => c === 'blue').length;
-  if (blue === 0) out.push('One cube must be blue.');
-  if (blue > 1) out.push(`There are ${blue} blue cubes. Only one cube may be blue.`);
-  if (!colors.includes('red')) out.push('At least one cube must be red.');
-  if (!colors.includes('green')) out.push('At least one cube must be green.');
-  return out;
+  return EN_TEXT.scenarioProblems(s);
 }
 
 export function isValidScenario(s: WarehouseSortScenario): boolean {
@@ -123,12 +180,6 @@ export function randomScenario(rng: () => number): WarehouseSortScenario {
   return scenarioFromIndex(Math.floor(rng() * SCENARIO_COUNT) % SCENARIO_COUNT);
 }
 
-/** Short code of an arrangement: "GR-BR" (W1 W2, then W3 W4 - as the cubes lie on the mat). */
-export function encodeScenario(s: WarehouseSortScenario): string {
-  const letters = WAREHOUSE_IDS.map((w) => LETTER[s.cubes[w]] ?? '?').join('');
-  return `${letters.slice(0, 2)}-${letters.slice(2)}`;
-}
-
 /**
  * The letters and digits of a typed code, in capitals: "gr-br" -> "GRBR". Wide letters, as a
  * keyboard for Chinese or Japanese types them ("ＧＲ－ＢＲ"), are read as the usual ones (NFKC).
@@ -137,20 +188,71 @@ export function compactCode(code: string): string {
   return code.normalize('NFKC').toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
 
+/** How a game writes its arrangement codes, and reads them back. */
+export interface ScenarioCodec {
+  /** the letter of each colour */
+  letters: Readonly<Record<CubeColor, string>>;
+  /** short code of an arrangement: "GR-BR" (W1 W2, then W3 W4 - as the cubes lie on the mat) */
+  encode(s: WarehouseSortScenario): string;
+  /** what a code says, also when the arrangement cannot be played (scenarioOfCode below) */
+  ofCode(code: string): WarehouseSortScenario | null;
+  /** read a code back; null for anything else, and for an arrangement that cannot be played (decodeScenario below) */
+  decode(code: string): WarehouseSortScenario | null;
+}
+
+/**
+ * The codes written with these letters, one capital A - Z per colour, all different. A reader may
+ * also take other letters (`alsoReads`): Robot en fête writes V for vert and also reads the G of
+ * a Warehouse Sort code. Letter case, spaces and dashes never matter.
+ */
+export function scenarioCodec(letters: Readonly<Record<CubeColor, string>>, alsoReads: Readonly<Record<string, CubeColor>> = {}): ScenarioCodec {
+  const fromLetter: Record<string, CubeColor> = {};
+  for (const color of CUBE_COLORS) {
+    const letter = letters[color];
+    if (!/^[A-Z]$/.test(letter) || letter in fromLetter) throw new Error(`scenarioCodec: the letter of ${color} must be one capital letter of its own`);
+    fromLetter[letter] = color;
+  }
+  for (const [letter, color] of Object.entries(alsoReads)) {
+    if (!/^[A-Z]$/.test(letter) || letter in fromLetter || !isCubeColor(color)) throw new Error(`scenarioCodec: ${letter} cannot also be read`);
+    fromLetter[letter] = color;
+  }
+  function encode(s: WarehouseSortScenario): string {
+    const code = WAREHOUSE_IDS.map((w) => letters[s.cubes[w]] ?? '?').join('');
+    return `${code.slice(0, 2)}-${code.slice(2)}`;
+  }
+  function ofCode(code: string): WarehouseSortScenario | null {
+    if (typeof code !== 'string' || code.length > 100) return null;
+    const compact = compactCode(code);
+    if (compact.length !== WAREHOUSE_IDS.length || ![...compact].every((letter) => letter in fromLetter)) return null;
+    const cubes = {} as Record<WarehouseId, CubeColor>;
+    WAREHOUSE_IDS.forEach((w, i) => {
+      cubes[w] = fromLetter[compact[i]];
+    });
+    return { cubes };
+  }
+  function decode(code: string): WarehouseSortScenario | null {
+    if (typeof code !== 'string') return null;
+    const s = ofCode(code.trim());
+    return s !== null && isValidScenario(s) ? s : null;
+  }
+  return { letters, encode, ofCode, decode };
+}
+
+/** The codes of Warehouse Sort: "GR-BR". */
+export const EN_CODEC: ScenarioCodec = scenarioCodec(EN_LETTERS);
+
+/** Short code of an arrangement: "GR-BR" (W1 W2, then W3 W4 - as the cubes lie on the mat). */
+export function encodeScenario(s: WarehouseSortScenario): string {
+  return EN_CODEC.encode(s);
+}
+
 /**
  * What a code says, also when the arrangement cannot be played ("RR-GG", "BB-RG"): letter case,
  * spaces and dashes do not matter. Null for a text that is no code at all - it never throws.
  * (For an editor that is being changed. A match is played with decodeScenario() below.)
  */
 export function scenarioOfCode(code: string): WarehouseSortScenario | null {
-  if (typeof code !== 'string' || code.length > 100) return null;
-  const compact = compactCode(code);
-  if (!/^[RGB]{4}$/.test(compact)) return null;
-  const cubes = {} as Record<WarehouseId, CubeColor>;
-  WAREHOUSE_IDS.forEach((w, i) => {
-    cubes[w] = FROM_LETTER[compact[i]];
-  });
-  return { cubes };
+  return EN_CODEC.ofCode(code);
 }
 
 /**
@@ -161,17 +263,12 @@ export function scenarioOfCode(code: string): WarehouseSortScenario | null {
  * and a student who typed a row number would get another arrangement than that row's.
  */
 export function decodeScenario(code: string): WarehouseSortScenario | null {
-  if (typeof code !== 'string') return null;
-  const s = scenarioOfCode(code.trim());
-  return s !== null && isValidScenario(s) ? s : null;
+  return EN_CODEC.decode(code);
 }
 
 /** One line for people: "Red: W2, W4. Green: W1. Blue: W3 (leave it)." */
 export function describeScenario(s: WarehouseSortScenario): string {
-  const problems = scenarioProblems(s);
-  if (problems.length > 0) return `This arrangement cannot be played. ${problems.join(' ')}`;
-  const where = (color: CubeColor) => WAREHOUSE_IDS.filter((w) => s.cubes[w] === color).join(', ');
-  return `Red: ${where('red')}. Green: ${where('green')}. Blue: ${where('blue')} (leave it).`;
+  return EN_TEXT.describeScenario(s);
 }
 
 /** The same arrangement with one cube changed (for an editor; the result may be invalid). */

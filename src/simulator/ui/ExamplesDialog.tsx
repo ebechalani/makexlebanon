@@ -21,9 +21,10 @@
  * student's finger when it does.
  */
 import { Fragment, useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import { codeMessage, examplesIntro, EXAMPLES_WORDS as WORDS, type CodeMessage, type ExamplesView } from './examples-words';
+import type { CodeMessage, ExamplesView } from './examples-words';
 import { LockIcon, UnlockIcon } from './icons';
 import { CODE_LOOKS_LIKE, CODE_PLACEHOLDER, hiddenCode, type ExampleCard, type ExampleProgram } from './member-unlock';
+import { useScreenText } from './text/context';
 import type { MemberExamples } from './useMemberExamples';
 import { button, Modal } from './widgets';
 
@@ -40,6 +41,8 @@ export interface ExamplesDialogProps {
 
 export function ExamplesDialog({ examples, onLoad, onClose, howLoadingWorks }: ExamplesDialogProps) {
   const { config, levels, cards, available, unlocked, status, openList, refreshOpenList } = examples;
+  const text = useScreenText();
+  const WORDS = text.examplesWords;
   const canOpen = (card: ExampleCard): boolean => available[card.id] !== undefined;
   // a member is back: the code saved on this device is being checked, there is nothing to type
   const checkingSaved = !unlocked && status.phase === 'checking' && status.about === 'saved';
@@ -101,9 +104,9 @@ export function ExamplesDialog({ examples, onLoad, onClose, howLoadingWorks }: E
   };
 
   return (
-    <Modal title="Examples" onClose={close} widthClass="max-w-3xl" align="top">
+    <Modal title={text.examplesTitle} onClose={close} widthClass="max-w-3xl" align="top">
       <p className="mb-3 text-sm leading-relaxed text-ink-600" data-examples-intro>
-        {examplesIntro(view, config.organisation, howLoadingWorks)}
+        {text.examplesIntro(view, config.organisation, howLoadingWorks)}
       </p>
 
       <MemberCodePanel examples={examples} />
@@ -144,7 +147,7 @@ export function ExamplesDialog({ examples, onLoad, onClose, howLoadingWorks }: E
           // (a heading is drawn only over at least one card)
           if (list.length === 0) return null;
           return (
-            <section key={level.id} className="mb-4 last:mb-0" aria-label={`${level.title} examples`} data-example-level={level.id}>
+            <section key={level.id} className="mb-4 last:mb-0" aria-label={text.examplesLevel(level.title)} data-example-level={level.id}>
               <h3 tabIndex={-1} className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-ink-500 outline-none">
                 <span className={`rounded px-1.5 py-0.5 ${HEADING_COLOURS[i % HEADING_COLOURS.length]}`}>{level.title}</span>
                 {level.about}
@@ -180,12 +183,13 @@ function LockedCard({ card, note }: { card: ExampleCard; note: string }) {
 
 /** An example the server has handed out: its description and the button that loads it. */
 function OpenCard({ example, onLoad }: { example: ExampleProgram; onLoad: (example: ExampleProgram) => void }) {
+  const text = useScreenText();
   return (
     <li data-example={example.id} data-locked="false" className="flex flex-col gap-2 rounded-card border border-slate-200 bg-slate-50 p-3">
       <p className="text-sm font-bold text-ink-900">{example.title}</p>
       <p className="flex-1 text-xs leading-relaxed text-ink-600">{example.description}</p>
-      <button type="button" onClick={() => onLoad(example)} className={`${button.plain} self-start py-1.5`} aria-label={`Load the example ${example.title}`}>
-        {WORDS.loadExample}
+      <button type="button" onClick={() => onLoad(example)} className={`${button.plain} self-start py-1.5`} aria-label={text.loadExampleLabel(example.title)}>
+        {text.examplesWords.loadExample}
       </button>
     </li>
   );
@@ -225,12 +229,14 @@ function Spinner({ className }: { className: string }) {
 
 function MemberCodePanel({ examples }: { examples: MemberExamples }) {
   const { status, savedCode, draft, setDraft, unlocked, changing } = examples;
+  const text = useScreenText();
+  const WORDS = text.examplesWords;
   const checking = status.phase === 'checking';
   // the field is there to type a code into: not once the examples are open (unless a different
   // code is to be typed), and not while the code that is saved on this device is being checked
   // (a member who comes back types nothing)
   const showForm = changing || (!unlocked && !(checking && status.about === 'saved'));
-  const message = codeMessage(status, examples.config.organisation, unlocked);
+  const message = text.codeMessage(status, examples.config.organisation, unlocked);
 
   const [confirmingForget, setConfirmingForget] = useState(false);
   const inputId = useId();
@@ -309,7 +315,7 @@ function MemberCodePanel({ examples }: { examples: MemberExamples }) {
 
   return (
     <section
-      aria-label="Member code"
+      aria-label={text.memberCode}
       data-member-panel={status.phase}
       data-unlocked={unlocked ? 'true' : 'false'}
       className={`mb-4 rounded-card border p-3 ${unlocked ? 'border-emerald-200 bg-emerald-50' : 'border-brand-200 bg-brand-50'}`}
@@ -412,7 +418,7 @@ function MemberCodePanel({ examples }: { examples: MemberExamples }) {
           {/* forgetting takes two steps, and the second one starts on "Keep it": it cannot happen with one slip.
               (Nothing to forget when the browser did not save the code.) */}
           {examples.remembered && confirmingForget ? (
-            <span role="group" aria-label="Forget this code on this device?" className="flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-lg bg-white px-2.5 py-1.5 ring-1 ring-inset ring-slate-300">
+            <span role="group" aria-label={text.forgetGroup} className="flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-lg bg-white px-2.5 py-1.5 ring-1 ring-inset ring-slate-300">
               <span className="font-semibold text-ink-800">{WORDS.forgetQuestion}</span>
               <button ref={keepRef} type="button" onClick={() => setConfirmingForget(false)} className={SMALL_BUTTON}>
                 {WORDS.forgetNo}

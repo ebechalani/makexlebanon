@@ -6,14 +6,16 @@
  * is then selected in the workspace.
  */
 import { useEffect, useRef } from 'react';
-import { formatStamp, type LogLevel, type LogLine, type TimeText } from './format';
+import type { LogLevel, LogLine, TimeText } from './format';
+import { useScreenText } from './text/context';
 import { button } from './widgets';
 
-const LEVEL_STYLE: Record<LogLevel, { dot: string; text: string; name: string }> = {
-  info: { dot: 'bg-brand-500', text: 'text-ink-800', name: 'Info' },
-  event: { dot: 'bg-slate-400', text: 'text-ink-600', name: 'Event' },
-  warn: { dot: 'bg-amber-500', text: 'text-amber-900', name: 'Warning' },
-  error: { dot: 'bg-rose-600', text: 'text-rose-800', name: 'Error' },
+/** The colours of each kind of line (its name, for a screen reader, is in the word table: `logLevels`). */
+const LEVEL_STYLE: Record<LogLevel, { dot: string; text: string }> = {
+  info: { dot: 'bg-brand-500', text: 'text-ink-800' },
+  event: { dot: 'bg-slate-400', text: 'text-ink-600' },
+  warn: { dot: 'bg-amber-500', text: 'text-amber-900' },
+  error: { dot: 'bg-rose-600', text: 'text-rose-800' },
 };
 
 export interface ConsolePanelProps {
@@ -25,7 +27,10 @@ export interface ConsolePanelProps {
   timeText?: TimeText;
 }
 
-export function ConsolePanel({ logs, onClear, onSelectBlock, timeText = formatStamp }: ConsolePanelProps) {
+export function ConsolePanel({ logs, onClear, onSelectBlock, timeText: ownTimeText }: ConsolePanelProps) {
+  const text = useScreenText();
+  // (left out: the times of the word table - the rounded time stamps)
+  const timeText = ownTimeText ?? text.moment;
   const listRef = useRef<HTMLDivElement>(null);
   /** keep showing the newest line, unless the student has scrolled up to read */
   const stickRef = useRef(true);
@@ -45,11 +50,11 @@ export function ConsolePanel({ logs, onClear, onSelectBlock, timeText = formatSt
         }}
         className="max-h-56 min-h-16 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-1.5 text-xs"
         role="log"
-        aria-label="Console"
+        aria-label={text.consoleLabel}
         tabIndex={0}
       >
         {logs.length === 0 ? (
-          <p className="p-2 text-ink-500">Nothing yet. Messages and problems of your program appear here while it runs.</p>
+          <p className="p-2 text-ink-500">{text.consoleEmpty}</p>
         ) : (
           <ul className="flex flex-col">
             {logs.map((line) => {
@@ -59,7 +64,10 @@ export function ConsolePanel({ logs, onClear, onSelectBlock, timeText = formatSt
                   <span className="shrink-0 font-mono tabular-nums text-ink-400">{timeText(line.time)}</span>
                   <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${style.dot}`} aria-hidden="true" />
                   <span className={`min-w-0 flex-1 break-words ${style.text} ${line.level === 'error' ? 'font-semibold' : ''}`}>
-                    <span className="sr-only">{style.name}: </span>
+                    <span className="sr-only">
+                      {text.logLevels[line.level]}
+                      {text.levelSeparator}
+                    </span>
                     {line.text}
                     {line.count > 1 && <span className="ml-1 rounded bg-slate-200 px-1 font-mono text-[10px] font-bold text-ink-600">×{line.count}</span>}
                   </span>
@@ -71,7 +79,7 @@ export function ConsolePanel({ logs, onClear, onSelectBlock, timeText = formatSt
                     <button
                       type="button"
                       onClick={() => onSelectBlock(line.blockId as string)}
-                      title="Show the block this message is about"
+                      title={text.showBlockHint}
                       className="flex w-full items-start gap-2 rounded px-1.5 py-1 text-left underline decoration-dotted underline-offset-2 hover:bg-white"
                     >
                       {body}
@@ -86,9 +94,9 @@ export function ConsolePanel({ logs, onClear, onSelectBlock, timeText = formatSt
         )}
       </div>
       <div className="flex items-center justify-between">
-        <p className="text-xs text-ink-500">Underlined lines: click to see the block.</p>
+        <p className="text-xs text-ink-500">{text.underlinedHint}</p>
         <button type="button" onClick={onClear} disabled={logs.length === 0} className={`${button.ghost} text-xs`}>
-          Clear
+          {text.clearConsole}
         </button>
       </div>
     </div>

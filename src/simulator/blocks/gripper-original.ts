@@ -34,10 +34,18 @@
  * held up by what it grips), the My Blocks always wait their fixed time; and "arm moves to height"
  * as a Gripper block keeps the height between 0 and 100, the My Block does not check it.
  *
+ * In French (the page of Robot en fête 2027) the same five My Blocks have French names, a French
+ * input ("hauteur"), a French note and French words: every function that names them takes a
+ * `locale` ('fr'); left out, English - what every English page and every test gets, unchanged.
+ * The blocks inside are the same blocks (the servo block, a wait): they turn French by themselves
+ * in a French workspace (./register.ts). The names are program data: a My Block keeps the name
+ * it was given, on either page.
+ *
  * Plain data and pure functions: no DOM, no Blockly, and no import of the program builder
  * (vm/builder.ts), so the simulator screen may use this file.
  */
 import type { BlockJson, GripperConfig, ProgramJson, RobotConfig, ServoPort, VariableJson } from '../core/types';
+import type { BlockLocale } from './locale';
 import { COLUMN_GAP, estimateStackWidth, FIRST_X, FIRST_Y, noteState } from './stack-size';
 import { toolboxBlock } from './toolbox';
 
@@ -64,7 +72,7 @@ export interface GripperVariant {
   part: 'claw' | 'arm';
 }
 
-/** Name of the number input of "arm moves to height". */
+/** Name of the number input of "arm moves to height" (in French: FRENCH_VARIANT_WORDS). */
 const HEIGHT_INPUT = 'height';
 
 export const GRIPPER_VARIANTS: readonly GripperVariant[] = [
@@ -86,6 +94,30 @@ const VARIANT_BY_ID = new Map<GripperVariantId, GripperVariant>(GRIPPER_VARIANTS
 
 export function gripperVariant(id: GripperVariantId): GripperVariant {
   const variant = VARIANT_BY_ID.get(id);
+  if (!variant) throw new Error(`Unknown Gripper block "${id}".`);
+  return variant;
+}
+
+/** What the five Gripper blocks and their My Blocks are called in French (the blocks: ./fr.ts FR_BLOCKS). */
+const FRENCH_VARIANT_WORDS: Readonly<Record<GripperVariantId, Pick<GripperVariant, 'label' | 'myBlock' | 'inputs'>>> = {
+  'claw-open': { label: 'la pince s’ouvre jusqu’à la fin', myBlock: 'la pince s’ouvre', inputs: [] },
+  'claw-close': { label: 'la pince se ferme jusqu’à la fin', myBlock: 'la pince se ferme', inputs: [] },
+  'arm-raise': { label: 'le bras monte jusqu’à la fin', myBlock: 'le bras monte', inputs: [] },
+  'arm-lower': { label: 'le bras descend jusqu’à la fin', myBlock: 'le bras descend', inputs: [] },
+  'arm-height': { label: 'le bras va à la hauteur 50\u00a0% jusqu’à la fin', myBlock: 'le bras va à la hauteur', inputs: ['hauteur'] },
+};
+
+const FRENCH_VARIANTS: readonly GripperVariant[] = GRIPPER_VARIANTS.map((variant) => ({ ...variant, ...FRENCH_VARIANT_WORDS[variant.id], inputs: [...FRENCH_VARIANT_WORDS[variant.id].inputs] }));
+
+/** The five Gripper blocks with the words of a language: English, GRIPPER_VARIANTS itself; French, the same with French names. */
+export function gripperVariants(locale: BlockLocale = 'en'): readonly GripperVariant[] {
+  return locale === 'fr' ? FRENCH_VARIANTS : GRIPPER_VARIANTS;
+}
+
+/** One Gripper block with the words of a language. */
+function variantIn(id: GripperVariantId, locale: BlockLocale): GripperVariant {
+  if (locale !== 'fr') return gripperVariant(id);
+  const variant = FRENCH_VARIANTS.find((v) => v.id === id);
   if (!variant) throw new Error(`Unknown Gripper block "${id}".`);
   return variant;
 }
@@ -134,22 +166,23 @@ const join = (sign: '+' | '-' | '*', left: Expr, right: Expr): Expr => ({ kind: 
 /** Numbers without binary noise: 0.9, not 0.9000000000000001. */
 const tidy = (n: number): number => Math.round(n * 1e6) / 1e6;
 
-function exprText(e: Expr): string {
-  if (e.kind === 'number') return String(e.value);
+/** A value in words; `number` writes a number (French: with a decimal comma). */
+function exprText(e: Expr, number: (value: number) => string = String): string {
+  if (e.kind === 'number') return number(e.value);
   if (e.kind === 'input') return e.name;
-  return `${exprText(e.left)} ${e.sign} ${exprText(e.right)}`;
+  return `${exprText(e.left, number)} ${e.sign} ${exprText(e.right, number)}`;
 }
 
 /**
  * The lift servo angle for a height in percent: down + height x (up - down) / 100, written as
  * simply as the numbers allow ("height * 0.9" when the arm is down at 0 degrees and up at 90).
  */
-function heightAngle(g: GripperConfig): Expr {
+function heightAngle(g: GripperConfig, input: string = HEIGHT_INPUT): Expr {
   const down = tidy(g.liftDownAngle);
   const perPercent = tidy((g.liftUpAngle - g.liftDownAngle) / 100);
   if (perPercent === 0) return num(down);
   const size = Math.abs(perPercent);
-  const height: Expr = { kind: 'input', name: HEIGHT_INPUT };
+  const height: Expr = { kind: 'input', name: input };
   const scaled = size === 1 ? height : join('*', height, num(size));
   if (down === 0 && perPercent > 0) return scaled;
   return join(perPercent > 0 ? '+' : '-', num(down), scaled);
@@ -188,7 +221,45 @@ interface Original extends GripperOriginal {
   expr: Expr;
 }
 
-function originalOf(config: RobotConfig, variant: GripperVariant): Original {
+/** The words of the original code in a language: its lines and its note. */
+interface OriginalWords {
+  /** a number as the words write it */
+  number(value: number): string;
+  define(myBlock: string, inputs: readonly string[]): string;
+  setServo(servo: ServoPort, angleText: string): string;
+  wait(seconds: string): string;
+  /** the note of "arm moves to height" */
+  heightNote(label: string, servo: ServoPort): string;
+  /** the note of the other four */
+  angleNote(label: string, servo: ServoPort, angleText: string): string;
+}
+
+const ENGLISH_WORDS: OriginalWords = {
+  number: String,
+  define: (myBlock, inputs) => (inputs.length > 0 ? `define ${myBlock} (${inputs.join(') (')})` : `define ${myBlock}`),
+  setServo: (servo, angleText) => `set servo ${servo} angle to ${angleText} °`,
+  wait: (seconds) => `wait ${seconds} seconds`,
+  heightNote: (label, servo) => `Does what the Gripper block "${label}" does: height 0 is all the way down, 100 all the way up. The wait gives servo ${servo} time to get there.`,
+  angleNote: (label, servo, angleText) => `Does what the Gripper block "${label}" does: servo ${servo} turns to ${angleText}°, and the wait gives it time to get there.`,
+};
+
+/** (a no-break space: French puts one before ":" and inside « ») */
+const NB = '\u00a0';
+
+const FRENCH_WORDS: OriginalWords = {
+  // the digits of the English number, with a decimal comma (0,4 - 0,9)
+  number: (value) => String(value).replace('.', ','),
+  define: (myBlock, inputs) => (inputs.length > 0 ? `définir ${myBlock} (${inputs.join(') (')})` : `définir ${myBlock}`),
+  setServo: (servo, angleText) => `régler le servo ${servo} à l’angle ${angleText} °`,
+  wait: (seconds) => `attendre ${seconds} secondes`,
+  heightNote: (label, servo) =>
+    `Fait ce que fait le bloc de la pince «${NB}${label}${NB}»${NB}: la hauteur 0 est tout en bas, 100 tout en haut. L’attente laisse au servo ${servo} le temps d’y arriver.`,
+  angleNote: (label, servo, angleText) =>
+    `Fait ce que fait le bloc de la pince «${NB}${label}${NB}»${NB}: le servo ${servo} tourne à ${angleText}°, et l’attente lui laisse le temps d’y arriver.`,
+};
+
+function originalOf(config: RobotConfig, variant: GripperVariant, locale: BlockLocale = 'en'): Original {
+  const words = locale === 'fr' ? FRENCH_WORDS : ENGLISH_WORDS;
   const g = config.gripper;
   const servo = variant.part === 'claw' ? g.clawServo : g.liftServo;
   let expr: Expr;
@@ -206,22 +277,17 @@ function originalOf(config: RobotConfig, variant: GripperVariant): Original {
       expr = num(tidy(g.liftDownAngle));
       break;
     default:
-      expr = heightAngle(g);
+      expr = heightAngle(g, variant.inputs[0]);
   }
   const wait = gripperWaitSeconds(config, variant.part);
-  const angleText = exprText(expr);
-  const head = variant.inputs.length > 0 ? `define ${variant.myBlock} (${variant.inputs.join(') (')})` : `define ${variant.myBlock}`;
-  const does = `Does what the Gripper block "${variant.label}" does`;
-  const note =
-    variant.id === 'arm-height'
-      ? `${does}: height 0 is all the way down, 100 all the way up. The wait gives servo ${servo} time to get there.`
-      : `${does}: servo ${servo} turns to ${angleText}°, and the wait gives it time to get there.`;
+  const angleText = exprText(expr, words.number);
+  const note = variant.id === 'arm-height' ? words.heightNote(variant.label, servo) : words.angleNote(variant.label, servo, angleText);
   const original: Original = {
     variant,
     servo,
     angleText,
     wait,
-    lines: [head, `set servo ${servo} angle to ${angleText} °`, `wait ${wait} seconds`],
+    lines: [words.define(variant.myBlock, variant.inputs), words.setServo(servo, angleText), words.wait(words.number(wait))],
     note,
     expr,
   };
@@ -229,10 +295,10 @@ function originalOf(config: RobotConfig, variant: GripperVariant): Original {
   return original;
 }
 
-/** The five My Blocks for this robot, in palette order. */
-export function gripperOriginals(config: RobotConfig): GripperOriginal[] {
-  return GRIPPER_VARIANTS.map((variant) => {
-    const { expr: _expr, ...original } = originalOf(config, variant);
+/** The five My Blocks for this robot, in palette order (`locale`: the language of their names and words). */
+export function gripperOriginals(config: RobotConfig, locale: BlockLocale = 'en'): GripperOriginal[] {
+  return gripperVariants(locale).map((variant) => {
+    const { expr: _expr, ...original } = originalOf(config, variant, locale);
     return original;
   });
 }
@@ -363,16 +429,16 @@ function freshParameter(name: string, ids: Ids): VariableJson {
 }
 
 /** The "define" stack of one Gripper block, on its own and without its note: the picture of the window. */
-export function gripperDefinitionProgram(config: RobotConfig, id: GripperVariantId): ProgramJson {
-  const original = originalOf(config, gripperVariant(id));
+export function gripperDefinitionProgram(config: RobotConfig, id: GripperVariantId, locale: BlockLocale = 'en'): ProgramJson {
+  const original = originalOf(config, variantIn(id, locale), locale);
   const parameter = original.variant.inputs.length > 0 ? freshParameter(original.variant.inputs[0], new Ids(new Set())) : null;
   const definition = definitionBlock(original, original.variant.myBlock, parameter, new Ids(new Set()), false);
   return programOf([{ ...definition, x: 0, y: 0 }], parameter ? [parameter] : []);
 }
 
 /** All five definitions as one program (what "Add these My Blocks to my program" puts into an empty workspace). */
-export function gripperDefinitionsProgram(config: RobotConfig): ProgramJson {
-  return addGripperMyBlocks(programOf([]), config).program;
+export function gripperDefinitionsProgram(config: RobotConfig, locale: BlockLocale = 'en'): ProgramJson {
+  return addGripperMyBlocks(programOf([]), config, locale).program;
 }
 
 // =============================================================================================
@@ -445,8 +511,10 @@ const DEFINITION_GAP = 32;
  * The work shared by "add the My Blocks" and "show my program the mBlock way".
  * @param replace false: make sure all five My Blocks are in the program. true: turn every Gripper
  *   block into a call of its My Block, and make sure the My Blocks that are called are there.
+ * @param locale the language of the names, inputs and notes of new My Blocks, and of the rows
+ *   whose width decides where they go
  */
-function change(program: ProgramJson, config: RobotConfig, replace: boolean): GripperChange {
+function change(program: ProgramJson, config: RobotConfig, replace: boolean, locale: BlockLocale): GripperChange {
   const tops = topBlocks(program);
 
   // ---- what is in the program
@@ -469,11 +537,12 @@ function change(program: ProgramJson, config: RobotConfig, replace: boolean): Gr
   }
 
   // ---- the My Block for every variant that is needed: one the student has, or a new one
-  const needed = replace ? GRIPPER_VARIANTS.filter((variant) => used.has(variant.id)) : GRIPPER_VARIANTS;
+  const variants = gripperVariants(locale);
+  const needed = replace ? variants.filter((variant) => used.has(variant.id)) : variants;
   const standIns = new Map<GripperVariantId, StandIn>();
   const toCreate: Array<{ original: Original; name: string }> = [];
   for (const variant of needed) {
-    const original = originalOf(config, variant);
+    const original = originalOf(config, variant, locale);
     for (let n = 1; !standIns.has(variant.id); n++) {
       // a name that is taken by something else gets a number: "gripper opens 2"
       const name = n === 1 ? variant.myBlock : `${variant.myBlock} ${n}`;
@@ -547,7 +616,7 @@ function change(program: ProgramJson, config: RobotConfig, replace: boolean): Gr
   let x = FIRST_X;
   let y = FIRST_Y;
   if (kept.length > 0) {
-    x = Math.ceil(Math.max(...kept.map((top) => finite(top.x) + estimateStackWidth(top, variables)))) + COLUMN_GAP;
+    x = Math.ceil(Math.max(...kept.map((top) => finite(top.x) + estimateStackWidth(top, variables, locale)))) + COLUMN_GAP;
     y = Math.min(...kept.map((top) => finite(top.y)));
   }
   const placed = definitions.map((definition) => {
@@ -581,9 +650,10 @@ export function countGripperBlocks(program: ProgramJson): number {
  * the right of what is already there. A My Block the program already has (same name, same number
  * of inputs, moves the same servo) is left alone and not added a second time, so doing this
  * twice adds nothing the second time.
+ * `locale`: the language of the new My Blocks ('fr': French names, input and note); left out, English.
  */
-export function addGripperMyBlocks(program: ProgramJson, config: RobotConfig): GripperChange {
-  return change(program, config, false);
+export function addGripperMyBlocks(program: ProgramJson, config: RobotConfig, locale: BlockLocale = 'en'): GripperChange {
+  return change(program, config, false, locale);
 }
 
 /**
@@ -594,7 +664,8 @@ export function addGripperMyBlocks(program: ProgramJson, config: RobotConfig): G
  * A My Block or a variable of the student is never changed. If the student already has a My
  * Block called "gripper opens" that is something else, the new one is named "gripper opens 2".
  * A program without Gripper blocks comes back as it is, so converting twice changes nothing more.
+ * `locale`: the language of the My Blocks it adds ('fr': French names, input and note); left out, English.
  */
-export function convertGripperBlocks(program: ProgramJson, config: RobotConfig): GripperChange {
-  return change(program, config, true);
+export function convertGripperBlocks(program: ProgramJson, config: RobotConfig, locale: BlockLocale = 'en'): GripperChange {
+  return change(program, config, true, locale);
 }

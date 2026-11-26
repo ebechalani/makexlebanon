@@ -33,6 +33,11 @@
  * The "picked" points and the time of a cube's delivery depend on what happened during the
  * match, so this referee has a memory and looks at every tick (core/types.ts: Referee).
  *
+ * The same referee speaks French on the page of Robot en fête 2027 (../robot-en-fete/game.ts):
+ * every sentence and name it says is in ./referee-words.ts, and createWarehouseSortGame() below
+ * makes the game from a set of those words, its own id and title, and its way of writing codes.
+ * The English game, warehouseSortGame, is made by the same function with the English words.
+ *
  * Plain TypeScript only (no DOM, no React), so it also runs headless under Node.
  *
  * =====================================================================================
@@ -139,18 +144,20 @@ import {
   type WarehouseId,
 } from './field';
 import { START_POSE, WAREHOUSE_SORT_ROBOT } from './robot';
+import { EN_REFEREE_WORDS, clock, type RefereeWords } from './referee-words';
 import {
+  EN_CODEC,
+  EN_SCENARIO_WORDS,
   LEAVE_ALONE_COLOR,
   SCENARIO_COUNT,
   blueWarehouse,
-  decodeScenario,
   defaultScenario,
-  describeScenario,
-  encodeScenario,
   randomScenario,
-  scenarioProblems,
+  scenarioText,
   sortedWarehouses,
   type CubeColor,
+  type ScenarioCodec,
+  type ScenarioText,
   type WarehouseSortScenario,
 } from './scenario';
 
@@ -214,22 +221,25 @@ export const cubeBodyId = (warehouse: WarehouseId): string => `cube:${warehouse}
  * for the others.)
  */
 export const CUBE_FILL: Record<CubeColor, string> = { red: '#ef4044', green: '#40ad49', blue: '#00aeef' };
-/** Letter drawn on a cube, so the colour can also be read without seeing colours. */
-export const CUBE_LETTER: Record<CubeColor, string> = { red: 'R', green: 'G', blue: 'B' };
+/**
+ * Letter drawn on a cube, so the colour can also be read without seeing colours: the letter of
+ * the codes (./scenario.ts EN_LETTERS; a game made with other codes draws its own letters).
+ */
+export const CUBE_LETTER: Record<CubeColor, string> = EN_CODEC.letters as Record<CubeColor, string>;
 
 /** Where the cube of a warehouse stands at the start: the middle of its orange square. */
 export function cubeHome(warehouse: WarehouseId): { x: number; y: number } {
   return rectCenter(WAREHOUSES[warehouse].square);
 }
 
-function createBodies(s: WarehouseSortScenario): Body[] {
+function createBodies(s: WarehouseSortScenario, letters: Readonly<Record<CubeColor, string>>): Body[] {
   return WAREHOUSE_IDS.map((warehouse) => {
     const color = s.cubes[warehouse];
     const { x, y } = cubeHome(warehouse);
     return {
       id: cubeBodyId(warehouse),
       kind: KIND_CUBE,
-      label: CUBE_LETTER[color] ?? '?',
+      label: letters[color] ?? '?',
       fill: CUBE_FILL[color] ?? '#888888',
       colorName: color,
       x,
@@ -263,18 +273,18 @@ export function ellipseBox(e: Ellipse): Rect {
   return { x: e.cx - e.rx, y: e.cy - e.ry, w: 2 * e.rx, h: 2 * e.ry };
 }
 
-function overlays(s: WarehouseSortScenario): ZoneOverlay[] {
-  const out: ZoneOverlay[] = [{ id: 'start', label: 'Start zone', rect: START_ZONE, color: START_CSS, kind: 'start' }];
+function overlays(s: WarehouseSortScenario, words: RefereeWords): ZoneOverlay[] {
+  const out: ZoneOverlay[] = [{ id: 'start', label: words.startZone, rect: START_ZONE, color: START_CSS, kind: 'start' }];
   for (const w of WAREHOUSE_IDS) {
     const color = s.cubes[w];
-    out.push({ id: `warehouse:${w}`, label: `${w} ${color}`, rect: WAREHOUSES[w].frame, color: WAREHOUSE_CSS, kind: 'pickup' });
+    out.push({ id: `warehouse:${w}`, label: words.warehouseZone(w, color), rect: WAREHOUSES[w].frame, color: WAREHOUSE_CSS, kind: 'pickup' });
   }
   for (const color of BAY_COLORS) {
-    out.push({ id: `bay:${color}`, label: `${color === 'red' ? 'Red' : 'Green'} bay`, rect: BAYS[color], color: BAY_CSS[color], kind: 'delivery' });
+    out.push({ id: `bay:${color}`, label: words.bayZone(color), rect: BAYS[color], color: BAY_CSS[color], kind: 'delivery' });
   }
   for (const pad of PAD_IDS) {
     // (the round pad itself; its rect is the box around it)
-    out.push({ id: `pad:${pad}`, label: 'Finish pad', rect: ellipseBox(FINISH_PADS[pad]), color: PAD_CSS, kind: 'info', shape: 'ellipse' });
+    out.push({ id: `pad:${pad}`, label: words.finishPad, rect: ellipseBox(FINISH_PADS[pad]), color: PAD_CSS, kind: 'info', shape: 'ellipse' });
   }
   return out;
 }
@@ -435,12 +445,18 @@ export function blueShift(cube: Pick<Body, 'x' | 'y' | 'w' | 'l' | 'angle' | 'ho
  * Q15: why the blue cube is not where it was put - in words for the score sheet - or null when it
  * is (left alone). It was picked up or lifted at some time (`takenAt`), the robot holds it, it
  * lies off the mat, or it is more than BLUE_MOVED_MM from its place. `over`: the match has ended.
+ * (In English; blueMoveIn() says it in other words.)
  */
 export function blueMove(cube: Body, holding: string | null, takenAt: number | null, over: boolean): string | null {
-  if (isHeld(cube, holding)) return `the robot ${over ? 'still held' : 'is holding'} it`;
-  if (takenAt !== null) return `picked up at ${clock(takenAt)}`;
-  if (isOffMat(cube)) return 'it is off the mat';
-  if (isBlueShifted(cube)) return `${overLimit(blueShift(cube), BLUE_MOVED_MM)} mm from its place`;
+  return blueMoveIn(EN_REFEREE_WORDS, cube, holding, takenAt, over);
+}
+
+/** blueMove() in these words. */
+export function blueMoveIn(words: RefereeWords, cube: Body, holding: string | null, takenAt: number | null, over: boolean): string | null {
+  if (isHeld(cube, holding)) return words.robotHolds(over);
+  if (takenAt !== null) return words.pickedUpAt(words.clock(takenAt));
+  if (isOffMat(cube)) return words.itIsOffMat;
+  if (isBlueShifted(cube)) return words.fromItsPlace(words.decimal(overLimit(blueShift(cube), BLUE_MOVED_MM)));
   return null;
 }
 
@@ -464,20 +480,9 @@ const isBlueShifted = (cube: Pick<Body, 'x' | 'y' | 'w' | 'l' | 'angle' | 'home'
 // Words
 // =============================================================================================
 
-/** Match time as the referee writes it: 83.42 -> "1:23.4" (tenths cut off, never rounded up). */
-export function clock(seconds: number): string {
-  const tenths = Math.max(0, Math.floor(seconds * 10 + 1e-6));
-  const minutes = Math.floor(tenths / 600);
-  const rest = tenths - minutes * 600;
-  return `${minutes}:${rest < 100 ? '0' : ''}${(rest / 10).toFixed(1)}`;
-}
-
-const bayName = (color: BayColor): string => `the ${color} bay`;
-/** mm in cm, as a sentence writes it: 10 -> "1", 40 -> "4". */
-const cm = (mm: number): string => String(Math.round(mm) / 10);
-/** "cube W2 (red)" */
-const cubeName = (w: WarehouseId, color: CubeColor): string => `cube ${w} (${color})`;
-const capital = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
+// Every sentence and name the referee says: ./referee-words.ts (the English ones: EN_REFEREE_WORDS).
+/** Match time as the English referee writes it: 83.42 -> "1:23.4" (tenths cut off, never rounded up). */
+export { clock };
 
 // =============================================================================================
 // The referee
@@ -495,7 +500,12 @@ export const LINE_START_POSITION = 'start-position';
 /** The line of the blue cube: left alone 0, moved -5 (Q15). */
 export const LINE_BLUE = 'blue-cube';
 
-function createReferee(scenario: WarehouseSortScenario): Referee<WarehouseSortScenario> {
+function createReferee(scenario: WarehouseSortScenario, words: RefereeWords): Referee<WarehouseSortScenario> {
+  // (the numbers and names in the words of this game: "1:23.4" or "1:23,4", "cube W2 (red)" or "cube E2 (rouge)")
+  const clock = (seconds: number): string => words.clock(seconds);
+  const cm = (mm: number): string => words.cm(mm);
+  const cubeName = (w: WarehouseId, color: CubeColor): string => words.cubeName(w, color);
+  const bayName = (color: BayColor): string => words.bayName(color);
   /** the warehouse of the blue cube, and the three whose cubes go to a bay */
   const blueW = blueWarehouse(scenario);
   const sorted = sortedWarehouses(scenario);
@@ -561,20 +571,20 @@ function createReferee(scenario: WarehouseSortScenario): Referee<WarehouseSortSc
       if (blueTakenAt === null && (lifted || carried)) {
         blueTakenAt = time;
         blueSaid = true;
-        speak(`${clock(time)}: ${capital(name)} was picked up: -${BLUE_PENALTY}. The blue cube must stay where it is.`);
+        speak(words.bluePickedUp(clock(time), name, BLUE_PENALTY));
       }
     } else {
       takenAt.delete(w);
     }
     if (!blueSaid && isBlueShifted(cube)) {
       blueSaid = true;
-      speak(`${clock(time)}: ${capital(name)} was moved out of its place. The blue cube must stay where it is.`);
+      speak(words.blueMoved(clock(time), name));
     } else if (blueSaid && blueTakenAt === null && !isHeld(cube, ctx.world.robot.gripper.holding) && !isBlueShifted(cube)) {
       // Back within BLUE_MOVED_MM of its place, never picked up or lifted, not held: the sheet
       // says "left alone" again (a restart puts a cube the claw held back on its square; a robot
       // can also drag it back), so the console must not end on "moved". A new move is said again.
       blueSaid = false;
-      speak(`${clock(time)}: ${capital(name)} is back in its place.`);
+      speak(words.blueBack(clock(time), name));
     }
   }
 
@@ -586,7 +596,7 @@ function createReferee(scenario: WarehouseSortScenario): Referee<WarehouseSortSc
     // ---- +5: the first moment a part of the robot is outside the start zone
     if (leftAt === null && isOutsideStartZone(ctx.robotShapes)) {
       leftAt = time;
-      speak(`+${POINTS_LEAVE_START} points at ${clock(time)}: the robot left the start zone.`);
+      speak(words.leftStart(POINTS_LEAVE_START, clock(time)));
     }
 
     for (const w of WAREHOUSE_IDS) {
@@ -611,7 +621,7 @@ function createReferee(scenario: WarehouseSortScenario): Referee<WarehouseSortSc
           const carried = Math.hypot(cube.x - from.x, cube.y - from.y) >= CARRY_MM - 1e-9;
           if (lifted || carried) {
             pickedAt.set(w, time);
-            speak(`+${POINTS_PICK} points at ${clock(time)}: ${name} picked up.`);
+            speak(words.pickedUp(POINTS_PICK, clock(time), name));
           }
         }
       } else {
@@ -628,11 +638,7 @@ function createReferee(scenario: WarehouseSortScenario): Referee<WarehouseSortSc
         // (a cube pushed in and out at the edge of a bay is announced once, not on every tick)
         if (announced.get(w) !== bay) {
           announced.set(w, bay);
-          speak(
-            bay === colorOf(w)
-              ? `${clock(time)}: ${capital(name)} is in ${bayName(bay)}.`
-              : `${clock(time)}: ${capital(name)} is in ${bayName(bay)} - the wrong bay.`,
-          );
+          speak(bay === colorOf(w) ? words.inBay(clock(time), name, bayName(bay)) : words.inWrongBay(clock(time), name, bayName(bay)));
         }
       }
 
@@ -640,7 +646,7 @@ function createReferee(scenario: WarehouseSortScenario): Referee<WarehouseSortSc
       if (isLyingOffMat(cube, holding)) {
         if (!offMat.has(w)) {
           offMat.add(w);
-          speak(`${clock(time)}: ${capital(name)} is off the mat. It scores nothing now.`);
+          speak(words.offMat(clock(time), name));
         }
       } else {
         offMat.delete(w);
@@ -665,16 +671,11 @@ function createReferee(scenario: WarehouseSortScenario): Referee<WarehouseSortSc
     // ---- leave the start zone
     lines.push({
       id: LINE_LEAVE_START,
-      label: 'Leave the start zone',
+      label: words.leaveStartLabel,
       points: leftAt !== null ? POINTS_LEAVE_START : 0,
       max: POINTS_LEAVE_START,
       ok: leftAt !== null,
-      detail:
-        leftAt !== null
-          ? `done at ${clock(leftAt)}`
-          : over
-            ? 'the robot never left the start zone'
-            : 'not yet - drive out of the start zone',
+      detail: leftAt !== null ? words.doneAt(clock(leftAt)) : over ? words.neverLeft : words.notYetLeft,
       ...(leftAt !== null ? { time: leftAt } : {}),
     });
 
@@ -686,10 +687,10 @@ function createReferee(scenario: WarehouseSortScenario): Referee<WarehouseSortSc
     }
     // "no score" for a cube off the mat (§7) and "no points for that cube" for a cube in the
     // wrong bay (§6): that cube also loses its points for being picked up (Q9, Q10)
-    const lost = (w: WarehouseId): 'off the mat' | 'in the wrong bay' | null => {
+    const lost = (w: WarehouseId): string | null => {
       const d = judged.get(w);
-      if (d?.why === 'off-mat') return 'off the mat';
-      if (d?.result === 'wrong') return 'in the wrong bay';
+      if (d?.why === 'off-mat') return words.offMatPlace;
+      if (d?.result === 'wrong') return words.wrongBayPlace;
       return null;
     };
 
@@ -698,14 +699,14 @@ function createReferee(scenario: WarehouseSortScenario): Referee<WarehouseSortSc
       const where = lost(w);
       const earned = at !== undefined && where === null;
       let detail: string;
-      if (!judged.has(w)) detail = 'this cube is not on the field';
-      else if (where !== null) detail = at !== undefined ? `picked at ${clock(at)}, but the cube is ${where}: no points` : `the cube is ${where}: no points`;
-      else if (at !== undefined) detail = `done at ${clock(at)}`;
-      else if (over) detail = gripped.has(w) ? `gripped, but not lifted ${cm(LIFT_MM)} cm or carried ${cm(CARRY_MM)} cm` : 'not picked up';
-      else detail = `not yet - grip it, then lift it ${cm(LIFT_MM)} cm or carry it ${cm(CARRY_MM)} cm`;
+      if (!judged.has(w)) detail = words.notOnField;
+      else if (where !== null) detail = at !== undefined ? words.pickedButLost(clock(at), where) : words.lostNoPoints(where);
+      else if (at !== undefined) detail = words.doneAt(clock(at));
+      else if (over) detail = gripped.has(w) ? words.grippedNotPicked(cm(LIFT_MM), cm(CARRY_MM)) : words.notPicked;
+      else detail = words.notYetPicked(cm(LIFT_MM), cm(CARRY_MM));
       lines.push({
         id: pickLineId(w),
-        label: `Pick up ${cubeName(w, colorOf(w))}`,
+        label: words.pickLabel(cubeName(w, colorOf(w))),
         points: earned ? POINTS_PICK : 0,
         max: POINTS_PICK,
         ok: earned,
@@ -722,39 +723,39 @@ function createReferee(scenario: WarehouseSortScenario): Referee<WarehouseSortSc
       const d = judged.get(w);
       const since = inBay.get(w)?.since;
       let detail: string;
-      if (!d) detail = 'this cube is not on the field';
+      if (!d) detail = words.notOnField;
       else if (d.result === 'own') {
         delivered++;
         if (since !== undefined) lastDelivery = lastDelivery === null ? since : Math.max(lastDelivery, since);
-        detail = since !== undefined ? `in ${bayName(color)} since ${clock(since)}` : `in ${bayName(color)}`;
+        detail = since !== undefined ? words.inBaySince(bayName(color), clock(since)) : words.inBayNow(bayName(color));
       } else if (d.result === 'wrong') {
         wrong.push(w);
-        detail = `in ${bayName(d.bay as BayColor)} - wrong bay, -${WRONG_BAY_PENALTY}`;
+        detail = words.wrongBayDetail(bayName(d.bay as BayColor), WRONG_BAY_PENALTY);
       } else {
         switch (d.why) {
           case 'off-mat':
-            detail = 'off the mat: no points';
+            detail = words.offMatNoPoints;
             break;
           case 'held':
-            detail = `the robot ${over ? 'still held' : 'is holding'} it - put it down in ${bayName(color)}`;
+            detail = words.heldPutDown(over, bayName(color));
             break;
           case 'lifted':
-            detail = `not standing on the mat - put it down in ${bayName(color)}`;
+            detail = words.liftedPutDown(bayName(color));
             break;
           case 'touching':
-            detail = `in ${bayName(d.bay as BayColor)}, but touching the robot${over ? '' : ' - move away'}`;
+            detail = words.touchingRobot(bayName(d.bay as BayColor), over);
             break;
           case 'partly':
-            detail = `only partly in ${bayName(d.bay as BayColor)} - the whole cube must be inside`;
+            detail = words.partlyInBay(bayName(d.bay as BayColor));
             break;
           default:
-            detail = over ? 'not in a bay' : `not yet - put it in ${bayName(color)}`;
+            detail = over ? words.notInBay : words.notYetInBay(bayName(color));
         }
       }
       const ok = d?.result === 'own';
       lines.push({
         id: deliverLineId(w),
-        label: `${capital(cubeName(w, color))} in ${bayName(color)}`,
+        label: words.deliverLabel(cubeName(w, color), bayName(color)),
         points: ok ? POINTS_DELIVER : 0,
         max: POINTS_DELIVER,
         ok,
@@ -767,60 +768,63 @@ function createReferee(scenario: WarehouseSortScenario): Referee<WarehouseSortSc
     const pad = parkedOn(ctx.robotShapes);
     lines.push({
       id: LINE_PARK,
-      label: 'Park on a finish pad',
+      label: words.parkLabel,
       points: pad ? POINTS_PARK : 0,
       max: POINTS_PARK,
       ok: pad !== null,
-      detail: pad
-        ? `the robot ${over ? 'touched' : 'touches'} the ${pad} pad`
-        : over
-          ? 'the robot did not touch a finish pad at the end'
-          : 'at the end the robot must touch a round pad (left or right)',
+      detail: pad ? words.parkedOn(pad, over) : over ? words.noPadAtEnd : words.mustTouchPad,
     });
 
     // ---- clean run, restarts
     lines.push({
       id: LINE_CLEAN,
-      label: 'Clean run: no restart',
+      label: words.cleanLabel,
       points: restarts === 0 ? POINTS_CLEAN : 0,
       max: POINTS_CLEAN,
       ok: restarts === 0,
-      detail: restarts === 0 ? (over ? 'no restart' : 'no restart so far') : 'a restart was used',
+      detail: restarts === 0 ? (over ? words.noRestart : words.noRestartSoFar) : words.restartUsed,
     });
     lines.push({
       id: LINE_RESTARTS,
-      label: 'Restarts',
+      label: words.restartsLabel,
       points: 0 - RESTART_PENALTY * restarts,
       max: 0,
       ok: restarts === 0,
       detail:
         restarts === 0
-          ? 'no restarts'
-          : `${restarts} restart${restarts === 1 ? '' : 's'} (${restartTimes.map(clock).join(', ')}), -${RESTART_PENALTY} each`,
+          ? words.noRestarts
+          : words.restartsDetail(
+              restarts,
+              restartTimes.map((t) => clock(t)),
+              RESTART_PENALTY,
+            ),
     });
     lines.push({
       id: LINE_WRONG_BAY,
-      label: 'Cubes in the wrong bay',
+      label: words.wrongLabel,
       points: 0 - WRONG_BAY_PENALTY * wrong.length,
       max: 0,
       ok: wrong.length === 0,
       detail:
         wrong.length === 0
-          ? 'none'
-          : `${wrong.map((w) => cubeName(w, colorOf(w))).join(', ')}, -${WRONG_BAY_PENALTY} each`,
+          ? words.noneWrong
+          : words.wrongDetail(
+              wrong.map((w) => cubeName(w, colorOf(w))),
+              WRONG_BAY_PENALTY,
+            ),
     });
 
     // ---- the blue cube: left alone 0, moved -5 (Q15) - once, wherever it is
     if (blueW !== null) {
       const cube = cubeOf(ctx, blueW);
-      const move = cube ? blueMove(cube, ctx.world.robot.gripper.holding, blueTakenAt, over) : null;
+      const move = cube ? blueMoveIn(words, cube, ctx.world.robot.gripper.holding, blueTakenAt, over) : null;
       lines.push({
         id: LINE_BLUE,
-        label: `Blue cube (${blueW})`,
+        label: words.blueLabel(blueW),
         points: move === null ? 0 : -BLUE_PENALTY,
         max: 0,
         ok: move === null,
-        detail: move === null ? (cube ? 'left alone' : 'this cube is not on the field') : `moved: ${move}, -${BLUE_PENALTY}`,
+        detail: move === null ? (cube ? words.leftAlone : words.notOnField) : words.blueMovedDetail(move, BLUE_PENALTY),
       });
     }
 
@@ -830,11 +834,11 @@ function createReferee(scenario: WarehouseSortScenario): Referee<WarehouseSortSc
     if (lastDelivery !== null) {
       lines.push({
         id: LINE_LAST_DELIVERY,
-        label: 'Time of the last correct delivery',
+        label: words.lastDeliveryLabel,
         points: 0,
         max: 0,
         ok: true,
-        detail: `for a tie: ${delivered} cube${delivered === 1 ? '' : 's'} in the right bay, the last one put there at ${clock(lastDelivery)}`,
+        detail: words.tieDetail(delivered, clock(lastDelivery)),
         time: lastDelivery,
       });
     }
@@ -844,11 +848,11 @@ function createReferee(scenario: WarehouseSortScenario): Referee<WarehouseSortSc
     if (!inside) {
       lines.push({
         id: LINE_START_POSITION,
-        label: 'Start inside the start zone',
+        label: words.startPositionLabel,
         points: 0,
         max: 0,
         ok: false,
-        detail: 'the robot did not start completely inside the start zone - a referee would not start this match',
+        detail: words.startPositionDetail,
       });
     }
 
@@ -868,35 +872,61 @@ function createReferee(scenario: WarehouseSortScenario): Referee<WarehouseSortSc
 // The game
 // =============================================================================================
 
-export const warehouseSortGame: Game<WarehouseSortScenario> = {
+/** What makes one game of the Warehouse Sort mission different from another: its id, its title and how it writes codes. */
+export interface WarehouseSortGameOptions {
+  id: string;
+  title: string;
+  /** how the codes of the arrangements are written and read (./scenario.ts EN_CODEC: "GR-BR") */
+  codec: ScenarioCodec;
+  /** the sentences about an arrangement (./scenario.ts scenarioText) */
+  scenarioText: ScenarioText;
+}
+
+/**
+ * The Warehouse Sort mission as a game: the same mat, cubes, 24 arrangements, points, constants
+ * and referee, in the words given. Warehouse Sort (below) and Robot en fête 2027
+ * (../robot-en-fete/game.ts) are both made here.
+ */
+export function createWarehouseSortGame(words: RefereeWords, options: WarehouseSortGameOptions): Game<WarehouseSortScenario> {
+  const { codec, scenarioText: text } = options;
+  const referee = (scenario: WarehouseSortScenario): Referee<WarehouseSortScenario> => createReferee(scenario, words);
+  return {
+    id: options.id,
+    title: options.title,
+    mat: {
+      width: MAT_SIZE,
+      height: MAT_SIZE,
+      imageUrl: MAT_IMAGE_URL,
+      sensorImageUrl: MAT_SENSOR_IMAGE_URL,
+      vector: MAT_VECTOR,
+    },
+    matchDuration: MATCH_DURATION,
+    startZone: START_ZONE,
+    defaultStartPose: START_POSE,
+    restartPenalty: RESTART_PENALTY,
+    defaultScenario,
+    randomScenario,
+    scenarioCount: () => SCENARIO_COUNT,
+    encodeScenario: codec.encode,
+    decodeScenario: codec.decode,
+    describeScenario: text.describeScenario,
+    createBodies: (s) => createBodies(s, codec.letters),
+    overlays: (s) => overlays(s, words),
+    // (during a match the referee below keeps the score; this is the sheet of a match in which
+    // nothing has happened yet)
+    score: (ctx) => referee(ctx.scenario).score(ctx),
+
+    robotConfig: WAREHOUSE_SORT_ROBOT,
+    createReferee: referee,
+    // no restartRules: as many restarts as the team wants, RESTART_PENALTY each; only the cube in
+    // the gripper goes back (to its warehouse)
+    scenarioProblems: text.scenarioProblems,
+  };
+}
+
+export const warehouseSortGame: Game<WarehouseSortScenario> = createWarehouseSortGame(EN_REFEREE_WORDS, {
   id: 'warehouse-sort',
   title: 'MakeX Lebanon - Inspire: Warehouse Sort',
-  mat: {
-    width: MAT_SIZE,
-    height: MAT_SIZE,
-    imageUrl: MAT_IMAGE_URL,
-    sensorImageUrl: MAT_SENSOR_IMAGE_URL,
-    vector: MAT_VECTOR,
-  },
-  matchDuration: MATCH_DURATION,
-  startZone: START_ZONE,
-  defaultStartPose: START_POSE,
-  restartPenalty: RESTART_PENALTY,
-  defaultScenario,
-  randomScenario,
-  scenarioCount: () => SCENARIO_COUNT,
-  encodeScenario,
-  decodeScenario,
-  describeScenario,
-  createBodies,
-  overlays,
-  // (during a match the referee below keeps the score; this is the sheet of a match in which
-  // nothing has happened yet)
-  score: (ctx) => createReferee(ctx.scenario).score(ctx),
-
-  robotConfig: WAREHOUSE_SORT_ROBOT,
-  createReferee,
-  // no restartRules: as many restarts as the team wants, RESTART_PENALTY each; only the cube in
-  // the gripper goes back (to its warehouse)
-  scenarioProblems,
-};
+  codec: EN_CODEC,
+  scenarioText: scenarioText(EN_SCENARIO_WORDS),
+});

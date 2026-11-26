@@ -298,7 +298,8 @@ test('fixedSetup: only this screen passes it; the general screen uses it in its 
   }
   const app = code(read('../SimulatorApp.tsx'));
   assert.equal(app.split('fixedSetup').length - 1, 4, 'the prop, the button of the title row, and the summary and the body of the panel');
-  assert.match(app, /\{!props\.fixedSetup && \(\s+<button\b(?:(?!<\/button>)[^])*Test on many \$\{words\.scenarios\}(?:(?!<\/button>)[^])*<\/button>\s+\)\}/);
+  assert.match(app, /\{!props\.fixedSetup && \(\s+<button\b(?:(?!<\/button>)[^])*text\.testOnMany\(words\.scenarios\)(?:(?!<\/button>)[^])*<\/button>\s+\)\}/);
+  assert.equal((await import('../text/en')).EN_TEXT.testOnMany('arrangements'), 'Test on many arrangements');
   assert.match(app, /summary=\{props\.fixedSetup \? words\.scenarioSummary : <span className="font-mono">\{game\.encodeScenario\(scenario\)\}<\/span>\}/);
   assert.match(app, /\{props\.fixedSetup \? \(\s+props\.renderCombinationEditor\(scenario, changeScenario\)\s+\) : \(\s+<CombinationPanel /);
   // ... and every other screen still has the button and the panel of the code (drawn as their pages draw them)

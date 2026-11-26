@@ -7,7 +7,7 @@
  *     a request that is too large, a cancelled code, examples that are open to everyone
  *   - who sees what: a visitor, a member code and an advanced code - and that an example kept
  *     for advanced codes only is in no answer but the one to an advanced code
- *   - six games behind one address: each game's examples for each kind of visitor, nothing of
+ *   - seven games behind one address: each game's examples for each kind of visitor, nothing of
  *     another game in an answer, a request that names no game, one that names an unknown
  *     one, and the count of wrong codes across the games
  *   - the courtesy limit on wrong codes
@@ -51,11 +51,14 @@ import { FULL_MISSION_SAMPLE, SAMPLE_PROGRAMS } from '../fire-rescue/samples';
 import { lockerRoomGame } from '../locker-room/game';
 import { EXAMPLE_LEVELS as LOCKER_LEVELS, SAMPLE_CATALOG as LOCKER_CATALOG } from '../locker-room/sample-catalog';
 import { SAMPLE_PROGRAMS as LOCKER_PROGRAMS } from '../locker-room/samples';
+import { robotEnFeteGame } from '../robot-en-fete/game';
+import { EXAMPLE_LEVELS as FETE_LEVELS, SAMPLE_CATALOG as FETE_CATALOG } from '../robot-en-fete/sample-catalog';
+import { SAMPLE_PROGRAMS as FETE_PROGRAMS } from '../robot-en-fete/samples';
 import { EXAMPLES_GAMES } from '../ui/member-unlock';
 import { warehouseSortGame } from '../warehouse-sort/game';
 import { EXAMPLE_LEVELS as SORT_LEVELS, SAMPLE_CATALOG as SORT_CATALOG } from '../warehouse-sort/sample-catalog';
 import { SAMPLE_PROGRAMS as SORT_PROGRAMS } from '../warehouse-sort/samples';
-import { ALL_GAMES, FIRE_CADET, FIRE_CHIEF, FIRE_FIGHTER, FIRE_RESCUE, LOCKER_ROOM, WAREHOUSE_SORT } from './all-examples';
+import { ALL_GAMES, FIRE_CADET, FIRE_CHIEF, FIRE_FIGHTER, FIRE_RESCUE, LOCKER_ROOM, ROBOT_EN_FETE, WAREHOUSE_SORT } from './all-examples';
 import { FINGERPRINT_BYTES, FINGERPRINT_PATTERN, FINGERPRINT_ROUNDS, FINGERPRINT_SALT, fingerprintOf } from './code-fingerprint.mjs';
 import { CODE_ALPHABET, CODE_EXAMPLE, CODE_LENGTH, CODE_PREFIX, formatCode, maskCode, normalizeCode } from './code-format.mjs';
 import {
@@ -80,7 +83,7 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..
  * Most tests of this file were written while Fire Rescue was the only game, and they still try
  * every rule on its seven examples: ALL_EXAMPLES, ALL_LEVELS, MENU_ORDER, ALL_CARDS and
  * ALL_HEADINGS are Fire Rescue's, and a setup made with rescueOnly() knows no other game.
- * What more games change is tried in "six games behind one address", further down, and in
+ * What more games change is tried in "seven games behind one address", further down, and in
  * the tests of the owner's file and of the website's address, which go through every game.
  */
 const ALL_EXAMPLES = FIRE_RESCUE.examples;
@@ -261,11 +264,11 @@ describe('the list of examples', () => {
     assert.match(FULL_MISSION_SAMPLE.description, /180 ONLY on the default combination/);
   });
 
-  test('the server holds the examples of six games, each under the name of its game', () => {
-    assert.deepEqual(ALL_GAMES, [FIRE_RESCUE, FIRE_CHIEF, WAREHOUSE_SORT, LOCKER_ROOM, FIRE_CADET, FIRE_FIGHTER]);
+  test('the server holds the examples of seven games, each under the name of its game', () => {
+    assert.deepEqual(ALL_GAMES, [FIRE_RESCUE, FIRE_CHIEF, WAREHOUSE_SORT, LOCKER_ROOM, FIRE_CADET, FIRE_FIGHTER, ROBOT_EN_FETE]);
     assert.deepEqual(
       ALL_GAMES.map((game) => game.game),
-      ['fire-rescue', 'fire-chief', 'warehouse-sort', 'locker-room', 'fire-cadet', 'fire-fighter'],
+      ['fire-rescue', 'fire-chief', 'warehouse-sort', 'locker-room', 'fire-cadet', 'fire-fighter', 'robot-en-fete'],
     );
     // the name in a request is the id of the game (what its page is built around)
     assert.equal(FIRE_RESCUE.game, fireRescueGame.id);
@@ -274,8 +277,9 @@ describe('the list of examples', () => {
     assert.equal(LOCKER_ROOM.game, lockerRoomGame.id);
     assert.equal(FIRE_CADET.game, fireCadetGame.id);
     assert.equal(FIRE_FIGHTER.game, fireFighterGame.id);
+    assert.equal(ROBOT_EN_FETE.game, robotEnFeteGame.id);
     // the names a page of the website can ask with are exactly these
-    assert.deepEqual([...EXAMPLES_GAMES], ['fire-rescue', 'fire-chief', 'warehouse-sort', 'locker-room', 'fire-cadet', 'fire-fighter']);
+    assert.deepEqual([...EXAMPLES_GAMES], ['fire-rescue', 'fire-chief', 'warehouse-sort', 'locker-room', 'fire-cadet', 'fire-fighter', 'robot-en-fete']);
     // a request that names no game is about Fire Rescue: pages loaded before there was a second game ask like that
     assert.equal(GAME_WHEN_NONE_IS_NAMED, 'fire-rescue');
     assert.ok(ALL_GAMES.some((game) => game.game === GAME_WHEN_NONE_IS_NAMED));
@@ -442,6 +446,50 @@ describe('the list of examples', () => {
     }
   });
 
+  test('Robot en fête 2027: its six examples - those of Warehouse Sort, in French - in the order of its catalog, each a block program with its description, under French headings of its own', () => {
+    assert.deepEqual(
+      ROBOT_EN_FETE.examples.map((example) => example.id),
+      ['fete-leave-start', 'fete-white-line', 'fete-cube-colour', 'fete-one-cube', 'fete-two-cubes', 'fete-all-cubes'],
+    );
+    // the examples of Warehouse Sort, place by place and level by level: "sort-" there is "fete-" here
+    assert.deepEqual(
+      ROBOT_EN_FETE.examples.map((example) => `${example.id.replace(/^fete-/, '')} ${example.level}`),
+      WAREHOUSE_SORT.examples.map((example) => `${example.id.replace(/^sort-/, '')} ${example.level}`),
+    );
+    assert.deepEqual(new Set(ROBOT_EN_FETE.examples), new Set(FETE_PROGRAMS), 'the six programs of samples.ts, nothing else');
+    ROBOT_EN_FETE.examples.forEach((example, i) => {
+      assert.equal(example.id, FETE_CATALOG[i].id);
+      assert.equal(example.title, FETE_CATALOG[i].title);
+      assert.equal(example.level, FETE_CATALOG[i].level);
+      assert.ok(example.description.length > 40, example.id);
+      // its program is a program of blocks, the blocks of its twin in Warehouse Sort
+      const program = example.program as { blocks?: { blocks?: Array<{ type: string }> }; format?: unknown };
+      const twin = WAREHOUSE_SORT.examples[i].program as { blocks?: { blocks?: Array<{ type: string }> } };
+      assert.ok(Array.isArray(program.blocks?.blocks) && program.blocks.blocks.length > 0, `${example.id}: blocks`);
+      assert.deepEqual(program.blocks.blocks.map((block) => block.type), twin.blocks?.blocks?.map((block) => block.type), `${example.id}: the stacks of Warehouse Sort`);
+      assert.equal(program.format, undefined, `${example.id}: not a row of cards`);
+      // in French: no title, description or program of Warehouse Sort
+      assert.notEqual(example.title, WAREHOUSE_SORT.examples[i].title);
+      assert.notEqual(example.description, WAREHOUSE_SORT.examples[i].description);
+      assert.notDeepEqual(example.program, WAREHOUSE_SORT.examples[i].program);
+    });
+    assert.equal(ROBOT_EN_FETE.levels, FETE_LEVELS, 'the server hands out the headings of Robot en fête 2027');
+    assert.deepEqual(
+      FETE_LEVELS.map((level) => [level.id, level.title]),
+      [
+        ['starter', 'Premiers pas'],
+        ['intermediate', 'Intermédiaire'],
+        ['advanced', 'Avancé'],
+      ],
+    );
+    for (const level of FETE_LEVELS) assert.deepEqual(Object.keys(level).sort(), ['about', 'id', 'title'], level.id);
+    for (const card of FETE_CATALOG) {
+      assert.deepEqual(Object.keys(card).sort(), ['id', 'level', 'title'], `${card.id}: nothing but id, title and level`);
+      assert.ok(FETE_LEVELS.some((level) => level.id === card.level), `${card.id} stands under a heading`);
+      assert.match(card.id, /^fete-/, 'every id of Robot en fête 2027 begins with "fete-"');
+    }
+  });
+
   test('no id and no title is used twice across the games: the owner\'s lists name an example by its id alone', () => {
     const seen = new Map<string, string>();
     for (const { game, examples } of ALL_GAMES) {
@@ -452,7 +500,7 @@ describe('the list of examples', () => {
         }
       }
     }
-    assert.equal(seen.size, 2 * (7 + 6 + 6 + 6 + 6 + 6));
+    assert.equal(seen.size, 2 * (7 + 6 + 6 + 6 + 6 + 6 + 6));
     // (the website is not built with such a double either: see mistakesInSetup)
     assert.deepEqual(mistakesInSetup({ games: ALL_GAMES, advancedOnly: [] }), []);
   });
@@ -1000,10 +1048,10 @@ describe('who sees what: a visitor, a member code and an advanced code', () => {
 });
 
 // =============================================================================================
-// Six games behind one address
+// Seven games behind one address
 // =============================================================================================
 
-describe('six games behind one address: Fire Rescue, Fire Chief, Warehouse Sort, Locker Room, Fire Cadet and Fire Fighter', () => {
+describe('seven games behind one address: Fire Rescue, Fire Chief, Warehouse Sort, Locker Room, Fire Cadet, Fire Fighter and Robot en fête 2027', () => {
   /**
    * The rule, the same in every game: the starter examples are open to everyone, the
    * intermediate ones open with a member code or an advanced code, and the advanced ones are
@@ -1046,6 +1094,12 @@ describe('six games behind one address: Fire Rescue, Fire Chief, Warehouse Sort,
       starters: ['fighter-first-grab', 'fighter-line-to-t', 'fighter-yellow-x'],
       forMembers: ['fighter-first-grab', 'fighter-line-to-t', 'fighter-yellow-x', 'fighter-left-bay', 'fighter-right-bay'],
       all: ['fighter-first-grab', 'fighter-line-to-t', 'fighter-yellow-x', 'fighter-left-bay', 'fighter-right-bay', 'fighter-whole-mission'],
+    },
+    {
+      game: ROBOT_EN_FETE,
+      starters: ['fete-leave-start', 'fete-white-line', 'fete-cube-colour'],
+      forMembers: ['fete-leave-start', 'fete-white-line', 'fete-cube-colour', 'fete-one-cube', 'fete-two-cubes'],
+      all: ['fete-leave-start', 'fete-white-line', 'fete-cube-colour', 'fete-one-cube', 'fete-two-cubes', 'fete-all-cubes'],
     },
   ] as const;
 
@@ -1155,8 +1209,12 @@ describe('six games behind one address: Fire Rescue, Fire Chief, Warehouse Sort,
           assert.ok(telling.description.length >= 3, `${example.id}: ${telling.description.length} sentences of its description are its own`);
           // (the shortest block programs, the first starters of Warehouse Sort and Locker Room, have 7 pieces of their own:
           //  some blocks of the one are blocks of the other, and an answer that holds one of them holds those too.
+          //  The examples of Robot en fête 2027 are those of Warehouse Sort - the same blocks - with French words: where an
+          //  answer holds the twin of an example, that example has only its words of its own, 6 pieces for the first starter.
           //  A row of cards is one piece: the whole row, which no other example has)
-          assert.ok(telling.program.length >= (isCardRow(example.program) ? 1 : 7), `${example.id}: ${telling.program.length} pieces of its program are its own`);
+          const twin = /^(sort|fete)-/.test(example.id) ? example.id.replace(/^(sort|fete)-/, (prefix) => (prefix === 'sort-' ? 'fete-' : 'sort-')) : undefined;
+          const twinIsHeld = other !== game && twin !== undefined && open.includes(twin);
+          assert.ok(telling.program.length >= (isCardRow(example.program) ? 1 : twinIsHeld ? 6 : 7), `${example.id}: ${telling.program.length} pieces of its program are its own`);
           for (const piece of telling.description) assert.ok(!text.includes(piece), `${about} this sentence of the description of ${example.id}: "${piece}"`);
           for (const piece of telling.program) assert.ok(!text.includes(piece), `${about} this piece of the program of ${example.id}: ${piece}`);
         }
@@ -1181,6 +1239,9 @@ describe('six games behind one address: Fire Rescue, Fire Chief, Warehouse Sort,
     }
   }
 
+  /** The three headings, in the words of a game: the same in every English game, French in Robot en fête 2027. */
+  const HEADINGS = (game: GameExamples): string[] => (game === ROBOT_EN_FETE ? ['Premiers pas', 'Intermédiaire', 'Avancé'] : ['Starter', 'Intermediate', 'Advanced']);
+
   for (const rule of RULE) {
     const { game } = rule;
     const name = game.game;
@@ -1203,7 +1264,7 @@ describe('six games behind one address: Fire Rescue, Fire Chief, Warehouse Sort,
       );
       assert.deepEqual(
         body.levels.map((level) => level.title),
-        ['Starter', 'Intermediate'],
+        HEADINGS(game).slice(0, 2),
       );
       assertOnlyTheirs(response, game, rule.forMembers, rule.starters, 'a visitor');
     });
@@ -1229,7 +1290,7 @@ describe('six games behind one address: Fire Rescue, Fire Chief, Warehouse Sort,
         assert.deepEqual(body.examples, rule.forMembers.map(exampleOf));
         assert.deepEqual(
           body.levels.map((level) => level.title),
-          ['Starter', 'Intermediate'],
+          HEADINGS(game).slice(0, 2),
         );
         assertOnlyTheirs(response, game, rule.forMembers, rule.forMembers, 'a member');
       }
@@ -1247,7 +1308,7 @@ describe('six games behind one address: Fire Rescue, Fire Chief, Warehouse Sort,
         assert.deepEqual(body.levels, [...game.levels]);
         assert.deepEqual(
           body.levels.map((level) => level.title),
-          ['Starter', 'Intermediate', 'Advanced'],
+          HEADINGS(game),
         );
         assertOnlyTheirs(response, game, rule.all, rule.all, 'an advanced code');
       }
@@ -1337,7 +1398,7 @@ describe('six games behind one address: Fire Rescue, Fire Chief, Warehouse Sort,
     check({ ...good, body: { ...good.body, extra: [FIRE_CADET.examples[0], { cards: ['forward', 'x2'] }] } } as unknown as UnlockResponse);
   });
 
-  test('the numbers: Fire Rescue 5 cards / 3 open, 5 / 5, 7 / 7 - Fire Chief, Warehouse Sort, Locker Room, Fire Cadet and Fire Fighter 5 / 3, 5 / 5, 6 / 6', async () => {
+  test('the numbers: Fire Rescue 5 cards / 3 open, 5 / 5, 7 / 7 - Fire Chief, Warehouse Sort, Locker Room, Fire Cadet, Fire Fighter and Robot en fête 2027 5 / 3, 5 / 5, 6 / 6', async () => {
     const counts = async (game: string, code: string | null): Promise<string> => {
       const body = yes(await ask(game, code));
       return `${body.cards.length} / ${body.examples.length}`;
@@ -1348,6 +1409,7 @@ describe('six games behind one address: Fire Rescue, Fire Chief, Warehouse Sort,
     assert.deepEqual([await counts('locker-room', null), await counts('locker-room', CODE_A), await counts('locker-room', CODE_ADVANCED)], ['5 / 3', '5 / 5', '6 / 6']);
     assert.deepEqual([await counts('fire-cadet', null), await counts('fire-cadet', CODE_A), await counts('fire-cadet', CODE_ADVANCED)], ['5 / 3', '5 / 5', '6 / 6']);
     assert.deepEqual([await counts('fire-fighter', null), await counts('fire-fighter', CODE_A), await counts('fire-fighter', CODE_ADVANCED)], ['5 / 3', '5 / 5', '6 / 6']);
+    assert.deepEqual([await counts('robot-en-fete', null), await counts('robot-en-fete', CODE_A), await counts('robot-en-fete', CODE_ADVANCED)], ['5 / 3', '5 / 5', '6 / 6']);
   });
 
   test('a request that names no game is about Fire Rescue - as every request was before there was a second game', async () => {
@@ -1375,6 +1437,7 @@ describe('six games behind one address: Fire Rescue, Fire Chief, Warehouse Sort,
       if (unnamed.body.ok) assert.notDeepEqual(unnamed, await ask('locker-room', code), `${who}: and not the answer about Locker Room`);
       if (unnamed.body.ok) assert.notDeepEqual(unnamed, await ask('fire-cadet', code), `${who}: and not the answer about Fire Cadet`);
       if (unnamed.body.ok) assert.notDeepEqual(unnamed, await ask('fire-fighter', code), `${who}: and not the answer about Fire Fighter`);
+      if (unnamed.body.ok) assert.notDeepEqual(unnamed, await ask('robot-en-fete', code), `${who}: and not the answer about Robot en fête 2027`);
     }
     // the requests an open page of the live site sends, as its browser writes them - and an empty one
     const visitor = yes(withoutGame(await ask('fire-rescue', null)));
@@ -1389,7 +1452,7 @@ describe('six games behind one address: Fire Rescue, Fire Chief, Warehouse Sort,
     assertOnlyTheirs(await ask(undefined, CODE_ADVANCED), FIRE_RESCUE, RULE[0].all, RULE[0].all, 'an advanced code that names no game');
   });
 
-  test('a game that is not one of the six: 400 "unknown-game" - one and the same answer, with no list of the games there are', async () => {
+  test('a game that is not one of the seven: 400 "unknown-game" - one and the same answer, with no list of the games there are', async () => {
     const unknown: unknown[] = [
       'fire',
       'chief',
@@ -1433,6 +1496,19 @@ describe('six games behind one address: Fire Rescue, Fire Chief, Warehouse Sort,
       'fire-fighter,fire-cadet',
       'makex',
       'fire-city',
+      'robot',
+      'fete',
+      'robot-en-fête', // the name with its accent is not the name
+      'Robot-en-fete', // capitals
+      'ROBOT-EN-FETE',
+      'robot en fete',
+      'robot_en_fete',
+      'robotenfete',
+      'robot-en-fete ',
+      ' robot-en-fete',
+      'robot-en-fete-2027',
+      'robot-en-fete,warehouse-sort',
+      'warehouse-sort-fr',
       'Fire-Chief', // capitals
       'FIRE-RESCUE',
       ' fire-chief', // blanks
@@ -1513,6 +1589,14 @@ describe('six games behind one address: Fire Rescue, Fire Chief, Warehouse Sort,
         assert.equal(JSON.stringify(await ask(game, code)), JSON.stringify(await ask(game, code, beforeFighter)), `${game} with ${code}: the same answer, letter for letter, as without a sixth game`);
       }
     }
+    // ... and a server from before Robot en fête 2027 (the six games of before) does not know it - and answers the other six as before
+    const beforeFete: Partial<UnlockSetup> = { games: [FIRE_RESCUE, FIRE_CHIEF, WAREHOUSE_SORT, LOCKER_ROOM, FIRE_CADET, FIRE_FIGHTER] };
+    assert.deepEqual((await ask('robot-en-fete', null, beforeFete)).body, { ok: false, reason: 'unknown-game' });
+    for (const game of [undefined, 'fire-rescue', 'fire-chief', 'warehouse-sort', 'locker-room', 'fire-cadet', 'fire-fighter']) {
+      for (const code of [null, CODE_A, CODE_B, CODE_ADVANCED, CODE_ADVANCED_2, CODE_NOT_LISTED, 'not a code']) {
+        assert.equal(JSON.stringify(await ask(game, code)), JSON.stringify(await ask(game, code, beforeFete)), `${game} with ${code}: the same answer, letter for letter, as without a seventh game`);
+      }
+    }
 
     // what is not such a request at all is still "bad-request", whatever game it names
     for (const body of ['{"game":"fire-chief","code":123}', '{"game":"nonsense","code":["FIRE-AAAA-2222"]}', '["fire-chief"]', '"fire-chief"', 'fire-chief']) {
@@ -1588,7 +1672,7 @@ describe('six games behind one address: Fire Rescue, Fire Chief, Warehouse Sort,
       assert.deepEqual(ids(yes(await ask(rule.game.game, CODE_A, lockerMoved)).cards), rule.all, `${rule.game.game}: nothing hidden there`);
     }
     // the advanced example of Locker Room is hidden by its own line: hiding the advanced examples of the other games hides nothing here
-    const othersHidden: Partial<UnlockSetup> = { advancedOnly: ['smart-bucket', 'full-mission', 'chief-full-mission', 'sort-all-cubes', 'cadet-all-four', 'fighter-whole-mission'] };
+    const othersHidden: Partial<UnlockSetup> = { advancedOnly: ['smart-bucket', 'full-mission', 'chief-full-mission', 'sort-all-cubes', 'cadet-all-four', 'fighter-whole-mission', 'fete-all-cubes'] };
     assert.deepEqual(ids(yes(await ask('locker-room', CODE_A, othersHidden)).cards), RULE[3].all);
     assert.deepEqual(ids(yes(await ask('locker-room', null, othersHidden)).cards), RULE[3].all, 'a visitor sees its card too, with a lock');
     // a line of Fire Cadet decides about Fire Cadet alone
@@ -1601,7 +1685,7 @@ describe('six games behind one address: Fire Rescue, Fire Chief, Warehouse Sort,
       assert.deepEqual(ids(yes(await ask(rule.game.game, CODE_A, cadetMoved)).cards), rule.all, `${rule.game.game}: nothing hidden there`);
     }
     // the advanced example of Fire Cadet is hidden by its own line: hiding the advanced examples of the other games hides nothing here
-    const notCadet: Partial<UnlockSetup> = { advancedOnly: ['smart-bucket', 'full-mission', 'chief-full-mission', 'sort-all-cubes', 'locker-whole-mission', 'fighter-whole-mission'] };
+    const notCadet: Partial<UnlockSetup> = { advancedOnly: ['smart-bucket', 'full-mission', 'chief-full-mission', 'sort-all-cubes', 'locker-whole-mission', 'fighter-whole-mission', 'fete-all-cubes'] };
     assert.deepEqual(ids(yes(await ask('fire-cadet', CODE_A, notCadet)).cards), RULE[4].all);
     assert.deepEqual(ids(yes(await ask('fire-cadet', null, notCadet)).cards), RULE[4].all, 'a visitor sees its card too, with a lock');
     // a line of Fire Fighter decides about Fire Fighter alone
@@ -1614,9 +1698,23 @@ describe('six games behind one address: Fire Rescue, Fire Chief, Warehouse Sort,
       assert.deepEqual(ids(yes(await ask(rule.game.game, CODE_A, fighterMoved)).cards), rule.all, `${rule.game.game}: nothing hidden there`);
     }
     // the advanced example of Fire Fighter is hidden by its own line: hiding the advanced examples of the other games hides nothing here
-    const notFighter: Partial<UnlockSetup> = { advancedOnly: ['smart-bucket', 'full-mission', 'chief-full-mission', 'sort-all-cubes', 'locker-whole-mission', 'cadet-all-four'] };
+    const notFighter: Partial<UnlockSetup> = { advancedOnly: ['smart-bucket', 'full-mission', 'chief-full-mission', 'sort-all-cubes', 'locker-whole-mission', 'cadet-all-four', 'fete-all-cubes'] };
     assert.deepEqual(ids(yes(await ask('fire-fighter', CODE_A, notFighter)).cards), RULE[5].all);
     assert.deepEqual(ids(yes(await ask('fire-fighter', null, notFighter)).cards), RULE[5].all, 'a visitor sees its card too, with a lock');
+    // a line of Robot en fête 2027 decides about Robot en fête 2027 alone - and not about Warehouse Sort, whose examples are its twins
+    const feteMoved: Partial<UnlockSetup> = { openToEveryone: [...setup.openToEveryone, 'fete-one-cube'], advancedOnly: ['fete-two-cubes'] };
+    assert.deepEqual(ids(yes(await ask('robot-en-fete', null, feteMoved)).examples), [...RULE[6].starters, 'fete-one-cube']);
+    assert.deepEqual(ids(yes(await ask('robot-en-fete', null, feteMoved)).cards), ['fete-leave-start', 'fete-white-line', 'fete-cube-colour', 'fete-one-cube', 'fete-all-cubes']);
+    assert.deepEqual(ids(yes(await ask('robot-en-fete', CODE_ADVANCED, feteMoved)).cards), RULE[6].all);
+    for (const rule of RULE.filter((other) => other.game !== ROBOT_EN_FETE)) {
+      assert.deepEqual(ids(yes(await ask(rule.game.game, null, feteMoved)).examples), rule.starters, rule.game.game);
+      assert.deepEqual(ids(yes(await ask(rule.game.game, CODE_A, feteMoved)).cards), rule.all, `${rule.game.game}: nothing hidden there`);
+    }
+    // the advanced example of Robot en fête 2027 is hidden by its own line: hiding the one of Warehouse Sort (and of the others) hides nothing here
+    const notFete: Partial<UnlockSetup> = { advancedOnly: ['smart-bucket', 'full-mission', 'chief-full-mission', 'sort-all-cubes', 'locker-whole-mission', 'cadet-all-four', 'fighter-whole-mission'] };
+    assert.deepEqual(ids(yes(await ask('robot-en-fete', CODE_A, notFete)).cards), RULE[6].all);
+    assert.deepEqual(ids(yes(await ask('robot-en-fete', null, notFete)).cards), RULE[6].all, 'a visitor sees its card too, with a lock');
+    assert.deepEqual(ids(yes(await ask('warehouse-sort', CODE_A, notFete)).cards), RULE[2].forMembers, 'while the one of Warehouse Sort is hidden');
   });
 
   test('the website is not built while "examplesForAdvancedCodesOnly" names something that is an example of neither game', () => {
@@ -1655,6 +1753,11 @@ describe('six games behind one address: Fire Rescue, Fire Chief, Warehouse Sort,
     assert.deepEqual(mistakesInSetup({ games: ALL_GAMES, advancedOnly: ['fighter-whole-mission'] }), []);
     for (const slip of ['fighter-whole-misson', 'fighter-wholemission', 'Fighter-Whole-Mission', 'fire-fighter', 'whole-mission', 'fighter-', 'fighter-whole-mission ', 'fire-fighter-whole-mission']) {
       assert.equal(mistakesInSetup({ games: ALL_GAMES, advancedOnly: [slip] }).length, 1, `a misspelt id of Fire Fighter stops the build too: ${JSON.stringify(slip)}`);
+    }
+    assert.equal(mistakesInSetup({ games: [FIRE_RESCUE, FIRE_CHIEF, WAREHOUSE_SORT, LOCKER_ROOM, FIRE_CADET, FIRE_FIGHTER], advancedOnly: ['fete-all-cubes'] }).length, 1);
+    assert.deepEqual(mistakesInSetup({ games: ALL_GAMES, advancedOnly: ['fete-all-cubes'] }), []);
+    for (const slip of ['fete-all-cube', 'fete-allcubes', 'Fete-All-Cubes', 'fête-all-cubes', 'robot-en-fete', 'all-cubes', 'fete-', 'fete-all-cubes ', 'robot-en-fete-all-cubes']) {
+      assert.equal(mistakesInSetup({ games: ALL_GAMES, advancedOnly: [slip] }).length, 1, `a misspelt id of Robot en fête 2027 stops the build too: ${JSON.stringify(slip)}`);
     }
     assert.equal(mistakesInSetup({ games: [FIRE_CHIEF], advancedOnly: ['full-mission'] }).length, 1);
     assert.deepEqual(mistakesInSetup({ games: [FIRE_CHIEF], advancedOnly: ['chief-full-mission'] }), []);
@@ -1864,7 +1967,7 @@ describe('six games behind one address: Fire Rescue, Fire Chief, Warehouse Sort,
         assert.equal((await from(then, CODE_A)).status, 429, `${first} then ${then}: a right code waits its turn too`);
         assert.deepEqual([...(limiter as unknown as { clients: Map<string, unknown> }).clients.keys()], ['10.0.0.1']);
       }
-      // the six games and a request without a game in turn: one count of seven
+      // the six games before Robot en fête 2027 and a request without a game in turn: one count of seven
       const limiter = new AttemptLimiter(7, 60_000, 5000, 1_000);
       const from = (game: unknown, code: string) => ask(game, code, { limiter, now: () => 7_000 });
       const games = ['fire-rescue', 'fire-chief', 'warehouse-sort', 'locker-room', 'fire-cadet', 'fire-fighter', undefined];
@@ -1874,6 +1977,36 @@ describe('six games behind one address: Fire Rescue, Fire Chief, Warehouse Sort,
       // a second later the slow lane gives one turn, to a right code of Fire Fighter as to any other
       const later = (game: unknown, code: string) => ask(game, code, { limiter, now: () => 8_001 });
       assert.equal((await later('fire-fighter', CODE_A)).status, 200, 'a right code in the slow lane opens the examples');
+    });
+
+    test('Robot en fête 2027 draws on the same count: tries used in Warehouse Sort - or in any other game - leave none at full speed there, and the other way round', async () => {
+      for (const [first, then] of [
+        ['warehouse-sort', 'robot-en-fete'],
+        ['robot-en-fete', 'warehouse-sort'],
+        ['fire-rescue', 'robot-en-fete'],
+        ['fire-fighter', 'robot-en-fete'],
+        [undefined, 'robot-en-fete'],
+        ['robot-en-fete', undefined],
+        ['robot-en-fete', 'fire-cadet'],
+      ] as const) {
+        const limiter = new AttemptLimiter(3, 60_000, 5000, 1_000);
+        const from = (game: unknown, code: string) => ask(game, code, { limiter, now: () => 5_000 });
+        for (let i = 0; i < 3; i++) assert.equal((await from(first, wrongCode(i))).status, 403);
+        assert.equal((await from(then, wrongCode(3))).status, 403, `${first} then ${then}: the slow lane`);
+        assert.equal((await from(then, wrongCode(4))).status, 429, `${first} then ${then}: no fresh tries in the other game`);
+        assert.equal((await from(then, CODE_A)).status, 429, `${first} then ${then}: a right code waits its turn too`);
+        assert.deepEqual([...(limiter as unknown as { clients: Map<string, unknown> }).clients.keys()], ['10.0.0.1']);
+      }
+      // the seven games and a request without a game in turn: one count of eight
+      const limiter = new AttemptLimiter(8, 60_000, 5000, 1_000);
+      const from = (game: unknown, code: string) => ask(game, code, { limiter, now: () => 7_000 });
+      const games = ['fire-rescue', 'fire-chief', 'warehouse-sort', 'locker-room', 'fire-cadet', 'fire-fighter', 'robot-en-fete', undefined];
+      for (let i = 0; i < 8; i++) assert.equal((await from(games[i], wrongCode(10 + i))).status, 403);
+      assert.equal((await from('robot-en-fete', wrongCode(18))).status, 403, 'the one turn of the slow lane');
+      for (const game of games) assert.equal((await from(game, wrongCode(19))).status, 429, `${game}: waits`);
+      // a second later the slow lane gives one turn, to a right code of Robot en fête 2027 as to any other
+      const later = (game: unknown, code: string) => ask(game, code, { limiter, now: () => 8_001 });
+      assert.equal((await later('robot-en-fete', CODE_A)).status, 200, 'a right code in the slow lane opens the examples');
     });
 
     test('right codes never count, whichever game they are for', async () => {
@@ -1891,6 +2024,8 @@ describe('six games behind one address: Fire Rescue, Fire Chief, Warehouse Sort,
         assert.equal((await from('fire-cadet', CODE_ADVANCED)).status, 200);
         assert.equal((await from('fire-fighter', CODE_A)).status, 200);
         assert.equal((await from('fire-fighter', CODE_ADVANCED)).status, 200);
+        assert.equal((await from('robot-en-fete', CODE_A)).status, 200);
+        assert.equal((await from('robot-en-fete', CODE_ADVANCED)).status, 200);
       }
       assert.equal((limiter as unknown as { clients: Map<string, unknown> }).clients.size, 0, 'nothing is remembered about this address');
       assert.equal((await from('fire-chief', wrongCode(1))).status, 403);
@@ -2167,8 +2302,11 @@ describe('content/simulator-codes.ts', () => {
       'fighter-first-grab',
       'fighter-line-to-t',
       'fighter-yellow-x',
+      'fete-leave-start',
+      'fete-white-line',
+      'fete-cube-colour',
     ]);
-    assert.deepEqual(examplesForAdvancedCodesOnly, ['smart-bucket', 'full-mission', 'chief-full-mission', 'sort-all-cubes', 'locker-whole-mission', 'cadet-all-four', 'fighter-whole-mission']);
+    assert.deepEqual(examplesForAdvancedCodesOnly, ['smart-bucket', 'full-mission', 'chief-full-mission', 'sort-all-cubes', 'locker-whole-mission', 'cadet-all-four', 'fighter-whole-mission', 'fete-all-cubes']);
     // which is the rule "starter / intermediate / advanced", in every game
     for (const game of ALL_GAMES) {
       for (const example of game.examples) {
@@ -2201,7 +2339,8 @@ describe('content/simulator-codes.ts', () => {
         lines.includes(' *   Warehouse Sort (six)') &&
         lines.includes(' *   Locker Room (six)') &&
         lines.includes(' *   Fire Cadet (six)') &&
-        lines.includes(' *   Fire Fighter (six)'),
+        lines.includes(' *   Fire Fighter (six)') &&
+        lines.includes(' *   Robot en fête 2027 (six)'),
       'under the name of their game',
     );
   });
@@ -2271,7 +2410,7 @@ describe('content/simulator-codes.ts', () => {
     });
   }
 
-  test('with the owner\'s lists, the numbers are: Fire Rescue 5 cards / 3 open, 5 / 5, 7 / 7 - Fire Chief, Warehouse Sort, Locker Room, Fire Cadet and Fire Fighter 5 / 3, 5 / 5, 6 / 6', async () => {
+  test('with the owner\'s lists, the numbers are: Fire Rescue 5 cards / 3 open, 5 / 5, 7 / 7 - Fire Chief, Warehouse Sort, Locker Room, Fire Cadet, Fire Fighter and Robot en fête 2027 5 / 3, 5 / 5, 6 / 6', async () => {
     const setup: UnlockSetup = {
       codes: [await entryFor(1, CODE_A)],
       advancedCodes: [await entryFor(1, CODE_ADVANCED)],
@@ -2290,6 +2429,7 @@ describe('content/simulator-codes.ts', () => {
     assert.deepEqual([await counts('locker-room', null), await counts('locker-room', CODE_A), await counts('locker-room', CODE_ADVANCED)], ['5 / 3', '5 / 5', '6 / 6']);
     assert.deepEqual([await counts('fire-cadet', null), await counts('fire-cadet', CODE_A), await counts('fire-cadet', CODE_ADVANCED)], ['5 / 3', '5 / 5', '6 / 6']);
     assert.deepEqual([await counts('fire-fighter', null), await counts('fire-fighter', CODE_A), await counts('fire-fighter', CODE_ADVANCED)], ['5 / 3', '5 / 5', '6 / 6']);
+    assert.deepEqual([await counts('robot-en-fete', null), await counts('robot-en-fete', CODE_A), await counts('robot-en-fete', CODE_ADVANCED)], ['5 / 3', '5 / 5', '6 / 6']);
   });
 
   test('there is no code in the file - only the made-up one that shows what a code looks like', () => {
@@ -2350,7 +2490,7 @@ describe('src/app/api/simulator/unlock/route.ts, with the owner\'s lists', () =>
         'under the headings of this game',
       );
       const notTheirs = [...game.examples.filter((e) => examplesForAdvancedCodesOnly.includes(e.id)), ...ALL_GAMES.filter((other) => other !== game).flatMap((other) => other.examples)];
-      assert.equal(notTheirs.length, 37 - 5);
+      assert.equal(notTheirs.length, 43 - 5);
       for (const example of notTheirs) {
         for (const secret of [`"${example.id}"`, example.title, descriptionMark(example)]) assert.ok(!text.includes(secret), `the answer does not hold ${secret}`);
       }
@@ -2378,6 +2518,7 @@ describe('src/app/api/simulator/unlock/route.ts, with the owner\'s lists', () =>
     assert.notEqual((await visitorAnswer('{"game":"locker-room"}')).text.replace('"game":"locker-room",', ''), unnamedText);
     assert.notEqual((await visitorAnswer('{"game":"fire-cadet"}')).text.replace('"game":"fire-cadet",', ''), unnamedText);
     assert.notEqual((await visitorAnswer('{"game":"fire-fighter"}')).text.replace('"game":"fire-fighter",', ''), unnamedText);
+    assert.notEqual((await visitorAnswer('{"game":"robot-en-fete"}')).text.replace('"game":"robot-en-fete",', ''), unnamedText);
   });
 
   test('a code that is on no list, and what is not such a request, are refused as before - in every game', async () => {
@@ -2389,6 +2530,7 @@ describe('src/app/api/simulator/unlock/route.ts, with the owner\'s lists', () =>
       { game: 'locker-room', code: CODE_EXAMPLE },
       { game: 'fire-cadet', code: CODE_EXAMPLE },
       { game: 'fire-fighter', code: CODE_EXAMPLE },
+      { game: 'robot-en-fete', code: CODE_EXAMPLE },
     ]) {
       const wrong = await ask(JSON.stringify(sent));
       assert.equal(wrong.status, 403, JSON.stringify(sent));
@@ -2406,7 +2548,7 @@ describe('src/app/api/simulator/unlock/route.ts, with the owner\'s lists', () =>
     assert.deepEqual(await get.json(), { ok: false, reason: 'method-not-allowed' });
   });
 
-  test('a game that is not one of the six is refused with "unknown-game", and the answer lists no game', async () => {
+  test('a game that is not one of the seven is refused with "unknown-game", and the answer lists no game', async () => {
     for (const sent of [
       { game: 'fire' },
       { game: 'Fire-Chief' },
@@ -2421,6 +2563,10 @@ describe('src/app/api/simulator/unlock/route.ts, with the owner\'s lists', () =>
       { game: 'Fire-Fighter' },
       { game: 'fighter' },
       { game: 'fire_fighter' },
+      { game: 'Robot-en-fete' },
+      { game: 'robot-en-fête' },
+      { game: 'fete' },
+      { game: 'robot_en_fete' },
       { game: '' },
       { game: null },
       { game: 7 },
@@ -2439,8 +2585,8 @@ describe('src/app/api/simulator/unlock/route.ts, with the owner\'s lists', () =>
     const from = (sent: object, address = '203.0.113.77'): Promise<Response> =>
       routePost(new Request('http://localhost/api/simulator/unlock', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-forwarded-for': address }, body: JSON.stringify(sent) }));
     const wrongCode = (i: number): string => formatCode(`UUUU${[...String(i).padStart(4, '2')].map((d) => CODE_ALPHABET[Number(d)]).join('')}`);
-    const GAMES = [{ game: 'fire-rescue' }, { game: 'fire-chief' }, { game: 'warehouse-sort' }, { game: 'locker-room' }, { game: 'fire-cadet' }, { game: 'fire-fighter' }, {}];
-    // 104 wrong codes in the same instant, in turn about Fire Rescue, Fire Chief, Warehouse Sort, Locker Room, Fire Cadet, Fire Fighter and without a game. They are counted
+    const GAMES = [{ game: 'fire-rescue' }, { game: 'fire-chief' }, { game: 'warehouse-sort' }, { game: 'locker-room' }, { game: 'fire-cadet' }, { game: 'fire-fighter' }, { game: 'robot-en-fete' }, {}];
+    // 104 wrong codes in the same instant, in turn about Fire Rescue, Fire Chief, Warehouse Sort, Locker Room, Fire Cadet, Fire Fighter, Robot en fête 2027 and without a game. They are counted
     // before they are checked, so however the checks overlap: 100 at full speed, 1 in the slow lane, 3 turned away
     const all = await Promise.all(Array.from({ length: 104 }, (_, i) => from({ ...GAMES[i % GAMES.length], code: wrongCode(i) })));
     const statuses = all.map((response) => response.status);
@@ -2450,7 +2596,7 @@ describe('src/app/api/simulator/unlock/route.ts, with the owner\'s lists', () =>
     assert.ok(waiting);
     assert.equal(waiting.headers.get('Retry-After'), '1');
     assert.deepEqual(await waiting.json(), { ok: false, reason: 'too-many-attempts' });
-    // with a count per game there would have been 15 wrong codes in each, all under a limit of a hundred, and none turned away
+    // with a count per game there would have been 13 wrong codes in each, all under a limit of a hundred, and none turned away
     assert.ok(Math.ceil(104 / GAMES.length) < 100);
     // a request without a code is still answered at once, in every game - and another address has all its tries
     assert.equal((await from({ game: 'fire-rescue' })).status, 200);
@@ -2459,6 +2605,7 @@ describe('src/app/api/simulator/unlock/route.ts, with the owner\'s lists', () =>
     assert.equal((await from({ game: 'locker-room' })).status, 200);
     assert.equal((await from({ game: 'fire-cadet' })).status, 200);
     assert.equal((await from({ game: 'fire-fighter' })).status, 200);
+    assert.equal((await from({ game: 'robot-en-fete' })).status, 200);
     assert.equal((await from({ game: 'fire-chief', code: wrongCode(500) }, '203.0.113.78')).status, 403);
   });
 
@@ -2778,6 +2925,9 @@ describe('scripts/generate-simulator-codes.mjs', () => {
       'fighter-first-grab',
       'fighter-line-to-t',
       'fighter-yellow-x',
+      'fete-leave-start',
+      'fete-white-line',
+      'fete-cube-colour',
     ]);
     // ... and keeps the advanced examples of every game for advanced codes: starting over never shows them to everybody
     assert.deepEqual(exampleListOf(fresh, 'examplesForAdvancedCodesOnly'), [
@@ -2788,6 +2938,7 @@ describe('scripts/generate-simulator-codes.mjs', () => {
       'locker-whole-mission',
       'cadet-all-four',
       'fighter-whole-mission',
+      'fete-all-cubes',
     ]);
     assert.deepEqual(readListFile(fresh, 'advanced')?.active, 0);
     assert.equal(readListFile(fresh, 'advanced')?.nextNumber, 1);
@@ -2884,20 +3035,20 @@ describe('scripts/generate-simulator-codes.mjs', () => {
     const script = readFileSync(path.join(REPO_ROOT, 'scripts', 'generate-simulator-codes.mjs'), 'utf8');
     assert.ok(!script.includes('the Fire Rescue simulator'), 'the script is about the codes of every game');
     assert.ok(
-      !/\bseven ready-made\b|The seven ids|the same seven\b|the same thirteen\b|the same nineteen\b|the same twenty-five\b|the same thirty-one\b/.test(script),
-      'not "seven", "thirteen", "nineteen", "twenty-five" or "thirty-one" examples: there are thirty-seven',
+      !/\bseven ready-made\b|The seven ids|the same seven\b|the same thirteen\b|the same nineteen\b|the same twenty-five\b|the same thirty-one\b|the same thirty-seven\b/.test(script),
+      'not "seven", "thirteen", "nineteen", "twenty-five", "thirty-one" or "thirty-seven" examples: there are forty-three',
     );
     assert.ok(
-      !/\bboth games\b|\ball three games\b|\ball three of its games\b|\bin all three\b|\ball four games\b|\ball four of its games\b|\bin all four\b|\ball five games\b|\ball five of its games\b|\bin all five\b/.test(script),
-      'not "both games", "all three games", "all four games" or "all five games": there are six',
+      !/\bboth games\b|\ball three games\b|\ball three of its games\b|\bin all three\b|\ball four games\b|\ball four of its games\b|\bin all four\b|\ball five games\b|\ball five of its games\b|\bin all five\b|\ball six games\b|\ball six of its games\b|\bin all six\b|\bALL SIX GAMES\b/.test(script),
+      'not "both games", "all three games", "all four games", "all five games" or "all six games": there are seven',
     );
-    assert.match(script, /the same thirty-seven as above/);
+    assert.match(script, /the same forty-three as above/);
   });
 
-  test('--help says that the codes are for all six games', async () => {
+  test('--help says that the codes are for all seven games', async () => {
     const shown: string[] = [];
     await generateCodes(['--help'], (line: string) => shown.push(line));
-    assert.match(shown.join('\n'), /all six games, Fire Rescue, Fire Chief, Warehouse Sort, Locker Room, Fire Cadet and Fire Fighter/);
+    assert.match(shown.join('\n'), /all seven games, Fire Rescue, Fire Chief, Warehouse Sort, Locker Room, Fire Cadet, Fire Fighter and Robot en fête 2027/);
   });
 
   // ------------------------------------------------------------------------------------------

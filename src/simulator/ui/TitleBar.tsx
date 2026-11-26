@@ -9,11 +9,14 @@
  */
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { POWERED_BY } from './powered-by';
+import { useTitleText } from './text/title-context';
+import type { TitleText } from './text/types';
 
 /** The pages above the simulator on the website: the Simulator page lists all the simulators. */
-const PARENT_PAGES: Array<{ label: string; href: string }> = [
-  { label: 'Home', href: '/' },
-  { label: 'Simulator', href: '/simulator' },
+const parentPages = (text: TitleText): Array<{ label: string; href: string }> => [
+  { label: text.homeCrumb, href: '/' },
+  { label: text.simulatorCrumb, href: '/simulator' },
 ];
 
 export interface TitleBarProps {
@@ -32,9 +35,12 @@ export interface TitleBarProps {
 }
 
 export function TitleBar({ title, wrapOnPhone = false, robot = 'mBot2', children }: TitleBarProps) {
+  // (the title row is on every loading screen: it reads its own words of the table, not the whole table - ./text/title-context.tsx)
+  const text = useTitleText();
+  const PARENT_PAGES = parentPages(text);
   return (
     <div className="relative z-30 flex shrink-0 flex-wrap items-center gap-x-2 gap-y-0.5 border-b border-white/10 bg-ink-950 px-3 py-1.5 text-white sm:h-12 sm:flex-nowrap sm:px-4 sm:py-0">
-      <nav aria-label="Breadcrumb" className="max-sm:w-full">
+      <nav aria-label={text.breadcrumb} className="max-sm:w-full">
         <ol className="flex items-center gap-x-2 text-sm text-white/70">
           {PARENT_PAGES.map((page, i) => (
             <li key={page.href} className="flex items-center gap-x-2">
@@ -54,7 +60,7 @@ export function TitleBar({ title, wrapOnPhone = false, robot = 'mBot2', children
           lower than the row, so the row keeps its height. */}
       <div className="flex min-w-0 flex-1 flex-col justify-center">
         <h1 className={`truncate text-base font-semibold leading-tight text-white${wrapOnPhone ? ' max-sm:whitespace-normal' : ''}`}>
-          {title} simulator <span className="font-medium text-brand-300 max-md:hidden">· {robot}</span>
+          {text.simulatorTitle(title)}<span className="font-medium text-brand-300 max-md:hidden">· {robot}</span>
         </h1>
         <PoweredBy className="truncate max-sm:hidden" />
       </div>
@@ -67,13 +73,14 @@ export function TitleBar({ title, wrapOnPhone = false, robot = 'mBot2', children
   );
 }
 
-/** Who the simulator is powered by. Shown on every simulator page, also while it loads. */
-export const POWERED_BY = 'RoboHolic Robotics Academy';
+/** Who the simulator is powered by (./powered-by.ts). Shown on every simulator page, also while it loads. */
+export { POWERED_BY };
 
 function PoweredBy({ className }: { className: string }) {
+  const text = useTitleText();
   return (
     <p className={`text-[11px] leading-tight text-white/60 ${className}`} data-powered-by>
-      Powered by <span className="font-semibold text-white/85">{POWERED_BY}</span>
+      {text.poweredBy}<span className="font-semibold text-white/85">{POWERED_BY}</span>
     </p>
   );
 }

@@ -41,23 +41,24 @@ import { ConsolePanel } from './ConsolePanel';
 import { ControlBar } from './ControlBar';
 import { CyberPiPanel, HoldButton } from './CyberPiPanel';
 import { EditorToolbar } from './EditorToolbar';
-import { cyberPiSummary, timeTextOf } from './format';
 import { GripperCodeDialog } from './GripperCodeDialog';
 import { CentreIcon, EnlargeIcon, RotateLeftIcon, RotateRightIcon, RulerIcon, RulesIcon, SensorsIcon, ShrinkIcon, TestIcon, TrailIcon, ZonesIcon } from './icons';
 import type { ExampleProgram } from './member-unlock';
-import { blankProgram, hasRunnableScript, otherGameNote, parseProgramFile, programFileName, retiredBlocksNote, serializeProgramFile, withoutRetiredBlocks } from './program-file';
+import { blankProgram, hasRunnableScript, programFileName, serializeProgramFile, withoutRetiredBlocks } from './program-file';
 import type { StageOptions } from './render';
-import { robotParts, sensorSummary, sensorsViewHint } from './robot-parts';
-import { EMPTY_RULER, followRobot, removeLastRulerPoint, rulerText, startsOnRobot, type Ruler } from './ruler';
+import { robotParts } from './robot-parts';
+import { EMPTY_RULER, followRobot, removeLastRulerPoint, startsOnRobot, type Ruler } from './ruler';
 import type { CodeReader } from './scenario-code';
 import { ScoreSheet, StatusLine } from './ScoreSheet';
-import { capital, scoreSheetSummary, screenWords, type ScreenWords } from './screen-words';
+import { screenWords, type ScreenWords } from './screen-words';
 import { SensorDashboard } from './SensorDashboard';
 import { StageCanvas } from './StageCanvas';
-import { escapeAction, readyHint, sizeButtonHint, tabStop } from './stage-view';
-import { headingDegrees, homeButtonWords, homeKind, homePose, isPose, poseFits, rotatedPose } from './start-pose';
+import { escapeAction, tabStop } from './stage-view';
+import { headingDegrees, homeKind, homePose, isPose, poseFits, rotatedPose } from './start-pose';
 import { PAGE_FRAME } from './page-frame';
 import { isRecord, loadJson, saveJson, storageKey } from './storage';
+import { ScreenTextContext, useScreenText } from './text/context';
+import type { ScreenText } from './text/types';
 import { TitleBar, titleBarButton } from './TitleBar';
 import { useMemberExamples, type ExamplesConfig } from './useMemberExamples';
 import { SPEEDS, useSimulation, type Speed } from './useSimulation';
@@ -86,6 +87,15 @@ export interface RulesPart {
 }
 
 export interface SimulatorAppProps<S> {
+  /**
+   * The word table of the screen in another language: the French page (Tri d’entrepôt, Robot en
+   * fête 2027) hands in the French table (./text/fr.tsx). It is set above the whole screen, and
+   * the frame says the table's language (lang="fr"). Left out: the screen is English, as it always
+   * was - no table is set (the English one is the default, ./text/context.tsx) and the frame has no
+   * lang of its own. (The page hands the table in, so that this screen does not import it: every
+   * English page would download it.)
+   */
+  text?: ScreenText;
   game: Game<S>;
   robotConfig: RobotConfig;
   /** short name of the category for the header, e.g. "Fire Rescue Senior" */
@@ -292,11 +302,28 @@ function readSettings<S>(game: Game<S>, robotConfig: RobotConfig, fallbackPose: 
   return { scenario, startPose, view, open, speed, sound: raw.sound !== false, rotateStep };
 }
 
+/**
+ * The screen, in its language. A table the page hands in is set here, above the screen itself, so
+ * that the screen and every hook inside it (useSimulation: the console lines) read it.
+ */
 export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
+  if (props.text) {
+    return (
+      <ScreenTextContext.Provider value={props.text}>
+        <SimulatorScreen {...props} />
+      </ScreenTextContext.Provider>
+    );
+  }
+  return <SimulatorScreen {...props} />;
+}
+
+function SimulatorScreen<S>(props: SimulatorAppProps<S>) {
   const { game, robotConfig, startZoneName } = props;
+  // every text of the screen, in its language (./text: the English table unless the page sets another)
+  const text = useScreenText();
   const words = useMemo(() => screenWords(props.words), [props.words]);
   // how this game writes a moment of a match (as its referee does, where the referee writes times down)
-  const timeText = useMemo(() => timeTextOf(game), [game]);
+  const timeText = useMemo(() => text.timeTextOf(game), [game, text]);
   // what this robot has: the Sensors panel and the stage show only that
   const parts = useMemo(() => robotParts(robotConfig), [robotConfig]);
   // The Gripper blocks are shortcuts mBlock does not have, and the window that shows the real
@@ -406,7 +433,7 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
   );
 
   // ------------------------------------------------------------------ placing the robot
-  const notAllowed = `The robot must be completely inside the ${startZoneName}.`;
+  const notAllowed = text.notAllowed(startZoneName);
 
   const onPlace = useCallback(
     (pose: Pose, phase: 'move' | 'end') => {
@@ -441,13 +468,13 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
     [game, robotConfig, props.initialStartPose],
   );
   const home = useMemo(() => homeKind(robotConfig, game.startZone, defaultPose), [game, robotConfig, defaultPose]);
-  const homeWords = homeButtonWords(home, startZoneName);
+  const homeWords = text.homeButtonWords(home, startZoneName);
 
   const centreRobot = () => {
     const from = ghost ?? sim.startPose;
     const pose = homePose(home, robotConfig, game.startZone, defaultPose, from.heading);
     if (setStartPose(pose)) setGhost(null);
-    else say(home === 'default' ? notAllowed : `${notAllowed} It does not fit at this angle.`, 'error');
+    else say(home === 'default' ? notAllowed : text.notAllowedAtAngle(notAllowed), 'error');
   };
 
   const changeScenario = useCallback((next: S) => {
@@ -476,7 +503,7 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
   // every match counts as "the robot" all the time: a plan made there is still the robot's plan
   // while it drives.
   const rulerRobotThere = startsOnRobot(ruler, snapshot.pose, sim.startPose);
-  const rulerReading = rulerText(ruler, rulerRobotThere);
+  const rulerReading = text.rulerText(ruler, rulerRobotThere);
 
   // ------------------------------------------------------------------ the enlarged stage
   // (How it is laid over the window is in simulator.css, at ".mbot2-stage-head[data-enlarged]".)
@@ -497,8 +524,8 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
   // the newest piece and the total are.
   const rulerTextRef = useRef<HTMLParagraphElement>(null);
   useEffect(() => {
-    const text = rulerTextRef.current;
-    if (text) text.scrollTop = text.scrollHeight;
+    const row = rulerTextRef.current;
+    if (row) row.scrollTop = row.scrollHeight;
   }, [rulerReading, rulerOn, isEnlarged]);
 
   useEffect(() => {
@@ -578,18 +605,14 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
   const start = () => {
     setGhost(null);
     if (!sim.start()) {
-      say('The block editor is still loading. Try again in a moment.', 'error');
+      say(text.editorStillLoading, 'error');
       return;
     }
     replacedDuringMatch.current = false;
     // a program with nothing under its yellow block ends in the same moment: say why
     const program = getProgram();
     if (program && !hasRunnableScript(program)) {
-      say(
-        canLoadExamples
-          ? 'Nothing to run yet: snap blocks under the yellow "when CyberPi starts up" block, or open one of the Examples.'
-          : 'Nothing to run yet: snap blocks under the yellow "when CyberPi starts up" block, then press Start again.',
-      );
+      say(text.nothingToRun(canLoadExamples));
     }
   };
   const reset = () => {
@@ -609,11 +632,11 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
   const replaceProgram = (program: ProgramJson, what: string): boolean => {
     const editor = editorRef.current;
     if (!editor) return false;
-    if (editor.blockCount() > 1 && !window.confirm(`Replace the blocks in your workspace with ${what}?\n(You can get them back with Undo.)`)) {
+    if (editor.blockCount() > 1 && !window.confirm(text.replaceConfirm(what))) {
       return false;
     }
     if (!editor.loadProgram(program)) {
-      say('This program could not be shown. Your blocks were not changed.', 'error');
+      say(text.programNotShown, 'error');
       return false;
     }
     if (matchOn) replacedDuringMatch.current = true;
@@ -621,28 +644,28 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
   };
 
   const onNew = () => {
-    replaceProgram(blankProgram(), 'a new, empty program');
+    replaceProgram(blankProgram(), text.newProgramWhat);
   };
 
   const onExample = (example: ExampleProgram) => {
-    if (replaceProgram(example.program, `the example "${example.title}"`)) say(`Example loaded: ${example.title}. Press Start to watch it.`);
+    if (replaceProgram(example.program, text.exampleWhat(example.title))) say(text.exampleLoaded(example.title));
   };
 
-  const onOpenFile = (text: string, fileName: string) => {
-    const parsed = parseProgramFile(text);
+  const onOpenFile = (fileText: string, fileName: string) => {
+    const parsed = text.parseProgramFile(fileText);
     if (!parsed.ok) {
       say(parsed.error, 'error');
       return;
     }
     // (blocks the simulator no longer has are taken out first: Blockly would refuse the whole file for one of them)
     const kept = withoutRetiredBlocks(parsed.program);
-    if (!replaceProgram(kept.program, `the program from "${fileName}"`)) return;
+    if (!replaceProgram(kept.program, text.fileWhat(fileName))) return;
     // A program made in another game opens here too, but its blocks for parts this robot does
     // not have do not work: say so now, in plain words (and long enough to be read). The same
     // for blocks that were taken out.
-    const notes = [retiredBlocksNote(kept, 'this program'), otherGameNote(kept.program, parsed.game, game.id)].filter((note) => note !== null);
-    if (notes.length > 0) say(`Opened ${fileName}. ${notes.join(' ')}`, 'info', 12000);
-    else say(`Opened ${fileName}.`);
+    const notes = [text.retiredBlocksNote(kept, 'this program'), text.otherGameNote(kept.program, parsed.game, game.id)].filter((note) => note !== null);
+    if (notes.length > 0) say(text.openedWithNotes(fileName, notes), 'info', 12000);
+    else say(text.opened(fileName));
   };
 
   const onSave = () => {
@@ -657,14 +680,14 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
     link.click();
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    say('Program saved to your downloads.');
+    say(text.programSaved);
   };
 
   const selectBlock = useCallback(
     (blockId: string) => {
-      if (!editorRef.current?.selectBlock(blockId)) say('That block is no longer in your workspace.', 'error');
+      if (!editorRef.current?.selectBlock(blockId)) say(text.blockGone, 'error');
     },
-    [say],
+    [say, text],
   );
 
   // ------------------------------------------------------------------ derived texts
@@ -694,14 +717,14 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
    *          phone it covered both squares of the building in that corner), so with the ruler on
    *          nothing lies on the mat at all.
    */
-  const sizeLabel = isEnlarged ? 'Shrink' : 'Enlarge';
+  const sizeLabel = isEnlarged ? text.shrink : text.enlarge;
   const sizeButton = (place: 'mat' | 'row') => (
     <button
       ref={enlargeButtonRef}
       type="button"
       onClick={isEnlarged ? shrink : enlarge}
       aria-label={sizeLabel}
-      title={sizeButtonHint({ rulerOn, rulerPoints, enlarged: isEnlarged })}
+      title={text.sizeButtonHint({ rulerOn, rulerPoints, enlarged: isEnlarged })}
       className={
         place === 'mat'
           ? // small and tight in the corner: even on the smallest mat (17rem) it covers only the roof of the building there.
@@ -736,7 +759,7 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
   );
 
   return (
-    <div className={`${PAGE_FRAME} text-ink-900`}>
+    <div className={`${PAGE_FRAME} text-ink-900`} lang={props.text?.locale}>
       {/* ================================================================ title row (under the site header) */}
       <TitleBar title={props.title} wrapOnPhone={props.titleWrapsOnPhone}>
         {/* (a category with one setup has nothing to test it on many of: see `fixedSetup`) */}
@@ -752,23 +775,23 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
             title={words.batchHint}
           >
             <TestIcon className="h-4 w-4" />
-            <span className="hidden md:inline">{`Test on many ${words.scenarios}`}</span>
-            <span className="md:hidden">Test</span>
+            <span className="hidden md:inline">{text.testOnMany(words.scenarios)}</span>
+            <span className="md:hidden">{text.testShort}</span>
           </button>
         )}
         <div className="relative" ref={rules.ref}>
           <button type="button" onClick={() => rules.setOpen(!rules.open)} aria-expanded={rules.open} aria-haspopup="true" className={titleBarButton}>
             <RulesIcon className="h-4 w-4" />
-            Rules
+            {text.rulesButton}
           </button>
           {rules.open && (
             <div
               role="region"
-              aria-label="Rules in short"
+              aria-label={text.rulesRegion}
               className="mbot2-rules-panel absolute right-0 top-full z-40 mt-2 w-[min(30rem,calc(100vw-1.5rem))] overflow-y-auto rounded-card border border-slate-200 bg-white p-4 text-ink-800 shadow-2xl"
             >
               {/* (a window with two parts has real headings: see rulesSection) */}
-              <RulesTitle className={rulesTitleLook}>{props.title}: the rules in short</RulesTitle>
+              <RulesTitle className={rulesTitleLook}>{text.rulesTitle(props.title)}</RulesTitle>
               {props.rulesNote && (
                 <p className="mt-1 rounded-md bg-amber-100 px-2 py-1 text-xs font-semibold leading-snug text-amber-900">
                   {props.rulesNote}
@@ -802,7 +825,7 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
         {/* ============================================================== blocks */}
         {/* (side by side, the blocks get all the width the stage column does not need: see .mbot2-stage-column in simulator.css) */}
-        <section aria-label="Your program" className="relative flex h-[72dvh] min-h-[26rem] flex-col border-b border-slate-300 bg-white lg:h-auto lg:min-h-0 lg:min-w-0 lg:flex-1 lg:border-b-0 lg:border-r">
+        <section aria-label={text.yourProgram} className="relative flex h-[72dvh] min-h-[26rem] flex-col border-b border-slate-300 bg-white lg:h-auto lg:min-h-0 lg:min-w-0 lg:flex-1 lg:border-b-0 lg:border-r">
           <EditorToolbar
             ready={editorReady}
             canUndo={editorStatus.canUndo}
@@ -832,16 +855,8 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
                 first block that is added. Its left edge clears the list of block groups. */}
             {editorReady && editorStatus.blocks <= 1 && (
               <p className="pointer-events-none absolute left-[10.75rem] right-10 top-28 z-10 max-w-sm text-sm leading-relaxed text-ink-500">
-                <span className="font-bold text-ink-700">Build your program here.</span> Click a group on the left (try{' '}
-                <span className="font-semibold text-ink-700">mBot2 Chassis</span>), drag a block out and snap it under the yellow block. Then press{' '}
-                <span className="font-semibold text-ink-700">Start</span>.
-                {/* (only for a visitor who can open one: the examples are for members) */}
-                {canLoadExamples && (
-                  <>
-                    {' '}
-                    Or open one of the <span className="font-semibold text-ink-700">Examples</span> to see how it is done.
-                  </>
-                )}
+                {/* (the last sentence only for a visitor who can open one: the examples are for members) */}
+                {text.emptyWorkspace(canLoadExamples)}
               </p>
             )}
           </div>
@@ -849,7 +864,7 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
 
         {/* ============================================================== stage */}
         <section
-          aria-label="Stage"
+          aria-label={text.stageRegion}
           data-enlarged={isEnlarged ? '' : undefined}
           className="mbot2-stage-column relative flex min-h-0 flex-col gap-2 p-3 lg:shrink-0 lg:overflow-y-auto"
         >
@@ -865,7 +880,7 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
             data-ruler={rulerOn ? '' : undefined}
             role={isEnlarged ? 'dialog' : undefined}
             aria-modal={isEnlarged ? true : undefined}
-            aria-label={isEnlarged ? 'The stage, enlarged' : undefined}
+            aria-label={isEnlarged ? text.stageEnlarged : undefined}
             tabIndex={isEnlarged ? -1 : undefined}
           >
           <ControlBar
@@ -903,8 +918,8 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
             timeText={timeText}
             // (a referee that writes its own sentences can write long ones: the line keeps to their first words)
             briefEnding={game.createReferee !== undefined}
-            readyHint={readyHint(startZoneName, rulerOn, isEnlarged)}
-            placingProblem={placing && ghost ? `Not allowed: ${notAllowed.charAt(0).toLowerCase()}${notAllowed.slice(1)} It stays where it was.` : null}
+            readyHint={text.readyHint(startZoneName, rulerOn, isEnlarged)}
+            placingProblem={placing && ghost ? text.placingProblem(notAllowed) : null}
             onShowSheet={showScoreSheet}
           />
 
@@ -947,7 +962,7 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
                     points on, the text can be reached with the Tab key, so that it can be scrolled with
                     the keyboard too. */}
                 <p ref={rulerTextRef} aria-live="polite" tabIndex={rulerPoints >= 2 ? 0 : undefined} className="mbot2-ruler-text min-w-0 flex-1 font-medium tabular-nums">
-                  <span className="sr-only">Ruler: </span>
+                  <span className="sr-only">{text.rulerPrefix}</span>
                   {rulerReading}
                 </p>
                 <button
@@ -955,9 +970,9 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
                   onClick={() => setRuler(EMPTY_RULER)}
                   disabled={rulerPoints === 0}
                   className="inline-flex h-7 shrink-0 select-none items-center rounded-md border border-orange-300 bg-white px-2 text-xs font-semibold text-ink-700 transition hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-40"
-                  title="Remove the measurement (the Esc key removes only the last point)"
+                  title={text.clearRulerHint}
                 >
-                  Clear
+                  {text.clearRuler}
                 </button>
               </div>
               {sizeButton('row')}
@@ -968,18 +983,18 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
           {/* (the row measures its own width: see VIEW_ICON) */}
           <div className="@container">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <div className="flex items-center gap-1.5" role="group" aria-label="Show on the stage">
+            <div className="flex items-center gap-1.5" role="group" aria-label={text.showOnStage}>
               <button type="button" aria-pressed={view.overlays} onClick={toggleView('overlays')} className={toggleClass(view.overlays)} title={words.zonesHint}>
                 <ZonesIcon className={VIEW_ICON} />
-                Zones
+                {text.zones}
               </button>
-              <button type="button" aria-pressed={view.sensors} onClick={toggleView('sensors')} className={toggleClass(view.sensors)} title={sensorsViewHint(parts)}>
+              <button type="button" aria-pressed={view.sensors} onClick={toggleView('sensors')} className={toggleClass(view.sensors)} title={text.sensorsViewHint(parts)}>
                 <SensorsIcon className={VIEW_ICON} />
-                Sensors
+                {text.sensorsButton}
               </button>
-              <button type="button" aria-pressed={view.trail} onClick={toggleView('trail')} className={toggleClass(view.trail)} title="Draw the path the robot has driven">
+              <button type="button" aria-pressed={view.trail} onClick={toggleView('trail')} className={toggleClass(view.trail)} title={text.pathHint}>
                 <TrailIcon className={VIEW_ICON} />
-                Path
+                {text.path}
               </button>
               <button
                 ref={rulerButtonRef}
@@ -987,41 +1002,41 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
                 aria-pressed={rulerOn}
                 onClick={() => setRulerOn(!rulerOn)}
                 className={toggleClass(rulerOn)}
-                title="Measure on the mat: click points to see the distances in cm and the turns between them"
+                title={text.rulerHint}
               >
                 <RulerIcon className={VIEW_ICON} />
-                Ruler
+                {text.rulerButton}
               </button>
             </div>
 
             {/* during a match the robot cannot be placed any more: its two buttons take that spot, so that
                 "when button A pressed" programs can be started while watching the stage */}
             {matchOn && (
-              <div className="ml-auto flex items-center gap-1.5" role="group" aria-label="CyberPi buttons">
-                <span className="text-xs font-semibold text-ink-600" title="Hold a button down to press it on the robot. The joystick is in the CyberPi panel below.">
+              <div className="ml-auto flex items-center gap-1.5" role="group" aria-label={text.cyberPiButtons}>
+                <span className="text-xs font-semibold text-ink-600" title={text.cyberPiButtonsHint}>
                   CyberPi
                 </span>
-                <HoldButton name="a" label="Button A" onButton={sim.setButton} className="h-9 w-9 rounded-full text-sm">
+                <HoldButton name="a" label={text.buttonA} onButton={sim.setButton} className="h-9 w-9 rounded-full text-sm">
                   A
                 </HoldButton>
-                <HoldButton name="b" label="Button B" onButton={sim.setButton} className="h-9 w-9 rounded-full text-sm">
+                <HoldButton name="b" label={text.buttonB} onButton={sim.setButton} className="h-9 w-9 rounded-full text-sm">
                   B
                 </HoldButton>
               </div>
             )}
 
-            <div className={matchOn ? 'hidden' : 'ml-auto flex items-center gap-1.5'} role="group" aria-label="Robot start position">
-              <span className="font-mono text-xs tabular-nums text-ink-600" title="Direction the robot faces: 0° = up the mat, 90° = to the right">
+            <div className={matchOn ? 'hidden' : 'ml-auto flex items-center gap-1.5'} role="group" aria-label={text.startPosition}>
+              <span className="font-mono text-xs tabular-nums text-ink-600" title={text.headingHint}>
                 {headingDegrees(shownPose.heading)}°
               </span>
-              <button type="button" onClick={() => onRotate(-rotateStep)} disabled={!placing} className={button.icon} aria-label={`Turn the robot ${rotateStep} degrees to the left`} title="Turn left (the mouse wheel on the robot turns it too)">
+              <button type="button" onClick={() => onRotate(-rotateStep)} disabled={!placing} className={button.icon} aria-label={text.turnLeftLabel(rotateStep)} title={text.turnLeftHint}>
                 <RotateLeftIcon className="h-4 w-4" />
               </button>
-              <button type="button" onClick={() => onRotate(rotateStep)} disabled={!placing} className={button.icon} aria-label={`Turn the robot ${rotateStep} degrees to the right`} title="Turn right (the mouse wheel on the robot turns it too)">
+              <button type="button" onClick={() => onRotate(rotateStep)} disabled={!placing} className={button.icon} aria-label={text.turnRightLabel(rotateStep)} title={text.turnRightHint}>
                 <RotateRightIcon className="h-4 w-4" />
               </button>
               <label className="sr-only" htmlFor="rotate-step">
-                Turning step
+                {text.turningStep}
               </label>
               <select
                 id="rotate-step"
@@ -1029,7 +1044,7 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
                 disabled={!placing}
                 onChange={(event) => setRotateStep(Number(event.target.value))}
                 className="h-9 rounded-lg border border-slate-300 bg-white px-1.5 text-xs font-semibold text-ink-700 disabled:opacity-40"
-                title="How far one press turns the robot"
+                title={text.turningStepHint}
               >
                 {ROTATE_STEPS.map((step) => (
                   <option key={step} value={step}>
@@ -1049,8 +1064,8 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
           {/* (stacked, the page itself scrolls to the sheet: keep it clear of the site's sticky header) */}
           <div ref={scoreSheetRef} className="scroll-mb-3 scroll-mt-24 lg:scroll-mt-3">
           <Section
-            title="Score sheet"
-            summary={scoreSheetSummary(snapshot.score, missionsDone, missions.length, words)}
+            title={text.scoreSheet}
+            summary={text.scoreSheetSummary(snapshot.score, missionsDone, missions.length, words)}
             open={open.score}
             onToggle={toggleSection('score')}
           >
@@ -1076,20 +1091,18 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
           </Section>
 
           <Section
-            title="Sensors"
-            summary={sensorSummary(parts, snapshot.sensors)}
+            title={text.sensorsTitle}
+            summary={text.sensorSummary(parts, snapshot.sensors)}
             open={open.sensors}
             onToggle={toggleSection('sensors')}
           >
             <SensorDashboard snapshot={snapshot} robotConfig={robotConfig} />
             <p className="mt-2 text-xs text-ink-500">
-              {sim.realMat
-                ? 'The line sensor reads the real picture of the mat, illustrations included.'
-                : 'The line sensor reads a simplified drawing of the mat (the real picture is still loading).'}
+              {sim.realMat ? text.lineSensorReal : text.lineSensorDrawn}
             </p>
           </Section>
 
-          <Section title="CyberPi" summary={cyberPiSummary(snapshot.screenLines, props.showLastPrint === true)} open={open.cyberpi} onToggle={toggleSection('cyberpi')}>
+          <Section title="CyberPi" summary={text.cyberPiSummary(snapshot.screenLines, props.showLastPrint === true)} open={open.cyberpi} onToggle={toggleSection('cyberpi')}>
             <CyberPiPanel
               lines={snapshot.screenLines}
               labels={snapshot.screenLabels}
@@ -1101,16 +1114,8 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
           </Section>
 
           <Section
-            title="Console"
-            summary={
-              errorCount > 0 ? (
-                <span className="font-bold text-rose-700">
-                  {errorCount} problem{errorCount === 1 ? '' : 's'}
-                </span>
-              ) : (
-                `${sim.logs.length} message${sim.logs.length === 1 ? '' : 's'}`
-              )
-            }
+            title={text.consoleTitle}
+            summary={errorCount > 0 ? <span className="font-bold text-rose-700">{text.consoleProblems(errorCount)}</span> : text.consoleMessages(sim.logs.length)}
             open={open.console}
             onToggle={toggleSection('console')}
           >
@@ -1143,7 +1148,7 @@ export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
           onPick={(picked) => {
             setBatchOpen(false);
             changeScenario(picked);
-            say(`${capital(words.scenario)} loaded. Press Start to watch your program on it.`);
+            say(text.scenarioLoaded(words.scenario));
           }}
           onClose={() => setBatchOpen(false)}
         />

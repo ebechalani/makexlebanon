@@ -45,6 +45,7 @@ import { createSimulation } from '../core/simulation';
 import type { BlockJson, MatSampler, Pose, ProgramJson, ScoreLine, SimEvent, Simulation } from '../core/types';
 import { SAMPLE_CATALOG as FIRE_CHIEF_CATALOG } from '../fire-chief/sample-catalog';
 import { SAMPLE_CATALOG as FIRE_RESCUE_CATALOG } from '../fire-rescue/sample-catalog';
+import { SAMPLE_CATALOG as ROBOT_EN_FETE_CATALOG } from '../robot-en-fete/sample-catalog';
 import { supportsBlock } from '../vm';
 import { gripper, moveCm, program as buildProgram, script, wait, whenStart, type BlockNode } from '../vm/builder';
 import { SAMPLE_CATALOG as WAREHOUSE_SORT_CATALOG } from '../warehouse-sort/sample-catalog';
@@ -391,6 +392,11 @@ describe('the list of the examples', () => {
     }
     for (const card of SAMPLE_CATALOG) assert.match(card.id, /^locker-[a-z]+(-[a-z]+)*$/, card.id);
     for (const card of [...FIRE_RESCUE_CATALOG, ...FIRE_CHIEF_CATALOG, ...WAREHOUSE_SORT_CATALOG]) assert.ok(!card.id.startsWith('locker-'), card.id);
+    // ... nor by an example of Robot en fête 2027, which came later (its own test checks it against every game)
+    for (const card of ROBOT_EN_FETE_CATALOG) {
+      assert.ok(!ids.has(card.id) && !titles.has(card.title.toLowerCase()), card.id);
+      assert.ok(!card.id.startsWith('locker-'), card.id);
+    }
     // a student reads the titles: short
     for (const card of SAMPLE_CATALOG) assert.ok(card.title.length <= 30, card.title);
   });

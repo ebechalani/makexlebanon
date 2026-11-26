@@ -13,8 +13,9 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import type { Game } from '../core/types';
 import { CopyIcon, DiceIcon } from './icons';
-import { codeReaderOf, type CodeReader } from './scenario-code';
-import { capital, DEFAULT_WORDS, type ScreenWords } from './screen-words';
+import type { CodeReader } from './scenario-code';
+import { DEFAULT_WORDS, type ScreenWords } from './screen-words';
+import { useScreenText } from './text/context';
 import { button } from './widgets';
 
 /** One way to draw a random combination, as a button of the panel. */
@@ -52,8 +53,9 @@ export interface CombinationPanelProps<S> {
 }
 
 export function CombinationPanel<S>({ game, scenario, onChange, words = DEFAULT_WORDS, readCode, randomDraws, children }: CombinationPanelProps<S>) {
+  const text = useScreenText();
   const code = game.encodeScenario(scenario);
-  const read = useMemo(() => readCode ?? codeReaderOf(game), [readCode, game]);
+  const read = useMemo(() => readCode ?? text.codeReaderOf(game), [readCode, game, text]);
   const [typed, setTyped] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -87,15 +89,15 @@ export function CombinationPanel<S>({ game, scenario, onChange, words = DEFAULT_
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="rounded-lg bg-ink-900 px-2.5 py-1.5 font-mono text-sm font-bold tracking-wide text-white" aria-label={`${capital(words.scenario)} code ${code}`}>
+        <span className="rounded-lg bg-ink-900 px-2.5 py-1.5 font-mono text-sm font-bold tracking-wide text-white" aria-label={text.scenarioCodeLabel(words.scenario, code)}>
           {code}
         </span>
-        <button type="button" onClick={() => void copy()} className={button.icon} aria-label={`Copy the ${words.scenario} code`} title="Copy the code">
+        <button type="button" onClick={() => void copy()} className={button.icon} aria-label={text.copyCodeLabel(words.scenario)} title={text.copyCodeHint}>
           <CopyIcon className="h-4 w-4" />
         </button>
         {copied && (
           <span className="text-xs font-semibold text-emerald-700" role="status">
-            Copied
+            {text.copied}
           </span>
         )}
         <span className="ml-auto flex gap-2">
@@ -116,7 +118,7 @@ export function CombinationPanel<S>({ game, scenario, onChange, words = DEFAULT_
           beside the code.) */}
       {ownDraws && (
         <div role="group" aria-label={words.randomLabel} title={words.randomHint} className="flex flex-wrap items-center gap-x-2 gap-y-1.5" data-random-draws>
-          <span className="text-sm font-semibold text-ink-700">{words.randomLabel}:</span>
+          <span className="text-sm font-semibold text-ink-700">{text.randomDrawsLead(words.randomLabel)}</span>
           <span className="flex flex-wrap gap-2">
             {ownDraws.map((choice) => (
               <button key={choice.id} type="button" onClick={() => onChange(choice.draw(Math.random))} className={button.plain} title={choice.hint} aria-label={choice.hint} data-random-draw={choice.id}>
@@ -132,7 +134,7 @@ export function CombinationPanel<S>({ game, scenario, onChange, words = DEFAULT_
 
       <form onSubmit={submit} className="flex flex-col gap-1">
         <label htmlFor="combination-code" className="text-xs font-semibold text-ink-600">
-          Enter a code
+          {text.enterCode}
         </label>
         <div className="flex gap-2">
           <input
@@ -150,7 +152,7 @@ export function CombinationPanel<S>({ game, scenario, onChange, words = DEFAULT_
             className="min-w-0 flex-1 rounded-lg border border-slate-300 px-2.5 py-2 font-mono text-sm uppercase placeholder:normal-case placeholder:text-ink-400"
           />
           <button type="submit" className={button.plain} disabled={typed.trim() === ''}>
-            Use
+            {text.useCode}
           </button>
         </div>
         {error && (
@@ -161,11 +163,7 @@ export function CombinationPanel<S>({ game, scenario, onChange, words = DEFAULT_
       </form>
 
       <p className="text-xs text-ink-500">
-        {words.scenarioNote ?? (
-          <>
-            {game.scenarioCount().toLocaleString('en')} combinations are possible. Changing the combination puts the field back to the start.
-          </>
-        )}
+        {words.scenarioNote ?? text.scenarioCountNote(game.scenarioCount())}
       </p>
     </div>
   );

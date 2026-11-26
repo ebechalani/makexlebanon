@@ -22,10 +22,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { runMatch, summarize, type BatchResult } from '../core/batch';
 import { makeRng } from '../core/geometry';
 import type { Game, MatSampler, Pose, ProgramJson, RobotConfig } from '../core/types';
-import { bestAndWorst, compareRuns, endSentence, scoreTimeText } from './batch-words';
-import { finishText, timeTextOf } from './format';
+import { bestAndWorst, compareRuns } from './batch-words';
 import { DiceIcon, TestIcon } from './icons';
 import { capital, DEFAULT_WORDS, type ScreenWords } from './screen-words';
+import { useScreenText } from './text/context';
 import { button, Modal } from './widgets';
 
 /** A ready-made list of combinations offered next to the random draws. */
@@ -163,10 +163,6 @@ function drawCombinations<S>(game: Game<S>, count: number, seed: number): S[] {
   return out;
 }
 
-function percent(share: number): string {
-  return `${Math.round(share * 100)}%`;
-}
-
 function StatTile({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
     <div className="rounded-card border border-slate-200 bg-white px-3 py-2.5">
@@ -180,6 +176,8 @@ function StatTile({ label, value, note }: { label: string; value: string; note?:
 export function BatchDialog<S>(props: BatchDialogProps<S>) {
   const { game, robotConfig, getProgram, startPose, getSampler, currentScenario, presets = [], random, words = DEFAULT_WORDS, onPick, onClose } = props;
   const { tieBreak, summaryLabel, summaryOrder } = props;
+  const text = useScreenText();
+  const percent = text.percent;
   // (a game that offers no random lists begins with its first ready-made list)
   const offersRandom = props.randomLists !== false || presets.length === 0;
 
@@ -212,7 +210,7 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
   const run = useCallback(() => {
     const program = getProgram();
     if (!program) {
-      setProblem('The block editor is still loading. Try again in a moment.');
+      setProblem(text.editorStillLoading);
       return;
     }
     let scenarios: S[];
@@ -223,7 +221,7 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
       scenarios = kind ? kind.draw(count, seed) : random ? random.draw(count, seed) : drawCombinations(game, count, seed);
     }
     if (scenarios.length === 0) {
-      setProblem(`There is no ${words.scenario} to test.`);
+      setProblem(text.batchNothingToTest(words.scenario));
       return;
     }
 
@@ -251,7 +249,7 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
           collected.push({ index, scenario: scenarios[index], result });
         } while (collected.length < scenarios.length && performance.now() - sliceStart < SLICE_MS);
       } catch (err) {
-        setProblem(`The test stopped: ${err instanceof Error ? err.message : String(err)}`);
+        setProblem(text.batchStopped(err instanceof Error ? err.message : String(err)));
         setRows([...collected]);
         setPhase('cancelled');
         return;
@@ -261,7 +259,7 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
       else timerRef.current = setTimeout(slice, 0);
     };
     timerRef.current = setTimeout(slice, 0);
-  }, [choice, currentScenario, game, getProgram, getSampler, kind, kinds.length, presets, random, robotConfig, seed, startPose, words]);
+  }, [choice, currentScenario, game, getProgram, getSampler, kind, kinds.length, presets, random, robotConfig, seed, startPose, words, text]);
 
   const cancel = () => {
     cancelRef.current = true;
@@ -288,31 +286,32 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
   const extremes = useMemo(() => (refereeTimes ? bestAndWorst(rows.map((row) => row.result), rank) : null), [rows, refereeTimes, rank]);
   const programErrors = useMemo(() => {
     const seen = new Set<string>();
-    for (const row of rows) for (const e of row.result.errors ?? []) seen.add(e.message);
+    // (a sentence of the interpreter, as the console shows it)
+    for (const row of rows) for (const e of row.result.errors ?? []) seen.add(text.consoleLine(e.message));
     return [...seen];
-  }, [rows]);
+  }, [rows, text]);
 
   const running = phase === 'running';
   const done = rows.length;
   // (how this game writes a moment of a match: see timeTextOf)
-  const timeText = useMemo(() => timeTextOf(game), [game]);
+  const timeText = useMemo(() => text.timeTextOf(game), [game, text]);
   // what the game adds about the chosen list: about its random lists, or about the combination on the stage
   const randomNote = choice.startsWith('random-') ? (random?.note ?? null) : null;
   const presetNote = presets.find((p) => p.id === choice)?.note?.(currentScenario) ?? null;
   /** "at 0:37.2" under the best and the worst run, where the time of the points ranks (nothing for a run without points) */
   const reachedAt = (result: BatchResult | undefined): string | undefined => {
-    const time = result ? scoreTimeText(tieBreak ? { scoreTime: tieBreak.timeOf(result) } : result, timeText, '') : '';
-    return time === '' ? undefined : `${tieBreak?.tileWords ?? 'at'} ${time}`;
+    const time = result ? text.scoreTimeText(tieBreak ? { scoreTime: tieBreak.timeOf(result) } : result, timeText, '') : '';
+    return time === '' ? undefined : text.batchAt(time, tieBreak?.tileWords);
   };
 
   return (
-    <Modal title={`Test on many ${words.scenarios}`} onClose={onClose} widthClass="max-w-4xl">
+    <Modal title={text.testOnMany(words.scenarios)} onClose={onClose} widthClass="max-w-4xl">
       <div className="flex flex-col gap-4">
         <p className="text-sm text-ink-600">{words.batchIntro}</p>
 
         {/* ---------------------------------------------------------------- what to run */}
         <fieldset disabled={running} className="flex flex-col gap-2">
-          <legend className="mb-1 text-xs font-bold uppercase tracking-wide text-ink-500">{`Which ${words.scenarios}?`}</legend>
+          <legend className="mb-1 text-xs font-bold uppercase tracking-wide text-ink-500">{text.whichScenarios(words.scenarios)}</legend>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {offersRandom && RANDOM_COUNTS.map((count) => (
               <label
@@ -329,10 +328,10 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
                 <span>
                   <span className="font-semibold text-ink-800">
                     {count}
-                    {` random ${random?.name ?? words.scenarios}`}
+                    {text.randomListName(random?.name ?? words.scenarios)}
                   </span>
                   <span className="block text-xs text-ink-500">
-                    {count === 10 ? 'A quick check.' : count === 50 ? 'A good picture of how reliable the program is.' : 'A thorough test. Takes a little longer.'}
+                    {text.randomCountHint(count)}
                   </span>
                 </span>
               </label>
@@ -361,7 +360,7 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
           <div className={`flex flex-wrap items-center ${kinds.length > 1 ? 'gap-x-4 gap-y-2' : 'gap-2'}`}>
             {choice.startsWith('random-') && kinds.length > 1 && (
               // which kind of random list: a small choice that belongs to the three random lists above
-              <div role="radiogroup" aria-label={random?.kindsLegend ?? `Kind of random ${words.scenarios}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-700" data-batch-kinds>
+              <div role="radiogroup" aria-label={random?.kindsLegend ?? text.kindOfRandom(words.scenarios)} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-700" data-batch-kinds>
                 {/* (on a phone the words stand on a line of their own, and the choices under them) */}
                 {random?.kindsLegend && <span className="w-full font-semibold text-ink-800 sm:w-auto">{random.kindsLegend}</span>}
                 {kinds.map((k) => (
@@ -373,8 +372,8 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
               </div>
             )}
             {choice.startsWith('random-') && (
-              <label className="flex items-center gap-2 text-sm text-ink-600" title={`The same seed always draws the same ${words.scenarios}, so you can repeat a test after changing your program.`}>
-                Seed
+              <label className="flex items-center gap-2 text-sm text-ink-600" title={text.seedHint(words.scenarios)}>
+                {text.seed}
                 <input
                   type="number"
                   min={0}
@@ -386,8 +385,8 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
                 <button
                   type="button"
                   className={button.icon}
-                  aria-label="Pick another seed"
-                  title={`Pick another seed (other ${words.scenarios})`}
+                  aria-label={text.anotherSeed}
+                  title={text.anotherSeedHint(words.scenarios)}
                   onClick={() => setSeed(1 + Math.floor(Math.random() * 99999))}
                 >
                   <DiceIcon className="h-4 w-4" />
@@ -410,12 +409,12 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
         <div className="flex flex-wrap items-center gap-3">
           {running ? (
             <button type="button" onClick={cancel} className={button.plain}>
-              Cancel
+              {text.cancel}
             </button>
           ) : (
             <button type="button" onClick={run} className={button.primary}>
               <TestIcon className="h-4 w-4" />
-              {phase === 'idle' ? 'Run the test' : 'Run again'}
+              {phase === 'idle' ? text.runTest : text.runAgain}
             </button>
           )}
           {phase !== 'idle' && (
@@ -423,7 +422,7 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
               <div
                 className="h-2 flex-1 overflow-hidden rounded-full bg-brand-100"
                 role="progressbar"
-                aria-label="Test progress"
+                aria-label={text.testProgress}
                 aria-valuemin={0}
                 aria-valuemax={total}
                 aria-valuenow={done}
@@ -432,7 +431,7 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
               </div>
               <span className="shrink-0 font-mono text-sm tabular-nums text-ink-600" aria-live="polite">
                 {done} / {total}
-                {phase === 'cancelled' && ' (stopped)'}
+                {phase === 'cancelled' && text.testStoppedNote}
               </span>
             </div>
           )}
@@ -454,25 +453,25 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
         {done > 0 && (
           <>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <StatTile label="Average score" value={summary.average.toFixed(1)} note={`of ${rows[0].result.max} points`} />
-              <StatTile label="Best run" value={String(summary.best)} note={reachedAt(extremes?.best)} />
-              <StatTile label="Worst run" value={String(summary.worst)} note={reachedAt(extremes?.worst)} />
+              <StatTile label={text.averageScoreLabel} value={text.averageScore(summary.average)} note={text.ofPoints(rows[0].result.max)} />
+              <StatTile label={text.bestRun} value={String(summary.best)} note={reachedAt(extremes?.best)} />
+              <StatTile label={text.worstRun} value={String(summary.worst)} note={reachedAt(extremes?.worst)} />
               <StatTile
-                label={`Every ${words.goal} complete`}
+                label={text.everyGoal(words.goal, words.goals)}
                 value={percent(summary.completeCount / summary.runs)}
-                note={`${summary.completeCount} of ${summary.runs} runs`}
+                note={text.runsCount(summary.completeCount, summary.runs)}
               />
             </div>
 
             {programErrors.length > 0 && (
               <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                <span className="font-semibold">The program has a problem:</span> {programErrors[0]}
-                {programErrors.length > 1 && ` (and ${programErrors.length - 1} more)`}
+                <span className="font-semibold">{text.programProblem}</span> {programErrors[0]}
+                {programErrors.length > 1 && text.moreProblems(programErrors.length - 1)}
               </p>
             )}
 
             <div>
-              <p className="mb-1.5 text-xs font-bold uppercase tracking-wide text-ink-500">How often each line of the score sheet succeeds</p>
+              <p className="mb-1.5 text-xs font-bold uppercase tracking-wide text-ink-500">{text.lineSuccessTitle}</p>
               <ul className="grid grid-cols-1 gap-x-6 gap-y-1.5 md:grid-cols-2">
                 {summaryLines.map((line) => {
                   // (the game's own name for a line, where it has one; null: not in this list)
@@ -482,9 +481,9 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
                     <li
                       key={line.id}
                       className="grid grid-cols-[minmax(0,1fr)_6rem_2.75rem] items-center gap-2"
-                      title={`${name}: ${percent(line.successRate)} of the runs`}
+                      title={text.lineSuccessHint(name, percent(line.successRate))}
                     >
-                      <span className="text-sm leading-tight text-ink-700">{penaltyIds.has(line.id) ? `${words.cleanLine}: ${name.toLowerCase()}` : name}</span>
+                      <span className="text-sm leading-tight text-ink-700">{penaltyIds.has(line.id) ? text.cleanLineName(words.cleanLine, name) : name}</span>
                       <span className="h-2 overflow-hidden rounded-full bg-brand-100" aria-hidden="true">
                         <span className="block h-full rounded-full bg-brand-600" style={{ width: `${line.successRate * 100}%` }} />
                       </span>
@@ -497,10 +496,10 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
 
             <div>
               <div className="mb-1.5 flex items-center justify-between gap-2">
-                <p className="text-xs font-bold uppercase tracking-wide text-ink-500">Every run</p>
+                <p className="text-xs font-bold uppercase tracking-wide text-ink-500">{text.everyRun}</p>
                 <label className="flex cursor-pointer items-center gap-1.5 text-xs text-ink-600">
                   <input type="checkbox" className="accent-brand-600" checked={worstFirst} onChange={(event) => setWorstFirst(event.target.checked)} />
-                  Worst first
+                  {text.worstFirst}
                 </label>
               </div>
               <div className="max-h-72 overflow-auto rounded-card border border-slate-200">
@@ -510,23 +509,23 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
                     <tr>
                       <th scope="col" className="px-2.5 py-2 font-semibold">#</th>
                       <th scope="col" className="px-2.5 py-2 font-semibold">{capital(words.scenario)}</th>
-                      <th scope="col" className="px-2.5 py-2 text-right font-semibold">Score</th>
+                      <th scope="col" className="px-2.5 py-2 text-right font-semibold">{text.scoreColumn}</th>
                       <th scope="col" className="px-2.5 py-2 font-semibold">{capital(words.goals)}</th>
                       {refereeTimes ? (
                         <>
-                          <th scope="col" className="px-2.5 py-2 text-right font-semibold" title={tieBreak ? tieBreak.hint : 'The time on the clock when the last of these points was earned. With equal points, the shorter time ranks higher.'}>
-                            {tieBreak ? tieBreak.label : 'Time of the points'}
+                          <th scope="col" className="px-2.5 py-2 text-right font-semibold" title={tieBreak ? tieBreak.hint : text.pointsTimeHint}>
+                            {tieBreak ? tieBreak.label : text.pointsTime}
                           </th>
-                          <th scope="col" className="px-2.5 py-2 font-semibold">How it ended</th>
+                          <th scope="col" className="px-2.5 py-2 font-semibold">{text.howItEnded}</th>
                         </>
                       ) : (
                         <>
-                          <th scope="col" className="px-2.5 py-2 text-right font-semibold">Time</th>
-                          <th scope="col" className="px-2.5 py-2 font-semibold">Ended</th>
+                          <th scope="col" className="px-2.5 py-2 text-right font-semibold">{text.timeColumn}</th>
+                          <th scope="col" className="px-2.5 py-2 font-semibold">{text.endedColumn}</th>
                         </>
                       )}
                       <th scope="col" className="px-2.5 py-2">
-                        <span className="sr-only">Watch</span>
+                        <span className="sr-only">{text.watch}</span>
                       </th>
                     </tr>
                   </thead>
@@ -564,20 +563,20 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
                                 {(tieBreak ? tieBreak.timeOf(row.result) : row.result.scoreTime) === undefined ? (
                                   <>
                                     <span aria-hidden="true">-</span>
-                                    <span className="sr-only">{tieBreak ? tieBreak.none : 'no points'}</span>
+                                    <span className="sr-only">{tieBreak ? tieBreak.none : text.noPoints}</span>
                                   </>
                                 ) : (
-                                  scoreTimeText(tieBreak ? { scoreTime: tieBreak.timeOf(row.result) } : row.result, timeText)
+                                  text.scoreTimeText(tieBreak ? { scoreTime: tieBreak.timeOf(row.result) } : row.result, timeText)
                                 )}
                               </td>
-                              <td className="min-w-[16rem] px-2.5 py-1.5 text-xs leading-snug text-ink-600">{endSentence(row.result, timeText)}</td>
+                              <td className="min-w-[16rem] px-2.5 py-1.5 text-xs leading-snug text-ink-600">{text.endSentence(row.result, timeText)}</td>
                             </>
                           ) : (
                             <>
                               <td className="px-2.5 py-1.5 text-right font-mono text-xs tabular-nums text-ink-600">{timeText(row.result.time)}</td>
                               <td className="px-2.5 py-1.5 text-xs text-ink-600">
-                                {finishText(row.result.finishReason)}
-                                {row.result.restarts > 0 && `, ${row.result.restarts} restart${row.result.restarts === 1 ? '' : 's'}`}
+                                {text.finishText(row.result.finishReason)}
+                                {row.result.restarts > 0 && text.runRestarts(row.result.restarts)}
                               </td>
                             </>
                           )}
@@ -589,9 +588,9 @@ export function BatchDialog<S>(props: BatchDialogProps<S>) {
                                 onPick(row.scenario);
                               }}
                               className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-ink-700 hover:bg-slate-50"
-                              aria-label={`Watch ${words.scenario} ${row.result.scenarioCode} on the stage`}
+                              aria-label={text.watchLabel(words.scenario, row.result.scenarioCode)}
                             >
-                              Watch
+                              {text.watch}
                             </button>
                           </td>
                         </tr>

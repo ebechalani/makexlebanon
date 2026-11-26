@@ -8,37 +8,33 @@
  * sensor at the front, the DC motor ports and the fan.
  */
 import { PROBE_NAMES, type ProbeName, type ProbeReading, type RobotConfig, type Scalar } from '../core/types';
-import { formatNumber, rgbCss } from './format';
-import { colourRangeNote, dcMotorUse, robotParts, SENSOR_COLOR_CSS } from './robot-parts';
+import { rgbCss } from './format';
+import { robotParts, SENSOR_COLOR_CSS } from './robot-parts';
+import { useScreenText } from './text/context';
+import type { ScreenText } from './text/types';
 import type { UiSnapshot } from './useSimulation';
 
-const PROBE_HINT: Record<ProbeName, string> = {
-  L2: 'far left',
-  L1: 'left',
-  R1: 'right',
-  R2: 'far right',
-};
-
 function ProbeCard({ name, reading }: { name: ProbeName; reading: ProbeReading }) {
+  const text = useScreenText();
   return (
-    <div className="flex min-w-0 flex-col items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-1.5 py-2" title={`Probe ${name} (${PROBE_HINT[name]})`}>
+    <div className="flex min-w-0 flex-col items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-1.5 py-2" title={text.probeTitle(name, text.probeHint[name])}>
       <span className="text-xs font-bold text-ink-700">{name}</span>
       <span
         className="h-7 w-7 rounded-full border-2 border-white shadow ring-1 ring-slate-300"
         style={{ background: rgbCss(reading.rgb) }}
         aria-hidden="true"
       />
-      <span className="text-xs font-semibold capitalize text-ink-800">{reading.color}</span>
+      <span className="text-xs font-semibold capitalize text-ink-800">{text.sensorColour(reading.color)}</span>
       <span
         className={
           'rounded px-1.5 py-0.5 text-[11px] font-bold leading-none ' +
           (reading.onLine ? 'bg-ink-800 text-white' : 'bg-white text-ink-500 ring-1 ring-slate-300')
         }
       >
-        {reading.onLine ? 'line' : 'background'}
+        {reading.onLine ? text.probeOnLine : text.probeBackground}
       </span>
-      <span className="font-mono text-[11px] tabular-nums text-ink-500" title="reflected light, 0 (black) to 100 (white)">
-        light {formatNumber(reading.light)}
+      <span className="font-mono text-[11px] tabular-nums text-ink-500" title={text.lightHint}>
+        {text.probeLight(text.number(reading.light))}
       </span>
     </div>
   );
@@ -56,8 +52,9 @@ function Value({ label, value, unit, hint }: { label: string; value: string; uni
   );
 }
 
-function showScalar(value: Scalar): string {
-  if (typeof value === 'number') return formatNumber(value, Number.isInteger(value) ? 0 : 2);
+/** A value of the program as the Variables list shows it: as the program holds it, a number as the screen writes numbers. */
+function showScalar(value: Scalar, text: ScreenText): string {
+  if (typeof value === 'number') return text.number(value, Number.isInteger(value) ? 0 : 2);
   if (typeof value === 'boolean') return value ? 'true' : 'false';
   return value === '' ? '""' : value;
 }
@@ -68,6 +65,7 @@ export interface SensorDashboardProps {
 }
 
 export function SensorDashboard({ snapshot, robotConfig }: SensorDashboardProps) {
+  const text = useScreenText();
   const s = snapshot.sensors;
   const status = s.lineStatus & 15;
   const bits = status.toString(2).padStart(4, '0');
@@ -79,7 +77,7 @@ export function SensorDashboard({ snapshot, robotConfig }: SensorDashboardProps)
   return (
     <div className="flex flex-col gap-3">
       <div>
-        <p className="mb-1.5 text-xs font-bold uppercase tracking-wide text-ink-500">Quad RGB line sensor</p>
+        <p className="mb-1.5 text-xs font-bold uppercase tracking-wide text-ink-500">{text.quadRgb}</p>
         <div className="grid grid-cols-4 gap-1.5">
           {PROBE_NAMES.map((name) => (
             <ProbeCard key={name} name={name} reading={s.probes[name]} />
@@ -87,12 +85,12 @@ export function SensorDashboard({ snapshot, robotConfig }: SensorDashboardProps)
         </div>
         <dl className="mt-1.5 grid grid-cols-2 gap-x-4">
           <Value
-            label="Line status"
+            label={text.lineStatus}
             value={`${status}`}
             unit={`(${bits})`}
-            hint="One digit per probe, L2 L1 R1 R2: 1 = on the line. Example: 0110 = 6 means the two middle probes see the line."
+            hint={text.lineStatusHint}
           />
-          <Value label="Deviation" value={formatNumber(s.lineOffset)} hint="-100 = the robot is far to the left of the line, 0 = centred, 100 = far to the right of the line (as on the real mBot2)" />
+          <Value label={text.deviation} value={text.number(s.lineOffset)} hint={text.deviationHint} />
         </dl>
       </div>
 
@@ -104,18 +102,18 @@ export function SensorDashboard({ snapshot, robotConfig }: SensorDashboardProps)
         <dl>
           <div
             className="flex flex-wrap items-center justify-between gap-x-2 border-b border-slate-100 py-1"
-            title={`What the colour sensor at the front of the robot reads. In this simulator it names the colour of a thing that is ${formatNumber(parts.frontColour.rangeMm)} mm or less in front of it. "none" = nothing is that close.`}
+            title={text.frontColourHint(text.number(parts.frontColour.rangeMm))}
           >
-            <dt className="text-xs text-ink-500">Colour sensor</dt>
+            <dt className="text-xs text-ink-500">{text.colourSensor}</dt>
             {/* (the words are the ones the "colour sensor (1) colour" block gives: a colour name, or "none") */}
             <dd className="flex items-center gap-1.5 text-sm font-semibold text-ink-900">
               {s.frontColor !== 'none' && (
                 <span className="h-3.5 w-3.5 rounded-full ring-1 ring-slate-400" style={{ background: SENSOR_COLOR_CSS[s.frontColor] }} aria-hidden="true" />
               )}
-              {s.frontColor}
+              {text.sensorColour(s.frontColor)}
             </dd>
             <dd className="basis-full text-[11px] leading-snug text-ink-500" data-colour-range>
-              {colourRangeNote(parts.frontColour)}
+              {text.colourRangeNote(parts.frontColour)}
             </dd>
           </div>
         </dl>
@@ -123,68 +121,68 @@ export function SensorDashboard({ snapshot, robotConfig }: SensorDashboardProps)
 
       <dl className="grid grid-cols-2 gap-x-4">
         <Value
-          label="Ultrasonic"
-          value={sees ? formatNumber(s.ultrasonicCm, 1) : `${formatNumber(robotConfig.ultrasonic.maxRangeCm)}`}
-          unit={sees ? 'cm' : 'cm (nothing seen)'}
+          label={text.ultrasonic}
+          value={sees ? text.number(s.ultrasonicCm, 1) : `${text.number(robotConfig.ultrasonic.maxRangeCm)}`}
+          unit={sees ? 'cm' : text.ultrasonicNothing}
         />
         {parts.clawColour && (
           <div className="flex items-center justify-between gap-2 border-b border-slate-100 py-1">
-            <dt className="text-xs text-ink-500">Claw colour</dt>
+            <dt className="text-xs text-ink-500">{text.clawColour}</dt>
             <dd className="flex items-center gap-1.5 text-sm font-semibold capitalize text-ink-900">
               {s.frontColor !== 'none' && (
                 <span className="h-3.5 w-3.5 rounded-full ring-1 ring-slate-400" style={{ background: SENSOR_COLOR_CSS[s.frontColor] }} aria-hidden="true" />
               )}
-              {s.frontColor === 'none' ? 'nothing' : s.frontColor}
+              {text.clawReading(s.frontColor)}
             </dd>
           </div>
         )}
-        <Value label="Yaw (turned)" value={formatNumber(s.yawDeg, 1)} unit="°" hint="How far the robot has turned since the gyro was reset; clockwise is positive" />
-        <Value label="Timer" value={formatNumber(s.timer, 1)} unit="s" />
+        <Value label={text.yaw} value={text.number(s.yawDeg, 1)} unit="°" hint={text.yawHint} />
+        <Value label={text.timer} value={text.number(s.timer, 1)} unit="s" />
         <Value
-          label="EM1 angle (left)"
-          value={formatNumber(s.leftAngleDeg)}
+          label={text.em1Angle}
+          value={text.number(s.leftAngleDeg)}
           unit="°"
-          hint="Encoder of motor EM1, the left wheel"
+          hint={text.em1AngleHint}
         />
         <Value
-          label="EM2 angle (right)"
-          value={formatNumber(-s.rightAngleDeg)}
+          label={text.em2Angle}
+          value={text.number(-s.rightAngleDeg)}
           unit="°"
-          hint="Encoder of motor EM2, the right wheel. It is mounted mirrored, so it counts backwards when the robot drives forward - just like on the real mBot2."
+          hint={text.em2AngleHint}
         />
-        <Value label="EM1 speed" value={formatNumber(s.leftRpm)} unit="RPM" />
-        <Value label="EM2 speed" value={formatNumber(-s.rightRpm)} unit="RPM" hint="Negative while the robot drives forward (mirrored motor)" />
+        <Value label={text.em1Speed} value={text.number(s.leftRpm)} unit={text.rpm} />
+        <Value label={text.em2Speed} value={text.number(-s.rightRpm)} unit={text.rpm} hint={text.em2SpeedHint} />
         {parts.gripper && (
           <>
-            <Value label={`Arm (${g.liftServo})`} value={formatNumber(snapshot.servos[g.liftServo])} unit="°" hint={`Claw is ${formatNumber(snapshot.gripper.height)} mm above the mat`} />
-            <Value label={`Claw (${g.clawServo})`} value={formatNumber(snapshot.servos[g.clawServo])} unit="°" hint={`Opening: ${formatNumber(snapshot.gripper.gap)} mm`} />
+            <Value label={text.armLabel(g.liftServo)} value={text.number(snapshot.servos[g.liftServo])} unit="°" hint={text.armHint(text.number(snapshot.gripper.height))} />
+            <Value label={text.clawLabel(g.clawServo)} value={text.number(snapshot.servos[g.clawServo])} unit="°" hint={text.clawHint(text.number(snapshot.gripper.gap))} />
           </>
         )}
         {parts.dcMotors.map((port) => {
-          const use = dcMotorUse(parts, port);
+          const use = text.dcMotorUse(parts, port);
           return (
             <Value
               key={port}
-              label={use ? `DC motor ${port} (${use})` : `DC motor ${port}`}
-              value={formatNumber(s.dcMotorPower[port])}
+              label={text.dcMotorLabel(port, use)}
+              value={text.number(s.dcMotorPower[port])}
               unit="%"
-              hint={`Power of DC motor port ${port}, -100 to 100 %${use ? '' : '. Nothing is connected to this port on this robot.'}`}
+              hint={text.dcMotorHint(port, use)}
             />
           );
         })}
         {parts.fan && (
           <div
             className="flex items-center justify-between gap-2 border-b border-slate-100 py-1"
-            title={`The fan blows while DC motor ${parts.fan.port} runs at ${formatNumber(parts.fan.minPower)} % power or more, forwards or backwards.`}
+            title={text.fanHint(parts.fan.port, text.number(parts.fan.minPower))}
           >
-            <dt className="text-xs text-ink-500">Fan</dt>
+            <dt className="text-xs text-ink-500">{text.fan}</dt>
             <dd>
               <span
                 className={
                   'rounded px-1.5 py-0.5 text-[11px] font-bold leading-none ' + (s.fanOn ? 'bg-brand-600 text-white' : 'bg-white text-ink-500 ring-1 ring-slate-300')
                 }
               >
-                {s.fanOn ? 'fan on' : 'fan off'}
+                {text.fanState(s.fanOn)}
               </span>
             </dd>
           </div>
@@ -192,16 +190,16 @@ export function SensorDashboard({ snapshot, robotConfig }: SensorDashboardProps)
       </dl>
 
       <div>
-        <p className="mb-1 text-xs font-bold uppercase tracking-wide text-ink-500">Variables</p>
+        <p className="mb-1 text-xs font-bold uppercase tracking-wide text-ink-500">{text.variablesTitle}</p>
         {variables.length === 0 ? (
-          <p className="text-xs text-ink-500">Your program has no variables yet.</p>
+          <p className="text-xs text-ink-500">{text.noVariables}</p>
         ) : (
           <dl className="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
             {variables.map(([name, value]) => (
               <div key={name} className="flex items-baseline justify-between gap-2 border-b border-slate-100 py-1">
-                <dt className="truncate text-xs font-semibold text-orange-700">{name}</dt>
+                <dt className="truncate text-xs font-semibold text-orange-700">{text.variableName(name)}</dt>
                 <dd className="min-w-0 truncate font-mono text-sm font-semibold tabular-nums text-ink-900">
-                  {Array.isArray(value) ? `[${value.map(showScalar).join(', ')}]` : showScalar(value)}
+                  {Array.isArray(value) ? `[${value.map((item) => showScalar(item, text)).join(', ')}]` : showScalar(value, text)}
                 </dd>
               </div>
             ))}

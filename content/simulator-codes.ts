@@ -1,11 +1,11 @@
 /**
- * Codes for the examples of the simulators - for all six games, Fire Rescue, Fire Chief,
- * Warehouse Sort, Locker Room, Fire Cadet and Fire Fighter.
+ * Codes for the examples of the simulators - for all seven games, Fire Rescue, Fire Chief,
+ * Warehouse Sort, Locker Room, Fire Cadet, Fire Fighter and Robot en fête 2027.
  *
  * Each game has an Examples window with ready-made programs: seven in Fire Rescue, six in
- * Fire Chief, six in Warehouse Sort, six in Locker Room, six in Fire Cadet, six in Fire Fighter.
- * This file decides who gets which of them. The examples are in three groups, and there are two
- * kinds of codes:
+ * Fire Chief, six in Warehouse Sort, six in Locker Room, six in Fire Cadet, six in Fire Fighter,
+ * six in Robot en fête 2027. This file decides who gets which of them. The examples are in three
+ * groups, and there are two kinds of codes:
  *
  *   GROUP                         WHO SEES THE CARD            WHO CAN OPEN IT
  *   open to everyone              everybody                    everybody, without a code
@@ -18,11 +18,11 @@
  * code, do not see its card, its title or the heading above it - nothing tells them that it
  * exists.
  *
- * ONE SET OF CODES FOR ALL SIX GAMES. There is no code "for Fire Rescue", "for Fire Chief",
- * "for Warehouse Sort", "for Locker Room", "for Fire Cadet" or "for Fire Fighter": a member code
- * opens the examples for members in every game, an advanced code opens every example in every
- * game. Somebody who has typed a code in one game does not have to type it again in another.
- * Cancelling a code cancels it in all six.
+ * ONE SET OF CODES FOR ALL SEVEN GAMES. There is no code "for Fire Rescue", "for Fire Chief",
+ * "for Warehouse Sort", "for Locker Room", "for Fire Cadet", "for Fire Fighter" or "for Robot en
+ * fête 2027": a member code opens the examples for members in every game, an advanced code opens
+ * every example in every game. Somebody who has typed a code in one game does not have to type
+ * it again in another. Cancelling a code cancels it in all seven.
  *
  * The four things you decide here, in this order:
  *
@@ -32,9 +32,15 @@
  *   4. which advanced codes work                             (at the very end of the file)
  *
  * An example that is on neither list 1 nor list 2 is "for members". Lists 1 and 2 hold the
- * examples of all six games together: an example is named by its id, every id of Fire Chief
+ * examples of all seven games together: an example is named by its id, every id of Fire Chief
  * begins with "chief-", every id of Warehouse Sort with "sort-", every id of Locker Room with
- * "locker-", every id of Fire Cadet with "cadet-" and every id of Fire Fighter with "fighter-".
+ * "locker-", every id of Fire Cadet with "cadet-", every id of Fire Fighter with "fighter-" and
+ * every id of Robot en fête 2027 with "fete-".
+ *
+ * Robot en fête 2027 is the Warehouse Sort mission in French: the same six programs, with French
+ * titles and texts, on a page of its own. Its examples have ids of their own, so a line about an
+ * example of Warehouse Sort ("sort-") decides nothing on the French page ("fete-"): to open or to
+ * hide an example on both pages, write both ids.
  *
  * Read "Member codes for the simulator examples" in README.md first. After every change:
  * save, commit and push. The change is live once Vercel has redeployed the site.
@@ -106,6 +112,15 @@
  *     'fighter-right-bay'      Two red cubes: bakery and hospital          (intermediate)
  *     'fighter-whole-mission'  The whole Fire Fighter mission              (advanced)
  *
+ *   Robot en fête 2027 (six)
+ *
+ *     'fete-leave-start'     Sortir de la zone de départ et s’arrêter      (starter)
+ *     'fete-white-line'      Suivre la ligne blanche jusqu’au T            (starter)
+ *     'fete-cube-colour'     Lire la couleur d’un cube                     (starter)
+ *     'fete-one-cube'        Mettre un cube dans sa baie                   (intermediate)
+ *     'fete-two-cubes'       Deux cubes, puis se garer                     (intermediate)
+ *     'fete-all-cubes'       Trier les cubes et se garer                   (advanced)
+ *
  * Mind the two that look alike: 'full-mission' is the one of Fire Rescue, 'chief-full-mission'
  * the one of Fire Chief.
  *
@@ -150,6 +165,10 @@ export const examplesOpenToEveryone: string[] = [
   'fighter-first-grab',
   'fighter-line-to-t',
   'fighter-yellow-x',
+  // Robot en fête 2027: the three starter examples
+  'fete-leave-start',
+  'fete-white-line',
+  'fete-cube-colour',
 ];
 
 // =====================================================================================
@@ -161,7 +180,7 @@ export const examplesOpenToEveryone: string[] = [
  * and a member with an ordinary member code - does not get to see that these examples exist:
  * no card, no title, no "Advanced" heading.
  *
- * The ids are the same thirty-seven as above. To hide an example from everybody but the holders of
+ * The ids are the same forty-three as above. To hide an example from everybody but the holders of
  * an advanced code, write its id here. To show it to all members again (with a lock for
  * visitors), take its line out.
  *
@@ -185,6 +204,8 @@ export const examplesForAdvancedCodesOnly: string[] = [
   'cadet-all-four',
   // Fire Fighter: the advanced example
   'fighter-whole-mission',
+  // Robot en fête 2027: the advanced example
+  'fete-all-cubes',
 ];
 
 // =====================================================================================

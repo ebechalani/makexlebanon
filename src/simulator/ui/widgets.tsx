@@ -6,6 +6,7 @@
  */
 import { useEffect, useId, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { ChevronIcon, CloseIcon } from './icons';
+import { useScreenText } from './text/context';
 
 // =============================================================================================
 // Button looks (Tailwind class lists)
@@ -121,6 +122,7 @@ const MODAL_FRAME = {
 
 /** A window on top of the page. Escape or a click beside it closes it; Tab stays inside. */
 export function Modal({ title, onClose, children, widthClass = 'max-w-lg', align = 'center' }: ModalProps) {
+  const text = useScreenText();
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
@@ -184,7 +186,7 @@ export function Modal({ title, onClose, children, widthClass = 'max-w-lg', align
           <h2 id={titleId} className="text-base font-bold text-ink-900">
             {title}
           </h2>
-          <button type="button" onClick={onClose} aria-label="Close" className={`${button.icon} ml-auto h-8 w-8 border-transparent`}>
+          <button type="button" onClick={onClose} aria-label={text.close} className={`${button.icon} ml-auto h-8 w-8 border-transparent`}>
             <CloseIcon className="h-4 w-4" />
           </button>
         </div>

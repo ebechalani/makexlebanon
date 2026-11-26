@@ -199,7 +199,7 @@ They appear automatically on:
 
 ## Editing text, categories and contact details
 
-Two files hold all the content:
+Three files hold all the content:
 
 ### `content/site.ts`
 
@@ -214,6 +214,15 @@ international events list, and the training tracks.
 To add next year's season, copy the `2026` block, change the year, slug, title and categories,
 and move it to the top of the `seasons` array. Then create matching folders under
 `public/gallery/<year>/`.
+
+### `content/standalone.ts`
+
+The categories of their own, outside every season: today **Robot en fête 2027**, whose French
+simulators are named by their mission — today **Tri d’entrepôt**, the French version of Warehouse
+Sort (a second, « Logistique intelligente », is to come: one more item of its `simulators`). Its
+name, its texts (in French: the cards of its simulators on the Simulator page, its page
+`/robot-en-fete`), its simulators and their lines in the menu. No season counts it (see "The Tri
+d’entrepôt simulator (Robot en fête 2027)").
 
 ---
 
@@ -354,11 +363,13 @@ Both cards show the picture of the Fire Rescue mat, the one the game itself show
 
 The same simulator has more games: **Fire Chief** (the maze, ages 14–17), **Warehouse Sort**
 (the beginner mission of the MakeX Lebanon Inspire category, local event), **Locker Room**
-(Season 2026) and **Fire Fighter** (the letter towers, ages 8–10): see "The Fire Chief
-simulator", "The Warehouse Sort simulator", "The Locker Room simulator" and "The Fire Fighter
-simulator" further down. One more simulator, **Fire Cadet**, is for another robot, the mTiny,
-and has a screen of its own: see "The Fire Cadet simulator". `/simulator` lists the seven
-simulators by season — see "The Simulator page" there. Nothing is installed, and the
+(Season 2026), **Fire Fighter** (the letter towers, ages 8–10) and **Tri d’entrepôt** (Warehouse
+Sort all in French, of Robot en fête 2027, a category of its own): see "The Fire Chief simulator", "The
+Warehouse Sort simulator", "The Tri d’entrepôt simulator (Robot en fête 2027)", "The Locker Room simulator" and
+"The Fire Fighter simulator" further down. One more simulator, **Fire Cadet**, is for another
+robot, the mTiny, and has a screen of its own: see "The Fire Cadet simulator". `/simulator`
+lists the eight simulators: seven by season, then Tri d’entrepôt in the part of Robot en fête 2027 — see
+"The Simulator page" there. Nothing is installed, and the
 student's blocks are saved in their own browser — they are never sent anywhere. The one thing
 the simulator asks the website's server for is the ready-made examples: the server decides,
 visitor by visitor, which of them to show and to open. See "Member codes for the simulator
@@ -456,16 +467,18 @@ the second is only the summary students read. Change both when a rule changes.
 
 ### Member codes for the simulator examples
 
-The simulators have six games with examples: **Fire Rescue** (both pages, Fire Rescue Junior
+The simulators have seven games with examples: **Fire Rescue** (both pages, Fire Rescue Junior
 and Fire Rescue Senior, show the same examples: both ask for the game `'fire-rescue'`), **Fire
 Chief** (the maze), **Warehouse Sort** (Inspire, beginner), **Locker Room** (Capelli Starter,
-Season 2026) and **Fire Fighter** (Season 2027, ages 8–10) for the mBot2, and **Fire Cadet**
-(Season 2027, ages 4–7) for the mTiny. Each has its own **Examples** window with
-ready-made programs (in Fire Cadet: rows of coding cards): seven in Fire Rescue, six in Fire
-Chief, six in Warehouse Sort, six in Locker Room, six in Fire Cadet, six in Fire Fighter. In
-every game the examples are in three groups, and there are two kinds of codes:
+Season 2026), **Fire Fighter** (Season 2027, ages 8–10) and **Robot en fête 2027** (Warehouse
+Sort in French: the game `'robot-en-fete'`) for the mBot2, and **Fire Cadet** (Season 2027,
+ages 4–7) for the mTiny. Each has its own **Examples** window with ready-made programs (in Fire
+Cadet: rows of coding cards): seven in Fire Rescue, six in Fire Chief, six in Warehouse Sort,
+six in Locker Room, six in Fire Cadet, six in Fire Fighter, six in Robot en fête 2027 (the six
+of Warehouse Sort, in French). In every game the examples are in three groups, and there are two
+kinds of codes:
 
-| Group | Now in it, in Fire Rescue | Now in it, in Fire Chief, Warehouse Sort, Locker Room, Fire Cadet and Fire Fighter | Who sees the card | Who can open it |
+| Group | Now in it, in Fire Rescue | Now in it, in Fire Chief, Warehouse Sort, Locker Room, Fire Cadet, Fire Fighter and Robot en fête 2027 | Who sees the card | Who can open it |
 | --- | --- | --- | --- | --- |
 | **Open to everyone** | the three starter examples | the three starter examples | everybody | everybody, without a code |
 | **For members** | the two intermediate examples | the two intermediate examples | everybody — with a lock and "Members only" | a **member code** or an advanced code |
@@ -476,15 +489,16 @@ So there are three kinds of visitor, and each sees the same in every game:
 - **No code.** Three open cards, two locked ones. Nothing else.
 - **A member code** (one of the 500 you already have). Five open cards. Nothing else.
 - **An advanced code.** All the cards of that game — seven in Fire Rescue, six in Fire Chief,
-  Warehouse Sort, Locker Room, Fire Cadet and Fire Fighter — under the headings Starter,
-  Intermediate and Advanced.
+  Warehouse Sort, Locker Room, Fire Cadet, Fire Fighter and Robot en fête 2027 — under the
+  headings Starter, Intermediate and Advanced (in Robot en fête 2027: Premiers pas,
+  Intermédiaire, Avancé).
 
-**One set of codes for all six games.** There is no code "for Fire Rescue", "for Fire Chief",
-"for Warehouse Sort", "for Locker Room", "for Fire Cadet" or "for Fire Fighter". A member code
-opens the examples for members in every game, and an advanced code opens every example in every
-game. The codes you have already handed out work in Fire Chief, Warehouse Sort, Locker Room,
-Fire Cadet and Fire Fighter as they are: there is nothing to make and nothing to hand out again. Cancelling a code cancels it in every
-game.
+**One set of codes for all seven games.** There is no code "for Fire Rescue", "for Fire Chief",
+"for Warehouse Sort", "for Locker Room", "for Fire Cadet", "for Fire Fighter" or "for Robot en
+fête 2027". A member code opens the examples for members in every game, and an advanced code
+opens every example in every game. The codes you have already handed out work in Fire Chief,
+Warehouse Sort, Locker Room, Fire Cadet, Fire Fighter and Robot en fête 2027 as they are: there
+is nothing to make and nothing to hand out again. Cancelling a code cancels it in every game.
 
 An example of the third group is *hidden*, not locked. A visitor, and a member with an ordinary
 member code, do not see its card, its title, the "Advanced" heading or a count — nothing on
@@ -505,7 +519,7 @@ it is typed once per device, and the simulator checks it with the server again o
 
 The code is remembered once for all games. Somebody who typed a code in Fire Rescue — also
 long ago, before Fire Chief existed — finds the examples of Fire Chief, Warehouse Sort, Locker
-Room, Fire Cadet and Fire Fighter open in the same browser without typing anything, and the other way round. Other tabs of the same browser that
+Room, Fire Cadet, Fire Fighter and Robot en fête 2027 open in the same browser without typing anything, and the other way round. Other tabs of the same browser that
 have a simulator open follow at once: a code that is accepted in one tab opens the examples in
 the others too (each asks the server what the code opens in its own game). A tab that follows
 stands as it does after a fresh load with that code: what an earlier code had opened there is
@@ -536,7 +550,7 @@ this order, each with its own explanation:
 After any change: save, commit and push. The change is live once Vercel has redeployed.
 
 **Moving an example between the three groups.** Every example has an id; the ids of all
-six games are listed at the top of the file:
+seven games are listed at the top of the file:
 
 - Fire Rescue: `'hello'`, `'line-follow'`, `'gripper-demo'`, `'one-bucket'`, `'one-person'`,
   `'smart-bucket'`, `'full-mission'`
@@ -550,13 +564,17 @@ six games are listed at the top of the file:
   `'cadet-two-rescues'`, `'cadet-round-the-sign'`, `'cadet-all-four'`
 - Fire Fighter: `'fighter-first-grab'`, `'fighter-line-to-t'`, `'fighter-yellow-x'`,
   `'fighter-left-bay'`, `'fighter-right-bay'`, `'fighter-whole-mission'`
+- Robot en fête 2027: `'fete-leave-start'`, `'fete-white-line'`, `'fete-cube-colour'`,
+  `'fete-one-cube'`, `'fete-two-cubes'`, `'fete-all-cubes'`
 
-Lists 1 and 2 hold the ids of all six games together, one below the other. Every id of Fire
+Lists 1 and 2 hold the ids of all seven games together, one below the other. Every id of Fire
 Chief begins with `chief-`, every id of Warehouse Sort with `sort-`, every id of Locker Room
-with `locker-`, every id of Fire Cadet with `cadet-` and every id of Fire Fighter with
-`fighter-`, so they cannot be mixed up: `'full-mission'` is the full mission of Fire Rescue, `'chief-full-mission'` the one
+with `locker-`, every id of Fire Cadet with `cadet-`, every id of Fire Fighter with
+`fighter-` and every id of Robot en fête 2027 with `fete-`, so they cannot be mixed up: `'full-mission'` is the full mission of Fire Rescue, `'chief-full-mission'` the one
 of Fire Chief. A line decides about that one example, in its own game, and about nothing in
-another game.
+another game. Robot en fête 2027 shows the six programs of Warehouse Sort in French, but it is a
+game of its own: a line about `'sort-one-cube'` decides nothing for `'fete-one-cube'`. To open
+or to hide an example on both pages, write both ids.
 
 An example is in a group because of the list its id is on:
 
@@ -708,13 +726,13 @@ The honest limits:
 npm run test:sim
 ```
 
-It runs about eighteen hundred checks (1,781 in November 2026, with Fire Fighter); among them,
+It runs about nineteen hundred checks (1,917 at the end of November 2026, with Tri d’entrepôt); among them,
 every example program of every game is played on the real engine with the real referee and its
 score is compared, and every practice map of Fire Cadet is proved. They also check
 `content/simulator-codes.ts` (a misspelt example id, an example that is on both lists, a
 damaged line, a code that is on both lists of codes) and that nothing about an example —
 not even a title — can slip back into what every visitor's browser downloads. It takes
-around a minute and a half (78 to 107 s measured) and must end with `fail 0`. If it does not, do not deploy — a failing
+around two and a half minutes (136 to 146 s measured at the end of November 2026) and must end with `fail 0`. If it does not, do not deploy — a failing
 test means a program would now score differently, a block would behave differently, or an
 example would be shown to somebody who should not see it.
 
@@ -836,8 +854,9 @@ with "Powered by …", the header height.
 
 The simulators have a section of their own on the website: **Simulator** in the menu, between
 Training and Videos, leads to `/simulator`. It is one page (`src/app/simulator/page.tsx`, titled
-"Robot simulators") that lists the seven simulators of two robots — Locker Room and Warehouse Sort
-(Season 2026), Fire Cadet, Fire Fighter, Fire Rescue Junior, Fire Rescue Senior and Fire Chief (Season 2027); Fire Cadet is played with the
+"Robot simulators") that lists the eight simulators of two robots — Locker Room and Warehouse Sort
+(Season 2026), Fire Cadet, Fire Fighter, Fire Rescue Junior, Fire Rescue Senior and Fire Chief (Season 2027), and
+Tri d’entrepôt (Robot en fête 2027, no season); Fire Cadet is played with the
 mTiny, the others with the mBot2 — with one part per season — "Season 2026", then "Season 2027" —
 and in each part one card per simulator: the picture of its mat, its two labels (age group and season, or for a mission
 without an age group its category and level, and its event), its name and two sentences. The
@@ -863,7 +882,14 @@ its category page.) A simulator of a mission that
 is not a category of a season (Warehouse Sort, the beginner mission of a local event) is an
 entry of `missionSimulators` in the same file instead: its `season` (a year) says in which part
 it is shown, after the categories of that season; it has two labels of its own (`label`,
-`event`) and no "About" link. A season without a simulator gets no part. The Training page
+`event`) and no "About" link. A season without a simulator gets no part. A category that belongs
+to no season at all (Robot en fête 2027, whose simulator Tri d’entrepôt is the French version of
+Warehouse Sort) is an entry of `standaloneCategories` in `content/standalone.ts`: after the seasons
+it gets a part of its own, headed with its name and in its language (`lang="fr"`), with one card
+per item of its `simulators`, which takes all its words from that entry ("Ouvrir le simulateur
+Tri d’entrepôt", "À propos de Robot en fête 2027"), and whose "About" link leads to the category's
+own page, `/<slug>`. `content/seasons.ts` does not know it, so no
+season, count or list changes for it. The Training page
 keeps one card that leads to `/simulator` (`simulatorTrack()` in `trainingTracks`, same file),
 "Robot simulators": its badge and its sentence name the seasons and the simulators, worked out
 from `simulatorSeasons()` too, so a simulator added later is named there by itself. The page and
@@ -873,7 +899,8 @@ its own robot in its title row ("Fire Cadet simulator · mTiny", "Fire Rescue Se
 The **Simulator** item of the menu has a dropdown, built by `simulatorMenu()` in
 `content/site.ts` from the same `simulatorSeasons()`: "All simulators" (this page), then one
 line per simulator in the order of the page, as "<name> — Season <year>" ("Warehouse Sort —
-Season 2026"). A simulator added later gets its line by itself; on a phone the lines are listed
+Season 2026"), and after them one line per simulator of a category of its own, from `content/standalone.ts`
+("Tri d’entrepôt — Robot en fête 2027": the menu is English, and these two French names are proper names). A simulator added later gets its line by itself; on a phone the lines are listed
 under "Simulator" in the menu. Keep simulator names short: on a computer the dropdown is as
 wide as its longest line but at most 24rem (`max-w-sm` in `src/components/Header.tsx`), so that
 at 1024 px it still ends inside the window; a longer line breaks onto a second one. A category
@@ -1297,7 +1324,7 @@ Use only blocks of the Fire Chief palette — blocks that exist in real mBlock. 
 
 Described in full in "Member codes for the simulator examples" above. In short:
 
-- **One address, six games.** Every simulator asks `/api/simulator/unlock`, and each says which
+- **One address, seven games.** Every simulator asks `/api/simulator/unlock`, and each says which
   game it is (Fire Rescue Junior and Senior both say `'fire-rescue'`: they show the same
   examples). The answer holds the cards and the programs of that game only, and says the name
   of the game back. A page takes an answer only when it is about its own game: should a tab
@@ -1312,7 +1339,7 @@ Described in full in "Member codes for the simulator examples" above. In short:
   server back.
 - **One set of codes.** A member code opens the member examples of every game, an advanced
   code shows every example of every game. There is nothing to make or to hand out for Fire
-  Chief, Warehouse Sort, Locker Room, Fire Cadet or Fire Fighter.
+  Chief, Warehouse Sort, Locker Room, Fire Cadet, Fire Fighter or Robot en fête 2027.
 - **Typed once.** The browser keeps the code in one place for all games.
 - **The same three groups.** Fire Chief has three starter examples open to everyone, two for
   members and one that only an advanced code shows — and, without such a code, no card, no
@@ -1656,6 +1683,211 @@ rectangle (upper middle)" — and have no blue cube.)
   blue cube there: the two cubes swap their colours, and a short sentence says which cube
   changed. Red or green for the blue cube is refused (there must be one), as is a change that
   leaves no red or no green cube.
+
+---
+
+## The Tri d’entrepôt simulator (Robot en fête 2027)
+
+**Tri d’entrepôt** is the Warehouse Sort simulator **all in French**, the simulator of **Robot en
+fête 2027** — a category of its own, outside every season. The organiser asked for it ("ajoute une
+catégorie robot en fête qui sera la version française de warehouse sort") and decided: everything
+in French, the blocks included ("tout, blocs compris"); exactly the same mission ("oui, exactement
+la même"); no age group ("pas d'âge affiché"); a category on its own, "Robot en fête 2027", with its
+own card and page, in French ("une catégorie seule", "à part, sa propre fiche", "fiche en
+français"). Robot en fête 2027 names its French simulators by their mission: this one is « Tri
+d’entrepôt »; a second one, « Logistique intelligente » (MakeX Inspire Smart Logistics), is to
+come. It lives at:
+
+```
+https://www.makexlebanon.com/simulator/tri-entrepot
+https://www.makexlebanon.com/robot-en-fete           (the category's page: what it is, and a button to each of its simulators)
+```
+
+The game inside keeps the id `robot-en-fete` (the work a student saves in the browser,
+`mbot2-sim:robot-en-fete:*`, and the ids of the examples); its program files are named
+`tri-entrepot-program-<day>.json`, and an English page that opens one says "This program was saved
+in the Tri d’entrepôt simulator."
+
+**It is the same mission as Warehouse Sort**: the same mat, the same four cubes and 24
+arrangements, the same robot, points, clock and referee. A match gives the same points, the same
+times and the same lines of the score sheet as the same match in Warehouse Sort — only the words
+are French (`src/simulator/robot-en-fete/game.test.ts` plays every example on every arrangement in
+both and compares them). Everything on its page is French: the buttons, the messages, the Rules
+window, the score sheet, the console, "Tester sur plusieurs dispositions", the Cube colours panel
+("Couleurs des cubes"), the six examples, the blocks ("avancer de … cm", "la pince s’ouvre") and
+Blockly's own words ("Créer une variable", "Mes blocs"). The French speaks to the student with
+"tu", and writes French numbers: `18,9 cm`, `1:23,4`, `0,5×`.
+
+A few names are this game's own:
+
+| English (Warehouse Sort) | French (Tri d’entrepôt) |
+| --- | --- |
+| warehouses W1 – W4 ("the W1 cube") | entrepôts E1 – E4 ("le cube E1") |
+| codes with R, G, B: `GR-BR` | codes with R, V, B: `VR-BR` (a code with G is read too: `GR-BR` is the same arrangement) |
+| arrangement, bay, finish pad, restart | disposition, baie, aire d'arrivée, relance |
+| Starter, Intermediate, Advanced | Premiers pas, Intermédiaire, Avancé |
+
+**What stays English.** The website around it: the header, the menu (its line in the Simulator
+dropdown reads "Tri d’entrepôt — Robot en fête 2027": two French proper names in the English menu),
+the footer, the breadcrumbs of `/robot-en-fete` (Home / Simulator / Robot en fête 2027) and the
+share picture. And the **values a program gets**:
+the colour sensor gives `red`, `green`, `blue`, … `none`, a condition is `true` or `false`, the
+same on both pages, as we believe the robot gives them (not verified: question 1 below). The
+screen shows them as the program holds them — in the Variables panel, on the CyberPi screen, in
+a printed line ("Cube : red") — and where a sensor reading is shown, the Sensors panel adds the
+French in brackets: `red (rouge)`. The block menus show French and store the English value
+(`rouge` in the menu, `red` in the program).
+
+### Where it is on the website
+
+Its entry is **`content/standalone.ts`**, a list of the categories of their own: its name, its
+robot, the lead of its page, the words of its page, and its `simulators` — today one, Tri
+d’entrepôt, with its address, its sentences, the words of its card, its picture (the mat of
+Warehouse Sort) and its line in the menu. Every text is in French but the menu line, and every one
+is required, so nothing on a card or a page can fall back to English. A second simulator is one
+more item of `simulators`: its card, its part of the category's page, its line in the menu and the
+sitemap follow by themselves, with no change to any page. `content/seasons.ts`
+does not know it: no season page, no count of categories, the homepage, the Training card and
+the lists of Season 2026 and Season 2027 are exactly as they were. From that entry:
+
+- **The Simulator page** shows, after the two seasons, a part of its own headed "Robot en fête
+  2027", in French (`lang="fr"`), with one card per simulator, like the others: the mat, the
+  labels "En français" and "mBot2", "Simulateur Tri d’entrepôt", its sentences, "Ouvrir le
+  simulateur Tri d’entrepôt", and under it "À propos de Robot en fête 2027", the link to the
+  category's page. The page's English description says it in one more sentence: "And Robot en
+  fête 2027 (in French): Tri d’entrepôt, the French version of Warehouse Sort."
+- **Its page `/robot-en-fete`** (`src/app/robot-en-fete/page.tsx`): its name, its lead, the robot
+  ("mBot2", no age) and one part per simulator, "Essaie le simulateur Tri d’entrepôt" with the
+  button "Ouvrir le simulateur". The French texts say `lang="fr"`; the breadcrumbs are English. It
+  has no photos, no downloads and no other categories next to it: it belongs to no season.
+- **The menu**: "Tri d’entrepôt — Robot en fête 2027", after the lines of the seasons
+  (`simulatorMenu()` in `content/site.ts`).
+- **The sitemap** has the category's page and the simulator's page.
+
+The simulator's page itself, `src/app/simulator/tri-entrepot/page.tsx`, has a French title
+("Simulateur mBot2 — Tri d’entrepôt (Robot en fête 2027)") and description; its title row reads
+"Simulateur Tri d’entrepôt · mBot2". The page of the website stays
+`<html lang="en">`; the simulator's screen and its loading screen say `lang="fr"`. There is no
+`hreflang` link between it and Warehouse Sort's page (it would change the English page too).
+
+### How the French is put together
+
+| What | Where |
+| --- | --- |
+| The screen in French | `src/simulator/ui/robot-en-fete/RobotEnFeteSimulator.tsx`: the general screen given the French word table, `text={FR_TEXT}`, filled in as Warehouse Sort's (`WarehouseSortSimulator.tsx`) with the French game and its French words, rules, panel words, code reader and test lists (the other files of `src/simulator/ui/robot-en-fete/`; its name in `title.ts`). `RobotEnFeteLoader.tsx`: the loading screen, French already, with only the French words of the title row (`text/fr-title.tsx`) |
+| The words of the screen | One word table per language: `src/simulator/ui/text/en.tsx` (English) and `fr.tsx` with its parts `fr-common`, `fr-screen`, `fr-title`, `fr-match`, `fr-panels`, `fr-console`, `fr-stage`, `fr-gripper` (French). `text={FR_TEXT}` sets the French table above the whole screen; a page that sets none — every English page — reads the English one, by the very same code as before |
+| The game in French | `src/simulator/robot-en-fete/game.ts`: Warehouse Sort's game, made by the same function (`createWarehouseSortGame` in `src/simulator/warehouse-sort/game.ts`) with the French words of the referee (`referee-words.ts`) and the French names and codes (`scenario-words.ts`). Its id `robot-en-fete` names the work a student saves here and the examples; its program files are named after its simulator, `tri-entrepot-program-<day>.json` |
+| The blocks in French | `src/simulator/blocks/fr.ts`: every block, menu and hover text of the palette, and our French for Blockly's own words (Blockly's French file comes with the `blockly` package). The blocks are the same blocks with the same stored values: a program file saved on one page opens on the other. The code of the blocks reads these words through `blocks/french.ts`, only on its French paths, and `fr.ts` hands them in when it is loaded — by the French table of the screen, so only the French page downloads them |
+| The examples in French | `src/simulator/robot-en-fete/sample-catalog.ts` (titles, headings) and `samples.ts` (descriptions, notes, names, printed texts). They stay on the server, like every game's |
+
+**A number typed into a block.** The French screen writes a decimal comma; in the French blocks a
+number bubble takes a comma as the decimal point too: typing `18,9` gives 18.9. The bubble then
+shows the number as Blockly does, with a point (`18.9`), as mBlock does. The white bubbles of
+"mettre … à" and of `<`, `>` and `=` are bubbles of text, as in mBlock: there `30,5` stays a text,
+which the program — as the robot — counts as no number. When Start is pressed, the console says
+so for each such text (« 30,5 » est un texte dans cette bulle, pas un nombre … : écris 30.5, avec un
+point); `src/simulator/ui/comma-texts.ts` finds them. The English screen says nothing.
+
+**Blockly's own words.** Blockly writes some words itself, outside our tables. The French page
+gives the shortcuts in its menus, toasts and screen-reader hints the French names of the keys
+("Annuler   Ctrl + Z", "Alt + Maj + A"), puts `lang="fr"` on Blockly's question windows ("Nom de
+la nouvelle variable"), and reads "menu : rouge", "Modifier nombre : 100" with a no-break space
+(`src/simulator/blocks/locale.ts`, `register.ts`, `ui/BlocklyEditor.tsx`). The hover texts of the
+French blocks reach Blockly already cut into lines (`frenchTooltipLines` in `register.ts`): Blockly
+cuts a long one at every space, the no-break space too, so a `»` or a `:` could start a line. A
+block moved with the keyboard is read "Déplacer la pince… après …", then "Déplacer après …":
+Blockly names the block only in the first sentence of a move. What Blockly writes in
+its own code stays as it is: the ", " between the parts of a block it reads out, and its
+"%1 piles de blocs" (one form).
+
+### The examples
+
+The six examples of Warehouse Sort, in French: the same blocks, numbers and order, only their
+texts are French. They score exactly what Warehouse Sort's do, on all 24 arrangements (measured by
+`src/simulator/robot-en-fete/samples.test.ts`, tick by tick beside the English twin):
+
+| Id | Level | Title | Points | Ends at |
+| --- | --- | --- | --- | --- |
+| `fete-leave-start` | starter | Sortir de la zone de départ et s’arrêter | 10 on all 24 | 1.85 s |
+| `fete-white-line` | starter | Suivre la ligne blanche jusqu’au T | 10 on all 24 | 3.17 s |
+| `fete-cube-colour` | starter | Lire la couleur d’un cube | 10 on all 24 | 3.27 s |
+| `fete-one-cube` | intermediate | Mettre un cube dans sa baie | 30 on all 24 | 11.19 – 16.71 s |
+| `fete-two-cubes` | intermediate | Deux cubes, puis se garer | 60 on all 24 | 32.43 – 37.95 s |
+| `fete-all-cubes` | advanced | Trier les cubes et se garer | 80 on all 24 | 53.51 – 60.84 s |
+
+The same member and advanced codes open them, by the same rule: three open to everyone, two for
+members, one for advanced codes only. But they are examples of their own, with ids that begin with
+`fete-`: in `content/simulator-codes.ts` a line about `'sort-one-cube'` decides nothing for
+`'fete-one-cube'`. To open or to hide an example on both pages, write both ids (see "Member codes
+for the simulator examples" above). An example changed in Warehouse Sort is not changed here by
+itself: change its French twin in `samples.ts` too (`samples.test.ts` fails until both are the
+same program).
+
+### What to change, and where
+
+| To change … | Edit … |
+| --- | --- |
+| a word of the screen (a button, a window, a message, the console) | `src/simulator/ui/text/fr-*.tsx` (the English of the same word is in `en.tsx`) |
+| a word of the blocks, of their menus and hover texts, or of Blockly's own menus | `src/simulator/blocks/fr.ts` |
+| a line of the score sheet or of the console about the referee | `src/simulator/robot-en-fete/referee-words.ts` |
+| the names of the warehouses, colours and places, or the letters of the codes | `src/simulator/robot-en-fete/scenario-words.ts` |
+| the Rules window | `src/simulator/ui/robot-en-fete/rules.ts` (`rules.test.ts` checks every number against the game and the English window) |
+| the other words of this game (score sheet notes, hints), the Cube colours panel, the test lists, the messages about a typed code | `words.ts`, `arrangement-words.ts`, `arrangement-batch.ts`, `arrangement-code.ts` in `src/simulator/ui/robot-en-fete/` |
+| an example | `src/simulator/robot-en-fete/samples.ts` and `sample-catalog.ts`; its group in `content/simulator-codes.ts` and the same lines in `scripts/generate-simulator-codes.mjs` |
+| its card, its category's page, its menu line, a second simulator | `content/standalone.ts` |
+| the title and description of the simulator's page | `src/app/simulator/tri-entrepot/page.tsx`; its name in the title row: `src/simulator/ui/robot-en-fete/title.ts` |
+| a rule of the mission | in Warehouse Sort first (`src/simulator/warehouse-sort/game.ts`), then the sentences of both Rules windows: the two games share the referee |
+
+Keep the French as it is written now: "tu" for the student, the infinitive on a button
+("Démarrer", "Replacer"), a no-break space before `:` `;` `!` `?` and inside « », `’` as
+the apostrophe, a decimal comma. The tests check each of these (`src/simulator/ui/text/text.test.ts`,
+`src/simulator/blocks/fr.test.ts` and the tests next to each French file), that every text of the
+shared screen goes through the word table (`src/simulator/ui/text/inventory.test.ts`), and that the
+English pages did not change.
+
+### Questions for the organiser
+
+1. **Colour names on the robot.** On your mBot2 with mBlock 5 in French, does the colour block
+   give `red` or `rouge` for a red cube? The simulator keeps `red` and shows `red (rouge)` on the
+   Sensors panel. If it is `rouge`, the values of the program change: a change of its own.
+2. **The block words.** Could somebody with mBlock 5 in French compare our block texts with
+   mBlock's (`src/simulator/blocks/fr.ts`; mainly CyberPi, Châssis mBot2, capteur quad RGB,
+   servos)? In particular: is the start block **"lorsque CyberPi démarre"** (our choice, from
+   French mBot sheets) or "quand CyberPi démarre"? And "lorsque le bouton A est pressé", "bouton A
+   pressé ?"?
+3. **What stays English.** The site's menu, header, footer and breadcrumbs stay English; the menu
+   line reads "Tri d’entrepôt — Robot en fête 2027". Warehouses E1 – E4 and codes with V for
+   "vert": fine?
+4. **Its page and its place.** Its own page at `/robot-en-fete`; on the Simulator page a part of
+   its own after the seasons, headed "Robot en fête 2027"; not on the Training page's card. Is
+   that what you want?
+5. **Numbers.** The French screen writes `18,9 cm`; the number bubbles accept `18,9` and show
+   `18.9`, as mBlock does. Fine?
+
+### Known limits of Tri d’entrepôt
+
+- **Everything of Warehouse Sort** ("Known limits of Warehouse Sort" above): it is the same game.
+- **Our own French.** The words of the blocks, the screen and the examples are our own
+  translation, written for children of 8 to 12 and their teachers; they have not been compared
+  with mBlock 5 in French (question 2).
+- **The number bubbles show a point** (`18.9`) while the sentences around them write a comma
+  (question 5).
+- **Blockly says "%1 piles de blocs"** for any number of stacks but one, also for none (one form
+  in its own French file).
+- **The values of a program are English** (`red`, `true`): question 1.
+- **A text bubble keeps a comma** (`30,5` is no number there, as on the robot): the console says
+  so at Start.
+- **One French text is read with the site's English voice**: the website's own announcement of the
+  page's title after a link inside the site (Next's route announcer, in `<body>`, which stays
+  `lang="en"` with the whole site: design D8).
+- **On a phone** the strip above the blocks takes two rows (English: one) and "Son activé" two
+  lines: no shorter French says the same.
+- **In a window narrower than 404 px** (phones of 390 and 360 px) the box of the clock and the
+  score stands under Démarrer, Stop and Pause, on a second line (English: on a 360 px phone too).
+  It has room for a score of two digits from the start, so it never moves during a match
+  (`src/simulator/ui/simulator.css`).
+- **Blockly's own punctuation**: the ", " between the parts of a block that a screen reader hears
+  is written by Blockly's code.
 
 ---
 
@@ -3220,6 +3452,7 @@ These are marked with `TODO` or `NOTE` comments in `content/seasons.ts`:
 content/            All editable text and data
   site.ts           Contact details, nav, org info
   seasons.ts        Seasons, categories, downloads, events, training
+  standalone.ts     Categories of their own, outside the seasons (Robot en fête 2027, in French)
   simulator-codes.ts  Member codes for the simulator examples (fingerprints only)
 public/
   gallery/          Competition photos, by year and category
@@ -3232,5 +3465,5 @@ src/
   app/              Pages and routing
   components/       Header, Footer, Gallery, shared UI
   lib/gallery.ts    Reads the photo folders
-  simulator/        The simulators: Fire Rescue Junior and Senior, Fire Chief, Warehouse Sort, Locker Room, Fire Fighter (mBot2) and Fire Cadet (mTiny) (see their sections above)
+  simulator/        The simulators: Fire Rescue Junior and Senior, Fire Chief, Warehouse Sort, Robot en fête 2027 (Warehouse Sort in French), Locker Room, Fire Fighter (mBot2) and Fire Cadet (mTiny) (see their sections above)
 ```

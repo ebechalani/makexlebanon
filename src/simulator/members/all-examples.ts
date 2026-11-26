@@ -4,9 +4,9 @@
  * levels. This is what the server hands out from (see ./unlock.ts).
  *
  * Server only. This file brings the samples.ts and the sample-catalog.ts of every game along
- * (../fire-rescue, ../fire-chief, ../warehouse-sort, ../locker-room, ../fire-cadet and
- * ../fire-fighter), so nothing of the simulator screen may import it (a test,
- * ./client-guard.test.ts, watches over this).
+ * (../fire-rescue, ../fire-chief, ../warehouse-sort, ../locker-room, ../fire-cadet,
+ * ../fire-fighter and ../robot-en-fete), so nothing of the simulator screen may import it (a
+ * test, ./client-guard.test.ts, watches over this).
  *
  * A game is named here the way its page names it when it asks the server ("game" in the
  * request), which is also the id of the game in its game.ts.
@@ -26,6 +26,8 @@ import { EXAMPLE_LEVELS as FIRE_RESCUE_LEVELS, SAMPLE_CATALOG as FIRE_RESCUE_CAT
 import { getSampleProgram as fireRescueProgram } from '../fire-rescue/samples';
 import { EXAMPLE_LEVELS as LOCKER_ROOM_LEVELS, SAMPLE_CATALOG as LOCKER_ROOM_CATALOG } from '../locker-room/sample-catalog';
 import { getSampleProgram as lockerRoomProgram } from '../locker-room/samples';
+import { EXAMPLE_LEVELS as ROBOT_EN_FETE_LEVELS, SAMPLE_CATALOG as ROBOT_EN_FETE_CATALOG } from '../robot-en-fete/sample-catalog';
+import { getSampleProgram as robotEnFeteProgram } from '../robot-en-fete/samples';
 import { EXAMPLE_LEVELS as WAREHOUSE_SORT_LEVELS, SAMPLE_CATALOG as WAREHOUSE_SORT_CATALOG } from '../warehouse-sort/sample-catalog';
 import { getSampleProgram as warehouseSortProgram } from '../warehouse-sort/samples';
 
@@ -100,5 +102,18 @@ export const FIRE_FIGHTER = {
   levels: FIRE_FIGHTER_LEVELS,
 };
 
+/**
+ * Robot en fête 2027 (MakeX Lebanon, a category of its own, outside every season: the Warehouse
+ * Sort mission in French): its six examples - those of Warehouse Sort, the same programs with
+ * French texts - ordered like the list in ../robot-en-fete/sample-catalog.ts, under French
+ * headings of its own. Every id starts with "fete-", so that the owner's lists name them apart
+ * from the "sort-" examples of Warehouse Sort; the same codes open them.
+ */
+export const ROBOT_EN_FETE = {
+  game: 'robot-en-fete',
+  examples: inCatalogOrder('Robot en fête 2027', ROBOT_EN_FETE_CATALOG, robotEnFeteProgram),
+  levels: ROBOT_EN_FETE_LEVELS,
+};
+
 /** Every game that has examples. A request to the server names one of them (or none, which means Fire Rescue). */
-export const ALL_GAMES = [FIRE_RESCUE, FIRE_CHIEF, WAREHOUSE_SORT, LOCKER_ROOM, FIRE_CADET, FIRE_FIGHTER];
+export const ALL_GAMES = [FIRE_RESCUE, FIRE_CHIEF, WAREHOUSE_SORT, LOCKER_ROOM, FIRE_CADET, FIRE_FIGHTER, ROBOT_EN_FETE];

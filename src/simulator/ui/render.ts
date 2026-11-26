@@ -31,7 +31,8 @@ import {
 } from '../core/types';
 import { inkOn, parseHex, rgbCss, shade } from './format';
 import { SENSOR_COLOR_CSS } from './robot-parts';
-import { rulerLabels, type Ruler, type RulerLabel } from './ruler';
+import type { Ruler, RulerLabel } from './ruler';
+import type { StageText } from './text/types';
 import type { Trail } from './trail';
 
 // =============================================================================================
@@ -1316,14 +1317,14 @@ const RULER_HEADING_LENGTH = 190;
  * every new size) and the letters have the same width (they change once, when the website's
  * font has loaded).
  */
-let lastRulerLabels: { ruler: Ruler; view: StageView; letter: number; labels: RulerLabel[] } | null = null;
+let lastRulerLabels: { ruler: Ruler; view: StageView; letter: number; text: StageWords; labels: RulerLabel[] } | null = null;
 
 /**
  * The ruler lies on top of everything else: its line, a dot on every point, and the numbers
  * (where each number goes is decided in ruler.ts). Line widths, dots and letters have a fixed
  * size on the SCREEN, whatever the size of the mat - hence all the "/ view.scale".
  */
-function drawRuler(ctx: CanvasRenderingContext2D, ruler: Ruler, view: StageView): void {
+function drawRuler(ctx: CanvasRenderingContext2D, ruler: Ruler, view: StageView, text: StageWords): void {
   const { points } = ruler;
   if (points.length === 0) return;
   const px = 1 / view.scale;
@@ -1386,15 +1387,15 @@ function drawRuler(ctx: CanvasRenderingContext2D, ruler: Ruler, view: StageView)
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   const letter = ctx.measureText('0').width;
-  if (!lastRulerLabels || lastRulerLabels.ruler !== ruler || lastRulerLabels.view !== view || lastRulerLabels.letter !== letter) {
+  if (!lastRulerLabels || lastRulerLabels.ruler !== ruler || lastRulerLabels.view !== view || lastRulerLabels.letter !== letter || lastRulerLabels.text !== text) {
     const corner = viewToMat(view, 0, 0);
-    const labels = rulerLabels(ruler, {
+    const labels = text.rulerLabels(ruler, {
       textWidth: (text) => ctx.measureText(text).width,
       fontSize,
       clearance: 9 * px,
       bounds: { x: corner.x + 2 * px, y: corner.y + 2 * px, w: view.cssWidth * px - 4 * px, h: view.cssHeight * px - 4 * px },
     });
-    lastRulerLabels = { ruler, view, letter, labels };
+    lastRulerLabels = { ruler, view, letter, text, labels };
   }
   for (const label of lastRulerLabels.labels) {
     roundRect(ctx, label.x - label.w / 2, label.y - label.h / 2, label.w, label.h, 4 * px);
@@ -1440,7 +1441,8 @@ export interface StagePainters {
   robot?(ctx: CanvasRenderingContext2D, sim: StageSim, view: StageView): void;
 }
 
-export interface StageScene {
+/** What every picture of the stage is drawn from (StageScene adds the ruler). */
+interface StageSceneParts {
   sim: StageSim;
   view: StageView;
   options: StageOptions;
@@ -1451,11 +1453,20 @@ export interface StageScene {
   placing: boolean;
   /** where the student is trying to put the robot although it does not fit there */
   ghost: Pose | null;
-  /** the measuring line, while the ruler is on (null = no ruler) */
-  ruler: Ruler | null;
   /** the game's own drawings (left out: everything is drawn as for the mBot2 games) */
   painters?: StagePainters;
 }
+
+/**
+ * A picture of the stage: its parts, and the measuring line while the ruler is on (null = no
+ * ruler). The numbers of the ruler are written in the words of the screen - the screen's word
+ * table (./text/types.ts), which StageCanvas.tsx passes - so a scene with a ruler must say them:
+ * there is no English default (a French screen would write "32.5 cm" without a word of warning).
+ */
+export type StageScene = (StageSceneParts & { ruler: null; text?: StageWords }) | (StageSceneParts & { ruler: Ruler; text: StageWords });
+
+/** What the stage writes on the mat in the words of the screen. */
+type StageWords = Pick<StageText, 'rulerLabels'>;
 
 /** The table the mat lies on: the website's ink-600 (the frame of the stage in StageCanvas.tsx has the same colour). */
 export const TABLE_COLOR = '#2c3a5c';
@@ -1527,5 +1538,5 @@ export function drawStage(ctx: CanvasRenderingContext2D, scene: StageScene): voi
   if (sensors) drawProbes(ctx, sim, sensors);
   if (sensors && beam) drawUltrasonicLabel(ctx, sim, sensors, beam, view);
   if (scene.ghost) drawGhost(ctx, sim.robotConfig, scene.ghost, view);
-  if (scene.ruler) drawRuler(ctx, scene.ruler, view);
+  if (scene.ruler !== null) drawRuler(ctx, scene.ruler, view, scene.text);
 }

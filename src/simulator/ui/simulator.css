@@ -90,6 +90,52 @@
 }
 
 /*
+ * The French page (Tri d’entrepôt, the only one with lang="fr"): its four buttons under the mat -
+ * "Zones · Capteurs · Trajet · Règle" - are 15px wider than the English ones. In the narrowest row
+ * that still shows their icons (21rem, a 360px phone, up to about 372px) they would stand 13px
+ * past the column and push the page sideways; there they get a little less padding (7px instead
+ * of 10px on each side) and keep to the column. (The container is the row's own: the "@container"
+ * around it in SimulatorApp.tsx. The English page has no lang="fr": nothing changes for it.)
+ */
+@container (max-width: 21.875rem) {
+  [lang='fr'] .mbot2-stage-column [role='group']:first-child > button[aria-pressed] {
+    padding-inline: 0.4375rem;
+  }
+}
+
+/*
+ * The French page again: the row of the referee over the mat - Démarrer, Stop, Pause and the box
+ * of the clock and the score (ControlBar.tsx). "Démarrer" is 35px wider than "Start", and the row
+ * was so full that the box dropped to a second line - and the mat 54px down - the moment the score
+ * reached 10, in the middle of a match. Two things keep the row the same from the first second
+ * of a match to its end:
+ *  - the score always has room for two digits ("5" stands where the "5" of "15" would): 80 is the
+ *    most a match gives and the score is never below 0, so the box is as wide at 0 as at 80, and
+ *    if the row ever needs two lines (a narrow phone), it has them from the start;
+ *  - Démarrer and Stop have a little less padding (12px instead of 20px on each side on a wide
+ *    row, 7px instead of 10px on a narrow one), so that the row keeps to one line where it did
+ *    with a one-digit score: from a 404px window up, and at every computer size.
+ * (The container is the bar's own: the "@container" of ControlBar.tsx; 34rem is its "@[34rem]:".
+ * The English page has no lang="fr": nothing changes for it.)
+ */
+[lang='fr'] .mbot2-stage-column [role='timer'] + div > span:last-child > span:first-child {
+  min-width: 2ch;
+  text-align: right;
+}
+
+@container (width < 34rem) {
+  [lang='fr'] .mbot2-stage-column div:has(> div > [role='timer']) > button:nth-child(-n + 2) {
+    padding-inline: 0.4375rem;
+  }
+}
+
+@container (width >= 34rem) {
+  [lang='fr'] .mbot2-stage-column div:has(> div > [role='timer']) > button:nth-child(-n + 2) {
+    padding-inline: 0.75rem;
+  }
+}
+
+/*
  * ---------------------------------------------------------------------------------------------
  * The enlarged stage (the "Enlarge" button of the stage)
  * ---------------------------------------------------------------------------------------------

@@ -1,6 +1,7 @@
 import type { MetadataRoute } from 'next';
 import { seasons } from '@content/seasons';
 import { site } from '@content/site';
+import { standaloneCategories } from '@content/standalone';
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const staticPaths = [
@@ -34,11 +35,17 @@ export default function sitemap(): MetadataRoute.Sitemap {
     })),
   ]);
 
+  // The categories of their own (content/standalone.ts), outside every season: their page and their simulators.
+  const standalonePaths = standaloneCategories.flatMap((category) => [
+    { path: `/${category.slug}`, priority: 0.6 },
+    ...category.simulators.map((simulator) => ({ path: simulator.href, priority: 0.7 })),
+  ]);
+
   // De-duplicate: /season/2026 appears in both lists.
   const seen = new Set<string>();
   const lastModified = new Date();
 
-  return [...staticPaths, ...seasonPaths]
+  return [...staticPaths, ...seasonPaths, ...standalonePaths]
     .filter((entry) => {
       if (seen.has(entry.path)) return false;
       seen.add(entry.path);

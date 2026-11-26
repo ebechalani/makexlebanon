@@ -33,6 +33,7 @@ import { SAMPLE_CATALOG as FIRE_CADET_CATALOG, EXAMPLE_LEVELS as FIRE_CADET_LEVE
 import { SAMPLE_CATALOG as FIRE_CHIEF_CATALOG, EXAMPLE_LEVELS as FIRE_CHIEF_LEVELS } from '../fire-chief/sample-catalog';
 import { SAMPLE_CATALOG as FIRE_RESCUE_CATALOG, EXAMPLE_LEVELS as FIRE_RESCUE_LEVELS } from '../fire-rescue/sample-catalog';
 import { SAMPLE_CATALOG as LOCKER_ROOM_CATALOG, EXAMPLE_LEVELS as LOCKER_ROOM_LEVELS } from '../locker-room/sample-catalog';
+import { EXAMPLE_LEVELS as ROBOT_EN_FETE_LEVELS, SAMPLE_CATALOG as ROBOT_EN_FETE_CATALOG } from '../robot-en-fete/sample-catalog';
 import { poseFits } from '../ui/start-pose';
 import { supportsBlock } from '../vm';
 import { gripper, moveCm, program as buildProgram, script, turn, whenStart, type BlockNode } from '../vm/builder';
@@ -376,6 +377,12 @@ describe('the list of the examples', () => {
     const otherAbouts = new Set([...FIRE_RESCUE_LEVELS, ...FIRE_CHIEF_LEVELS, ...WAREHOUSE_SORT_LEVELS, ...LOCKER_ROOM_LEVELS, ...FIRE_CADET_LEVELS].map((level) => level.about));
     assert.equal(otherAbouts.size, 15);
     for (const level of EXAMPLE_LEVELS) assert.ok(!otherAbouts.has(level.about), level.about);
+    // ... nor by an example of Robot en fête 2027, which came later (its own test checks it against every game)
+    for (const card of ROBOT_EN_FETE_CATALOG) {
+      assert.ok(!ids.has(card.id) && !titles.has(card.title.toLowerCase()), card.id);
+      assert.ok(!card.id.startsWith('fighter-'), card.id);
+    }
+    for (const level of EXAMPLE_LEVELS) assert.ok(!ROBOT_EN_FETE_LEVELS.some((other) => other.about === level.about), level.about);
     // a student of 8 to 10 reads the titles: short, no apostrophe - and none says "straight": the straight way from the
     // yellow square leads into the back of tower X, where a cube does not count
     for (const card of SAMPLE_CATALOG) {

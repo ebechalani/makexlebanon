@@ -20,6 +20,11 @@
  *
  * It opens from the button at the top of the Gripper palette, and from the entry "See the real
  * mBlock code" in the right-click menu of a Gripper block - then at that block.
+ *
+ * It speaks the language of the screen (./text, `useScreenText()`): its words, the pictures (their
+ * workspaces are marked with that language before a block is drawn, so the blocks show the same
+ * rows as the palette) and the names of the My Blocks its buttons add. Blockly's own words
+ * ("define") are the editor's: this window never writes them (../blocks/locale.ts).
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -34,9 +39,10 @@ import {
   type BlocklyApi,
   type GripperVariantId,
 } from '../blocks';
+import { setWorkspaceLocale, type BlockLocale } from '../blocks/locale';
 import type { ProgramJson, RobotConfig } from '../core/types';
 import type { BlocklyEditorHandle } from './BlocklyEditor';
-import { addedMessage, convertedMessage, GRIPPER_CODE_WORDS as WORDS, gripperCodeIntro } from './gripper-code-words';
+import { useScreenText } from './text/context';
 import { button, Modal } from './widgets';
 
 export interface GripperCodeDialogProps {
@@ -65,10 +71,12 @@ interface BlockPictureProps {
   /** the blocks in words, for screen readers */
   description: string;
   mediaPath: string;
+  /** the language of the blocks (the language of the screen) */
+  locale: BlockLocale;
 }
 
 /** Real Blockly blocks as a picture: read-only, exactly as large as the blocks, never wider than its place. */
-function BlockPicture({ Blockly, program, description, mediaPath }: BlockPictureProps) {
+function BlockPicture({ Blockly, program, description, mediaPath, locale }: BlockPictureProps) {
   /** as wide as the place the picture has */
   const frameRef = useRef<HTMLDivElement>(null);
   /** what Blockly draws into: as large as the blocks */
@@ -94,6 +102,8 @@ function BlockPicture({ Blockly, program, description, mediaPath }: BlockPicture
       move: { scrollbars: false, drag: false, wheel: false },
       zoom: { controls: false, wheel: false, pinch: false, startScale: PICTURE_SCALE, minScale: PICTURE_MIN_SCALE, maxScale: 1 },
     });
+    // (before the blocks are loaded: they are drawn in the language of the screen, as in the palette)
+    setWorkspaceLocale(workspace, locale);
     if (inUse && inUse !== workspace) Blockly.common.setMainWorkspace(inUse);
     let width = 0;
     let height = 0;
@@ -129,7 +139,7 @@ function BlockPicture({ Blockly, program, description, mediaPath }: BlockPicture
       observer.disconnect();
       workspace.dispose();
     };
-  }, [Blockly, program, mediaPath]);
+  }, [Blockly, program, mediaPath, locale]);
 
   return (
     <div ref={frameRef} role="img" aria-label={description} className="mbot2-block-picture min-w-0 overflow-hidden">
@@ -140,6 +150,11 @@ function BlockPicture({ Blockly, program, description, mediaPath }: BlockPicture
 }
 
 export function GripperCodeDialog({ robotConfig, at, getEditor, mediaPath, onConverted, onClose }: GripperCodeDialogProps) {
+  // ---- the words of the window, and the language of its blocks and of the My Blocks it adds
+  const text = useScreenText();
+  const WORDS = text.gripper;
+  const locale = text.locale;
+
   // ---- Blockly draws the pictures. The editor has loaded it already, so this is there at once.
   const [Blockly, setBlockly] = useState<BlocklyApi | null>(null);
   const [drawingFailed, setDrawingFailed] = useState(false);
@@ -161,12 +176,12 @@ export function GripperCodeDialog({ robotConfig, at, getEditor, mediaPath, onCon
 
   const pairs = useMemo(
     () =>
-      gripperOriginals(robotConfig).map((original) => ({
+      gripperOriginals(robotConfig, locale).map((original) => ({
         original,
         block: gripperBlockProgram(original.variant.id),
-        code: gripperDefinitionProgram(robotConfig, original.variant.id),
+        code: gripperDefinitionProgram(robotConfig, original.variant.id, locale),
       })),
-    [robotConfig],
+    [robotConfig, locale],
   );
 
   // ---- opened at one Gripper block: bring its pair into view (once the pictures have their size)
@@ -203,7 +218,7 @@ export function GripperCodeDialog({ robotConfig, at, getEditor, mediaPath, onCon
       return;
     }
     const current = editor.getProgram();
-    const change = changeProgram(current, robotConfig);
+    const change = changeProgram(current, robotConfig, locale);
     // (nothing to change: the workspace is left alone, so that Undo has nothing new to undo)
     if (change.program !== current) {
       if (!editor.loadProgram(change.program)) {
@@ -218,7 +233,7 @@ export function GripperCodeDialog({ robotConfig, at, getEditor, mediaPath, onCon
   return (
     <Modal title={WORDS.title} onClose={onClose} widthClass="max-w-3xl">
       <div className="space-y-1.5 text-sm leading-relaxed text-ink-700" data-gripper-code-intro>
-        {gripperCodeIntro(robotConfig).map((sentence) => (
+        {WORDS.intro(robotConfig).map((sentence) => (
           <p key={sentence}>{sentence}</p>
         ))}
       </div>
@@ -256,11 +271,11 @@ export function GripperCodeDialog({ robotConfig, at, getEditor, mediaPath, onCon
                 >
                   <div className="min-w-0" data-gripper-side="block">
                     <p className="mb-1 text-xs font-bold uppercase tracking-wide text-ink-500 sm:hidden">{WORDS.blockCaption}</p>
-                    <BlockPicture Blockly={Blockly} program={block} description={`Gripper block: ${original.variant.label}`} mediaPath={mediaPath} />
+                    <BlockPicture Blockly={Blockly} program={block} description={WORDS.blockPicture(original.variant.label)} mediaPath={mediaPath} locale={locale} />
                   </div>
                   <div className="min-w-0" data-gripper-side="code">
                     <p className="mb-1 text-xs font-bold uppercase tracking-wide text-ink-500 sm:hidden">{WORDS.codeCaption}</p>
-                    <BlockPicture Blockly={Blockly} program={code} description={`My Block: ${original.lines.join(', ')}`} mediaPath={mediaPath} />
+                    <BlockPicture Blockly={Blockly} program={code} description={WORDS.codePicture(original.lines)} mediaPath={mediaPath} locale={locale} />
                   </div>
                 </li>
               );
@@ -282,10 +297,10 @@ export function GripperCodeDialog({ robotConfig, at, getEditor, mediaPath, onCon
           {message?.text}
         </p>
         <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-          <button type="button" className={button.accent} title={WORDS.addHint} onClick={() => apply(addGripperMyBlocks, addedMessage)}>
+          <button type="button" className={button.accent} title={WORDS.addHint} onClick={() => apply(addGripperMyBlocks, WORDS.addedMessage)}>
             {WORDS.addButton}
           </button>
-          <button type="button" className={button.accent} title={WORDS.convertHint} onClick={() => apply(convertGripperBlocks, convertedMessage, onConverted)}>
+          <button type="button" className={button.accent} title={WORDS.convertHint} onClick={() => apply(convertGripperBlocks, WORDS.convertedMessage, onConverted)}>
             {WORDS.convertButton}
           </button>
         </div>

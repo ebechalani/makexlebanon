@@ -10,10 +10,9 @@
  * restartButton() in ./match-words.ts.
  */
 import type { RestartRules, ScoreReport } from '../core/types';
-import { formatClock } from './format';
 import { FinishIcon, FlagIcon, PauseIcon, PlayIcon, ResetIcon, RestartIcon, StopIcon } from './icons';
-import { restartButton } from './match-words';
-import { capital, DEFAULT_WORDS, type ScreenWords } from './screen-words';
+import { DEFAULT_WORDS, type ScreenWords } from './screen-words';
+import { useScreenText } from './text/context';
 import { SPEEDS, type RunState, type Speed } from './useSimulation';
 import { button } from './widgets';
 
@@ -77,19 +76,16 @@ const SMALL_ICON = `hidden h-4 w-4 @[34rem]:block`;
  */
 const SMALL_ICON_LATER = `hidden h-4 w-4 @[36rem]:block`;
 
-function speedLabel(speed: Speed): string {
-  return speed === 'max' ? 'Max' : `${speed}×`;
-}
-
 export function ControlBar(props: ControlBarProps) {
   const { runState, timeLeft, score, speed } = props;
+  const text = useScreenText();
   const active = runState === 'running' || runState === 'paused';
   /** the match was stopped or is over: the field shows the end of that run until it is reset */
   const over = runState === 'stopped' || runState === 'finished';
   const lowTime = active && timeLeft <= 30;
   const words = props.words ?? DEFAULT_WORDS;
   const { match } = words;
-  const restart = restartButton({ penalty: props.restartPenalty, rules: props.restartRules }, props.restartsLeft ?? Infinity, match);
+  const restart = text.restartButton({ penalty: props.restartPenalty, rules: props.restartRules }, props.restartsLeft ?? Infinity, match);
   const smallIcon = restart.tone === 'cost' ? SMALL_ICON : SMALL_ICON_LATER;
 
   // In a game that allows only so many restarts, the last one switches the "Restart" button off
@@ -105,12 +101,12 @@ export function ControlBar(props: ControlBarProps) {
   const speedPicker = (
     <div className="flex items-center gap-2">
       <span className="hidden text-xs font-semibold uppercase tracking-wide text-ink-500 @[42rem]:inline" aria-hidden="true">
-        Speed
+        {text.speedWord}
       </span>
       <div
         role="radiogroup"
-        aria-label="Speed of the simulation"
-        title={`Speed of the simulation (the ${match} clock runs at the same speed)`}
+        aria-label={text.speedGroup}
+        title={text.speedHint(match)}
         className="flex rounded-lg border border-slate-300"
       >
         {SPEEDS.map((option) => {
@@ -128,7 +124,7 @@ export function ControlBar(props: ControlBarProps) {
                 (selected ? 'bg-brand-600 text-white' : 'bg-white text-ink-600 hover:bg-slate-50')
               }
             >
-              {speedLabel(option)}
+              {text.speedLabel(option)}
             </button>
           );
         })}
@@ -145,31 +141,27 @@ export function ControlBar(props: ControlBarProps) {
           onClick={props.onStart}
           disabled={active || !props.canStart}
           className={`${BIG} bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800`}
-          title={
-            over
-              ? 'Try again: the field is set up fresh, the clock starts at the top and your program runs from its first block'
-              : "The referee's start signal: the field is set up fresh and your program starts from the top"
-          }
+          title={text.startHint(over)}
         >
           <FlagIcon className="h-6 w-6" />
-          Start
+          {text.start}
         </button>
         <button
           type="button"
           onClick={props.onStop}
           disabled={!active}
           className={`${BIG} bg-rose-600 hover:bg-rose-700 active:bg-rose-800 @[34rem]:px-4`}
-          title={`Stop the program and the robot where they are. The ${match} is not scored; Reset field puts everything back.`}
+          title={text.stopHint(match)}
         >
           <StopIcon className="h-5 w-5" />
-          Stop
+          {text.stop}
         </button>
         <button
           type="button"
           onClick={runState === 'paused' ? props.onResume : props.onPause}
           disabled={!active}
-          aria-label={runState === 'paused' ? 'Continue' : 'Pause'}
-          title={runState === 'paused' ? 'Continue' : `Pause (the ${match} clock pauses too)`}
+          aria-label={runState === 'paused' ? text.resume : text.pause}
+          title={runState === 'paused' ? text.resume : text.pauseHint(match)}
           className={`${button.icon} h-11 w-11 rounded-xl @[34rem]:h-12 @[34rem]:w-12`}
         >
           {runState === 'paused' ? <PlayIcon className="h-5 w-5" /> : <PauseIcon className="h-5 w-5" />}
@@ -179,18 +171,18 @@ export function ControlBar(props: ControlBarProps) {
           <div
             className={`flex flex-col leading-none @[34rem]:flex-row @[34rem]:items-baseline @[34rem]:gap-1.5`}
             role="timer"
-            aria-label={`${capital(match)} clock: ${formatClock(timeLeft)} left`}
+            aria-label={text.clockLabel(match, text.clock(timeLeft))}
           >
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-500">Time</span>
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-500">{text.timeWord}</span>
             <span className={`font-mono text-xl font-bold tabular-nums @[34rem]:text-2xl ${lowTime ? 'text-rose-600' : 'text-ink-900'}`}>
-              {formatClock(timeLeft)}
+              {text.clock(timeLeft)}
             </span>
           </div>
           <div
             className={`flex flex-col leading-none @[34rem]:flex-row @[34rem]:items-baseline @[34rem]:gap-1.5`}
-            aria-label={`Score: ${score.total} of ${score.max} points`}
+            aria-label={text.scoreLabel(score.total, score.max)}
           >
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-500">Score</span>
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-500">{text.scoreWord}</span>
             <span className="flex items-baseline gap-1">
               <span className={`font-mono text-xl font-bold tabular-nums text-ink-900 @[34rem]:text-2xl`}>{score.total}</span>
               <span className="text-xs font-medium text-ink-500">/ {score.max}</span>
@@ -212,7 +204,7 @@ export function ControlBar(props: ControlBarProps) {
             title={restart.hint}
           >
             <RestartIcon className={`${smallIcon} text-amber-600`} />
-            Restart
+            {text.restartWord}
             {restart.badge !== '' && (
               <span
                 className={
@@ -236,18 +228,19 @@ export function ControlBar(props: ControlBarProps) {
           title={words.finishedHint}
         >
           <FinishIcon className={`${smallIcon} text-ink-500`} />
-          Finished
+          {text.finishedWord}
         </button>
         <button
           type="button"
           onClick={props.onReset}
           disabled={runState === 'ready'}
           className={over ? SMALL_NEXT : SMALL}
-          aria-label="Reset field"
-          title={`${words.resetHint} Works at any moment, also during ${/^[aeiou]/i.test(match) ? 'an' : 'a'} ${match}.`}
+          aria-label={text.resetLabel}
+          title={text.resetHint(words.resetHint, match)}
         >
           <ResetIcon className={`${smallIcon} ${over ? 'text-brand-700' : 'text-ink-500'}`} />
-          Reset<span className={`hidden @[34rem]:inline`}>field</span>
+          {/* (a language whose button word is the whole command has no second word: no empty span) */}
+          {text.resetWord}{text.resetFieldWord ? <span className={`hidden @[34rem]:inline`}>{text.resetFieldWord}</span> : null}
         </button>
         <div className="ml-auto">{speedPicker}</div>
       </div>

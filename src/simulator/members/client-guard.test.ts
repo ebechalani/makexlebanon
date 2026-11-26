@@ -3,10 +3,10 @@
  * the text that explains one - or so much as the title of one.
  *
  * Every game of the simulator has examples of its own: Fire Rescue, Fire Chief, Warehouse Sort,
- * Locker Room, Fire Cadet and Fire Fighter. The programs and descriptions (samples.ts in
- * ../fire-rescue, ../fire-chief, ../warehouse-sort, ../locker-room, ../fire-cadet and
- * ../fire-fighter) and the lists of the titles (sample-catalog.ts, next to them) stay on the
- * server. They leave it only through
+ * Locker Room, Fire Cadet, Fire Fighter and Robot en fête 2027 (Warehouse Sort in French). The
+ * programs and descriptions (samples.ts in ../fire-rescue, ../fire-chief, ../warehouse-sort,
+ * ../locker-room, ../fire-cadet, ../fire-fighter and ../robot-en-fete) and the lists of the
+ * titles (sample-catalog.ts, next to them) stay on the server. They leave it only through
  * /api/simulator/unlock, which decides for every request what that visitor may see: an example
  * the owner keeps for advanced codes only must not show anywhere - not even its title, not
  * even the heading of its level - before an advanced code was checked. If a file of the
@@ -69,6 +69,7 @@ import { EXAMPLE_LEVELS as CHIEF_LEVELS, SAMPLE_CATALOG as CHIEF_CATALOG } from 
 import { EXAMPLE_LEVELS as FIGHTER_LEVELS, SAMPLE_CATALOG as FIGHTER_CATALOG } from '../fire-fighter/sample-catalog';
 import { EXAMPLE_LEVELS as RESCUE_LEVELS, SAMPLE_CATALOG as RESCUE_CATALOG } from '../fire-rescue/sample-catalog';
 import { EXAMPLE_LEVELS as LOCKER_LEVELS, SAMPLE_CATALOG as LOCKER_CATALOG } from '../locker-room/sample-catalog';
+import { EXAMPLE_LEVELS as FETE_LEVELS, SAMPLE_CATALOG as FETE_CATALOG } from '../robot-en-fete/sample-catalog';
 import { EXAMPLE_LEVELS as SORT_LEVELS, SAMPLE_CATALOG as SORT_CATALOG } from '../warehouse-sort/sample-catalog';
 import { ALL_GAMES } from './all-examples';
 
@@ -84,8 +85,10 @@ const SORT_CATALOG_FILE = 'src/simulator/warehouse-sort/sample-catalog.ts';
 const LOCKER_CATALOG_FILE = 'src/simulator/locker-room/sample-catalog.ts';
 /** ... for Fire Cadet ... */
 const CADET_CATALOG_FILE = 'src/simulator/fire-cadet/sample-catalog.ts';
-/** ... and for Fire Fighter. */
+/** ... for Fire Fighter ... */
 const FIGHTER_CATALOG_FILE = 'src/simulator/fire-fighter/sample-catalog.ts';
+/** ... and for Robot en fête 2027 (its titles and headings are French). */
+const FETE_CATALOG_FILE = 'src/simulator/robot-en-fete/sample-catalog.ts';
 /** The list of every game, with the number of examples it holds. */
 const CATALOGS: ReadonlyArray<{ file: string; samples: string; game: string; examples: number }> = [
   { file: CATALOG, samples: 'src/simulator/fire-rescue/samples.ts', game: 'Fire Rescue', examples: 7 },
@@ -94,16 +97,17 @@ const CATALOGS: ReadonlyArray<{ file: string; samples: string; game: string; exa
   { file: LOCKER_CATALOG_FILE, samples: 'src/simulator/locker-room/samples.ts', game: 'Locker Room', examples: 6 },
   { file: CADET_CATALOG_FILE, samples: 'src/simulator/fire-cadet/samples.ts', game: 'Fire Cadet', examples: 6 },
   { file: FIGHTER_CATALOG_FILE, samples: 'src/simulator/fire-fighter/samples.ts', game: 'Fire Fighter', examples: 6 },
+  { file: FETE_CATALOG_FILE, samples: 'src/simulator/robot-en-fete/samples.ts', game: 'Robot en fête 2027', examples: 6 },
 ];
 
 /** The cards of every game: what the titles and the ids are taken from. */
-const SAMPLE_CATALOG = [...RESCUE_CATALOG, ...CHIEF_CATALOG, ...SORT_CATALOG, ...LOCKER_CATALOG, ...CADET_CATALOG, ...FIGHTER_CATALOG];
+const SAMPLE_CATALOG = [...RESCUE_CATALOG, ...CHIEF_CATALOG, ...SORT_CATALOG, ...LOCKER_CATALOG, ...CADET_CATALOG, ...FIGHTER_CATALOG, ...FETE_CATALOG];
 /**
- * The headings of every game. (The six games call their levels the same - Starter,
- * Intermediate, Advanced - but the few words after a heading are a game's own, and all eighteen
- * are looked for.)
+ * The headings of every game. (The six English games call their levels the same - Starter,
+ * Intermediate, Advanced - and Robot en fête 2027 calls them Premiers pas, Intermédiaire,
+ * Avancé; the few words after a heading are a game's own, and all twenty-one are looked for.)
  */
-const EXAMPLE_LEVELS = [...RESCUE_LEVELS, ...CHIEF_LEVELS, ...SORT_LEVELS, ...LOCKER_LEVELS, ...CADET_LEVELS, ...FIGHTER_LEVELS];
+const EXAMPLE_LEVELS = [...RESCUE_LEVELS, ...CHIEF_LEVELS, ...SORT_LEVELS, ...LOCKER_LEVELS, ...CADET_LEVELS, ...FIGHTER_LEVELS, ...FETE_LEVELS];
 
 /** The files that hold the examples (paths from the repository's folder), and what they hold. */
 const HOLDERS: Record<string, string> = {
@@ -114,6 +118,7 @@ const HOLDERS: Record<string, string> = {
   // (written without the program builder - its programs are rows of cards - so it is listed by hand)
   'src/simulator/fire-cadet/samples.ts': 'holds example programs and descriptions',
   'src/simulator/fire-fighter/samples.ts': 'holds example programs and descriptions',
+  'src/simulator/robot-en-fete/samples.ts': 'holds example programs and descriptions',
   'src/simulator/members/all-examples.ts': 'holds example programs and descriptions',
   [CATALOG]: 'holds the titles of the examples',
   [CHIEF_CATALOG_FILE]: 'holds the titles of the examples',
@@ -121,6 +126,7 @@ const HOLDERS: Record<string, string> = {
   [LOCKER_CATALOG_FILE]: 'holds the titles of the examples',
   [CADET_CATALOG_FILE]: 'holds the titles of the examples',
   [FIGHTER_CATALOG_FILE]: 'holds the titles of the examples',
+  [FETE_CATALOG_FILE]: 'holds the titles of the examples',
 };
 
 /** Files that belong to the server for other reasons: the lists of codes and the code that checks one. */
@@ -533,10 +539,19 @@ function codeOnly(text: string): string {
   return parts.join(' ');
 }
 
-/** What names a level of the examples: its id in quotes, its heading, and the words after the heading. */
+/**
+ * What names a level of the examples: its id in quotes, its heading, and the words after the heading.
+ * The heading is looked for as a word of its own, between letters of any language: "\bAvancé\b"
+ * would never match "Avancé" (\b knows the letters a to z only, and "é" is none of them), so the
+ * boundaries are those of Unicode letters and digits (the u flag).
+ */
 function levelMarkers(levels: ReadonlyArray<{ id: string; title: string; about: string }>): RegExp[] {
   const escape = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return levels.flatMap((level) => [new RegExp(`['"\`]${escape(level.id)}['"\`]`), new RegExp(`\\b${escape(level.title)}\\b`), new RegExp(escape(level.about))]);
+  return levels.flatMap((level) => [
+    new RegExp(`['"\`]${escape(level.id)}['"\`]`),
+    new RegExp(`(?<![\\p{L}\\p{N}])${escape(level.title)}(?![\\p{L}\\p{N}])`, 'u'),
+    new RegExp(escape(level.about)),
+  ]);
 }
 
 /** The same for a file that is not code (a stylesheet has no quotes around a name: [data-level=advanced]): the id as a word of its own. */
@@ -677,6 +692,13 @@ describe('the examples stay on the server', () => {
       'src/simulator/ui/fire-fighter/FireFighterSimulator.tsx',
       'src/simulator/ui/fire-fighter/FireFighterLoader.tsx',
       'src/simulator/ui/fire-fighter/SetupList.tsx',
+      // Robot en fête 2027: Warehouse Sort in French - its loader and its screen (the general one, in French; its
+      // Cube colours panel is Warehouse Sort's, with French words)
+      'src/simulator/ui/robot-en-fete/RobotEnFeteSimulator.tsx',
+      'src/simulator/ui/robot-en-fete/RobotEnFeteLoader.tsx',
+      // ... and the French word table of the screen, which the screen and the loader set above it
+      'src/simulator/ui/text/context.tsx',
+      'src/simulator/ui/text/title-context.tsx',
     ]) {
       assert.ok(roots.client.includes(screen), `${screen} begins with 'use client'`);
     }
@@ -688,6 +710,7 @@ describe('the examples stay on the server', () => {
       ['src/app/simulator/warehouse-sort/page.tsx', 'src/simulator/ui/warehouse-sort/WarehouseSortLoader.tsx', 'src/simulator/ui/warehouse-sort/WarehouseSortSimulator.tsx', 'src/simulator/warehouse-sort/game.ts'],
       ['src/app/simulator/locker-room/page.tsx', 'src/simulator/ui/locker-room/LockerRoomLoader.tsx', 'src/simulator/ui/locker-room/LockerRoomSimulator.tsx', 'src/simulator/locker-room/game.ts'],
       ['src/app/simulator/fire-fighter/page.tsx', 'src/simulator/ui/fire-fighter/FireFighterLoader.tsx', 'src/simulator/ui/fire-fighter/FireFighterSimulator.tsx', 'src/simulator/fire-fighter/game.ts'],
+      ['src/app/simulator/tri-entrepot/page.tsx', 'src/simulator/ui/robot-en-fete/RobotEnFeteLoader.tsx', 'src/simulator/ui/robot-en-fete/RobotEnFeteSimulator.tsx', 'src/simulator/robot-en-fete/game.ts'],
     ]) {
       assert.ok(roots.pages.includes(page), page);
       const fromPage = reachableFrom(graph, page);
@@ -793,8 +816,37 @@ describe('the examples stay on the server', () => {
     ]) {
       assert.ok(fighterScreen.has(file), `the Fire Fighter screen -> ${file}`);
     }
-    // the page that lists the simulators is a page of the website like any other
+    // ... and so has the Robot en fête 2027 screen: its French words, rules window, code reader, test lists and Cube
+    // colours words, Warehouse Sort's panel, the French game it plays and its words, and the screen's French table and
+    // French blocks. Everything French of the page is looked at: a French title, heading or sentence of a description
+    // of an example written into any of them is caught (the French examples are in the guard's lists: CATALOGS, ALL_GAMES)
+    const feteScreen = reachableFrom(graph, 'src/simulator/ui/robot-en-fete/RobotEnFeteSimulator.tsx');
+    for (const file of [
+      'src/simulator/ui/robot-en-fete/words.ts',
+      'src/simulator/ui/robot-en-fete/rules.ts',
+      'src/simulator/ui/robot-en-fete/arrangement-code.ts',
+      'src/simulator/ui/robot-en-fete/arrangement-batch.ts',
+      'src/simulator/ui/robot-en-fete/arrangement-words.ts',
+      'src/simulator/ui/warehouse-sort/ArrangementEditor.tsx',
+      'src/simulator/ui/warehouse-sort/arrangement-panel.ts',
+      'src/simulator/robot-en-fete/game.ts',
+      'src/simulator/robot-en-fete/referee-words.ts',
+      'src/simulator/robot-en-fete/scenario-words.ts',
+      'src/simulator/warehouse-sort/game.ts',
+      'src/simulator/ui/text/fr.tsx',
+      'src/simulator/ui/text/fr-screen.tsx',
+      'src/simulator/ui/text/fr-console.tsx',
+      'src/simulator/ui/text/gripper.tsx',
+      'src/simulator/blocks/fr.ts',
+    ]) {
+      assert.ok(feteScreen.has(file), `the Robot en fête 2027 screen -> ${file}`);
+    }
+    // (its loading screen is French already: the loader reaches the French table itself, and not the examples)
+    const feteLoader = reachableFrom(graph, 'src/simulator/ui/robot-en-fete/RobotEnFeteLoader.tsx');
+    assert.ok(feteLoader.has('src/simulator/ui/text/fr.tsx') && feteLoader.has('src/simulator/ui/robot-en-fete/RobotEnFeteSimulator.tsx'));
+    // the page that lists the simulators is a page of the website like any other, and so is the page of Robot en fête 2027
     assert.ok(roots.pages.includes('src/app/simulator/page.tsx'));
+    assert.ok(roots.pages.includes('src/app/robot-en-fete/page.tsx'));
   });
 
   test('the files that hold the examples are known to the guard', () => {
@@ -803,7 +855,7 @@ describe('the examples stay on the server', () => {
     // the examples of every game: its list of titles and its programs
     assert.deepEqual(
       CATALOGS.map((catalog) => catalog.game),
-      ['Fire Rescue', 'Fire Chief', 'Warehouse Sort', 'Locker Room', 'Fire Cadet', 'Fire Fighter'],
+      ['Fire Rescue', 'Fire Chief', 'Warehouse Sort', 'Locker Room', 'Fire Cadet', 'Fire Fighter', 'Robot en fête 2027'],
     );
     for (const catalog of CATALOGS) {
       assert.match(forbidden.get(catalog.file) ?? '', /titles/, catalog.file);
@@ -835,11 +887,12 @@ describe('the examples stay on the server', () => {
       6 + 3 + 6,
       'Fire Fighter: six titles, the first halves of three titles ("First grab", and "Two red cubes" of two titles), six ids of more than one word',
     );
-    assert.equal(TITLE_MARKERS.length, 15 + 12 + 12 + 12 + 12 + 15, 'and the guard looks for all of them');
-    assert.equal(SAMPLE_CATALOG.length, 7 + 6 + 6 + 6 + 6 + 6);
-    // ... and for the sentences of every description: of all thirty-seven examples, several each
+    assert.equal(exampleMarkers(FETE_CATALOG).length, 6 + 0 + 6, 'Robot en fête 2027: six French titles (none with a colon), six ids of more than one word');
+    assert.equal(TITLE_MARKERS.length, 15 + 12 + 12 + 12 + 12 + 15 + 12, 'and the guard looks for all of them');
+    assert.equal(SAMPLE_CATALOG.length, 7 + 6 + 6 + 6 + 6 + 6 + 6);
+    // ... and for the sentences of every description: of all forty-three examples, several each
     const everyExample = ALL_GAMES.flatMap((game) => game.examples);
-    assert.equal(everyExample.length, 7 + 6 + 6 + 6 + 6 + 6);
+    assert.equal(everyExample.length, 7 + 6 + 6 + 6 + 6 + 6 + 6);
     for (const example of everyExample) {
       const mine = descriptionMarkers([example]);
       assert.ok(mine.length >= 2, `${example.id}: ${mine.length} sentences of its description are looked for`);
@@ -978,6 +1031,40 @@ describe('the examples stay on the server', () => {
     ]) {
       assert.ok(!REAL_MARKERS.some((marker) => marker.test(harmless)), harmless);
     }
+    // and for Robot en fête 2027 - Warehouse Sort in French, whose French screen speaks of cubes, bays and parking all the time:
+    // its French titles and the sentences of its French descriptions, in capitals, over two lines, with French typography
+    for (const telling of [
+      "'fete-all-cubes'",
+      '"fete-two-cubes"',
+      '`fete-cube-colour`',
+      'le programme «\u00a0Mettre un cube dans sa baie\u00a0»',
+      'TRIER LES CUBES ET SE GARER',
+      'SORTIR DE LA ZONE DE DÉPART ET S’ARRÊTER',
+      'suivre la ligne\n   blanche jusqu’au T',
+      'Il marque 80 points sur chacune des 24 dispositions, en 53 à 61 secondes sur 90.',
+      'Le robot prend un cube dans la rangée du bas et un dans la rangée du haut',
+      'data-example="fete-white-line"',
+    ]) {
+      assert.ok(REAL_MARKERS.some((marker) => marker.test(telling)), telling);
+    }
+    for (const harmless of [
+      'robot-en-fete',
+      'Robot en fête 2027',
+      'fete',
+      'fête',
+      'la ligne blanche',
+      'un cube dans sa baie',
+      'deux cubes',
+      'se garer sur une aire d’arrivée',
+      'la couleur du cube',
+      'sortir de la zone de départ',
+      'Couleurs des cubes',
+      'Disposition habituelle',
+      'trier les cubes',
+      'fete-all-cubes-later',
+    ]) {
+      assert.ok(!REAL_MARKERS.some((marker) => marker.test(harmless)), harmless);
+    }
   });
 
   test("nothing reachable from a 'use client' file, a page, a layout or a component imports a file that holds programs, descriptions or titles", () => {
@@ -1005,8 +1092,13 @@ describe('the examples stay on the server', () => {
         'must not get the word "Advanced" either.\n',
     );
     // the headings of every game are looked for: the names of the three levels, and the words after each heading
-    assert.equal(EXAMPLE_LEVELS.length, 3 + 3 + 3 + 3 + 3 + 3);
-    assert.equal(new Set(EXAMPLE_LEVELS.map((level) => level.about)).size, 18, 'eighteen different texts');
+    assert.equal(EXAMPLE_LEVELS.length, 3 + 3 + 3 + 3 + 3 + 3 + 3);
+    assert.equal(new Set(EXAMPLE_LEVELS.map((level) => level.about)).size, 21, 'twenty-one different texts');
+    assert.deepEqual(
+      [...new Set(EXAMPLE_LEVELS.map((level) => level.title))],
+      ['Starter', 'Intermediate', 'Advanced', 'Premiers pas', 'Intermédiaire', 'Avancé'],
+      'the headings in English, and in French',
+    );
     assert.deepEqual([...new Set(EXAMPLE_LEVELS.map((level) => level.id))], ['starter', 'intermediate', 'advanced']);
     // (the check looks at the screen's own files, and at their code, not at their comments)
     const screen = reachableFrom(graph, 'src/simulator/ui/fire-rescue/FireRescueSimulator.tsx');
@@ -1074,6 +1166,8 @@ describe('the examples stay on the server', () => {
     assert.deepEqual(importers('src/simulator/fire-cadet/samples.ts'), ['src/simulator/members/all-examples.ts']);
     assert.deepEqual(importers(FIGHTER_CATALOG_FILE), ['src/simulator/fire-fighter/samples.ts', 'src/simulator/members/all-examples.ts']);
     assert.deepEqual(importers('src/simulator/fire-fighter/samples.ts'), ['src/simulator/members/all-examples.ts']);
+    assert.deepEqual(importers(FETE_CATALOG_FILE), ['src/simulator/members/all-examples.ts', 'src/simulator/robot-en-fete/samples.ts']);
+    assert.deepEqual(importers('src/simulator/robot-en-fete/samples.ts'), ['src/simulator/members/all-examples.ts']);
     assert.deepEqual(importers('src/simulator/members/all-examples.ts'), ['src/app/api/simulator/unlock/route.ts']);
     assert.deepEqual(importers('src/simulator/members/unlock.ts'), ['src/app/api/simulator/unlock/route.ts']);
     assert.deepEqual(importers('content/simulator-codes.ts'), ['src/app/api/simulator/unlock/route.ts']);
@@ -1343,6 +1437,38 @@ describe('the guard catches a leak', () => {
     }
     assert.deepEqual(findLevelNames(withFile('src/simulator/members/server-helper.ts', "export const level = 'advanced';\n"), levels), []);
     assert.deepEqual(findLevelNames(withFile('src/app/about/page.tsx', "export default function Page() { return 'Advanced sensing'; }\n"), levels), []);
+  });
+
+  test('a French heading is found as a word of its own - "Avancé", "Premiers pas", "Intermédiaire" - where \\b would miss it', () => {
+    // (\b knows the letters a to z only: after the "é" of "Avancé" it sees no boundary, so the old marker never matched)
+    assert.ok(!/\bAvancé\b/.test('<h3>Avancé</h3>') && !/\bAvancé\b/.test("'Avancé'"), 'what the marker was before');
+    const levels = [
+      { id: 'starter', title: 'Premiers pas', about: 'une chose à la fois' },
+      { id: 'intermediate', title: 'Intermédiaire', about: 'des cubes dans la bonne baie' },
+      { id: 'advanced', title: 'Avancé', about: 'tous les cubes, toutes les dispositions' },
+    ];
+    assert.deepEqual(findLevelNames(base(), levels), []);
+    for (const line of [
+      'const heading = <h3>Avancé</h3>;',
+      "const title = 'Avancé';",
+      'const title = "Avancé : tous les cubes";',
+      'const label = `${n} Avancé`;',
+      'const heading = <h3>Premiers pas</h3>;',
+      "const title = 'Intermédiaire';",
+      "const about = 'tous les cubes, toutes les dispositions';",
+    ]) {
+      const inScreen = findLevelNames(withFile('src/simulator/ui/Screen.tsx', `'use client';\n${line}\nexport const Screen = () => null;\n`), levels);
+      assert.equal(inScreen.length, 1, line);
+    }
+    // a word that only begins like a heading, or another word of the same letters, is no heading
+    for (const line of ["const word = 'Avancées';", "const verb = 'avancer';", "const word = 'Avancer';", "const word = 'Intermédiaires';", "const text = 'nos premiers pas';"]) {
+      assert.deepEqual(findLevelNames(withFile('src/simulator/ui/Screen.tsx', `'use client';\n${line}\nexport const Screen = () => null;\n`), levels), [], line);
+    }
+    // the English headings are found as before
+    for (const line of ['const heading = <h3>Advanced</h3>;', "const title = 'Starter';"]) {
+      assert.equal(findLevelNames(withFile('src/simulator/ui/Screen.tsx', `'use client';\n${line}\nexport const Screen = () => null;\n`)).length, 1, line);
+    }
+    assert.deepEqual(findLevelNames(withFile('src/simulator/ui/Screen.tsx', "'use client';\nconst word = 'Advancedness';\nexport const Screen = () => null;\n")), []);
   });
 
   test('a title is found however it is written: in small letters, over two lines, with escapes, in pieces', () => {
