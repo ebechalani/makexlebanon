@@ -14,7 +14,8 @@
  */
 import { getBlockDef } from './catalog';
 import type { BlockArg, BlockDef } from './catalog';
-import { FR_BLOCKS, FR_DEFAULT_TEXTS } from './fr';
+// (the French words, ./fr.ts, are read through ./french.ts, for a French size only: an English page never downloads them)
+import { frenchWords } from './french';
 import type { BlockLocale } from './locale';
 import type { BlockJson, VariableJson } from '../core/types';
 
@@ -88,7 +89,7 @@ export class Sizer {
   private message(def: BlockDef, index: number): string {
     const english = index === 0 ? def.message : (def.rows?.[index - 1]?.message ?? '');
     if (this.locale !== 'fr') return english;
-    const french = FR_BLOCKS[def.type];
+    const french = frenchWords().FR_BLOCKS[def.type];
     return (index === 0 ? french?.message : french?.rows?.[index - 1]) ?? english;
   }
 
@@ -96,12 +97,14 @@ export class Sizer {
   private optionText(def: BlockDef, arg: Extract<BlockArg, { type: 'field_dropdown' }>, stored: unknown): string {
     const index = Math.max(0, arg.options.findIndex(([, value]) => value === stored));
     const english = arg.options[index][0];
-    return this.locale === 'fr' ? (FR_BLOCKS[def.type]?.options?.[arg.name]?.[index] ?? english) : english;
+    return this.locale === 'fr' ? (frenchWords().FR_BLOCKS[def.type]?.options?.[arg.name]?.[index] ?? english) : english;
   }
 
   /** A default word (a variable's name, a text) in the language of the sizer. */
   private word(text: string): string {
-    return this.locale === 'fr' && Object.prototype.hasOwnProperty.call(FR_DEFAULT_TEXTS, text) ? FR_DEFAULT_TEXTS[text] : text;
+    if (this.locale !== 'fr') return text;
+    const { FR_DEFAULT_TEXTS } = frenchWords();
+    return Object.prototype.hasOwnProperty.call(FR_DEFAULT_TEXTS, text) ? FR_DEFAULT_TEXTS[text] : text;
   }
 
   /** Width of a stack of blocks: its widest block, the blocks nested inside C-shaped blocks included. */

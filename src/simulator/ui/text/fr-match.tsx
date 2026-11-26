@@ -85,8 +85,9 @@ export const FR_MATCH_TEXT: MatchText = {
       ? `Recommencer${NB}: le terrain est remis en place, le chrono repart du début et ton programme reprend à son premier bloc`
       : `Le signal de départ de l’arbitre${NB}: le terrain est remis en place et ton programme commence au début`,
   start: 'Démarrer',
-  stopHint: (match) => `Arrêter le programme et le robot là où ils sont. Le ${match} ne compte pas${NB}; Remettre en place remet tout comme au début.`,
-  stop: 'Arrêter',
+  stopHint: (match) => `Arrêter le programme et le robot là où ils sont. Le ${match} ne compte pas${NB}; Replacer remet tout comme au début.`,
+  // ("Stop" is French too, as "Pause" beside it; "Arrêter" made the row of these buttons wrap at 1 440 px)
+  stop: 'Stop',
   resume: 'Reprendre',
   pause: 'Pause',
   pauseHint: (match) => `Pause (le chrono du ${match} s’arrête aussi)`,
@@ -97,10 +98,12 @@ export const FR_MATCH_TEXT: MatchText = {
   scoreWord: 'Score',
   restartWord: 'Relance',
   finishedWord: 'Terminé',
-  resetLabel: 'Remettre en place',
-  resetHint: (resetHint, match) => `${resetHint} Marche à tout moment, aussi pendant un ${match}.`,
-  resetWord: 'Remettre',
-  resetFieldWord: 'en place',
+  // ("Replacer" - put back in place - is the whole command in one word: "Remettre" alone said too little on a phone,
+  // and "Remettre en place" made the row wrap on a computer. Nothing is added on a wide bar, so the second word is empty.)
+  resetLabel: 'Replacer',
+  resetHint: (resetHint, match) => `${resetHint} Possible à tout moment, même pendant un ${match}.`,
+  resetWord: 'Replacer',
+  resetFieldWord: '',
   restartButton,
   restartSummary,
   finishSentence: frFinishSentence,
@@ -108,7 +111,7 @@ export const FR_MATCH_TEXT: MatchText = {
   finishText: frFinishText,
 
   markNames: { done: 'fait', 'not-done': 'pas fait', penalty: 'pénalité', note: 'remarque' },
-  lineEarnedHint: 'Le temps au chrono quand cette ligne a été gagnée',
+  lineEarnedHint: 'Le temps au chrono quand les points de cette ligne ont été gagnés',
   earnedAt: 'gagné à ',
   howEnded: (match) => `Fin du ${match}${NB}: `,
   total: 'Total',
@@ -134,7 +137,7 @@ export const FR_MATCH_TEXT: MatchText = {
     <>
       <span className="font-bold">Tu as arrêté le match</span> {`à ${time} - pas de score final (pour l’instant `}
       {points}
-      {'). Démarrer recommence, Remettre en place remet le terrain.'}
+      {'). Démarrer recommence, Replacer remet le terrain en place.'}
     </>
   ),
   statusOver: (o, points) => (
@@ -153,7 +156,8 @@ export const FR_MATCH_TEXT: MatchText = {
     (o.perfect ? ` - un parcours parfait${NB}!` : o.complete ? ` - tous les ${o.goals} atteints.` : '') +
     (o.penaltyNote ? ` (${o.penaltyNote})` : ''),
   scoreSheetSummary: (score: { total: number; max: number }, done: number, of: number, words: ScreenWords) =>
-    `${score.total} / ${score.max} points · ${words.goalsShort ?? words.goals}${NB}: ${done} sur ${of}`,
+    // ("1/9": short, so that the heading of the score sheet is never cut on a 360 px phone)
+    `${score.total} / ${score.max} points · ${words.goalsShort ?? words.goals}${NB}: ${done}/${of}`,
 };
 
 /** endSentence (../batch-words.ts) in French: how a run ended, and the restarts it used. */
@@ -189,7 +193,7 @@ export const FR_BATCH_TEXT: BatchText = {
   runsCount: (complete, runs) => frPlural(complete, `${complete} essai sur ${runs}`, `${complete} essais sur ${runs}`),
   programProblem: `Le programme a un problème${NB}:`,
   moreProblems: (more) => frPlural(more, ` (et ${more} autre)`, ` (et ${more} autres)`),
-  lineSuccessTitle: 'Combien de fois chaque ligne de la feuille de score réussit',
+  lineSuccessTitle: 'Combien de fois chaque ligne de la feuille de score est réussie',
   lineSuccessHint: (name, percent) => `${name}${NB}: ${percent} des essais`,
   cleanLineName: (cleanLine, name) => `${cleanLine}${NB}: ${name.toLowerCase()}`,
   everyRun: 'Tous les essais',

@@ -77,15 +77,16 @@ test('menu: the dropdown of "Simulator" is the Simulator page, then each simulat
     { label: 'Fire Rescue Junior — Season 2027', href: '/simulator/fire-rescue-junior' },
     { label: 'Fire Rescue Senior — Season 2027', href: '/simulator/fire-rescue-senior' },
     { label: 'Fire Chief — Season 2027', href: '/simulator/fire-chief' },
-    // (after the seasons, the category of its own: content/standalone.ts. The menu is English, so is its line)
-    { label: 'Robot en fête 2027 — in French', href: '/simulator/robot-en-fete' },
+    // (after the seasons, the simulator of the category of its own: content/standalone.ts. The menu is English;
+    // the two names in its line are French proper names, the simulator's and its category's)
+    { label: 'Tri d’entrepôt — Robot en fête 2027', href: '/simulator/tri-entrepot' },
   ]);
   // the same simulators as the cards of /simulator, in the same order: the seasons' first, then the categories of their own
   assert.deepEqual(
     simulator?.children?.slice(1).map((child) => child.href),
     [
       ...simulatorSeasons().flatMap((section) => section.simulators.map((card) => card.href)),
-      ...standaloneCategories.map((category) => category.simulator.href),
+      ...standaloneCategories.flatMap((category) => category.simulators.map((card) => card.href)),
     ],
   );
   // (built from the season data, not typed by hand)
@@ -119,13 +120,21 @@ test('menu: a simulator added to a season appears in the dropdown by itself, in 
     { label: 'Fire Chief — Season 2027', href: '/simulator/fire-chief' },
     { label: 'Later Mission — Season 2027', href: '/simulator/later' },
     // (the category of its own stays at the end, after every season)
-    { label: 'Robot en fête 2027 — in French', href: '/simulator/robot-en-fete' },
+    { label: 'Tri d’entrepôt — Robot en fête 2027', href: '/simulator/tri-entrepot' },
   ]);
   // no simulator at all: only the Simulator page; no season but the category of its own: its line alone
   assert.deepEqual(simulatorMenu([], []), [{ label: 'All simulators', href: '/simulator' }]);
   assert.deepEqual(simulatorMenu([]), [
     { label: 'All simulators', href: '/simulator' },
-    { label: 'Robot en fête 2027 — in French', href: '/simulator/robot-en-fete' },
+    { label: 'Tri d’entrepôt — Robot en fête 2027', href: '/simulator/tri-entrepot' },
+  ]);
+  // a second simulator of the category (the organiser's « Logistique intelligente », to come) gets its line after the first, by itself
+  const [fete] = standaloneCategories;
+  const later = { ...fete.simulators[0], name: 'Plus tard', href: '/simulator/plus-tard', menuLabel: 'Plus tard — Robot en fête 2027' };
+  assert.deepEqual(simulatorMenu([], [{ ...fete, simulators: [...fete.simulators, later] }]), [
+    { label: 'All simulators', href: '/simulator' },
+    { label: 'Tri d’entrepôt — Robot en fête 2027', href: '/simulator/tri-entrepot' },
+    { label: 'Plus tard — Robot en fête 2027', href: '/simulator/plus-tard' },
   ]);
 });
 
@@ -356,7 +365,7 @@ test('pages: every simulator is /simulator/<game>, with its page folder, its add
   const folders = readdirSync(fromRoot('src/app/simulator'), { withFileTypes: true });
   assert.deepEqual(
     folders.map((entry) => (entry.isDirectory() ? `${entry.name}/` : entry.name)).sort(),
-    ['fire-cadet/', 'fire-chief/', 'fire-fighter/', 'fire-rescue-junior/', 'fire-rescue-senior/', 'locker-room/', 'page.tsx', 'robot-en-fete/', 'warehouse-sort/'],
+    ['fire-cadet/', 'fire-chief/', 'fire-fighter/', 'fire-rescue-junior/', 'fire-rescue-senior/', 'locker-room/', 'page.tsx', 'tri-entrepot/', 'warehouse-sort/'],
   );
   assert.ok(!existsSync(fromRoot('src/app/training/simulator')), 'the old folder is gone');
   assert.ok(!existsSync(fromRoot('src/app/simulator/fire-rescue')), 'the page of before the split is gone: its address is a redirect');
@@ -916,7 +925,7 @@ function textsOf(value: unknown, at = ''): Array<[at: string, text: string]> {
   return [];
 }
 
-test('Robot en fête 2027: a category of its own - in no season, with no age group, and every text of its page and its card given, in French', () => {
+test('Robot en fête 2027: a category of its own - in no season, with no age group, and every text of its page and its cards given, in French; its one simulator is « Tri d’entrepôt »', () => {
   assert.deepEqual(standaloneCategories.map((category) => category.slug), ['robot-en-fete']);
   const entry = fete();
   assert.deepEqual([entry.name, entry.lang, entry.platform], ['Robot en fête 2027', 'fr', 'mBot2']);
@@ -925,7 +934,6 @@ test('Robot en fête 2027: a category of its own - in no season, with no age gro
     description: 'La version française de Warehouse Sort : la même mission pour débutants, entièrement en français, blocs compris.',
     eyebrow: '2027',
     simulatorEyebrow: 'S’entraîner en ligne',
-    simulatorTitle: 'Essaie le simulateur Robot en fête 2027',
     open: 'Ouvrir le simulateur',
   });
   assert.equal(
@@ -935,48 +943,54 @@ test('Robot en fête 2027: a category of its own - in no season, with no age gro
   );
   // (the page's description is the first sentence of its lead)
   assert.ok(entry.summary.startsWith(`${entry.page.description} `));
+  // its simulators, named by their mission (the organiser): today one, the French Warehouse Sort
+  assert.deepEqual(entry.simulators.map((simulator) => simulator.name), ['Tri d’entrepôt']);
+  const [simulator] = entry.simulators;
   assert.deepEqual(
-    [entry.simulator.href, entry.simulator.mat, entry.simulator.menuLabel],
-    ['/simulator/robot-en-fete', '/simulator/warehouse-sort/mat.webp', 'Robot en fête 2027 — in French'],
+    [simulator.href, simulator.mat, simulator.menuLabel, simulator.pageTitle],
+    ['/simulator/tri-entrepot', '/simulator/warehouse-sort/mat.webp', 'Tri d’entrepôt — Robot en fête 2027', 'Essaie le simulateur Tri d’entrepôt'],
   );
-  assert.match(entry.simulator.summary, /^Construis un programme avec des blocs comme dans mBlock et regarde le mBot2 trier des cubes rouges et verts sur le tapis Inspire : /);
-  assert.match(entry.simulator.summary, / Tout est en français, les blocs aussi\. Il marche dans le navigateur : pas besoin de robot ni d’installation\.$/);
-  assert.deepEqual(entry.simulator.card, {
-    heading: 'Simulateur Robot en fête 2027',
-    open: 'Ouvrir le simulateur Robot en fête 2027',
-    matAlt: 'Le tapis du simulateur Robot en fête 2027, vu de dessus',
+  assert.match(simulator.summary, /^Construis un programme avec des blocs comme dans mBlock et regarde le mBot2 trier des cubes rouges et verts sur le tapis Inspire : /);
+  assert.ok(simulator.summary.includes(' — avec toutes les dispositions des cubes, et le score que donnent les règles de la mission pour débutants. '), simulator.summary);
+  assert.match(simulator.summary, / Tout est en français, les blocs aussi\. Le simulateur fonctionne dans le navigateur : pas besoin de robot ni d’installation\.$/);
+  assert.deepEqual(simulator.card, {
+    heading: 'Simulateur Tri d’entrepôt',
+    open: 'Ouvrir le simulateur Tri d’entrepôt',
+    matAlt: 'Le tapis du simulateur Tri d’entrepôt, vu de dessus',
     about: 'À propos de Robot en fête 2027',
     labels: ['En français', 'mBot2'],
   });
   // in no season: no category and no mission of content/seasons.ts is it, and that file does not name it
   for (const season of seasons) assert.ok(!season.categories.some((category) => category.slug === entry.slug || category.name === entry.name), `Season ${season.year}`);
-  assert.ok(!missionSimulators.some((mission) => mission.href === entry.simulator.href));
-  assert.ok(!simulatorSeasons().some((section) => section.simulators.some((card) => card.href === entry.simulator.href)));
-  assert.ok(!/robot-en-f[eê]te|Robot en f[eê]te|standalone/i.test(readFileSync(fromRoot('content/seasons.ts'), 'utf8')), 'content/seasons.ts does not name it');
+  assert.ok(!missionSimulators.some((mission) => mission.href === simulator.href));
+  assert.ok(!simulatorSeasons().some((section) => section.simulators.some((card) => card.href === simulator.href)));
+  assert.ok(!/robot-en-f[eê]te|Robot en f[eê]te|tri-entrepot|Tri d.entrep[oô]t|standalone/i.test(readFileSync(fromRoot('content/seasons.ts'), 'utf8')), 'content/seasons.ts does not name it');
   // no age group (the organiser: "pas d'âge affiché"): no field for one, and no text that gives one
   const texts = textsOf(entry);
   assert.ok(!texts.some(([at]) => at.split('.').some((key) => /^(age|ages|ageRange|ageGroup)$/i.test(key))), 'no field for an age');
   for (const [at, text] of texts) assert.ok(!/(?<!\p{L})(ans|âge|ages?|years?)(?!\p{L})|\d\s*[–-]\s*\d/iu.test(text), `${at}: ${text}`);
-  // every text of its page and its card is given (none empty), and written as French is written: a no-break
+  // every text of its page and its cards is given (none empty), and written as French is written: a no-break
   // space before : ; ! ?, never one after an opening word; ’ for an apostrophe
   for (const [at, text] of texts) {
     assert.ok(text.trim().length > 0, at);
     assert.ok(!/ [:;!?]/.test(text), `${at}: a plain space before : ; ! ? - ${text}`);
     assert.ok(!/'/.test(text), `${at}: ’, not ' - ${text}`);
   }
-  // ... but the menu line, which is English, as the whole menu: one dash, as every line of the dropdown
-  assert.equal(entry.simulator.menuLabel.split(' — ').length, 2);
+  // ... but the menu line, which is English, as the whole menu - "<simulator> — <category>", both French proper names: one dash, as every line of the dropdown
+  assert.deepEqual(simulator.menuLabel.split(' — '), [simulator.name, entry.name]);
   // the mat is Warehouse Sort's picture (the same mission on the same mat), and nothing in public/ has the page's address
-  assert.equal(entry.simulator.mat, missionSimulators.find((mission) => mission.name === 'Warehouse Sort')?.mat);
-  assert.ok(statSync(fromRoot(`public${entry.simulator.mat}`)).isFile());
-  assert.ok(!existsSync(fromRoot('public/simulator/robot-en-fete')), 'no file or folder at the address of the simulator');
+  assert.equal(simulator.mat, missionSimulators.find((mission) => mission.name === 'Warehouse Sort')?.mat);
+  assert.ok(statSync(fromRoot(`public${simulator.mat}`)).isFile());
+  for (const folder of ['public/simulator/tri-entrepot', 'public/simulator/robot-en-fete']) assert.ok(!existsSync(fromRoot(folder)), `no file or folder at ${folder}`);
   assert.ok(!existsSync(fromRoot('public/robot-en-fete')), 'no file or folder at the address of its page');
-  // its two pages exist
-  for (const page of ['src/app/robot-en-fete/page.tsx', 'src/app/simulator/robot-en-fete/page.tsx']) assert.ok(existsSync(fromRoot(page)), page);
+  // its two pages exist; the address the simulator had before its name, never published, is gone (no redirect)
+  for (const page of ['src/app/robot-en-fete/page.tsx', 'src/app/simulator/tri-entrepot/page.tsx']) assert.ok(existsSync(fromRoot(page)), page);
+  assert.ok(!existsSync(fromRoot('src/app/simulator/robot-en-fete')), 'no page at /simulator/robot-en-fete');
 });
 
-test('Robot en fête 2027: its page /robot-en-fete is French (lang="fr" on its texts), with English breadcrumbs, no age, and its simulator', async () => {
+test('Robot en fête 2027: its page /robot-en-fete is French (lang="fr" on its texts), with English breadcrumbs, no age, and a part for its simulator Tri d’entrepôt', async () => {
   const entry = fete();
+  const [simulator] = entry.simulators;
   const { default: Page, metadata } = (await import('../../app/robot-en-fete/page')) as {
     default: () => Parameters<typeof renderToStaticMarkup>[0];
     metadata: { title?: string; description?: string; alternates?: { canonical?: string }; openGraph?: { url?: string; locale?: string; title?: string } };
@@ -1005,9 +1019,10 @@ test('Robot en fête 2027: its page /robot-en-fete is French (lang="fr" on its t
   assert.match(html, /<div class="mt-8" lang="fr"><div class="[^"]*"><span class="[^"]*">mBot2<\/span><\/div><\/div>/);
   const part = html.slice(html.indexOf('<div lang="fr"><section'));
   assert.ok(part.startsWith('<div lang="fr"><section'), 'the part about the simulator');
-  assert.ok(part.includes('>S’entraîner en ligne<') && part.includes('>Essaie le simulateur Robot en fête 2027</h2>'));
-  assert.ok(part.includes(`>${entry.simulator.summary}</p>`), 'the sentences of its simulator');
-  assert.match(part, /<a[^>]*href="\/simulator\/robot-en-fete"[^>]*>Ouvrir le simulateur<\/a>/);
+  assert.ok(part.includes('>S’entraîner en ligne<') && part.includes('>Essaie le simulateur Tri d’entrepôt</h2>'));
+  assert.ok(part.includes(`>${simulator.summary}</p>`), 'the sentences of its simulator');
+  assert.match(part, /<a[^>]*href="\/simulator\/tri-entrepot"[^>]*>Ouvrir le simulateur<\/a>/);
+  assert.equal(part.match(/<section/g)?.length, 1, 'one part: one simulator');
   assert.equal(html.match(/ lang="fr"/g)?.length, 5, 'eyebrow, title, lead, pill and the part about the simulator');
   // nothing of a season's category page: no age, no downloads, no photos, no other categories - and no English of those pages
   for (const word of ['Ages', 'years', 'Season', 'Practise online', 'Try the', 'Open the simulator', 'Rules and downloads', 'Gallery', 'photos', 'undefined']) {
@@ -1015,8 +1030,9 @@ test('Robot en fête 2027: its page /robot-en-fete is French (lang="fr" on its t
   }
 });
 
-test('Simulator page: after the seasons, a part of its own for Robot en fête 2027 - in French, with a card like the others - and the English cards keep their words', async () => {
+test('Simulator page: after the seasons, a part of its own for Robot en fête 2027 - in French, with a card like the others for Tri d’entrepôt - and the English cards keep their words', async () => {
   const entry = fete();
+  const [simulator] = entry.simulators;
   const { default: SimulatorPage, metadata } = (await import('../../app/simulator/page')) as {
     default: () => Parameters<typeof renderToStaticMarkup>[0];
     metadata: { description?: string };
@@ -1024,7 +1040,7 @@ test('Simulator page: after the seasons, a part of its own for Robot en fête 20
   // the page's description names it after the seasons' categories, in one more English sentence
   assert.match(
     metadata.description ?? '',
-    /Fire Chief \(ages 14–17\)\. And Robot en fête 2027, the French version of Warehouse Sort\. Free, nothing to install\.$/,
+    /Fire Chief \(ages 14–17\)\. And Robot en fête 2027 \(in French\): Tri d’entrepôt, the French version of Warehouse Sort\. Free, nothing to install\.$/,
   );
   const html = renderToStaticMarkup(createElement(SimulatorPage));
   const start = html.indexOf('<section aria-labelledby="category-robot-en-fete" lang="fr">');
@@ -1034,19 +1050,19 @@ test('Simulator page: after the seasons, a part of its own for Robot en fête 20
   assert.equal(html.indexOf('<section', start + 1), -1, 'the last part');
   assert.match(part, /<h2 id="category-robot-en-fete" class="[^"]*">Robot en fête 2027<\/h2>/);
   assert.equal(part.match(/<li /g)?.length, 1, 'one card');
-  const linkStart = part.indexOf('<a aria-label="Ouvrir le simulateur Robot en fête 2027"');
+  const linkStart = part.indexOf('<a aria-label="Ouvrir le simulateur Tri d’entrepôt"');
   assert.ok(linkStart > 0, 'a link named in French after the simulator');
   const link = part.slice(linkStart, part.indexOf('</a>', linkStart) + 4);
-  assert.match(link, /href="\/simulator\/robot-en-fete"/);
-  assert.match(link, /aria-describedby="simulator-robot-en-fete-summary"/);
+  assert.match(link, /href="\/simulator\/tri-entrepot"/);
+  assert.match(link, /aria-describedby="simulator-tri-entrepot-summary"/);
   assert.ok(!link.slice(2).includes('<a '), 'no link inside the link');
   // its picture (the mat of Warehouse Sort), its two labels, its name, its sentences and its hint, all in French
-  assert.match(link, /<img [^>]*alt="Le tapis du simulateur Robot en fête 2027, vu de dessus"/);
+  assert.match(link, /<img [^>]*alt="Le tapis du simulateur Tri d’entrepôt, vu de dessus"/);
   assert.match(link, /<img [^>]*src="[^"]*%2Fsimulator%2Fwarehouse-sort%2Fmat\.webp/);
   for (const label of ['En français', 'mBot2']) assert.ok(link.includes(`>${label}</span>`), label);
-  assert.ok(link.includes('>Simulateur Robot en fête 2027</h3>'));
-  assert.ok(link.includes(`<p id="simulator-robot-en-fete-summary" class="mt-2 flex-1 text-sm leading-relaxed text-ink-600 text-pretty">${entry.simulator.summary}</p>`));
-  assert.ok(link.includes('>Ouvrir le simulateur Robot en fête 2027<'));
+  assert.ok(link.includes('>Simulateur Tri d’entrepôt</h3>'));
+  assert.ok(link.includes(`<p id="simulator-tri-entrepot-summary" class="mt-2 flex-1 text-sm leading-relaxed text-ink-600 text-pretty">${simulator.summary}</p>`));
+  assert.ok(link.includes('>Ouvrir le simulateur Tri d’entrepôt<'));
   // under the card, outside the link, "À propos de" leads to its own page
   const rest = part.slice(linkStart + link.length);
   assert.match(rest, /^<a class="[^"]*" href="\/robot-en-fete">À propos de Robot en fête 2027</);
@@ -1063,32 +1079,34 @@ test('Simulator page: after the seasons, a part of its own for Robot en fête 20
     if (card.about) assert.ok(markup.includes(`About <!-- -->${card.name.replace(/&/g, '&amp;')}`), card.name);
   }
   // (the French card's words are whole texts: no markers in them)
-  assert.ok(markup.includes('>Simulateur Robot en fête 2027</h3>') && markup.includes('>À propos de Robot en fête 2027<'));
+  assert.ok(markup.includes('>Simulateur Tri d’entrepôt</h3>') && markup.includes('>À propos de Robot en fête 2027<'));
 });
 
-test('sitemap: the page of Robot en fête 2027 and its simulator, after the seasons, each once', async () => {
+test('sitemap: the page of Robot en fête 2027 and its simulator Tri d’entrepôt, after the seasons, each once', async () => {
   const { default: sitemap } = (await import('../../app/sitemap')) as { default: () => Array<{ url: string; priority?: number }> };
   const entries = sitemap().map((entry) => [entry.url.slice(site.url.length), entry.priority]);
   assert.deepEqual(entries.slice(-2), [
     ['/robot-en-fete', 0.6],
-    ['/simulator/robot-en-fete', 0.7],
+    ['/simulator/tri-entrepot', 0.7],
   ]);
   const urls = entries.map(([url]) => url);
   assert.equal(urls.length, new Set(urls).size, 'no address twice');
 });
 
-test('README: the Robot en fête 2027 section, after Warehouse Sort\'s - its two addresses, its entry outside the seasons, the six examples, the five questions - and every place that counts the games', () => {
+test('README: the section of Tri d’entrepôt (Robot en fête 2027), after Warehouse Sort\'s - its two addresses, its entry outside the seasons, the six examples, the five questions - and every place that counts the games', () => {
   const readme = readFileSync(fromRoot('README.md'), 'utf8');
-  const start = readme.indexOf('\n## The Robot en fête 2027 simulator\n');
+  const start = readme.indexOf('\n## The Tri d’entrepôt simulator (Robot en fête 2027)\n');
   const end = readme.indexOf('\n## ', start + 1);
   assert.ok(start > readme.indexOf('\n## The Warehouse Sort simulator\n') && readme.indexOf('\n## The Warehouse Sort simulator\n') > 0, 'after the Warehouse Sort section');
   assert.ok(readme.startsWith('\n## The Locker Room simulator\n', end), 'and before the Locker Room section');
   const section = readme.slice(start, end);
   const flat = section.replace(/\s+/g, ' ');
-  for (const address of ['https://www.makexlebanon.com/simulator/robot-en-fete', 'https://www.makexlebanon.com/robot-en-fete']) assert.ok(flat.includes(address), address);
+  for (const address of ['https://www.makexlebanon.com/simulator/tri-entrepot', 'https://www.makexlebanon.com/robot-en-fete']) assert.ok(flat.includes(address), address);
+  // (the simulator's address before its name is nowhere; its game's folder src/simulator/robot-en-fete/ keeps its name)
+  assert.ok(!/(?<!src)\/simulator\/robot-en-fete\b/.test(readme), 'the simulator\'s address before its name is nowhere');
   // where it is: its own entry, outside the seasons, which content/seasons.ts does not know
   assert.ok(flat.includes('**`content/standalone.ts`**') && flat.includes('`content/seasons.ts` does not know it'));
-  assert.ok(flat.includes('`locale="fr"`') && flat.includes('"Robot en fête 2027 — in French"'));
+  assert.ok(flat.includes('`text={FR_TEXT}`') && flat.includes('"Tri d’entrepôt — Robot en fête 2027"'));
   // the six examples of its catalog, each with its level and its title, in catalog order, and the points they score
   const rows = [...section.matchAll(/^\| `(fete-[a-z-]+)` \| (starter|intermediate|advanced) \| ([^|]+) \| ([^|]+) \|/gm)];
   assert.deepEqual(

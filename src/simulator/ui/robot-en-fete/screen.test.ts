@@ -1,8 +1,9 @@
 /**
- * The page of Robot en fête 2027 without a browser: what its screen (./RobotEnFeteSimulator.tsx)
- * hands the general screen - Warehouse Sort's props, with the French game, words, rules, panel,
- * code reader and test lists, and locale="fr" - and its loader (./RobotEnFeteLoader.tsx), whose
- * loading screen is already French. And that the English Warehouse Sort page did not change for it.
+ * The page of Tri d’entrepôt (Robot en fête 2027) without a browser: what its screen
+ * (./RobotEnFeteSimulator.tsx) hands the general screen - Warehouse Sort's props, with the French
+ * game, words, rules, panel, code reader and test lists, and the French word table, text={FR_TEXT} -
+ * and its loader (./RobotEnFeteLoader.tsx), whose loading screen is already French (with the French
+ * words of the title row only). And that the English Warehouse Sort page did not change for it.
  *
  * (The words, the rules, the panel and the test lists themselves are tested in ./words.test.ts and
  * ./rules.test.ts; the French table of the screen in ../text/text.test.ts; the site's parts - the
@@ -22,9 +23,10 @@ import { robotEnFeteGame } from '../../robot-en-fete/game';
 import { warehouseSortGame } from '../../warehouse-sort/game';
 import { START_POSE } from '../../warehouse-sort/robot';
 import { EXAMPLES_GAMES } from '../member-unlock';
-import { ScreenTextContext } from '../text/context';
-import { FR_TEXT } from '../text/fr';
+import { FR_TITLE_TEXT } from '../text/fr-title';
+import { TitleTextContext } from '../text/title-context';
 import { TitleBar } from '../TitleBar';
+import { TRI_ENTREPOT_TITLE } from './title';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const read = (file: string): string => readFileSync(path.join(HERE, file), 'utf8');
@@ -52,21 +54,21 @@ function simulatorAppProps(file: string): Map<string, string> {
 /** The code of a file without its comments (a comment may name anything). */
 const code = (text: string): string => text.replace(/\/\*[^]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
 
-test('screen: the French screen hands the general screen every prop Warehouse Sort\'s hands it, and locale="fr" - with the French game, words, rules, panel, code reader and test lists', () => {
+test('screen: the French screen hands the general screen every prop Warehouse Sort\'s hands it, and the French word table - with the French game, words, rules, panel, code reader and test lists', () => {
   const french = simulatorAppProps('./RobotEnFeteSimulator.tsx');
   const english = simulatorAppProps('../warehouse-sort/WarehouseSortSimulator.tsx');
-  // the same props, and one more: the language
-  assert.deepEqual([...french.keys()].filter((name) => name !== 'locale').sort(), [...english.keys()].sort());
-  assert.equal(french.get('locale'), '"fr"');
-  assert.ok(!english.has('locale'), 'the English page sets no language');
+  // the same props, and one more: the word table of the language
+  assert.deepEqual([...french.keys()].filter((name) => name !== 'text').sort(), [...english.keys()].sort());
+  assert.equal(french.get('text'), '{FR_TEXT}');
+  assert.ok(!english.has('text') && !english.has('locale'), 'the English page sets no language');
   // the robot, the table, the start pose and how the screen is laid out: Warehouse Sort's own
   for (const same of ['robotConfig', 'stageMargin', 'initialStartPose', 'showLastPrint', 'titleWrapsOnPhone', 'batchRandomLists', 'renderCombinationEditor', 'examples']) {
     assert.equal(french.get(same), english.get(same), same);
   }
   // the game, the title and every word list: the French ones
-  assert.deepEqual(Object.fromEntries([...french].filter(([name]) => !['robotConfig', 'stageMargin', 'initialStartPose', 'showLastPrint', 'titleWrapsOnPhone', 'batchRandomLists', 'renderCombinationEditor', 'examples', 'locale'].includes(name))), {
+  assert.deepEqual(Object.fromEntries([...french].filter(([name]) => !['robotConfig', 'stageMargin', 'initialStartPose', 'showLastPrint', 'titleWrapsOnPhone', 'batchRandomLists', 'renderCombinationEditor', 'examples', 'text'].includes(name))), {
     game: '{robotEnFeteGame}',
-    title: '"Robot en fête 2027"',
+    title: '{TRI_ENTREPOT_TITLE}',
     startZoneName: '{ROBOT_EN_FETE_START_ZONE}',
     rules: '{ROBOT_EN_FETE_RULES}',
     rulesNote: '{ROBOT_EN_FETE_RULES_NOTE}',
@@ -89,30 +91,36 @@ test('screen: the French screen hands the general screen every prop Warehouse So
   assert.notEqual(robotEnFeteGame, warehouseSortGame);
   assert.deepEqual(START_POSE, robotEnFeteGame.defaultStartPose);
   assert.match(read('./RobotEnFeteSimulator.tsx'), /^'use client';/);
+  // its name: the name of its mission, « Tri d’entrepôt » (the organiser), the same on the loading screen
+  assert.equal(TRI_ENTREPOT_TITLE, 'Tri d’entrepôt');
+  assert.match(robotEnFeteGame.title, /: Tri d’entrepôt \(Robot en fête 2027\)$/);
 });
 
 test('page: its address and its French title and description; the loader shows the French title row and message, in lang="fr", while the screen loads', async () => {
-  const { metadata } = (await import('../../../app/simulator/robot-en-fete/page')) as {
+  const { metadata } = (await import('../../../app/simulator/tri-entrepot/page')) as {
     metadata: { title?: string; description?: string; alternates?: { canonical?: string }; openGraph?: { url?: string; locale?: string; title?: string } };
   };
-  assert.equal(metadata.title, 'Simulateur mBot2 — Robot en fête 2027');
-  assert.equal(metadata.alternates?.canonical, '/simulator/robot-en-fete');
-  assert.deepEqual([metadata.openGraph?.url, metadata.openGraph?.locale, metadata.openGraph?.title], ['/simulator/robot-en-fete', 'fr_LB', metadata.title]);
+  assert.equal(metadata.title, 'Simulateur mBot2 — Tri d’entrepôt (Robot en fête 2027)');
+  assert.equal(metadata.alternates?.canonical, '/simulator/tri-entrepot');
+  assert.deepEqual([metadata.openGraph?.url, metadata.openGraph?.locale, metadata.openGraph?.title], ['/simulator/tri-entrepot', 'fr_LB', metadata.title]);
   const description = metadata.description ?? '';
   assert.match(description, /^Construis un programme avec des blocs comme dans mBlock et regarde un mBot2 de Makeblock ranger des cubes rouges et verts /);
-  assert.match(description, / de la mission pour débutants « Warehouse Sort »\. Gratuit, dans le navigateur\. La version française de Warehouse Sort\.$/);
+  assert.ok(description.includes(' — avec toutes les dispositions des cubes, et le score que donnent les règles de la mission pour débutants « Warehouse Sort ». '), description);
+  assert.match(description, / Gratuit, dans le navigateur\. Tri d’entrepôt est la version française de Warehouse Sort\.$/);
   assert.ok(!/ [:;!?»]|« /.test(description), 'a no-break space before : ; ! ? » and after «');
-  assert.match(read('../../../app/simulator/robot-en-fete/page.tsx'), /return <RobotEnFeteLoader \/>;/);
-  // the loader: the French table above the loading screen, lang="fr" on its frame, the title row of this page
+  assert.match(read('../../../app/simulator/tri-entrepot/page.tsx'), /return <RobotEnFeteLoader \/>;/);
+  // the loader: the French words of the title row above the loading screen (not the whole table:
+  // every page fetches the loader ahead, through the menu), lang="fr" on its frame, the title row of this page
   const loader = code(read('./RobotEnFeteLoader.tsx'));
   assert.match(read('./RobotEnFeteLoader.tsx'), /^'use client';/);
-  assert.match(loader, /<ScreenTextContext\.Provider value=\{FR_TEXT\}>\s*<div className=\{PAGE_FRAME\} lang="fr">/);
+  assert.match(loader, /<TitleTextContext\.Provider value=\{FR_TITLE_TEXT\}>\s*<div className=\{PAGE_FRAME\} lang="fr">/);
+  for (const word of ['FR_TEXT', 'ScreenTextContext', "'../text/fr'", "'../text/context'"]) assert.ok(!loader.includes(word), word);
   assert.equal([...loader.matchAll(/<TitleBar\b[^>]*>/g)].length, 1, 'one title row');
-  assert.match(loader, /<TitleBar title="Robot en fête 2027" wrapOnPhone \/>/);
+  assert.match(loader, /<TitleBar title=\{TRI_ENTREPOT_TITLE\} wrapOnPhone \/>/);
   assert.ok(loader.includes('>Préparation du tapis et du robot…<'));
   assert.match(loader, /dynamic\(\(\) => import\('\.\/RobotEnFeteSimulator'\), \{\s+ssr: false,/);
-  // ... which, with the French table, is the screen's own title row in French: Accueil / Simulateur, "Simulateur Robot en fête 2027 · mBot2", "Proposé par"
-  const row = renderToStaticMarkup(createElement(ScreenTextContext.Provider, { value: FR_TEXT }, createElement(TitleBar, { title: 'Robot en fête 2027', wrapOnPhone: true })));
+  // ... which, with those words, is the screen's own title row in French: Accueil / Simulateur, "Simulateur Tri d’entrepôt · mBot2", "Proposé par"
+  const row = renderToStaticMarkup(createElement(TitleTextContext.Provider, { value: FR_TITLE_TEXT }, createElement(TitleBar, { title: TRI_ENTREPOT_TITLE, wrapOnPhone: true })));
   assert.deepEqual(
     [...row.matchAll(/<a[^>]*href="([^"]+)"[^>]*>([^<]+)<\/a>/g)].map((match) => [match[1], match[2]]),
     [
@@ -121,7 +129,7 @@ test('page: its address and its French title and description; the loader shows t
     ],
   );
   assert.match(row, /<nav aria-label="Fil d’Ariane"/);
-  assert.match(row, /<h1[^>]*>Simulateur Robot en fête 2027 <span[^>]*>· mBot2<\/span><\/h1>/);
+  assert.match(row, /<h1[^>]*>Simulateur Tri d’entrepôt <span[^>]*>· mBot2<\/span><\/h1>/);
   assert.ok(row.includes('Proposé par <span'));
   for (const word of ['Home', 'Breadcrumb', 'Powered by', ' simulator']) assert.ok(!row.includes(word), word);
 });
@@ -129,7 +137,7 @@ test('page: its address and its French title and description; the loader shows t
 test('the English page of Warehouse Sort is as it was: no language, no French table, nothing of Robot en fête', () => {
   for (const file of ['../warehouse-sort/WarehouseSortSimulator.tsx', '../warehouse-sort/WarehouseSortLoader.tsx', '../../../app/simulator/warehouse-sort/page.tsx']) {
     const source = code(read(file));
-    for (const word of ['locale=', 'lang=', 'FR_TEXT', 'ScreenTextContext', 'robot-en-fete', 'RobotEnFete', 'ROBOT_EN_FETE', 'fr_LB']) assert.ok(!source.includes(word), `${file}: ${word}`);
+    for (const word of ['locale=', 'lang=', 'text=', 'FR_TEXT', 'FR_TITLE_TEXT', 'ScreenTextContext', 'TitleTextContext', 'robot-en-fete', 'RobotEnFete', 'ROBOT_EN_FETE', 'tri-entrepot', 'fr_LB']) assert.ok(!source.includes(word), `${file}: ${word}`);
   }
   // (the English page's share data keeps the site's own locale)
   assert.match(code(read('../../../app/simulator/warehouse-sort/page.tsx')), /\slocale: site\.locale,\s/);

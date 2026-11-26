@@ -1,10 +1,11 @@
 'use client';
 
 /**
- * The simulator of Robot en fête 2027: the Warehouse Sort mission (MakeX Lebanon, Inspire
- * category, local event) all in French, a category of its own. It is the general simulator
- * screen (../SimulatorApp) with `locale="fr"` - the French word table above the whole screen,
- * lang="fr" on its frame, the blocks and Blockly's own words in French - filled in with the French
+ * The simulator Tri d’entrepôt of Robot en fête 2027 (a category of its own): the Warehouse Sort
+ * mission (MakeX Lebanon, Inspire category, local event) all in French. It is the general simulator
+ * screen (../SimulatorApp) given the French word table, `text={FR_TEXT}` - the table above the
+ * whole screen, lang="fr" on its frame, the blocks and Blockly's own words in French (the table
+ * loads the French words of the blocks too: ../../blocks/fr.ts) - filled in with the French
  * twin of the Warehouse Sort game (../../robot-en-fete/game.ts: the same mat, cubes, 24
  * arrangements, points and referee, with French words, the warehouses E1 - E4 and the codes
  * R, V, B), its French words, rules, Cube colours panel and lists of "Tester sur plusieurs
@@ -25,12 +26,14 @@ import { TABLE_STRIP } from '../../warehouse-sort/field';
 import { START_POSE, WAREHOUSE_SORT_ROBOT } from '../../warehouse-sort/robot';
 import type { WarehouseSortScenario } from '../../warehouse-sort/scenario';
 import { SimulatorApp } from '../SimulatorApp';
+import { FR_TEXT } from '../text/fr';
 import type { ExamplesConfig } from '../useMemberExamples';
 import { ArrangementEditor } from '../warehouse-sort/ArrangementEditor';
 import { ROBOT_EN_FETE_BATCH_PRESETS, ROBOT_EN_FETE_TIE_BREAK, robotEnFeteSummaryLabel, robotEnFeteSummaryOrder } from './arrangement-batch';
 import { readRobotEnFeteCode } from './arrangement-code';
 import { FR_ARRANGEMENT_WORDS } from './arrangement-words';
 import { ROBOT_EN_FETE_ASSUMPTIONS, ROBOT_EN_FETE_RULES, ROBOT_EN_FETE_RULES_NOTE } from './rules';
+import { TRI_ENTREPOT_TITLE } from './title';
 import { ROBOT_EN_FETE_START_ZONE, ROBOT_EN_FETE_WORDS } from './words';
 
 function renderCombinationEditor(scenario: WarehouseSortScenario, onChange: (next: WarehouseSortScenario) => void): ReactNode {
@@ -49,12 +52,12 @@ export default function RobotEnFeteSimulator() {
   return (
     <SimulatorApp
       // the whole screen in French: the word table, lang="fr", the blocks (../text/fr.tsx, ../../blocks/fr.ts)
-      locale="fr"
+      text={FR_TEXT}
       game={robotEnFeteGame}
       // the mBot2 of Warehouse Sort, with its line sensor set for white lines on the black mat (../../warehouse-sort/robot.ts)
       robotConfig={WAREHOUSE_SORT_ROBOT}
-      title="Robot en fête 2027"
-      // ("Simulateur Robot en fête 2027" is longer than a 360 px phone has room for: two lines there, not cut off)
+      title={TRI_ENTREPOT_TITLE}
+      // ("Simulateur Tri d’entrepôt" with the robot's name does not fit every phone's line: two lines there, not cut off)
       titleWrapsOnPhone
       // no walls: the robot and the cubes can leave the mat, up to the edge of the table - the stage shows all of it
       stageMargin={TABLE_STRIP}

@@ -65,9 +65,10 @@ export type NavItem = {
  * The dropdown of "Simulator": the Simulator page, then every simulator in the order of that page
  * (Season 2026 first), as "Warehouse Sort — Season 2026". Built from `simulatorSeasons()`, the
  * list the page shows, so a simulator added in content/seasons.ts appears here by itself, in its
- * season's place. After the seasons, as on the page, the categories of their own
- * (content/standalone.ts), each with its line: "Robot en fête 2027 — in French". (The sections and
- * the categories can be handed in, for the tests.)
+ * season's place. After the seasons, as on the page, the simulators of the categories of their own
+ * (content/standalone.ts), one line each: "Tri d’entrepôt — Robot en fête 2027" - the French name
+ * of the simulator, then of its category, both French proper names in this English menu, written
+ * as they are. (The sections and the categories can be handed in, for the tests.)
  */
 export function simulatorMenu(
   sections = simulatorSeasons(),
@@ -81,7 +82,7 @@ export function simulatorMenu(
         href: simulator.href,
       })),
     ),
-    ...standalone.map((category) => ({ label: category.simulator.menuLabel, href: category.simulator.href })),
+    ...standalone.flatMap((category) => category.simulators.map((simulator) => ({ label: simulator.menuLabel, href: simulator.href }))),
   ];
 }
 

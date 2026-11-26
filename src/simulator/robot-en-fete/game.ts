@@ -25,7 +25,8 @@ export const ROBOT_EN_FETE_ID = 'robot-en-fete';
 
 export const robotEnFeteGame: Game<WarehouseSortScenario> = createWarehouseSortGame(FR_REFEREE_WORDS, {
   id: ROBOT_EN_FETE_ID,
-  title: `MakeX Lebanon - Inspire${NB}: Robot en fête 2027`,
+  // (its simulator is « Tri d’entrepôt », of the category Robot en fête 2027)
+  title: `MakeX Lebanon - Inspire${NB}: Tri d’entrepôt (Robot en fête 2027)`,
   codec: FR_CODEC,
   scenarioText: FR_SCENARIO_TEXT,
 });

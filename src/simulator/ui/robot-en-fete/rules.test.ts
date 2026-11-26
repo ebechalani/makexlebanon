@@ -170,7 +170,7 @@ test('what the simulator only assumes is in the second part; the rules part does
     ['the total never below 0', /Le total n’est jamais en dessous de 0\./],
     ['the yellow frame', /Le cadre jaune fait partie de la zone de départ\./],
     ['"carried"', /« Porté » veut dire : la pince tient le cube et l’a déplacé d’au moins 4 cm\./],
-    ['a raised claw does not touch a cube', /« Toucher » veut dire : à moins de 0,5 mm\. Une pince haut au-dessus d’un cube ne le touche pas\./],
+    ['a raised claw does not touch a cube', /« Toucher » veut dire : à moins de 0,5 mm\. Une pince levée bien au-dessus d’un cube ne le touche pas\./],
     ['a cube in the wrong bay loses its pick-up points', /Un cube dans la baie de l’autre couleur : -5, et il perd aussi ses 5 points pour avoir été pris\./],
     ['partly inside the other bay', /Un cube seulement en partie dedans ne coûte rien\./],
     ['a held cube is not off the mat', /Un cube que le robot tient encore n’est pas hors du tapis\./],

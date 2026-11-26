@@ -114,10 +114,21 @@ export function blankProgram(): ProgramJson {
   };
 }
 
+/**
+ * The games whose program files are not named after their id: the French Warehouse Sort keeps the
+ * id 'robot-en-fete' (the work saved in the browser, the examples), but Robot en fête 2027 is its
+ * category, which will have more than one simulator; its files are named after its simulator,
+ * Tri d’entrepôt, as its address is (/simulator/tri-entrepot).
+ */
+const FILE_NAMES: Readonly<Record<string, string>> = {
+  'robot-en-fete': 'tri-entrepot',
+};
+
 /** A safe file name for the download: "fire-rescue-program-2027-03-14.json". */
 export function programFileName(gameId: string, now: Date = new Date()): string {
   const day = now.toISOString().slice(0, 10);
-  return `${gameId.replace(/[^a-z0-9-]+/gi, '-')}-program-${day}.json`;
+  const name = Object.prototype.hasOwnProperty.call(FILE_NAMES, gameId) ? FILE_NAMES[gameId] : gameId;
+  return `${name.replace(/[^a-z0-9-]+/gi, '-')}-program-${day}.json`;
 }
 
 // =============================================================================================
@@ -197,12 +208,12 @@ export function gameNameFromId(gameId: string): string {
  * Rescue game of before the split, 'fire-rescue' (so that the work saved on the Fire Rescue page
  * is found again on the Senior page), and the website has no page called "Fire Rescue" any more.
  * A file saved on that page before the split is named after the Senior page too: it is the same
- * game, and its old address leads there. Robot en fête 2027 is a French name, with its accent and
- * its year: its id cannot say it ("Robot En Fete").
+ * game, and its old address leads there. The game 'robot-en-fete' is the simulator Tri d’entrepôt
+ * of Robot en fête 2027, a French name its id cannot say ("Robot En Fete").
  */
 const GAME_NAMES: Readonly<Record<string, string>> = {
   'fire-rescue': 'Fire Rescue Senior',
-  'robot-en-fete': 'Robot en fête 2027',
+  'robot-en-fete': 'Tri d’entrepôt',
 };
 
 /** The name of a game as its page shows it in the title row: "Fire Rescue Senior", "Fire Rescue Junior", "Fire Chief". */

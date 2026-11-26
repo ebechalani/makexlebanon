@@ -469,6 +469,13 @@ export interface ConsoleText {
   startLine(scenarioWord: string | undefined, code: string): string;
   noStartHat: string;
   nothingSnapped: string;
+  /**
+   * A warning at Start for a text typed into a text bubble that looks like a number with a decimal
+   * comma ("30,5": ../comma-texts.ts), which the program counts as no number. English: null - the
+   * English screen writes a decimal point, so nothing invites a comma there; the French screen
+   * writes a comma everywhere, so it says what a text bubble does with one.
+   */
+  commaTextWarning(typed: string): string | null;
   stoppedByYou: string;
   matPictureFailed: string;
   /** ../format.ts: an event of the engine as a line of the console */

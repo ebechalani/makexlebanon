@@ -7,7 +7,8 @@ import { Button, Section, SectionHeading } from '@/components/ui';
 /**
  * The page of Robot en fête 2027, a category of its own (content/standalone.ts): outside every
  * season, so it has no season page above it, no photos, no downloads and no other categories next
- * to it - only what it is and its simulator. Its texts are French (lang="fr" on each of them); the
+ * to it - only what it is and its simulators, one part each (today one: Tri d’entrepôt; a simulator
+ * added to the entry gets its part by itself). Its texts are French (lang="fr" on each of them); the
  * breadcrumbs are the website's own path and stay English, as the menu and the footer do. No age
  * group is shown (the organiser asked for none).
  */
@@ -71,15 +72,17 @@ export default function RobotEnFetePage() {
         </div>
       </PageHero>
 
-      {/* Its simulator, as a category page of a season shows its own */}
-      <div lang={category.lang}>
-        <Section className="bg-slate-50">
-          <div className="flex flex-wrap items-center justify-between gap-8">
-            <SectionHeading eyebrow={category.page.simulatorEyebrow} title={category.page.simulatorTitle} lead={category.simulator.summary} />
-            <Button href={category.simulator.href}>{category.page.open}</Button>
-          </div>
-        </Section>
-      </div>
+      {/* Its simulators, as a category page of a season shows its own */}
+      {category.simulators.map((simulator) => (
+        <div key={simulator.href} lang={category.lang}>
+          <Section className="bg-slate-50">
+            <div className="flex flex-wrap items-center justify-between gap-8">
+              <SectionHeading eyebrow={category.page.simulatorEyebrow} title={simulator.pageTitle} lead={simulator.summary} />
+              <Button href={simulator.href}>{category.page.open}</Button>
+            </div>
+          </Section>
+        </div>
+      ))}
     </>
   );
 }

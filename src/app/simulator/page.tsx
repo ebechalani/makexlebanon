@@ -17,8 +17,8 @@ const DESCRIPTION =
   'MakeX Lebanon mission in the browser: the Season 2026 category Locker Room (Capelli, ages 13–15) and ' +
   'Warehouse Sort, the beginner mission of the Inspire category (Season 2026), and the 2027 categories ' +
   'Fire Cadet (mTiny, ages 4–7), Fire Fighter (ages 8–10), Fire Rescue Junior (ages 10–12), Fire Rescue Senior ' +
-  '(ages 13–15) and Fire Chief (ages 14–17). And Robot en fête 2027, the French version of Warehouse Sort. ' +
-  'Free, nothing to install.';
+  '(ages 13–15) and Fire Chief (ages 14–17). And Robot en fête 2027 (in French): Tri d’entrepôt, the French ' +
+  'version of Warehouse Sort. Free, nothing to install.';
 
 /**
  * The site's share card (src/app/opengraph-image.tsx). A page that sets its own `openGraph`
@@ -59,9 +59,10 @@ export const metadata: Metadata = {
  * `simulatorSeasons()` in content/seasons.ts, so a simulator added there appears here by itself.
  *
  * After the seasons, one part for each category of its own (content/standalone.ts): Robot en
- * fête 2027, in French. That part is in its category's language (lang="fr"), and so are all the
- * words of its card, which come from the same entry: a card is given all its words (CardWords),
- * so that none of them can fall back to the English of the other cards.
+ * fête 2027, in French, with a card for each of its simulators (today Tri d’entrepôt). That part is
+ * in its category's language (lang="fr"), and so are all the words of its cards, which come from
+ * the same entry: a card is given all its words (CardWords), so that none of them can fall back to
+ * the English of the other cards.
  *
  * A card is one link to the simulator (the picture, the name and the sentences), so it can be
  * clicked anywhere. The "About <category>" link is a separate link under the card: a link may
@@ -104,17 +105,20 @@ export default function SimulatorPage() {
                 </h2>
 
                 <ul className="mt-8 grid gap-6 md:grid-cols-2">
-                  <CardItem
-                    simulator={{
-                      name: category.name,
-                      href: category.simulator.href,
-                      summary: category.simulator.summary,
-                      mat: category.simulator.mat,
-                      labels: category.simulator.card.labels,
-                      about: `/${category.slug}`,
-                    }}
-                    words={category.simulator.card}
-                  />
+                  {category.simulators.map((simulator) => (
+                    <CardItem
+                      key={simulator.href}
+                      simulator={{
+                        name: simulator.name,
+                        href: simulator.href,
+                        summary: simulator.summary,
+                        mat: simulator.mat,
+                        labels: simulator.card.labels,
+                        about: `/${category.slug}`,
+                      }}
+                      words={simulator.card}
+                    />
+                  ))}
                 </ul>
               </section>
             ))}

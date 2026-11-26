@@ -58,7 +58,8 @@ export const ROBOT_EN_FETE_RULES: RulesSection[] = [
   {
     title: 'La mission',
     items: [
-      `${CUBE_COUNT} entrepôts près des coins ont chacun un cube. ${CUBES_TO_SORT} cubes sont rouges ou verts, un est bleu.`,
+      // (a French sentence does not begin with a digit: the numbers come after a few words)
+      `Près des coins, ${CUBE_COUNT} entrepôts ont chacun un cube${NB}: ${CUBES_TO_SORT} cubes sont rouges ou verts, un est bleu.`,
       `Apporte chaque cube rouge ou vert dans la baie de sa couleur${NB}: un cube rouge dans la baie rouge, un cube vert dans la baie verte.`,
       'Laisse le cube bleu à sa place. Vérifie la couleur d’un cube avant de le prendre.',
       'À la fin, gare le robot sur une des deux aires d’arrivée rondes, à gauche ou à droite.',
@@ -143,7 +144,7 @@ export const ROBOT_EN_FETE_ASSUMPTIONS: RulesPart = {
       items: [
         `Un cube mesure ${cm(CUBE_SIZE)} cm de chaque côté et il est léger${NB}: le robot peut le pousser. Les règles ne donnent pas de taille.`,
         `${quote('Porté')} veut dire${NB}: la pince tient le cube et l’a déplacé d’au moins ${cm(CARRY_MM)} cm.`,
-        `${quote('Toucher')} veut dire${NB}: à moins de ${num(TOUCH_MM)} mm. Une pince haut au-dessus d’un cube ne le touche pas.`,
+        `${quote('Toucher')} veut dire${NB}: à moins de ${num(TOUCH_MM)} mm. Une pince levée bien au-dessus d’un cube ne le touche pas.`,
         `Un cube dans la baie de l’autre couleur${NB}: -${WRONG_BAY_PENALTY}, et il perd aussi ses ${POINTS_PICK} points pour avoir été pris. Les règles disent ${quote('aucun point pour ce cube')}.`,
         `Les -${WRONG_BAY_PENALTY} sont seulement pour un cube tout entier dans l’autre baie. Un cube seulement en partie dedans ne coûte rien.`,
         `Un cube tout entier hors du tapis ne rapporte aucun point, pas même les points pour avoir été pris. Les règles laissent l’arbitre le remettre pour -5 points. Le simulateur ne le fait pas${NB}: le cube reste où il est.`,

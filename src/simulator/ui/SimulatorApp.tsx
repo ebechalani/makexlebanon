@@ -58,7 +58,7 @@ import { headingDegrees, homeKind, homePose, isPose, poseFits, rotatedPose } fro
 import { PAGE_FRAME } from './page-frame';
 import { isRecord, loadJson, saveJson, storageKey } from './storage';
 import { ScreenTextContext, useScreenText } from './text/context';
-import { FR_TEXT } from './text/fr';
+import type { ScreenText } from './text/types';
 import { TitleBar, titleBarButton } from './TitleBar';
 import { useMemberExamples, type ExamplesConfig } from './useMemberExamples';
 import { SPEEDS, useSimulation, type Speed } from './useSimulation';
@@ -88,12 +88,14 @@ export interface RulesPart {
 
 export interface SimulatorAppProps<S> {
   /**
-   * 'fr': the screen speaks French (Robot en fête 2027) - the French word table (./text/fr.tsx)
-   * is set above the whole screen, and its frame says lang="fr". Left out: the screen is English,
-   * as it always was - no table is set (the English one is the default, ./text/context.tsx) and
-   * the frame has no lang of its own.
+   * The word table of the screen in another language: the French page (Tri d’entrepôt, Robot en
+   * fête 2027) hands in the French table (./text/fr.tsx). It is set above the whole screen, and
+   * the frame says the table's language (lang="fr"). Left out: the screen is English, as it always
+   * was - no table is set (the English one is the default, ./text/context.tsx) and the frame has no
+   * lang of its own. (The page hands the table in, so that this screen does not import it: every
+   * English page would download it.)
    */
-  locale?: 'fr';
+  text?: ScreenText;
   game: Game<S>;
   robotConfig: RobotConfig;
   /** short name of the category for the header, e.g. "Fire Rescue Senior" */
@@ -301,13 +303,13 @@ function readSettings<S>(game: Game<S>, robotConfig: RobotConfig, fallbackPose: 
 }
 
 /**
- * The screen, in its language. The French table is set here, above the screen itself, so that
- * the screen and every hook inside it (useSimulation: the console lines) read it.
+ * The screen, in its language. A table the page hands in is set here, above the screen itself, so
+ * that the screen and every hook inside it (useSimulation: the console lines) read it.
  */
 export function SimulatorApp<S>(props: SimulatorAppProps<S>) {
-  if (props.locale === 'fr') {
+  if (props.text) {
     return (
-      <ScreenTextContext.Provider value={FR_TEXT}>
+      <ScreenTextContext.Provider value={props.text}>
         <SimulatorScreen {...props} />
       </ScreenTextContext.Provider>
     );
@@ -757,7 +759,7 @@ function SimulatorScreen<S>(props: SimulatorAppProps<S>) {
   );
 
   return (
-    <div className={`${PAGE_FRAME} text-ink-900`} lang={props.locale}>
+    <div className={`${PAGE_FRAME} text-ink-900`} lang={props.text?.locale}>
       {/* ================================================================ title row (under the site header) */}
       <TitleBar title={props.title} wrapOnPhone={props.titleWrapsOnPhone}>
         {/* (a category with one setup has nothing to test it on many of: see `fixedSetup`) */}

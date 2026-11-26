@@ -217,10 +217,12 @@ and move it to the top of the `seasons` array. Then create matching folders unde
 
 ### `content/standalone.ts`
 
-The categories of their own, outside every season: today **Robot en fête 2027**, the French
-version of Warehouse Sort. Its name, its texts (in French: its card on the Simulator page, its
-page `/robot-en-fete`), its simulator and its line in the menu. No season counts it (see "The
-Robot en fête 2027 simulator").
+The categories of their own, outside every season: today **Robot en fête 2027**, whose French
+simulators are named by their mission — today **Tri d’entrepôt**, the French version of Warehouse
+Sort (a second, « Logistique intelligente », is to come: one more item of its `simulators`). Its
+name, its texts (in French: the cards of its simulators on the Simulator page, its page
+`/robot-en-fete`), its simulators and their lines in the menu. No season counts it (see "The Tri
+d’entrepôt simulator (Robot en fête 2027)").
 
 ---
 
@@ -361,12 +363,12 @@ Both cards show the picture of the Fire Rescue mat, the one the game itself show
 
 The same simulator has more games: **Fire Chief** (the maze, ages 14–17), **Warehouse Sort**
 (the beginner mission of the MakeX Lebanon Inspire category, local event), **Locker Room**
-(Season 2026), **Fire Fighter** (the letter towers, ages 8–10) and **Robot en fête 2027**
-(Warehouse Sort all in French, a category of its own): see "The Fire Chief simulator", "The
-Warehouse Sort simulator", "The Robot en fête 2027 simulator", "The Locker Room simulator" and
+(Season 2026), **Fire Fighter** (the letter towers, ages 8–10) and **Tri d’entrepôt** (Warehouse
+Sort all in French, of Robot en fête 2027, a category of its own): see "The Fire Chief simulator", "The
+Warehouse Sort simulator", "The Tri d’entrepôt simulator (Robot en fête 2027)", "The Locker Room simulator" and
 "The Fire Fighter simulator" further down. One more simulator, **Fire Cadet**, is for another
 robot, the mTiny, and has a screen of its own: see "The Fire Cadet simulator". `/simulator`
-lists the eight simulators: seven by season, then Robot en fête 2027 in a part of its own — see
+lists the eight simulators: seven by season, then Tri d’entrepôt in the part of Robot en fête 2027 — see
 "The Simulator page" there. Nothing is installed, and the
 student's blocks are saved in their own browser — they are never sent anywhere. The one thing
 the simulator asks the website's server for is the ready-made examples: the server decides,
@@ -854,7 +856,7 @@ The simulators have a section of their own on the website: **Simulator** in the 
 Training and Videos, leads to `/simulator`. It is one page (`src/app/simulator/page.tsx`, titled
 "Robot simulators") that lists the eight simulators of two robots — Locker Room and Warehouse Sort
 (Season 2026), Fire Cadet, Fire Fighter, Fire Rescue Junior, Fire Rescue Senior and Fire Chief (Season 2027), and
-Robot en fête 2027 (no season); Fire Cadet is played with the
+Tri d’entrepôt (Robot en fête 2027, no season); Fire Cadet is played with the
 mTiny, the others with the mBot2 — with one part per season — "Season 2026", then "Season 2027" —
 and in each part one card per simulator: the picture of its mat, its two labels (age group and season, or for a mission
 without an age group its category and level, and its event), its name and two sentences. The
@@ -881,11 +883,12 @@ is not a category of a season (Warehouse Sort, the beginner mission of a local e
 entry of `missionSimulators` in the same file instead: its `season` (a year) says in which part
 it is shown, after the categories of that season; it has two labels of its own (`label`,
 `event`) and no "About" link. A season without a simulator gets no part. A category that belongs
-to no season at all (Robot en fête 2027, the French version of Warehouse Sort) is an entry of
-`standaloneCategories` in `content/standalone.ts`: after the seasons it gets a part of its own,
-headed with its name and in its language (`lang="fr"`), whose card takes all its words from that
-entry ("Ouvrir le simulateur Robot en fête 2027", "À propos de Robot en fête 2027"), and its
-"About" link leads to its own page, `/<slug>`. `content/seasons.ts` does not know it, so no
+to no season at all (Robot en fête 2027, whose simulator Tri d’entrepôt is the French version of
+Warehouse Sort) is an entry of `standaloneCategories` in `content/standalone.ts`: after the seasons
+it gets a part of its own, headed with its name and in its language (`lang="fr"`), with one card
+per item of its `simulators`, which takes all its words from that entry ("Ouvrir le simulateur
+Tri d’entrepôt", "À propos de Robot en fête 2027"), and whose "About" link leads to the category's
+own page, `/<slug>`. `content/seasons.ts` does not know it, so no
 season, count or list changes for it. The Training page
 keeps one card that leads to `/simulator` (`simulatorTrack()` in `trainingTracks`, same file),
 "Robot simulators": its badge and its sentence name the seasons and the simulators, worked out
@@ -896,8 +899,8 @@ its own robot in its title row ("Fire Cadet simulator · mTiny", "Fire Rescue Se
 The **Simulator** item of the menu has a dropdown, built by `simulatorMenu()` in
 `content/site.ts` from the same `simulatorSeasons()`: "All simulators" (this page), then one
 line per simulator in the order of the page, as "<name> — Season <year>" ("Warehouse Sort —
-Season 2026"), and after them one line per category of its own, from `content/standalone.ts`
-("Robot en fête 2027 — in French": the menu is English). A simulator added later gets its line by itself; on a phone the lines are listed
+Season 2026"), and after them one line per simulator of a category of its own, from `content/standalone.ts`
+("Tri d’entrepôt — Robot en fête 2027": the menu is English, and these two French names are proper names). A simulator added later gets its line by itself; on a phone the lines are listed
 under "Simulator" in the menu. Keep simulator names short: on a computer the dropdown is as
 wide as its longest line but at most 24rem (`max-w-sm` in `src/components/Header.tsx`), so that
 at 1024 px it still ends inside the window; a longer line breaks onto a second one. A category
@@ -1683,19 +1686,27 @@ rectangle (upper middle)" — and have no blue cube.)
 
 ---
 
-## The Robot en fête 2027 simulator
+## The Tri d’entrepôt simulator (Robot en fête 2027)
 
-**Robot en fête 2027** is the Warehouse Sort simulator **all in French** — a category of its own,
-outside every season. The organiser asked for it ("ajoute une catégorie robot en fête qui sera la
-version française de warehouse sort") and decided: everything in French, the blocks included
-("tout, blocs compris"); exactly the same mission ("oui, exactement la même"); no age group ("pas
-d'âge affiché"); a category on its own, "Robot en fête 2027", with its own card and page, in
-French ("une catégorie seule", "à part, sa propre fiche", "fiche en français"). It lives at:
+**Tri d’entrepôt** is the Warehouse Sort simulator **all in French**, the simulator of **Robot en
+fête 2027** — a category of its own, outside every season. The organiser asked for it ("ajoute une
+catégorie robot en fête qui sera la version française de warehouse sort") and decided: everything
+in French, the blocks included ("tout, blocs compris"); exactly the same mission ("oui, exactement
+la même"); no age group ("pas d'âge affiché"); a category on its own, "Robot en fête 2027", with its
+own card and page, in French ("une catégorie seule", "à part, sa propre fiche", "fiche en
+français"). Robot en fête 2027 names its French simulators by their mission: this one is « Tri
+d’entrepôt »; a second one, « Logistique intelligente » (MakeX Inspire Smart Logistics), is to
+come. It lives at:
 
 ```
-https://www.makexlebanon.com/simulator/robot-en-fete
-https://www.makexlebanon.com/robot-en-fete          (its page: what it is, and a button to the simulator)
+https://www.makexlebanon.com/simulator/tri-entrepot
+https://www.makexlebanon.com/robot-en-fete           (the category's page: what it is, and a button to each of its simulators)
 ```
+
+The game inside keeps the id `robot-en-fete` (the work a student saves in the browser,
+`mbot2-sim:robot-en-fete:*`, and the ids of the examples); its program files are named
+`tri-entrepot-program-<day>.json`, and an English page that opens one says "This program was saved
+in the Tri d’entrepôt simulator."
 
 **It is the same mission as Warehouse Sort**: the same mat, the same four cubes and 24
 arrangements, the same robot, points, clock and referee. A match gives the same points, the same
@@ -1709,7 +1720,7 @@ Blockly's own words ("Créer une variable", "Mes blocs"). The French speaks to t
 
 A few names are this game's own:
 
-| English (Warehouse Sort) | French (Robot en fête 2027) |
+| English (Warehouse Sort) | French (Tri d’entrepôt) |
 | --- | --- |
 | warehouses W1 – W4 ("the W1 cube") | entrepôts E1 – E4 ("le cube E1") |
 | codes with R, G, B: `GR-BR` | codes with R, V, B: `VR-BR` (a code with G is read too: `GR-BR` is the same arrangement) |
@@ -1717,8 +1728,9 @@ A few names are this game's own:
 | Starter, Intermediate, Advanced | Premiers pas, Intermédiaire, Avancé |
 
 **What stays English.** The website around it: the header, the menu (its line in the Simulator
-dropdown reads "Robot en fête 2027 — in French"), the footer, the breadcrumbs of `/robot-en-fete`
-(Home / Simulator / Robot en fête 2027) and the share picture. And the **values a program gets**:
+dropdown reads "Tri d’entrepôt — Robot en fête 2027": two French proper names in the English menu),
+the footer, the breadcrumbs of `/robot-en-fete` (Home / Simulator / Robot en fête 2027) and the
+share picture. And the **values a program gets**:
 the colour sensor gives `red`, `green`, `blue`, … `none`, a condition is `true` or `false`, the
 same on both pages, as we believe the robot gives them (not verified: question 1 below). The
 screen shows them as the program holds them — in the Variables panel, on the CyberPi screen, in
@@ -1729,28 +1741,32 @@ French in brackets: `red (rouge)`. The block menus show French and store the Eng
 ### Where it is on the website
 
 Its entry is **`content/standalone.ts`**, a list of the categories of their own: its name, its
-robot, the lead of its page, the words of its page and of its card, its picture (the mat of
-Warehouse Sort) and its line in the menu — every text in French but the menu line, and every
-one required, so nothing on its card or its page can fall back to English. `content/seasons.ts`
+robot, the lead of its page, the words of its page, and its `simulators` — today one, Tri
+d’entrepôt, with its address, its sentences, the words of its card, its picture (the mat of
+Warehouse Sort) and its line in the menu. Every text is in French but the menu line, and every one
+is required, so nothing on a card or a page can fall back to English. A second simulator is one
+more item of `simulators`: its card, its part of the category's page, its line in the menu and the
+sitemap follow by themselves, with no change to any page. `content/seasons.ts`
 does not know it: no season page, no count of categories, the homepage, the Training card and
 the lists of Season 2026 and Season 2027 are exactly as they were. From that entry:
 
 - **The Simulator page** shows, after the two seasons, a part of its own headed "Robot en fête
-  2027", in French (`lang="fr"`), with one card like the others: the mat, the labels "En
-  français" and "mBot2", "Simulateur Robot en fête 2027", its sentences, "Ouvrir le simulateur
-  Robot en fête 2027", and under it "À propos de Robot en fête 2027", the link to its page. The
-  page's English description says it in one more sentence: "And Robot en fête 2027, the French
-  version of Warehouse Sort."
+  2027", in French (`lang="fr"`), with one card per simulator, like the others: the mat, the
+  labels "En français" and "mBot2", "Simulateur Tri d’entrepôt", its sentences, "Ouvrir le
+  simulateur Tri d’entrepôt", and under it "À propos de Robot en fête 2027", the link to the
+  category's page. The page's English description says it in one more sentence: "And Robot en
+  fête 2027 (in French): Tri d’entrepôt, the French version of Warehouse Sort."
 - **Its page `/robot-en-fete`** (`src/app/robot-en-fete/page.tsx`): its name, its lead, the robot
-  ("mBot2", no age) and the part "Essaie le simulateur Robot en fête 2027" with the button
-  "Ouvrir le simulateur". The French texts say `lang="fr"`; the breadcrumbs are English. It has no
-  photos, no downloads and no other categories next to it: it belongs to no season.
-- **The menu**: "Robot en fête 2027 — in French", after the lines of the seasons
+  ("mBot2", no age) and one part per simulator, "Essaie le simulateur Tri d’entrepôt" with the
+  button "Ouvrir le simulateur". The French texts say `lang="fr"`; the breadcrumbs are English. It
+  has no photos, no downloads and no other categories next to it: it belongs to no season.
+- **The menu**: "Tri d’entrepôt — Robot en fête 2027", after the lines of the seasons
   (`simulatorMenu()` in `content/site.ts`).
-- **The sitemap** has both pages.
+- **The sitemap** has the category's page and the simulator's page.
 
-The simulator's page itself, `src/app/simulator/robot-en-fete/page.tsx`, has a French title
-("Simulateur mBot2 — Robot en fête 2027") and description. The page of the website stays
+The simulator's page itself, `src/app/simulator/tri-entrepot/page.tsx`, has a French title
+("Simulateur mBot2 — Tri d’entrepôt (Robot en fête 2027)") and description; its title row reads
+"Simulateur Tri d’entrepôt · mBot2". The page of the website stays
 `<html lang="en">`; the simulator's screen and its loading screen say `lang="fr"`. There is no
 `hreflang` link between it and Warehouse Sort's page (it would change the English page too).
 
@@ -1758,15 +1774,27 @@ The simulator's page itself, `src/app/simulator/robot-en-fete/page.tsx`, has a F
 
 | What | Where |
 | --- | --- |
-| The screen in French | `src/simulator/ui/robot-en-fete/RobotEnFeteSimulator.tsx`: the general screen with `locale="fr"`, filled in as Warehouse Sort's (`WarehouseSortSimulator.tsx`) with the French game and its French words, rules, panel words, code reader and test lists (the other files of `src/simulator/ui/robot-en-fete/`). `RobotEnFeteLoader.tsx`: the loading screen, French already |
-| The words of the screen | One word table per language: `src/simulator/ui/text/en.tsx` (English) and `fr.tsx` with its parts `fr-common`, `fr-screen`, `fr-match`, `fr-panels`, `fr-console`, `fr-stage` (French); the Gripper window's in `gripper.tsx`. `locale="fr"` sets the French table above the whole screen; a page that sets none — every English page — reads the English one, by the very same code as before |
-| The game in French | `src/simulator/robot-en-fete/game.ts`: Warehouse Sort's game, made by the same function (`createWarehouseSortGame` in `src/simulator/warehouse-sort/game.ts`) with the French words of the referee (`referee-words.ts`) and the French names and codes (`scenario-words.ts`). Its id `robot-en-fete` names the work a student saves here and its program files |
-| The blocks in French | `src/simulator/blocks/fr.ts`: every block, menu and hover text of the palette, and our French for Blockly's own words (Blockly's French file comes with the `blockly` package). The blocks are the same blocks with the same stored values: a program file saved on one page opens on the other |
+| The screen in French | `src/simulator/ui/robot-en-fete/RobotEnFeteSimulator.tsx`: the general screen given the French word table, `text={FR_TEXT}`, filled in as Warehouse Sort's (`WarehouseSortSimulator.tsx`) with the French game and its French words, rules, panel words, code reader and test lists (the other files of `src/simulator/ui/robot-en-fete/`; its name in `title.ts`). `RobotEnFeteLoader.tsx`: the loading screen, French already, with only the French words of the title row (`text/fr-title.tsx`) |
+| The words of the screen | One word table per language: `src/simulator/ui/text/en.tsx` (English) and `fr.tsx` with its parts `fr-common`, `fr-screen`, `fr-title`, `fr-match`, `fr-panels`, `fr-console`, `fr-stage`, `fr-gripper` (French). `text={FR_TEXT}` sets the French table above the whole screen; a page that sets none — every English page — reads the English one, by the very same code as before |
+| The game in French | `src/simulator/robot-en-fete/game.ts`: Warehouse Sort's game, made by the same function (`createWarehouseSortGame` in `src/simulator/warehouse-sort/game.ts`) with the French words of the referee (`referee-words.ts`) and the French names and codes (`scenario-words.ts`). Its id `robot-en-fete` names the work a student saves here and the examples; its program files are named after its simulator, `tri-entrepot-program-<day>.json` |
+| The blocks in French | `src/simulator/blocks/fr.ts`: every block, menu and hover text of the palette, and our French for Blockly's own words (Blockly's French file comes with the `blockly` package). The blocks are the same blocks with the same stored values: a program file saved on one page opens on the other. The code of the blocks reads these words through `blocks/french.ts`, only on its French paths, and `fr.ts` hands them in when it is loaded — by the French table of the screen, so only the French page downloads them |
 | The examples in French | `src/simulator/robot-en-fete/sample-catalog.ts` (titles, headings) and `samples.ts` (descriptions, notes, names, printed texts). They stay on the server, like every game's |
 
 **A number typed into a block.** The French screen writes a decimal comma; in the French blocks a
 number bubble takes a comma as the decimal point too: typing `18,9` gives 18.9. The bubble then
-shows the number as Blockly does, with a point (`18.9`), as mBlock does.
+shows the number as Blockly does, with a point (`18.9`), as mBlock does. The white bubbles of
+"mettre … à" and of `<`, `>` and `=` are bubbles of text, as in mBlock: there `30,5` stays a text,
+which the program — as the robot — counts as no number. When Start is pressed, the console says
+so for each such text (« 30,5 » est un texte dans cette bulle, pas un nombre … : écris 30.5, avec un
+point); `src/simulator/ui/comma-texts.ts` finds them. The English screen says nothing.
+
+**Blockly's own words.** Blockly writes some words itself, outside our tables. The French page
+gives the shortcuts in its menus, toasts and screen-reader hints the French names of the keys
+("Annuler   Ctrl + Z", "Alt + Maj + A"), puts `lang="fr"` on Blockly's question windows ("Nom de
+la nouvelle variable"), and reads "menu : rouge", "Modifier nombre : 100" with a no-break space
+(`src/simulator/blocks/locale.ts`, `register.ts`, `ui/BlocklyEditor.tsx`). What Blockly writes in
+its own code stays as it is: the ", " between the parts of a block it reads out, and its
+"%1 piles de blocs" (one form).
 
 ### The examples
 
@@ -1802,12 +1830,12 @@ same program).
 | the Rules window | `src/simulator/ui/robot-en-fete/rules.ts` (`rules.test.ts` checks every number against the game and the English window) |
 | the other words of this game (score sheet notes, hints), the Cube colours panel, the test lists, the messages about a typed code | `words.ts`, `arrangement-words.ts`, `arrangement-batch.ts`, `arrangement-code.ts` in `src/simulator/ui/robot-en-fete/` |
 | an example | `src/simulator/robot-en-fete/samples.ts` and `sample-catalog.ts`; its group in `content/simulator-codes.ts` and the same lines in `scripts/generate-simulator-codes.mjs` |
-| its card, its page, its menu line | `content/standalone.ts` |
-| the title and description of the simulator's page | `src/app/simulator/robot-en-fete/page.tsx` |
+| its card, its category's page, its menu line, a second simulator | `content/standalone.ts` |
+| the title and description of the simulator's page | `src/app/simulator/tri-entrepot/page.tsx`; its name in the title row: `src/simulator/ui/robot-en-fete/title.ts` |
 | a rule of the mission | in Warehouse Sort first (`src/simulator/warehouse-sort/game.ts`), then the sentences of both Rules windows: the two games share the referee |
 
 Keep the French as it is written now: "tu" for the student, the infinitive on a button
-("Démarrer", "Remettre en place"), a no-break space before `:` `;` `!` `?` and inside « », `’` as
+("Démarrer", "Replacer"), a no-break space before `:` `;` `!` `?` and inside « », `’` as
 the apostrophe, a decimal comma. The tests check each of these (`src/simulator/ui/text/text.test.ts`,
 `src/simulator/blocks/fr.test.ts` and the tests next to each French file), that every text of the
 shared screen goes through the word table (`src/simulator/ui/text/inventory.test.ts`), and that the
@@ -1824,15 +1852,15 @@ English pages did not change.
    French mBot sheets) or "quand CyberPi démarre"? And "lorsque le bouton A est pressé", "bouton A
    pressé ?"?
 3. **What stays English.** The site's menu, header, footer and breadcrumbs stay English; the menu
-   line reads "Robot en fête 2027 — in French". Warehouses E1 – E4 and codes with V for "vert":
-   fine?
+   line reads "Tri d’entrepôt — Robot en fête 2027". Warehouses E1 – E4 and codes with V for
+   "vert": fine?
 4. **Its page and its place.** Its own page at `/robot-en-fete`; on the Simulator page a part of
    its own after the seasons, headed "Robot en fête 2027"; not on the Training page's card. Is
    that what you want?
 5. **Numbers.** The French screen writes `18,9 cm`; the number bubbles accept `18,9` and show
    `18.9`, as mBlock does. Fine?
 
-### Known limits of Robot en fête 2027
+### Known limits of Tri d’entrepôt
 
 - **Everything of Warehouse Sort** ("Known limits of Warehouse Sort" above): it is the same game.
 - **Our own French.** The words of the blocks, the screen and the examples are our own
@@ -1843,6 +1871,15 @@ English pages did not change.
 - **Blockly says "%1 piles de blocs"** for any number of stacks but one, also for none (one form
   in its own French file).
 - **The values of a program are English** (`red`, `true`): question 1.
+- **A text bubble keeps a comma** (`30,5` is no number there, as on the robot): the console says
+  so at Start.
+- **One French text is read with the site's English voice**: the website's own announcement of the
+  page's title after a link inside the site (Next's route announcer, in `<body>`, which stays
+  `lang="en"` with the whole site: design D8).
+- **On a phone** the strip above the blocks takes two rows (English: one) and "Son activé" two
+  lines: no shorter French says the same.
+- **Blockly's own punctuation**: the ", " between the parts of a block that a screen reader hears
+  is written by Blockly's code.
 
 ---
 

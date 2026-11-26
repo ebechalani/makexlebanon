@@ -710,7 +710,7 @@ describe('the examples stay on the server', () => {
       ['src/app/simulator/warehouse-sort/page.tsx', 'src/simulator/ui/warehouse-sort/WarehouseSortLoader.tsx', 'src/simulator/ui/warehouse-sort/WarehouseSortSimulator.tsx', 'src/simulator/warehouse-sort/game.ts'],
       ['src/app/simulator/locker-room/page.tsx', 'src/simulator/ui/locker-room/LockerRoomLoader.tsx', 'src/simulator/ui/locker-room/LockerRoomSimulator.tsx', 'src/simulator/locker-room/game.ts'],
       ['src/app/simulator/fire-fighter/page.tsx', 'src/simulator/ui/fire-fighter/FireFighterLoader.tsx', 'src/simulator/ui/fire-fighter/FireFighterSimulator.tsx', 'src/simulator/fire-fighter/game.ts'],
-      ['src/app/simulator/robot-en-fete/page.tsx', 'src/simulator/ui/robot-en-fete/RobotEnFeteLoader.tsx', 'src/simulator/ui/robot-en-fete/RobotEnFeteSimulator.tsx', 'src/simulator/robot-en-fete/game.ts'],
+      ['src/app/simulator/tri-entrepot/page.tsx', 'src/simulator/ui/robot-en-fete/RobotEnFeteLoader.tsx', 'src/simulator/ui/robot-en-fete/RobotEnFeteSimulator.tsx', 'src/simulator/robot-en-fete/game.ts'],
     ]) {
       assert.ok(roots.pages.includes(page), page);
       const fromPage = reachableFrom(graph, page);
@@ -1041,7 +1041,7 @@ describe('the examples stay on the server', () => {
       'TRIER LES CUBES ET SE GARER',
       'SORTIR DE LA ZONE DE DÉPART ET S’ARRÊTER',
       'suivre la ligne\n   blanche jusqu’au T',
-      'Il marque 80 points avec les 24 dispositions, en 53 à 61 secondes sur 90.',
+      'Il marque 80 points sur chacune des 24 dispositions, en 53 à 61 secondes sur 90.',
       'Le robot prend un cube dans la rangée du bas et un dans la rangée du haut',
       'data-example="fete-white-line"',
     ]) {

@@ -8,7 +8,10 @@
  *   toolbox.ts    paletteToolbox(gameId, 'fr'): FR_CATEGORY_NAMES, FR_TOOLBOX, FR_DEFAULT_TEXTS;
  *   locale.ts     applyBlocklyMessages(Blockly, 'fr', ...): FR_BLOCKLY_MSG on top of Blockly's French file;
  *   stack-size.ts the width of a French row.
- * Which workspace is French: ./locale.ts. The English blocks never read this file.
+ * Which workspace is French: ./locale.ts. The English blocks never read this file: those four
+ * files do not import it, they ask ./french.ts, to which this file hands its words when it is
+ * loaded (at its end). So only what imports this file - the French screen, the French examples,
+ * a test - downloads it.
  *
  * The rules of this table:
  *  - one entry per block type of ./catalog.ts (every block, also those of other palettes: a program
@@ -17,7 +20,9 @@
  *    ORDER may change (Blockly reads %n by number). Field and input names never change;
  *  - `options`: the texts shown in a menu, in the order of the English options. The stored values
  *    stay the English ones ('forward', 'red', 'all' ...): a program is the same program on both pages;
- *  - menus whose texts are names (EM1, L2, S1, M1, A, B, abs, sin ...) are not listed: they are shown as they are;
+ *  - menus whose texts are names (EM1, L2, S1, M1, A, B, abs, sin ...) are not listed: they are shown as they are -
+ *    unless the French row needs an article or a noun that agrees with the choice: then the menu holds
+ *    it (« arrêter tous les moteurs encodeurs », « régler le servo S1 », « allumer toutes les LED »);
  *  - French typography: a no-break space (U+00A0) goes before ":" "?" "!" "%" and "°" where it stands
  *    after a word; in a row this file writes it as `NB`, so that it cannot be lost.
  *
@@ -26,8 +31,10 @@
  * every text: see `VERIFIED` at the end - almost everything is our own translation, not compared with
  * mBlock 5 in French (the open question 2 of the design).
  *
- * Plain data: no import, no Blockly, no DOM. A test (./fr.test.ts) checks it against the catalog.
+ * Plain data: no Blockly, no DOM; its one import is the place it hands its words to (./french.ts).
+ * A test (./fr.test.ts) checks it against the catalog.
  */
+import { setFrenchBlockWords } from './french';
 
 export interface FrenchBlock {
   message: string;
@@ -41,7 +48,8 @@ const COLOURS = ['rouge', 'jaune', 'vert', 'cyan', 'bleu', 'violet', 'blanc', 'n
 const MOVE_4 = ['avancer', 'reculer', 'tourner à gauche', 'tourner à droite'];
 const MOVE_2 = ['avancer', 'reculer'];
 const TURN_2 = ['tourner à gauche', 'tourner à droite'];
-const LEDS = ['toutes', '1', '2', '3', '4', '5'];
+// (the noun is in the menu, so that its article agrees with it: « allumer toutes les LED », « éteindre la LED 3 »)
+const LEDS = ['toutes les LED', 'la LED 1', 'la LED 2', 'la LED 3', 'la LED 4', 'la LED 5'];
 const JOYSTICK = ['poussé ↑', 'poussé ↓', 'poussé ←', 'poussé →', 'enfoncé'];
 const UNTIL_DONE = 'jusqu’à la fin';
 
@@ -60,13 +68,13 @@ export const FR_GRIPPER_SHORTCUT =
 
 export const FR_BLOCKS: Record<string, FrenchBlock> = {
   // ------------------------------------------------------------------------------- CyberPi
-  cyberpi_led_color: { message: 'LED %1 affiche %2', tooltip: 'Allume une des cinq LED du CyberPi (ou toutes) dans la couleur choisie.', options: { INDEX: LEDS } },
+  cyberpi_led_color: { message: 'allumer %1 en %2', tooltip: 'Allume une des cinq LED du CyberPi (ou toutes) dans la couleur choisie.', options: { INDEX: LEDS } },
   cyberpi_led_rgb: {
-    message: 'LED %1 affiche R %2 V %3 B %4',
+    message: 'allumer %1 en R %2 V %3 B %4',
     tooltip: 'Allume les LED d’une couleur mélangée de rouge (R), de vert (V) et de bleu (B), chacun de 0 à 255.',
     options: { INDEX: LEDS },
   },
-  cyberpi_led_off: { message: 'éteindre la LED %1', tooltip: 'Éteint les LED.', options: { INDEX: LEDS } },
+  cyberpi_led_off: { message: 'éteindre %1', tooltip: 'Éteint les LED.', options: { INDEX: LEDS } },
   cyberpi_print: { message: 'afficher %1 puis aller à la ligne', tooltip: 'Écrit une ligne de texte sur l’écran du CyberPi.' },
   cyberpi_show_label: {
     message: `afficher l’étiquette %1 à x${NB}: %2 y${NB}: %3 taille %4`,
@@ -87,7 +95,7 @@ export const FR_BLOCKS: Record<string, FrenchBlock> = {
   cyberpi_rotation_z: {
     message: 'angle de rotation autour de l’axe z (°)',
     tooltip:
-      'Gyroscope : de combien le robot a tourné depuis la dernière remise à zéro, en degrés. Tourner à droite compte vers le haut, tourner à gauche vers le bas, et le compte continue après 360.',
+      'Gyroscope : de combien le robot a tourné depuis la dernière remise à zéro, en degrés. Tourner à droite fait monter le compte, tourner à gauche le fait descendre, et le compte continue après 360.',
   },
   cyberpi_yaw: {
     message: 'angle de lacet (°)',
@@ -199,12 +207,12 @@ export const FR_BLOCKS: Record<string, FrenchBlock> = {
     options: { DIRECTION: MOVE_4 },
   },
   mbot2_drive_speed: {
-    message: 'moteur encodeur EM1 ↻ tourne à %1 tr/min , moteur encodeur EM2 ↻ tourne à %2 tr/min',
+    message: 'moteur encodeur EM1 ↻ tourne à %1 tr/min, moteur encodeur EM2 ↻ tourne à %2 tr/min',
     tooltip:
       'Règle la vitesse des deux moteurs. EM1 est la roue gauche, EM2 la roue droite. Les moteurs sont montés en miroir : EM1 = 50 et EM2 = -50 font rouler tout droit en avant.',
   },
   mbot2_drive_power: {
-    message: `moteur encodeur EM1 ↻ tourne à la puissance %1${NB}% , moteur encodeur EM2 ↻ tourne à la puissance %2${NB}%`,
+    message: `moteur encodeur EM1 ↻ tourne à la puissance %1${NB}%, moteur encodeur EM2 ↻ tourne à la puissance %2${NB}%`,
     tooltip:
       'Règle la puissance des deux moteurs (-100 à 100). EM1 est la roue gauche, EM2 la roue droite. Les moteurs sont montés en miroir : EM1 = 50 et EM2 = -50 font rouler tout droit en avant.',
   },
@@ -214,11 +222,12 @@ export const FR_BLOCKS: Record<string, FrenchBlock> = {
   },
   mbot2_motor_power: { message: `moteur encodeur %1 ↻ tourne à la puissance %2${NB}%`, tooltip: 'Règle la puissance d’un moteur (-100 à 100).' },
   mbot2_motor_rotate_deg: {
-    message: `moteur encodeur %1 ↻ tourne de %2${NB}° à %3 tr/min ${UNTIL_DONE}`,
+    message: `%1 ↻ tourne de %2${NB}° à %3 tr/min ${UNTIL_DONE}`,
     tooltip: 'Fait tourner l’axe du moteur de ce nombre de degrés, puis s’arrête. 360, c’est un tour complet de la roue.',
-    options: { PORT: ['EM1', 'EM2', 'tous'] },
+    // (the noun in the menu: « chaque moteur encodeur ↻ tourne … », never « moteur encodeur tous »)
+    options: { PORT: ['moteur encodeur EM1', 'moteur encodeur EM2', 'chaque moteur encodeur'] },
   },
-  mbot2_stop: { message: 'arrêter le moteur encodeur %1', tooltip: 'Arrête les moteurs.', options: { PORT: ['tous', 'EM1', 'EM2'] } },
+  mbot2_stop: { message: 'arrêter %1', tooltip: 'Arrête les moteurs.', options: { PORT: ['tous les moteurs encodeurs', 'le moteur encodeur EM1', 'le moteur encodeur EM2'] } },
   mbot2_motor_angle: {
     message: 'angle tourné du moteur encodeur %1 ↻ (°)',
     tooltip: 'De combien le moteur a tourné depuis la dernière remise à zéro, en degrés. Pour EM2, rouler en avant fait descendre le compte (moteur en miroir).',
@@ -226,9 +235,9 @@ export const FR_BLOCKS: Record<string, FrenchBlock> = {
   mbot2_motor_rpm: { message: 'vitesse du moteur encodeur %1 ↻ (tr/min)', tooltip: 'La vitesse du moteur en ce moment.' },
   mbot2_motor_power_value: { message: 'puissance du moteur encodeur %1 ↻ (%)', tooltip: 'La puissance du moteur en ce moment (-100 à 100).' },
   mbot2_motor_reset_angle: {
-    message: 'remettre à zéro l’angle tourné du moteur encodeur %1 ↻',
+    message: 'remettre à zéro l’angle tourné %1 ↻',
     tooltip: 'Remet à 0 l’angle tourné du moteur.',
-    options: { PORT: ['tous', 'EM1', 'EM2'] },
+    options: { PORT: ['de tous les moteurs encodeurs', 'du moteur encodeur EM1', 'du moteur encodeur EM2'] },
   },
 
   // ------------------------------------------------------------------------------- mBot2 extension port (not in this palette; a Fire Chief program can be opened here)
@@ -242,16 +251,16 @@ export const FR_BLOCKS: Record<string, FrenchBlock> = {
     tooltip: 'Règle la puissance des deux ports de moteur CC en même temps (chacun de -100 à 100). 0 arrête un moteur.',
   },
   mbot2_dc_motor_stop: {
-    message: 'le moteur CC %1 arrête de tourner',
+    message: 'arrêter %1',
     tooltip: 'Arrête le moteur CC de ce port (ou des deux ports). Un ventilateur branché dessus arrête de souffler.',
-    options: { PORT: ['M1', 'M2', 'tous'] },
+    options: { PORT: ['le moteur CC M1', 'le moteur CC M2', 'les deux moteurs CC'] },
   },
 
   // ------------------------------------------------------------------------------- Servos
   mbot2_servo_set: {
-    message: `régler le servo %1 à l’angle %2${NB}°`,
+    message: `régler %1 à l’angle %2${NB}°`,
     tooltip: 'Demande à un servo d’aller à un angle (0 à 180). Le servo a besoin d’un moment pour y arriver : ajoute un « attendre » si le bloc suivant en a besoin.',
-    options: { PORT: ['S1', 'S2', 'S3', 'S4', 'tous'] },
+    options: { PORT: ['le servo S1', 'le servo S2', 'le servo S3', 'le servo S4', 'tous les servos'] },
   },
   mbot2_servo_angle: { message: 'angle du servo %1 (°)', tooltip: 'L’angle du servo en ce moment.' },
 
@@ -284,7 +293,7 @@ export const FR_BLOCKS: Record<string, FrenchBlock> = {
   sensing_quadrgb_deviation: {
     message: 'écart du capteur quad RGB (-100~100)',
     tooltip:
-      'De combien le robot s’est écarté de la ligne, comme sur le vrai mBot2 : -100 = le robot est loin à gauche de la ligne (la ligne est sous les sondes de droite), 0 = la ligne est au milieu, 100 = le robot est loin à droite de la ligne (la ligne est sous les sondes de gauche). Pour suivre une ligne : puissance EM1 = base - kp x écart, puissance EM2 = -1 x (base + kp x écart).',
+      'De combien le robot s’est écarté de la ligne, comme sur le vrai mBot2 : -100 = le robot est loin à gauche de la ligne (la ligne est sous les sondes de droite), 0 = la ligne est au milieu, 100 = le robot est loin à droite de la ligne (la ligne est sous les sondes de gauche). Pour suivre une ligne : puissance EM1 = base - kp × écart, puissance EM2 = -1 × (base + kp × écart).',
   },
   sensing_quadrgb_probe_detects: {
     message: `la sonde %1 du capteur quad RGB détecte %2${NB}?`,
@@ -424,16 +433,18 @@ export const FR_BLOCKLY_MSG: Record<string, string> = {
   ARIA_LABEL_COMMENT_EXPAND: 'Ouvrir le commentaire',
   ARIA_LABEL_FIELD_ANGLE: '%1 degrés',
   ARIA_LABEL_HEADING: 'titre',
-  ARIA_TYPE_FIELD_ANGLE: 'angle',
-  ARIA_TYPE_FIELD_CHECKBOX: 'case à cocher',
-  ARIA_TYPE_FIELD_COLOUR: 'couleur',
-  ARIA_TYPE_FIELD_DROPDOWN: 'menu',
-  ARIA_TYPE_FIELD_IMAGE: 'image',
-  ARIA_TYPE_FIELD_INPUT: 'champ',
-  ARIA_TYPE_FIELD_NUMBER: 'nombre',
-  ARIA_TYPE_FIELD_TEXT_INPUT: 'texte',
-  ARIA_TYPE_FIELD_TEXT_INPUT_ARGUMENT: 'nom de l’entrée',
-  ARIA_TYPE_FIELD_TEXT_INPUT_PROCEDURE: 'nom du bloc',
+  // (Blockly reads a field as "<type>: <value>", the ": " written in its own code (Field.computeAriaLabel): each type name
+  // ends with a no-break space, so that a screen reader gets "nombre : 0.4", "menu : rouge", "Modifier nombre : 30")
+  ARIA_TYPE_FIELD_ANGLE: `angle${NB}`,
+  ARIA_TYPE_FIELD_CHECKBOX: `case à cocher${NB}`,
+  ARIA_TYPE_FIELD_COLOUR: `couleur${NB}`,
+  ARIA_TYPE_FIELD_DROPDOWN: `menu${NB}`,
+  ARIA_TYPE_FIELD_IMAGE: `image${NB}`,
+  ARIA_TYPE_FIELD_INPUT: `champ${NB}`,
+  ARIA_TYPE_FIELD_NUMBER: `nombre${NB}`,
+  ARIA_TYPE_FIELD_TEXT_INPUT: `texte${NB}`,
+  ARIA_TYPE_FIELD_TEXT_INPUT_ARGUMENT: `nom de l’entrée${NB}`,
+  ARIA_TYPE_FIELD_TEXT_INPUT_PROCEDURE: `nom du bloc${NB}`,
   BLOCK_LABEL_BEGIN_PREFIX: 'Début de %1',
   BLOCK_LABEL_BEGIN_STACK: 'Début de pile',
   BLOCK_LABEL_COLLAPSED: 'réduit',
@@ -527,6 +538,14 @@ export const FR_BLOCKLY_MSG: Record<string, string> = {
   // the menus: the same word as the toolbar ("Rétablir"), and "the" comment of this block
   REDO: 'Rétablir',
   REMOVE_COMMENT: 'Supprimer le commentaire',
+  // the hover text of « si … retourner » in « Mes blocs », with the block's own word (Blockly's French says "renvoyer")
+  PROCEDURES_IFRETURN_TOOLTIP: 'Si la condition est vraie, ton bloc s’arrête là et retourne la valeur.',
+  // Blockly's French, with ’ for the apostrophe and the no-break spaces inside « » (it writes ' and plain spaces)
+  WORKSPACE_LABEL_MUTATOR_WORKSPACE: 'Espace de travail de l’éditeur de blocs',
+  RENAME_VARIABLE: `Renommer la variable « %1 »`,
+  SHORTCUTS_CLEANUP: 'Nettoyer l’espace de travail',
+  SHORTCUTS_SHOW_TOOLTIP: 'Afficher l’infobulle',
+  SHORTCUTS_TOGGLE_SCREENREADER_MODE: 'Activer ou couper le mode lecteur d’écran',
   // (every other menu word of a block and of the workspace: Blockly's French words are fine and are not repeated here)
 };
 
@@ -557,7 +576,8 @@ export const FR_BLOCKLY_NOT_ON_THIS_PAGE: Record<string, string> = {
   INPUT_LABEL_CONDITION_A: 'logic_operation is not used', INPUT_LABEL_CONDITION_B: 'logic_operation is not used',
   INPUT_LABEL_VALUE_A: 'logic_compare is not used', INPUT_LABEL_VALUE_B: 'logic_compare is not used',
   LOGIC_TERNARY_CONDITION: 'logic_ternary is not used', MATH_ADDITION_SYMBOL_ARIA: 'math_arithmetic is not used',
-  MATH_ONLIST_: 'math_on_list is not used', MATH_CONSTANT_TOOLTIP: 'math_constant is not used',
+  MATH_ONLIST_: 'math_on_list is not used', MATH_CONSTANT_TOOLTIP: 'math_constant is not used', MATH_CONSTANT_GOLDEN_RATIO_ARIA: 'math_constant is not used',
+  LOGIC_COMPARE_NEQ_ARIA: 'logic_compare is not used (our comparisons are catalog blocks)',
   NEW_COLOUR_VARIABLE: 'typed variables are not used', NEW_NUMBER_VARIABLE: 'typed variables are not used', NEW_STRING_VARIABLE: 'typed variables are not used',
   _HELPURL: 'addresses, not texts',
 };
@@ -574,3 +594,6 @@ export const VERIFIED: Record<string, string> = {
   'nombre aléatoire entre': 'Scratch 3 in French, seen in French teaching documents.',
   'everything else': 'our own translation, in the style of Scratch 3 in French; NOT compared with mBlock 5 (open question 2).',
 };
+
+// (the code of the blocks reads these words through ./french.ts, only on its French paths)
+setFrenchBlockWords({ FR_BLOCKS, FR_BLOCKLY_MSG, FR_CATEGORY_NAMES, FR_DEFAULT_TEXTS, FR_PALETTE_TOOLTIPS, FR_TEXT_BUBBLE_TOOLTIP, FR_TOOLBOX });

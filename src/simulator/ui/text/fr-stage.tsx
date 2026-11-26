@@ -47,12 +47,12 @@ function rulerReading(ruler: Ruler, robotThere = true): string {
 
 /** rulerText (../ruler.ts) in French: how to begin, or the measurement. */
 function rulerText(ruler: Ruler, robotThere = true): string {
-  if (ruler.points.length === 0) return 'Clique sur le tapis pour poser le premier point. Clique sur le robot pour partir d’entre ses roues.';
+  if (ruler.points.length === 0) return 'Clique sur le tapis pour poser le premier point. Clique sur le robot pour que la règle parte d’entre ses roues.';
   if (ruler.points.length === 1) {
-    if (ruler.startHeading === null) return 'Premier point posé. Clique maintenant le deuxième point.';
+    if (ruler.startHeading === null) return 'Premier point posé. Clique maintenant pour poser le deuxième point.';
     return robotThere
       ? 'La règle part d’entre les roues du robot. Clique maintenant là où le robot doit aller.'
-      : 'La règle part de la place du robot. Clique maintenant le deuxième point.';
+      : 'La règle part de la place du robot. Clique maintenant pour poser le deuxième point.';
   }
   const full = ruler.points.length >= MAX_RULER_POINTS ? ` (La règle est pleine${NB}: ${MAX_RULER_POINTS} points.)` : '';
   return `${rulerReading(ruler, robotThere)}${full}`;

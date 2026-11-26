@@ -68,9 +68,10 @@ export const FR_SENSOR_TEXT: SensorText = {
   yaw: 'Lacet (rotation)',
   yawHint: `De combien le robot a tourné depuis la remise à zéro du gyroscope${NB}; le sens des aiguilles d’une montre est positif`,
   timer: 'Chronomètre',
-  em1Angle: 'Angle EM1 (gauche)',
+  // (short: the card is 105 px wide on a 360 px phone; the hint says which wheel in full)
+  em1Angle: 'Angle EM1 (g.)',
   em1AngleHint: 'Encodeur du moteur EM1, la roue gauche',
-  em2Angle: 'Angle EM2 (droite)',
+  em2Angle: 'Angle EM2 (d.)',
   em2AngleHint: `Encodeur du moteur EM2, la roue droite. Il est monté en miroir${NB}: il compte à l’envers quand le robot avance - comme sur le vrai mBot2.`,
   em1Speed: 'Vitesse EM1',
   em2Speed: 'Vitesse EM2',
@@ -163,6 +164,9 @@ export const FR_CONSOLE_TEXT: ConsoleText = {
   startLine: (scenarioWord, code) => `C’est parti${NB}! ${capital(scenarioWord ?? 'disposition')} ${code}.`,
   noStartHat: `Rien ne va se passer${NB}: le programme n’a pas de bloc jaune «${NB}lorsque CyberPi démarre${NB}» pour commencer.`,
   nothingSnapped: `Rien ne va se passer${NB}: aucun bloc n’est encore accroché sous un bloc jaune «${NB}lorsque …${NB}» ou «${NB}quand …${NB}».`,
+  // (a text bubble keeps a comma as it is: the robot reads « 30,5 » as no number - ../comma-texts.ts)
+  commaTextWarning: (typed) =>
+    `«${NB}${typed}${NB}» est un texte dans cette bulle, pas un nombre (seules les bulles de nombre lisent la virgule)${NB}: écris ${typed.replace(',', '.')}, avec un point.`,
   stoppedByYou: 'Tu as arrêté le programme. Appuie sur Démarrer pour recommencer.',
   matPictureFailed: `L’image du tapis n’a pas pu être chargée${NB}: les capteurs du sol lisent le dessin simplifié du tapis.`,
   describeEvent,

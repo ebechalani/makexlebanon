@@ -204,7 +204,7 @@ test('the same game as Warehouse Sort - mat, numbers, robot, arrangements - with
   const { en, fr } = GAMES;
   assert.equal(fr.id, 'robot-en-fete');
   assert.equal(ROBOT_EN_FETE_ID, fr.id);
-  assert.equal(fr.title, `MakeX Lebanon - Inspire${NB}: Robot en fête 2027`);
+  assert.equal(fr.title, `MakeX Lebanon - Inspire${NB}: Tri d’entrepôt (Robot en fête 2027)`);
   assert.deepEqual(Object.keys(fr), Object.keys(en), 'the same parts, in the same order');
   assert.deepEqual(fr.mat, en.mat);
   assert.equal(fr.matchDuration, en.matchDuration);

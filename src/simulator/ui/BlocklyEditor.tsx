@@ -139,6 +139,7 @@ function BlocklyEditorImpl(props: BlocklyEditorProps) {
     let workspace: BlocklyModule.WorkspaceSvg | null = null;
     let saveTimer: ReturnType<typeof setTimeout> | null = null;
     let observer: ResizeObserver | null = null;
+    let dialogLang: MutationObserver | null = null;
     let saveNow: (() => void) | null = null;
     let flashTimer: ReturnType<typeof setTimeout> | null = null;
     let blockly: BlocklyApi | null = null;
@@ -169,6 +170,18 @@ function BlocklyEditorImpl(props: BlocklyEditorProps) {
         onGripperCode: propsRef.current.onGripperCode ? (at) => propsRef.current.onGripperCode?.(at) : undefined,
       });
       workspace = ws;
+      // Blockly puts its own windows - the questions of "Créer une variable", "Renommer", "Supprimer" - straight
+      // into <body>, outside the screen's lang="fr": a screen reader would read their French with an English
+      // voice. On a French screen each such window gets the screen's language as it appears. (An English
+      // screen sets nothing: its windows are as they always were.)
+      if (locale !== 'en') {
+        dialogLang = new MutationObserver((records) => {
+          for (const record of records) {
+            for (const node of record.addedNodes) if (node instanceof HTMLDialogElement && node.classList.contains('blocklyDialog')) node.lang = locale;
+          }
+        });
+        dialogLang.observe(document.body, { childList: true });
+      }
       const serializer = Blockly.serialization.workspaces;
 
       // Development only: lets an automated browser test reach the editor (window.__sim).
@@ -291,6 +304,7 @@ function BlocklyEditorImpl(props: BlocklyEditorProps) {
       if (saveTimer) saveNow?.();
       if (flashTimer) clearTimeout(flashTimer);
       observer?.disconnect();
+      dialogLang?.disconnect();
       propsRef.current.onReady(null);
       // (a French editor leaves Blockly's own words English for the next page: ../blocks/register.ts disposeEditor)
       if (workspace && blockly) disposeEditor(blockly, workspace);

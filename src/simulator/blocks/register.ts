@@ -24,10 +24,11 @@
  */
 import type * as BlocklyModule from 'blockly';
 import { BLOCKS, blocklyDefinitions, getBlockDef, LIST_VARIABLE_TYPE, toBlocklyJson } from './catalog';
-import { FR_BLOCKS, FR_PALETTE_TOOLTIPS, FR_TEXT_BUBBLE_TOOLTIP, FR_TOOLBOX } from './fr';
+// (the French words of the blocks are read through ./french.ts, on the French paths only: an English page never downloads ./fr.ts)
+import { frenchWords } from './french';
 import { gripperVariantOf } from './gripper-original';
 import type { GripperVariantId } from './gripper-original';
-import { applyBlocklyMessages, localeOfWorkspace, setWorkspaceLocale, withBlocklyMessage } from './locale';
+import { applyBlocklyMessages, frenchShortcutKeys, localeOfWorkspace, setWorkspaceLocale, withBlocklyMessage } from './locale';
 import type { BlockLocale } from './locale';
 import { createCommaNumberFieldClass, putCommaNumberField } from './number-field';
 import { PALETTE_TOOLTIPS, paletteOf, paletteTooltip } from './palettes';
@@ -184,6 +185,8 @@ export function registerBlocks(Blockly: BlocklyApi): void {
 
   registerGripperCodeMenu(Blockly);
 
+  frenchMenuShortcuts(Blockly);
+
   useGameTooltips(Blockly);
 }
 
@@ -199,7 +202,7 @@ export function registerBlocks(Blockly: BlocklyApi): void {
  */
 export function frenchBlockJson(type: string): Record<string, unknown> | undefined {
   const def = getBlockDef(type);
-  const french = FR_BLOCKS[type];
+  const french = frenchWords().FR_BLOCKS[type];
   if (!def || !french) return undefined;
   const json = toBlocklyJson(def);
   json.message0 = french.message;
@@ -225,21 +228,86 @@ export function frenchBlockJson(type: string): Record<string, unknown> | undefin
 /**
  * Every catalog block made in a French workspace is built from its French texts; in every other
  * workspace it runs its own (English) definition, as before. Done once per block (a marker).
+ * (The French definition is made the first time a French workspace asks for it: an English page,
+ * which never does, never reads the French words.)
  */
 function useFrenchBlocks(Blockly: BlocklyApi): void {
   const marker = 'mbot2FrenchBlock';
   for (const def of BLOCKS) {
     const definition = Blockly.Blocks[def.type] as (Record<string, unknown> & { init?: () => void }) | undefined;
     if (!definition || definition[marker] || typeof definition.init !== 'function') continue;
-    const french = frenchBlockJson(def.type);
-    if (!french) continue;
     const init = definition.init;
+    // (null: not made yet; undefined: the block has no French, it keeps its own definition)
+    let french: Record<string, unknown> | undefined | null = null;
     definition.init = function (this: BlocklyModule.Block) {
-      if (localeOfWorkspace(this.workspace) === 'fr') this.jsonInit(french);
-      else init.call(this);
+      if (localeOfWorkspace(this.workspace) === 'fr') {
+        if (french === null) french = frenchBlockJson(def.type);
+        if (french) {
+          this.jsonInit(french);
+          frenchScreenReaderLabels(this);
+          return;
+        }
+      }
+      init.call(this);
     };
     definition[marker] = true;
   }
+}
+
+/**
+ * What a screen reader says for a French block. Blockly reads a block as its fields one after the
+ * other, with ", " between them, and a piece of text that follows a menu or a bubble on its own -
+ * so the French "le capteur … détecte %1 ?" was read "… détecte, rouge, ?, …". A piece of text
+ * that is only punctuation (the "?" of a question) says nothing to a listener: it is left out of
+ * what is read. The block still shows it. (Only French blocks: the English rows are as they were.)
+ */
+function frenchScreenReaderLabels(block: BlocklyModule.Block): void {
+  for (const input of block.inputList) {
+    for (const field of input.fieldRow) {
+      if (field.isLabelField() && /^[\s\u00a0?!.,:;…]+$/.test(field.getText())) field.computeAriaLabel = () => '';
+    }
+  }
+}
+
+/**
+ * The shortcuts of the right-click menus, in French. Blockly writes them itself after the words of
+ * an entry ("Annuler   Control + Z"), with key names it fixed when its code was loaded - in English
+ * (./locale.ts explains why). In a French workspace each entry that has a shortcut now hands Blockly
+ * the whole line instead: the same two parts, in the same elements and classes as Blockly's own,
+ * with the French names of the keys ("Annuler   Ctrl + Z"). In every other workspace the entry
+ * gives Blockly what it always gave. Done once per entry (a marker).
+ */
+function frenchMenuShortcuts(Blockly: BlocklyApi): void {
+  const marker = 'mbot2FrenchShortcut';
+  // (Blockly has no way to list its menu entries, so they are read where it keeps them)
+  const entries = (Blockly.ContextMenuRegistry.registry as unknown as { registeredItems?: Map<string, BlocklyModule.ContextMenuRegistry.RegistryItem> }).registeredItems;
+  for (const item of entries?.values() ?? []) {
+    const entry = item as BlocklyModule.ContextMenuRegistry.RegistryItem & Record<string, unknown>;
+    const shortcut = 'associatedKeyboardShortcut' in entry ? entry.associatedKeyboardShortcut : undefined;
+    if (entry[marker] || typeof shortcut !== 'string' || !('displayText' in entry)) continue;
+    const own = entry.displayText;
+    entry.displayText = (scope: BlocklyModule.ContextMenuRegistry.Scope) => {
+      const text = (typeof own === 'function' ? own(scope) : own) ?? '';
+      if (typeof text !== 'string' || localeOfWorkspace(workspaceOfScope(scope)) !== 'fr') return text;
+      // (Blockly's own line: <div class="blocklyShortcutContainer"><span>words</span><span class="blocklyShortcut"> keys</span></div>)
+      const line = document.createElement('div');
+      line.className = 'blocklyShortcutContainer';
+      const words = document.createElement('span');
+      words.textContent = text;
+      const keys = document.createElement('span');
+      keys.className = 'blocklyShortcut';
+      keys.textContent = ` ${frenchShortcutKeys(Blockly, shortcut)}`;
+      line.append(words, keys);
+      return line;
+    };
+    entry[marker] = true;
+  }
+}
+
+/** The workspace a right-click menu is about (a block's, a comment's, or the workspace itself). */
+function workspaceOfScope(scope: BlocklyModule.ContextMenuRegistry.Scope): BlocklyModule.Workspace | undefined {
+  const node = scope.focusedNode as { workspace?: BlocklyModule.Workspace } | undefined;
+  return scope.block?.workspace ?? scope.workspace ?? scope.comment?.workspace ?? node?.workspace;
 }
 
 /**
@@ -268,6 +336,7 @@ const workspacePalettes = new WeakMap<BlocklyModule.Workspace, string>();
 
 /** The hover text a block has in a game in French, when that game has its own (FR_PALETTE_TOOLTIPS: the game of Warehouse Sort). */
 function frenchPaletteTooltip(type: string, gameId: string | undefined): string | undefined {
+  const { FR_PALETTE_TOOLTIPS } = frenchWords();
   return paletteOf(gameId) === 'warehouse-sort' && Object.prototype.hasOwnProperty.call(FR_PALETTE_TOOLTIPS, type) ? FR_PALETTE_TOOLTIPS[type] : undefined;
 }
 
@@ -326,7 +395,7 @@ function usePlainTextBubble(Blockly: BlocklyApi): void {
   const init = plain.init;
   plain.init = function (this: BlocklyModule.Block) {
     init.call(this);
-    if (localeOfWorkspace(this.workspace) === 'fr') this.setTooltip(FR_TEXT_BUBBLE_TOOLTIP);
+    if (localeOfWorkspace(this.workspace) === 'fr') this.setTooltip(frenchWords().FR_TEXT_BUBBLE_TOOLTIP);
   };
   plain[marker] = true;
   Blockly.Blocks['text'] = plain;
@@ -358,7 +427,7 @@ export function variablesFlyout(workspace: BlocklyModule.Workspace): ToolboxItem
   const locale = localeOfWorkspace(workspace);
   const french = locale === 'fr';
 
-  const items: ToolboxItem[] = [{ kind: 'button', text: french ? FR_TOOLBOX.makeVariable : 'Make a Variable', callbackkey: MAKE_VARIABLE_CALLBACK }];
+  const items: ToolboxItem[] = [{ kind: 'button', text: french ? frenchWords().FR_TOOLBOX.makeVariable : 'Make a Variable', callbackkey: MAKE_VARIABLE_CALLBACK }];
   for (const variable of variables) items.push(toolboxBlock('data_variable', { VARIABLE: ref(variable) }, locale));
   if (variables.length > 0) {
     const first = ref(variables[0]);
@@ -367,7 +436,7 @@ export function variablesFlyout(workspace: BlocklyModule.Workspace): ToolboxItem
     items.push(toolboxBlock('data_changevariableby', { VARIABLE: first }, locale));
   }
 
-  items.push({ kind: 'button', text: french ? FR_TOOLBOX.makeList : 'Make a List', callbackkey: MAKE_LIST_CALLBACK });
+  items.push({ kind: 'button', text: french ? frenchWords().FR_TOOLBOX.makeList : 'Make a List', callbackkey: MAKE_LIST_CALLBACK });
   for (const list of lists) items.push(toolboxBlock('data_listcontents', { LIST: ref(list) }, locale));
   if (lists.length > 0) {
     const first = ref(lists[0]);
@@ -403,7 +472,7 @@ export function attachToolboxCallbacks(Blockly: BlocklyApi, workspace: BlocklyMo
     // Blockly has one question for this dialog ("New variable name:"); it reads the text at the
     // moment the dialog opens, so for a list the wording is swapped just for that moment.
     const target = button.getTargetWorkspace();
-    const question = localeOfWorkspace(target) === 'fr' ? FR_TOOLBOX.newListName : 'New list name:';
+    const question = localeOfWorkspace(target) === 'fr' ? frenchWords().FR_TOOLBOX.newListName : 'New list name:';
     withBlocklyMessage(Blockly, 'NEW_VARIABLE_TITLE', question, () => {
       Blockly.Variables.createVariableButtonHandler(target, undefined, LIST_VARIABLE_TYPE);
     });

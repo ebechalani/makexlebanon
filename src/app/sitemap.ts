@@ -35,10 +35,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
     })),
   ]);
 
-  // The categories of their own (content/standalone.ts), outside every season: their page and their simulator.
+  // The categories of their own (content/standalone.ts), outside every season: their page and their simulators.
   const standalonePaths = standaloneCategories.flatMap((category) => [
     { path: `/${category.slug}`, priority: 0.6 },
-    { path: category.simulator.href, priority: 0.7 },
+    ...category.simulators.map((simulator) => ({ path: simulator.href, priority: 0.7 })),
   ]);
 
   // De-duplicate: /season/2026 appears in both lists.

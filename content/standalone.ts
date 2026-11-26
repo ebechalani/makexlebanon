@@ -2,10 +2,13 @@
  * The categories of their own: a category that belongs to no season of ./seasons.ts.
  *
  * Robot en fête 2027 is one (the organiser: "une catégorie seule robot en fête 2027", "à part, sa
- * propre fiche", "fiche en français"): the French version of the Warehouse Sort simulator - the
- * same beginner mission, all in French, the blocks included. It has its own page (/robot-en-fete),
- * its own simulator (/simulator/robot-en-fete), a part of its own on the Simulator page after the
- * seasons, and a line in the Simulator dropdown of the menu.
+ * propre fiche", "fiche en français"). Its simulators are French and named by their mission (the
+ * organiser's choice): today « Tri d’entrepôt », the French version of the Warehouse Sort
+ * simulator - the same beginner mission, all in French, the blocks included. (A second one,
+ * « Logistique intelligente », is to come: it is one more item of `simulators`, and no page needs a
+ * change for it.) The category has its own page (/robot-en-fete), a part of its own on the
+ * Simulator page after the seasons, with a card for each of its simulators, and each simulator its
+ * own page (/simulator/tri-entrepot) and a line in the Simulator dropdown of the menu.
  *
  * Nothing here is counted by a season: ./seasons.ts does not import this file, so no season page,
  * no count of categories and no list built from the seasons changes because of it. There is no
@@ -13,12 +16,44 @@
  *
  * Every text a card or a page shows is here, in the category's language (`lang`), and every one
  * is required: nothing on its page or its card falls back to English. Only the menu line is
- * English, as the whole menu of the website is. (The French texts are those of the design's table,
+ * English, as the whole menu of the website is (the names in it are French proper names). (The French texts are those of the design's table,
  * fr-src/4-site.txt. Typography: a no-break space (U+00A0) before : ; ! ?)
  *
  * Plain data that imports nothing: content/site.ts builds the menu from it, and the menu is drawn
  * by a client component, so what this file holds goes to every visitor's browser.
  */
+
+/** A simulator of a category of its own: its card on the Simulator page, its part of the category's page, its line in the menu. */
+export type StandaloneSimulator = {
+  /** its name, the name of its mission, as its title row shows it: « Tri d’entrepôt » */
+  name: string;
+  /** the simulator's page on this site: /simulator/<slug> */
+  href: string;
+  /** the sentences of its card on the Simulator page, and of its part of the category's page */
+  summary: string;
+  /** picture of the simulator's mat for the Simulator page: a file under public/ */
+  mat: string;
+  /** the words of its card on the Simulator page */
+  card: {
+    /** the name of the card */
+    heading: string;
+    /** what the whole card does (it is one link): its name for a screen reader, and the button-like hint */
+    open: string;
+    /** what the picture shows */
+    matAlt: string;
+    /** the link to its category's page, under the card */
+    about: string;
+    /** the two small labels, where a category's card shows its age group and its season */
+    labels: [string, string];
+  };
+  /** the heading of its part on the category's page */
+  pageTitle: string;
+  /**
+   * its line in the Simulator dropdown of the menu, which is English: "<name> — <category>" (one
+   * dash, as every line there). Both names are French proper names, written as they are.
+   */
+  menuLabel: string;
+};
 
 /** A category of its own, outside every season. */
 export type StandaloneCategory = {
@@ -26,7 +61,7 @@ export type StandaloneCategory = {
   slug: string;
   /** its name, shown as it is (a proper name: also in the English menu and breadcrumbs) */
   name: string;
-  /** the language of every text below but `simulator.menuLabel`: lang="fr" wherever they are shown */
+  /** the language of every text below but the simulators' `menuLabel`: lang="fr" wherever they are shown */
   lang: 'fr';
   /** the robot it is played with, e.g. mBot2 */
   platform: string;
@@ -40,36 +75,13 @@ export type StandaloneCategory = {
     description: string;
     /** the small line above the page's title */
     eyebrow: string;
-    /** the small line above the part about the simulator */
+    /** the small line above the part about each simulator */
     simulatorEyebrow: string;
-    /** the heading of the part about the simulator */
-    simulatorTitle: string;
-    /** the button that opens the simulator */
+    /** the button that opens a simulator */
     open: string;
   };
-  simulator: {
-    /** the simulator's page on this site: /simulator/<slug> */
-    href: string;
-    /** the sentences of its card on the Simulator page, and of the part about the simulator on its own page */
-    summary: string;
-    /** picture of the simulator's mat for the Simulator page: a file under public/ */
-    mat: string;
-    /** the words of its card on the Simulator page */
-    card: {
-      /** the name of the card */
-      heading: string;
-      /** what the whole card does (it is one link): its name for a screen reader, and the button-like hint */
-      open: string;
-      /** what the picture shows */
-      matAlt: string;
-      /** the link to its own page, under the card */
-      about: string;
-      /** the two small labels, where a category's card shows its age group and its season */
-      labels: [string, string];
-    };
-    /** its line in the Simulator dropdown of the menu, which is English: "<name> — in French" (one dash, as every line there) */
-    menuLabel: string;
-  };
+  /** its simulators, in the order the pages and the menu show them (one card, one part of its page and one menu line each) */
+  simulators: StandaloneSimulator[];
 };
 
 /** A no-break space: French puts one before : ; ! ? (written out, so that it can be seen here) */
@@ -90,27 +102,32 @@ export const standaloneCategories: StandaloneCategory[] = [
       description: `La version française de Warehouse Sort${NB}: la même mission pour débutants, entièrement en français, blocs compris.`,
       eyebrow: '2027',
       simulatorEyebrow: 'S’entraîner en ligne',
-      simulatorTitle: 'Essaie le simulateur Robot en fête 2027',
       open: 'Ouvrir le simulateur',
     },
-    simulator: {
-      href: '/simulator/robot-en-fete',
-      summary:
-        `Construis un programme avec des blocs comme dans mBlock et regarde le mBot2 trier des cubes rouges et verts sur le tapis Inspire${NB}: ` +
-        'des entrepôts vers la baie de leur couleur, en laissant le cube bleu à sa place, puis se garer sur une aire d’arrivée — ' +
-        'avec toutes les dispositions des cubes, notées selon les règles de la mission pour débutants. Tout est en français, les blocs aussi. ' +
-        `Il marche dans le navigateur${NB}: pas besoin de robot ni d’installation.`,
-      // (the same mission on the same mat: the picture of Warehouse Sort, public/simulator/warehouse-sort/)
-      mat: '/simulator/warehouse-sort/mat.webp',
-      card: {
-        heading: 'Simulateur Robot en fête 2027',
-        open: 'Ouvrir le simulateur Robot en fête 2027',
-        matAlt: 'Le tapis du simulateur Robot en fête 2027, vu de dessus',
-        about: 'À propos de Robot en fête 2027',
-        // (no age group: the organiser asked for none; where a category shows its season, the robot)
-        labels: ['En français', 'mBot2'],
+    simulators: [
+      {
+        // (the French Warehouse Sort; its game keeps the id 'robot-en-fete': src/simulator/robot-en-fete/game.ts)
+        name: 'Tri d’entrepôt',
+        href: '/simulator/tri-entrepot',
+        summary:
+          `Construis un programme avec des blocs comme dans mBlock et regarde le mBot2 trier des cubes rouges et verts sur le tapis Inspire${NB}: ` +
+          'des entrepôts vers la baie de leur couleur, en laissant le cube bleu à sa place, puis se garer sur une aire d’arrivée — ' +
+          'avec toutes les dispositions des cubes, et le score que donnent les règles de la mission pour débutants. Tout est en français, les blocs aussi. ' +
+          `Le simulateur fonctionne dans le navigateur${NB}: pas besoin de robot ni d’installation.`,
+        // (the same mission on the same mat: the picture of Warehouse Sort, public/simulator/warehouse-sort/)
+        mat: '/simulator/warehouse-sort/mat.webp',
+        card: {
+          heading: 'Simulateur Tri d’entrepôt',
+          open: 'Ouvrir le simulateur Tri d’entrepôt',
+          matAlt: 'Le tapis du simulateur Tri d’entrepôt, vu de dessus',
+          about: 'À propos de Robot en fête 2027',
+          // (no age group: the organiser asked for none; where a category shows its season, the robot)
+          labels: ['En français', 'mBot2'],
+        },
+        pageTitle: 'Essaie le simulateur Tri d’entrepôt',
+        // (a French proper name in the English menu, written as it is, then the category's: one dash, as every line there)
+        menuLabel: 'Tri d’entrepôt — Robot en fête 2027',
       },
-      menuLabel: 'Robot en fête 2027 — in French',
-    },
+    ],
   },
 ];

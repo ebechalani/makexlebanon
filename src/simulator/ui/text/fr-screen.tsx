@@ -11,19 +11,14 @@ import type { CodeMessage, ExamplesView } from '../examples-words';
 import { EN_TEXT } from './en';
 import { NB } from './fr-common';
 import { frPlural } from './plural';
-import type { AppText, CombinationText, ExamplesWords, ProgramText, TitleText } from './types';
+import type { AppText, CombinationText, ExamplesWords, ProgramText } from './types';
 
 // =============================================================================================
 // The title row
 // =============================================================================================
 
-export const FR_TITLE_TEXT: TitleText = {
-  breadcrumb: 'Fil d’Ariane',
-  homeCrumb: 'Accueil',
-  simulatorCrumb: 'Simulateur',
-  simulatorTitle: (title) => <>Simulateur {title} </>,
-  poweredBy: 'Proposé par ',
-};
+// (a file of its own, which the loading screen reads without the rest of the table)
+export { FR_TITLE_TEXT } from './fr-title';
 
 // =============================================================================================
 // The screen
@@ -61,16 +56,16 @@ export const FR_APP_TEXT: AppText = {
     </>
   ),
   yourProgram: 'Ton programme',
-  // (one French sentence each: design 4.5)
+  // (one French sentence each: design 4.5; short, so that on a phone it stays clear of the zoom buttons and the bin, as the English)
   emptyWorkspace: (canLoadExamples) => (
     <>
       <span className="font-bold text-ink-700">Construis ton programme ici.</span> Clique sur une catégorie à gauche (essaie{' '}
-      <span className="font-semibold text-ink-700">Châssis mBot2</span>), fais glisser un bloc et accroche-le sous le bloc jaune. Puis appuie sur{' '}
+      <span className="font-semibold text-ink-700">Châssis mBot2</span>) et accroche un bloc sous le bloc jaune. Puis appuie sur{' '}
       <span className="font-semibold text-ink-700">Démarrer</span>.
       {canLoadExamples && (
         <>
           {' '}
-          Ou ouvre un des <span className="font-semibold text-ink-700">Exemples</span> pour voir comment on fait.
+          Ou ouvre un des <span className="font-semibold text-ink-700">Exemples</span>.
         </>
       )}
     </>
@@ -85,7 +80,7 @@ export const FR_APP_TEXT: AppText = {
   sensorsButton: 'Capteurs',
   pathHint: 'Dessiner le trajet du robot',
   path: 'Trajet',
-  rulerHint: `Mesurer sur le tapis${NB}: clique des points pour voir les distances en cm et les virages entre eux`,
+  rulerHint: `Mesurer sur le tapis${NB}: clique sur des points pour voir les distances en cm et les virages entre eux`,
   rulerButton: 'Règle',
   cyberPiButtons: 'Boutons du CyberPi',
   cyberPiButtonsHint: 'Maintiens un bouton enfoncé pour appuyer sur celui du robot. Le joystick est dans le panneau CyberPi plus bas.',
@@ -106,7 +101,7 @@ export const FR_APP_TEXT: AppText = {
   consoleTitle: 'Console',
   consoleProblems: (count) => frPlural(count, `${count} problème`, `${count} problèmes`),
   consoleMessages: (count) => frPlural(count, `${count} message`, `${count} messages`),
-  scenarioLoaded: (scenario) => `${capital(scenario)} chargée. Appuie sur Démarrer pour y regarder ton programme.`,
+  scenarioLoaded: (scenario) => `${capital(scenario)} chargée. Appuie sur Démarrer pour voir ce que fait ton programme sur cette disposition.`,
   close: 'Fermer',
 };
 
@@ -240,7 +235,8 @@ export const FR_PROGRAM_TEXT: ProgramText = {
   redo: 'Rétablir',
   redoHint: 'Rétablir (Ctrl+Maj+Z)',
   autosaveHint: 'Tes blocs sont enregistrés dans ce navigateur un instant après chaque changement.',
-  blockCount: (blocks) => frPlural(blocks, `${blocks} bloc · enregistré automatiquement`, `${blocks} blocs · enregistrés automatiquement`),
+  // (short, so that the strip above the blocks keeps one row on a computer as the English one does)
+  blockCount: (blocks) => frPlural(blocks, `${blocks} bloc · sauvegarde auto`, `${blocks} blocs · sauvegarde auto`),
   toolbarLoading: 'Chargement…',
   examplesTitle: 'Exemples',
   examplesLevel: (title) => `Exemples${NB}: ${title}`,

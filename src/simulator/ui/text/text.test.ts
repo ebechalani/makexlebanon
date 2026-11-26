@@ -43,7 +43,9 @@ import * as startPose from '../start-pose';
 import { ScreenTextContext, useScreenText } from './context';
 import { EN_TEXT } from './en';
 import { EN_TITLE_TEXT } from './en-title';
-import { ScreenTextContext as TitleContext, useTitleText } from './title-context';
+import { ScreenTextContext as TitleContext, TitleTextContext, useTitleText } from './title-context';
+import { FR_TITLE_TEXT } from './fr-title';
+import { TitleBar } from '../TitleBar';
 import { FR_TEXT } from './fr';
 import { FR_COLOUR_NAMES, frSensorValue } from './fr-common';
 import { FR_CONSOLE_NOT_ON_THIS_PAGE, FR_CONSOLE_PATTERNS, frConsoleLine } from './fr-console';
@@ -83,6 +85,8 @@ const SAME_WORDS: Record<string, string> = {
   consoleTitle: 'Console (the French word too)',
   consoleLabel: 'Console (the French word too)',
   pause: 'Pause (the French word too)',
+  // (the French word too, as "Pause" beside it - and short: "Arrêter" broke the row of the match buttons at 1 440 px)
+  stop: 'Stop (the French word too)',
   scoreWord: 'Score (the French word too)',
   scoreColumn: 'Score (the French word too)',
   total: 'Total (the French word too)',
@@ -198,6 +202,116 @@ test('English: the title row stays small - every loading screen and the Simulato
   assert.deepEqual(imports('en-title.tsx'), []);
 });
 
+// =============================================================================================
+// What each page downloads: no French on an English page, no screen on the French loading screen
+// =============================================================================================
+
+const SRC = path.resolve(HERE, '../../..');
+const ROOT = path.resolve(SRC, '..');
+
+/** The file an import names (a package: null). */
+function resolveSource(from: string, spec: string): string | null {
+  let base: string;
+  if (spec.startsWith('@/')) base = path.join(SRC, spec.slice(2));
+  else if (spec.startsWith('@content/')) base = path.join(ROOT, 'content', spec.slice('@content/'.length));
+  else if (spec.startsWith('.')) base = path.resolve(path.dirname(from), spec);
+  else return null;
+  for (const ending of ['', '.ts', '.tsx', '/index.ts', '/index.tsx']) {
+    const file = base + ending;
+    try {
+      if (readdirSync(path.dirname(file)).includes(path.basename(file)) && /\.(ts|tsx)$/.test(file)) return file;
+    } catch {
+      // (no such folder)
+    }
+  }
+  return null;
+}
+
+/** The files a file brings along for their code: its imports and re-exports that are not types only, and its import() when `dynamic`. */
+function codeImports(file: string, dynamic: boolean): string[] {
+  const source = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true, file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+  const found: string[] = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
+      const clause = node.importClause;
+      const named = clause?.namedBindings;
+      // (an import of types only is gone once the code is compiled)
+      const onlyTypes = clause?.isTypeOnly || (clause && !clause.name && named && ts.isNamedImports(named) && named.elements.length > 0 && named.elements.every((element) => element.isTypeOnly));
+      if (!onlyTypes) found.push(node.moduleSpecifier.text);
+    } else if (ts.isExportDeclaration(node) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier) && !node.isTypeOnly) {
+      found.push(node.moduleSpecifier.text);
+    } else if (dynamic && ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword && node.arguments[0] && ts.isStringLiteral(node.arguments[0])) {
+      found.push(node.arguments[0].text);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return found.map((spec) => resolveSource(file, spec)).filter((target): target is string => target !== null);
+}
+
+/** Every file of the repository a file brings along, as paths from src/ (with import(): also what it loads later). */
+function reachedFrom(entry: string, dynamic: boolean): Set<string> {
+  const seen = new Set<string>();
+  const queue = [path.join(ROOT, entry)];
+  while (queue.length > 0) {
+    const file = queue.pop() as string;
+    const name = path.relative(ROOT, file);
+    if (seen.has(name)) continue;
+    seen.add(name);
+    queue.push(...codeImports(file, dynamic));
+  }
+  return seen;
+}
+
+/** The French tables: the screen's (fr.tsx and its parts) and the blocks' (../../blocks/fr.ts). */
+const isFrench = (file: string): boolean => /^src\/simulator\/ui\/text\/fr[^/]*\.tsx$/.test(file) || file === 'src/simulator/blocks/fr.ts';
+
+test('no English page downloads French: no English loader, screen or editor, nor the menu, reaches a French table (an import() included)', () => {
+  const games = readdirSync(path.join(HERE, '..'), { withFileTypes: true }).filter((entry) => entry.isDirectory() && entry.name !== 'text' && entry.name !== 'robot-en-fete');
+  const entries = [
+    ...games.flatMap((game) => readdirSync(path.join(HERE, '..', game.name)).filter((name) => /(Loader|Simulator)\.tsx$/.test(name)).map((name) => `src/simulator/ui/${game.name}/${name}`)),
+    'src/simulator/ui/TitleBar.tsx',
+    'src/simulator/ui/SimulatorApp.tsx',
+    'src/simulator/ui/BlocklyEditor.tsx',
+    'src/simulator/ui/GripperCodeDialog.tsx',
+    'src/simulator/vm/builder.ts',
+    'src/app/simulator/page.tsx',
+    'src/app/simulator/warehouse-sort/page.tsx',
+    'content/site.ts',
+  ];
+  // (every English game has its loader and its screen here: Warehouse Sort, Locker Room, Fire Rescue, Fire Chief, Fire Fighter, Fire Cadet ...)
+  assert.ok(entries.filter((entry) => entry.endsWith('Loader.tsx')).length >= 7, entries.join(', '));
+  for (const entry of entries) {
+    const french = [...reachedFrom(entry, true)].filter(isFrench);
+    assert.deepEqual(french, [], `${entry} brings along ${french.join(', ')}`);
+  }
+  // ... while the French screen does reach both tables (it hands the screen's to the general screen, which loads the blocks' words)
+  const screen = reachedFrom('src/simulator/ui/robot-en-fete/RobotEnFeteSimulator.tsx', false);
+  for (const table of ['src/simulator/ui/text/fr.tsx', 'src/simulator/blocks/fr.ts']) assert.ok(screen.has(table), table);
+});
+
+test('the French loading screen is small: the title row and its five French words, not the screen, not either word table, not the blocks - every page fetches it ahead, through the menu', () => {
+  const loader = reachedFrom('src/simulator/ui/robot-en-fete/RobotEnFeteLoader.tsx', false);
+  for (const heavy of ['src/simulator/ui/text/en.tsx', 'src/simulator/ui/text/fr.tsx', 'src/simulator/blocks/catalog.ts', 'src/simulator/blocks/fr.ts', 'src/simulator/ui/SimulatorApp.tsx']) {
+    assert.ok(!loader.has(heavy), `the loader brings along ${heavy}`);
+  }
+  assert.ok(loader.has('src/simulator/ui/text/fr-title.tsx') && loader.has('src/simulator/ui/TitleBar.tsx'));
+  // (the French words of the title row are those of the French table: one object)
+  assert.equal(FR_TEXT.homeCrumb, FR_TITLE_TEXT.homeCrumb);
+  assert.deepEqual(
+    Object.keys(FR_TITLE_TEXT).map((key) => [key, FR_TEXT[key as keyof typeof FR_TITLE_TEXT] === FR_TITLE_TEXT[key as keyof typeof FR_TITLE_TEXT]]),
+    Object.keys(FR_TITLE_TEXT).map((key) => [key, true]),
+  );
+  // the title row reads them from the title context, where no screen table is set
+  const row = renderToStaticMarkup(createElement(TitleTextContext.Provider, { value: FR_TITLE_TEXT }, createElement(TitleBar, { title: 'Tri d’entrepôt' })));
+  assert.ok(row.includes('>Accueil<') && row.includes('Simulateur Tri d’entrepôt ') && row.includes('Proposé par '), row);
+  // ... and a screen table, where there is one, wins (the French screen sets both: the same words)
+  const both = renderToStaticMarkup(
+    createElement(ScreenTextContext.Provider, { value: EN_TEXT }, createElement(TitleTextContext.Provider, { value: FR_TITLE_TEXT }, createElement(TitleBar, { title: 'X' }))),
+  );
+  assert.ok(both.includes('>Home<'), both);
+});
+
 test('English: the sentences moved into the table are the ones the screen always said', () => {
   assert.equal(EN_TEXT.testOnMany('arrangements'), 'Test on many arrangements');
   assert.equal(plain(EN_TEXT.simulatorTitle('Warehouse Sort')), 'Warehouse Sort simulator ');
@@ -221,8 +335,10 @@ test('French: the table has every key of the English one (and no other), and no 
   for (const key of keysOf(FR_TEXT)) {
     const value = at(FR_TEXT, key);
     assert.notEqual(value, undefined, key);
-    if (typeof value === 'string') assert.notEqual(value.trim(), '', key);
+    // (but the second word of the reset button: "Replacer" is the whole command, there is nothing to add on a wide bar)
+    if (typeof value === 'string' && key !== 'resetFieldWord') assert.notEqual(value.trim(), '', key);
   }
+  assert.equal(FR_TEXT.resetFieldWord, '');
   assert.equal(FR_TEXT.locale, 'fr');
 });
 
@@ -267,9 +383,10 @@ test('French plurals: the first form for 0 and 1, the second from 2 on - and for
   assert.equal(frPlural(1, 'bloc', 'blocs'), 'bloc');
   assert.equal(frPlural(1.5, 'point', 'points'), 'points');
   assert.equal(frPlural(2, 'bloc', 'blocs'), 'blocs');
-  assert.equal(FR_TEXT.blockCount(0), '0 bloc · enregistré automatiquement');
-  assert.equal(FR_TEXT.blockCount(1), '1 bloc · enregistré automatiquement');
-  assert.equal(FR_TEXT.blockCount(2), '2 blocs · enregistrés automatiquement');
+  // (short: the strip above the blocks keeps one row with 48 blocks at 1 440 px, as the English one)
+  assert.equal(FR_TEXT.blockCount(0), '0 bloc · sauvegarde auto');
+  assert.equal(FR_TEXT.blockCount(1), '1 bloc · sauvegarde auto');
+  assert.equal(FR_TEXT.blockCount(2), '2 blocs · sauvegarde auto');
   assert.equal(plain(FR_TEXT.consoleProblems(1)), '1 problème');
   assert.equal(plain(FR_TEXT.consoleProblems(3)), '3 problèmes');
   assert.equal(FR_TEXT.consoleMessages(0), '0 message');
@@ -286,13 +403,13 @@ test('French plurals: the first form for 0 and 1, the second from 2 on - and for
 // =============================================================================================
 
 test('French sentences: the status line as one sentence, the title row, the console, the ruler, the files', () => {
-  assert.equal(plain(FR_TEXT.simulatorTitle('Robot en fête 2027')), 'Simulateur Robot en fête 2027 ');
+  assert.equal(plain(FR_TEXT.simulatorTitle('Tri d’entrepôt')), 'Simulateur Tri d’entrepôt ');
   assert.equal(plain(FR_TEXT.statusRunning('Match', 3, 9, 'objectifs', null)), 'Match en cours. 3 objectifs atteints sur 9.');
   assert.equal(plain(FR_TEXT.statusRunning('Match', 1, 9, 'objectifs', null)), 'Match en cours. 1 objectif atteint sur 9.');
   assert.equal(plain(FR_TEXT.statusPaused(FR_TEXT.moment(41.53), 'match')), 'En pause à 0:41,5. Le chrono du match est aussi en pause.');
   assert.equal(
     plain(FR_TEXT.statusStopped('0:41,5', '35 / 80')),
-    'Tu as arrêté le match à 0:41,5 - pas de score final (pour l’instant 35 / 80). Démarrer recommence, Remettre en place remet le terrain.',
+    'Tu as arrêté le match à 0:41,5 - pas de score final (pour l’instant 35 / 80). Démarrer recommence, Replacer remet le terrain en place.',
   );
   const over: MatchOver = { Match: 'Match', ending: null, reason: FR_TEXT.finishText('time'), time: '1:30,0', total: 80, max: 80, perfect: true, complete: true, goal: 'objectif', goals: 'objectifs', penaltyNote: '' };
   assert.equal(plain(FR_TEXT.statusOver(over, '80 / 80')), `Match terminé. Le temps est écoulé à 1:30,0. Score final${NB}: 80 / 80 - un parcours parfait${NB}!`);
@@ -305,14 +422,31 @@ test('French sentences: the status line as one sentence, the title row, the cons
   assert.equal(FR_TEXT.finishHeadline(`Bravo${NB}! Le reste.`), `Bravo${NB}!`);
   assert.equal(FR_TEXT.clockLabel('match', '1:30'), `Chrono du match${NB}: il reste 1:30`);
   assert.equal(FR_TEXT.startLine('disposition', 'VR-BR'), `C’est parti${NB}! Disposition VR-BR.`);
-  assert.equal(FR_TEXT.scoreSheetSummary({ total: 5, max: 80 }, 1, 9, screenWords.screenWords({ goals: 'objectifs' })), `5 / 80 points · objectifs${NB}: 1 sur 9`);
+  // (short: "80 / 80 points · objectifs : 9/9" fits its heading on a 360 px phone)
+  assert.equal(FR_TEXT.scoreSheetSummary({ total: 5, max: 80 }, 1, 9, screenWords.screenWords({ goals: 'objectifs' })), `5 / 80 points · objectifs${NB}: 1/9`);
   assert.equal(plain(FR_TEXT.soundButton(true)), 'Son activé');
   assert.equal(plain(FR_TEXT.soundButton(false)), 'Son coupé');
   assert.equal(FR_TEXT.cyberPiSummary(['Cube : red'], true), `écran${NB}: «${NB}Cube : red${NB}»`);
   // the ruler
   const line = { points: [{ x: 300, y: 900 }, { x: 300, y: 600 }, { x: 600, y: 600 }], startHeading: null };
   assert.equal(FR_TEXT.rulerReading(line), '30,0 cm, puis 90° à droite, puis 30,0 cm - 60,0 cm en tout');
-  assert.equal(FR_TEXT.rulerText(ruler.EMPTY_RULER), 'Clique sur le tapis pour poser le premier point. Clique sur le robot pour partir d’entre ses roues.');
+  assert.equal(FR_TEXT.rulerText(ruler.EMPTY_RULER), 'Clique sur le tapis pour poser le premier point. Clique sur le robot pour que la règle parte d’entre ses roues.');
+  assert.equal(FR_TEXT.rulerText({ points: [{ x: 1, y: 1 }], startHeading: null }), 'Premier point posé. Clique maintenant pour poser le deuxième point.');
+  assert.equal(FR_TEXT.rulerText({ points: [{ x: 1, y: 1 }], startHeading: 0 }, false), 'La règle part de la place du robot. Clique maintenant pour poser le deuxième point.');
+  // the hints and labels the final check and the review corrected
+  assert.equal(FR_TEXT.rulerHint, `Mesurer sur le tapis${NB}: clique sur des points pour voir les distances en cm et les virages entre eux`);
+  assert.equal(FR_TEXT.resetHint('Remettre les cubes.', 'match'), 'Remettre les cubes. Possible à tout moment, même pendant un match.');
+  assert.deepEqual([FR_TEXT.resetWord, FR_TEXT.resetLabel, FR_TEXT.stop], ['Replacer', 'Replacer', 'Stop']);
+  assert.equal(FR_TEXT.stopHint('match'), `Arrêter le programme et le robot là où ils sont. Le match ne compte pas${NB}; Replacer remet tout comme au début.`);
+  assert.deepEqual([FR_TEXT.em1Angle, FR_TEXT.em2Angle], ['Angle EM1 (g.)', 'Angle EM2 (d.)']);
+  assert.equal(FR_TEXT.scenarioLoaded('disposition'), 'Disposition chargée. Appuie sur Démarrer pour voir ce que fait ton programme sur cette disposition.');
+  assert.equal(FR_TEXT.lineEarnedHint, 'Le temps au chrono quand les points de cette ligne ont été gagnés');
+  assert.equal(FR_TEXT.lineSuccessTitle, 'Combien de fois chaque ligne de la feuille de score est réussie');
+  assert.equal(
+    plain(FR_TEXT.emptyWorkspace(true)),
+    'Construis ton programme ici. Clique sur une catégorie à gauche (essaie Châssis mBot2) et accroche un bloc sous le bloc jaune. Puis appuie sur Démarrer. Ou ouvre un des Exemples.',
+  );
+  assert.equal(plain(FR_TEXT.emptyWorkspace(false)), 'Construis ton programme ici. Clique sur une catégorie à gauche (essaie Châssis mBot2) et accroche un bloc sous le bloc jaune. Puis appuie sur Démarrer.');
   const style = { textWidth: (text: string) => text.length * 7, fontSize: 12, clearance: 9, bounds: { x: 0, y: 0, w: 2000, h: 2000 } };
   const labels = FR_TEXT.rulerLabels(line, style);
   assert.deepEqual(labels.map((label) => label.text), ['30,0 cm', '30,0 cm', '90° à droite', '60,0 cm en tout']);
@@ -338,9 +472,12 @@ test('French: a program file of another game names that game and its groups of b
   const note = FR_TEXT.otherGameNote(gripperBlock, 'fire-rescue', 'fire-chief');
   assert.equal(note, `Ce programme a été enregistré dans le simulateur Fire Rescue Senior. 1 de ses blocs sert à des pièces que ce robot n’a pas (Pince)${NB}: il ne marche pas ici.`);
   assert.equal(FR_TEXT.otherGameNote({}, 'fire-chief', 'warehouse-sort'), 'Ce programme a été enregistré dans le simulateur Fire Chief. Tous ses blocs marchent aussi ici.');
-  // the name of the French game, as its title row writes it (design 2.3 rule 9) - in the English sentence too
-  assert.equal(programFile.gameName('robot-en-fete'), 'Robot en fête 2027');
-  assert.equal(EN_TEXT.otherGameNote({}, 'robot-en-fete', 'fire-chief'), 'This program was saved in the Robot en fête 2027 simulator. All its blocks work here too.');
+  // the name of the French game, as its title row writes it (design 2.3 rule 9): its simulator, « Tri d’entrepôt » - in the English sentence too
+  assert.equal(programFile.gameName('robot-en-fete'), 'Tri d’entrepôt');
+  assert.equal(EN_TEXT.otherGameNote({}, 'robot-en-fete', 'fire-chief'), 'This program was saved in the Tri d’entrepôt simulator. All its blocks work here too.');
+  // and its program files are named after it, not after the id of its game, which its category shares
+  assert.equal(programFile.programFileName('robot-en-fete', new Date('2026-11-26T10:00:00Z')), 'tri-entrepot-program-2026-11-26.json');
+  assert.equal(programFile.programFileName('warehouse-sort', new Date('2026-11-26T10:00:00Z')), 'warehouse-sort-program-2026-11-26.json');
 });
 
 // =============================================================================================
@@ -622,6 +759,7 @@ function frenchTexts(): Array<[string, string]> {
     // (a printed text is the program's own: a text without punctuation, so that only the frame is checked)
     cyberPiSummary: () => [T.cyberPiSummary(['Bonjour red'], true), T.cyberPiSummary([], false)],
     startLine: () => T.startLine('disposition', 'VR-BR'),
+    commaTextWarning: () => [T.commaTextWarning('30,5') ?? ''],
     describeEvent: () =>
       (
         [

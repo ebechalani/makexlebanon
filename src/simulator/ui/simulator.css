@@ -90,6 +90,20 @@
 }
 
 /*
+ * The French page (Tri d’entrepôt, the only one with lang="fr"): its four buttons under the mat -
+ * "Zones · Capteurs · Trajet · Règle" - are 15px wider than the English ones. In the narrowest row
+ * that still shows their icons (21rem, a 360px phone, up to about 372px) they would stand 13px
+ * past the column and push the page sideways; there they get a little less padding (7px instead
+ * of 10px on each side) and keep to the column. (The container is the row's own: the "@container"
+ * around it in SimulatorApp.tsx. The English page has no lang="fr": nothing changes for it.)
+ */
+@container (max-width: 21.875rem) {
+  [lang='fr'] .mbot2-stage-column [role='group']:first-child > button[aria-pressed] {
+    padding-inline: 0.4375rem;
+  }
+}
+
+/*
  * ---------------------------------------------------------------------------------------------
  * The enlarged stage (the "Enlarge" button of the stage)
  * ---------------------------------------------------------------------------------------------

@@ -28,7 +28,8 @@
  */
 import { BLOCKS, CATEGORIES, fieldArgs, fieldDefault, getBlockDef, getCategory, valueInputs } from './catalog';
 import type { CategoryId, ShadowSpec } from './catalog';
-import { FR_CATEGORY_NAMES, FR_DEFAULT_TEXTS, FR_TOOLBOX } from './fr';
+// (the French words, ./fr.ts, are read through ./french.ts, in French only: an English page never downloads them)
+import { frenchWords } from './french';
 import type { BlockLocale } from './locale';
 import { DEFAULT_PALETTE, paletteCategories } from './palettes';
 
@@ -113,24 +114,27 @@ const CATEGORY_INTRO: Partial<Record<CategoryId, ToolboxItem[]>> = {
 };
 
 /** The same in French. */
-const FRENCH_CATEGORY_INTRO: Partial<Record<CategoryId, ToolboxItem[]>> = {
-  gripper: [
-    { kind: 'label', text: FR_TOOLBOX.gripperIntro1 },
-    { kind: 'sep', gap: LINE_GAP },
-    { kind: 'label', text: FR_TOOLBOX.gripperIntro2 },
-    { kind: 'button', text: FR_TOOLBOX.seeMblockCode, callbackkey: GRIPPER_CODE_CALLBACK },
-  ],
-};
+function frenchCategoryIntro(): Partial<Record<CategoryId, ToolboxItem[]>> {
+  const { FR_TOOLBOX } = frenchWords();
+  return {
+    gripper: [
+      { kind: 'label', text: FR_TOOLBOX.gripperIntro1 },
+      { kind: 'sep', gap: LINE_GAP },
+      { kind: 'label', text: FR_TOOLBOX.gripperIntro2 },
+      { kind: 'button', text: FR_TOOLBOX.seeMblockCode, callbackkey: GRIPPER_CODE_CALLBACK },
+    ],
+  };
+}
 
 /** The words of the entry of the right-click menu of a Gripper block, in this language. */
 export function seeMblockCode(locale: BlockLocale = 'en'): string {
-  return locale === 'fr' ? FR_TOOLBOX.seeMblockCode : SEE_MBLOCK_CODE;
+  return locale === 'fr' ? frenchWords().FR_TOOLBOX.seeMblockCode : SEE_MBLOCK_CODE;
 }
 
 /** The name of a category in this language. */
 export function categoryName(id: CategoryId, locale: BlockLocale = 'en'): string {
   const name = getCategory(id).name;
-  return locale === 'fr' ? (FR_CATEGORY_NAMES[id] ?? name) : name;
+  return locale === 'fr' ? (frenchWords().FR_CATEGORY_NAMES[id] ?? name) : name;
 }
 
 // =============================================================================================
@@ -139,7 +143,9 @@ export function categoryName(id: CategoryId, locale: BlockLocale = 'en'): string
 
 /** What a bubble of words holds before anything is typed, in this language ("apple" / "pomme"; "makeblock" in both). */
 export function defaultText(value: string, locale: BlockLocale = 'en'): string {
-  return locale === 'fr' && Object.prototype.hasOwnProperty.call(FR_DEFAULT_TEXTS, value) ? FR_DEFAULT_TEXTS[value] : value;
+  if (locale !== 'fr') return value;
+  const { FR_DEFAULT_TEXTS } = frenchWords();
+  return Object.prototype.hasOwnProperty.call(FR_DEFAULT_TEXTS, value) ? FR_DEFAULT_TEXTS[value] : value;
 }
 
 /** The white bubble for a slot (a bubble of words gets its default text in the language of the palette). */
@@ -180,7 +186,7 @@ export function toolboxBlock(type: string, fields?: Record<string, unknown>, loc
 
 /** What one static category shows: its few words (if it has any), then its blocks in catalog order, with gaps between groups. */
 export function categoryContents(id: CategoryId, locale: BlockLocale = 'en'): ToolboxItem[] {
-  const intro = locale === 'fr' ? FRENCH_CATEGORY_INTRO : CATEGORY_INTRO;
+  const intro = locale === 'fr' ? frenchCategoryIntro() : CATEGORY_INTRO;
   const items: ToolboxItem[] = (intro[id] ?? []).map((item) => ({ ...item }));
   let blocks = 0;
   for (const def of BLOCKS) {

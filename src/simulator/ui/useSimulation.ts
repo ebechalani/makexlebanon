@@ -41,6 +41,7 @@ import type {
   Simulation,
 } from '../core/types';
 import { PROBE_NAMES, SERVO_PORTS } from '../core/types';
+import { commaNumberTexts } from './comma-texts';
 import { appendLog, restartFacts, type LogLine } from './format';
 import { hasHatBlock, hasRunnableScript } from './program-file';
 import { useScreenText } from './text/context';
@@ -433,6 +434,13 @@ export function useSimulation<S>(options: UseSimulationOptions<S>): SimulationCo
         level: 'warn',
         text: text.nothingSnapped,
       });
+    }
+    // (a number with a decimal comma typed into a text bubble: the French screen says what the program makes of it; English says nothing)
+    if (blockProgram) {
+      for (const typed of commaNumberTexts(program)) {
+        const line = text.commaTextWarning(typed);
+        if (line) addLog({ time: 0, level: 'warn', text: line });
+      }
     }
     handleEvents(sim.drainEvents());
 

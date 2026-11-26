@@ -18,7 +18,7 @@
  *   ./fr-console.tsx  the sentences of the engine and the interpreter
  *   ./fr-stage.tsx    the ruler, the stage, program files
  */
-import { FR_GRIPPER_TEXT } from './gripper';
+import { FR_GRIPPER_TEXT } from './fr-gripper';
 import { frMoment, frNumber, frRefereeTime, frTimeTextOf, NB, withComma } from './fr-common';
 import { FR_BATCH_TEXT, FR_MATCH_TEXT } from './fr-match';
 import { FR_CONSOLE_TEXT, FR_CYBERPI_TEXT, FR_SENSOR_TEXT } from './fr-panels';

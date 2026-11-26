@@ -32,7 +32,7 @@ const ROOT = path.join(SRC, '..');
 const rel = (file: string): string => path.relative(SIMULATOR, file).split(path.sep).join('/');
 
 /** The page of Robot en fête 2027 (design 7.3) - and, while it is not written yet, the shared screen it shows. */
-const FRENCH_PAGE = path.join(SRC, 'app', 'simulator', 'robot-en-fete', 'page.tsx');
+const FRENCH_PAGE = path.join(SRC, 'app', 'simulator', 'tri-entrepot', 'page.tsx');
 const SCREEN_ENTRIES = [path.join(UI, 'SimulatorApp.tsx'), path.join(UI, 'TitleBar.tsx')];
 
 /** The files of the shared screen: directly in ../ (not a game's folder, not the tables), no test. */
@@ -283,7 +283,7 @@ const ALLOWED_IN_COMPONENTS: Record<string, string> = {
 
 test('(a) the phrase inventory: from the French page, no phrase of the shared screen is outside the word table', async (t) => {
   const { entries, files } = reachedFiles();
-  if (entries[0] !== FRENCH_PAGE) t.diagnostic('the French page (src/app/simulator/robot-en-fete/page.tsx) is not there yet: the walk starts at the shared screen');
+  if (entries[0] !== FRENCH_PAGE) t.diagnostic('the French page (src/app/simulator/tri-entrepot/page.tsx) is not there yet: the walk starts at the shared screen');
   const shared = [...files].filter(([, kind]) => kind === 'shared').map(([file]) => file);
   // (the walk reaches the whole shared screen, the table and the plain modules of the table)
   for (const name of ['SimulatorApp.tsx', 'TitleBar.tsx', 'ControlBar.tsx', 'ScoreSheet.tsx', 'SensorDashboard.tsx', 'ConsolePanel.tsx', 'format.ts', 'match-words.ts', 'ruler.ts', 'program-file.ts']) {

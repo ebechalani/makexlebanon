@@ -374,6 +374,7 @@ export const EN_TEXT: ScreenText = {
   startLine: (scenarioWord, code) => `Start! ${capital(scenarioWord ?? 'combination')} ${code}.`,
   noStartHat: 'Nothing will happen: the program has no yellow "when CyberPi starts up" block to begin with.',
   nothingSnapped: 'Nothing will happen: no block is snapped under a yellow "when ..." block yet.',
+  commaTextWarning: () => null,
   stoppedByYou: 'Stopped by you. Press Start to try again.',
   matPictureFailed: 'The mat picture could not be loaded: the floor sensors use the simplified drawing of the mat.',
   describeEvent,

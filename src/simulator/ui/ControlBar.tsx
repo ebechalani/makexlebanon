@@ -239,7 +239,8 @@ export function ControlBar(props: ControlBarProps) {
           title={text.resetHint(words.resetHint, match)}
         >
           <ResetIcon className={`${smallIcon} ${over ? 'text-brand-700' : 'text-ink-500'}`} />
-          {text.resetWord}<span className={`hidden @[34rem]:inline`}>{text.resetFieldWord}</span>
+          {/* (a language whose button word is the whole command has no second word: no empty span) */}
+          {text.resetWord}{text.resetFieldWord ? <span className={`hidden @[34rem]:inline`}>{text.resetFieldWord}</span> : null}
         </button>
         <div className="ml-auto">{speedPicker}</div>
       </div>

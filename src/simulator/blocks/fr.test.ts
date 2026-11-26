@@ -33,7 +33,7 @@ import {
   FR_TOOLBOX,
 } from './fr';
 import { addGripperMyBlocks, convertGripperBlocks, gripperDefinitionProgram, gripperDefinitionsProgram, gripperOriginals, GRIPPER_VARIANTS, gripperVariants } from './gripper-original';
-import { applyBlocklyMessages, blocklyMessagesOf, localeOfWorkspace, setWorkspaceLocale, withBlocklyMessage } from './locale';
+import { applyBlocklyMessages, blocklyMessagesOf, frenchShortcutKeys, localeOfWorkspace, setWorkspaceLocale, SHORTCUTS_IN_MESSAGES, withBlocklyMessage } from './locale';
 import { withDecimalPoint } from './number-field';
 import { GAME_VERSIONS, LANGUAGE_VERSIONS, PALETTE_IDS, PALETTE_TOOLTIPS, paletteCategories, paletteOf, paletteTooltip, versionOf } from './palettes';
 import { createEditor, disposeEditor, frenchBlockJson, GRIPPER_CODE_MENU_ID, MAKE_LIST_CALLBACK, registerBlocks, variablesFlyout, type BlocklyApi } from './register';
@@ -120,7 +120,9 @@ describe('the French table of the blocks', () => {
       if (/\b(vous|votre|vos)\b|\bfonctions?\b(?! math)|procédure/i.test(text)) problems.push(`${where}: ${JSON.stringify(text)}`);
       // (the bubble "pomme " ends with a space on purpose - "regrouper pomme  et banane" gives "pomme banane", as in Scratch -
       // and Blockly puts " et un commentaire" after a number of stacks)
-      if (text !== text.trim() && text !== FR_DEFAULT_TEXTS['apple '] && !/^ et /.test(text)) problems.push(`${where}: spaces at an end - ${JSON.stringify(text)}`);
+      // (but the type names of Blockly's screen-reader labels: they end with the no-break space of Blockly's own ": ")
+      const typeName = /^Blockly\.Msg ARIA_TYPE_FIELD_/.test(where) && /[^\s]\u00a0$/.test(text);
+      if (text !== text.trim() && text !== FR_DEFAULT_TEXTS['apple '] && !/^ et /.test(text) && !typeName) problems.push(`${where}: spaces at an end - ${JSON.stringify(text)}`);
     }
     assert.deepEqual(problems, []);
     // the number of no-break spaces of the table, as the design counted them (79 with the one of its old header comment)
@@ -591,13 +593,81 @@ describe('a French workspace (real Blockly)', () => {
     assert.deepEqual(problems, []);
     for (const [key, value] of Object.entries(FR_BLOCKLY_MSG)) {
       assert.ok(key in blocklyEnglish, `${key} is one of Blockly's keys`);
-      assert.equal(msg[key], value, key);
+      // (a sentence with a shortcut in it gets the shortcut with the French names of its keys: see the next test)
+      const keys = SHORTCUTS_IN_MESSAGES[key] ? frenchShortcutKeys(Blockly, SHORTCUTS_IN_MESSAGES[key]) : '';
+      assert.equal(msg[key], keys ? value.replace('%1', keys) : value, key);
     }
-    assert.equal(Object.keys(FR_BLOCKLY_MSG).length, 120);
+    assert.equal(Object.keys(FR_BLOCKLY_MSG).length, 126);
+    // and written as French is written, also where Blockly's French file is used as it is: ’ for an apostrophe, a
+    // no-break space before : ; ! ? » and after « (only what the page can show or say: not the allow-list)
+    const typography: string[] = [];
+    for (const [key, value] of Object.entries(msg)) {
+      if (typeof value !== 'string' || allowed(key)) continue;
+      if (/'/.test(value)) typography.push(`${key}: ' in ${JSON.stringify(value)}`);
+      if (/ [:;!?»]|« /.test(value)) typography.push(`${key}: a plain space in ${JSON.stringify(value)}`);
+    }
+    assert.deepEqual(typography, []);
     assert.equal(msg.PROCEDURES_DEFNORETURN_TITLE, 'définir');
     assert.equal(msg.NEW_VARIABLE, 'Créer une variable');
     assert.equal(msg.REDO, 'Rétablir');
     assert.equal(msg.UNDO, 'Annuler');
+  });
+
+  test("the shortcuts Blockly writes - in its right-click menus, its toasts, its screen-reader hints - have the French names of the keys (Ctrl, Maj); English keeps its own", () => {
+    const msg = Blockly.Msg as Record<string, string>;
+    applyBlocklyMessages(Blockly, 'fr', blocklyFrench);
+    // the sentences (the toast after Ctrl + C or Ctrl + X, the screen-reader hints)
+    assert.equal(msg.KEYBOARD_NAV_COPIED_HINT, 'Copié. Appuie sur Ctrl + V pour coller.');
+    assert.equal(msg.KEYBOARD_NAV_CUT_HINT, 'Coupé. Appuie sur Ctrl + V pour coller.');
+    assert.equal(msg.SCREENREADER_HINT, 'Utilise les flèches pour te déplacer. Appuie sur Alt + Maj + A pour activer ou couper le mode lecteur d’écran.');
+    assert.equal(msg.SCREENREADER_MODE_ENABLED, 'Le mode lecteur d’écran est activé, appuie sur Alt + Maj + A pour le couper');
+    assert.equal(msg.KEYBOARD_NAV_FLYOUT_LABEL_HINT, 'Utilise les flèches pour aller à un bloc, ou appuie sur H pour aller au titre suivant.');
+    // (no shortcut "list_shortcuts" in this Blockly: Blockly never shows HELP_PROMPT, which keeps its %1)
+    assert.equal(msg.HELP_PROMPT, FR_BLOCKLY_MSG.HELP_PROMPT);
+    const onThisPage = (key: string): boolean =>
+      !Object.keys(FR_BLOCKLY_NOT_ON_THIS_PAGE).some((k) => (k.startsWith('_') ? key.endsWith(k) : k.endsWith('_') ? key.startsWith(k) : key === k || key.includes(k)));
+    for (const [key, value] of Object.entries(msg)) assert.ok(typeof value !== 'string' || !onThisPage(key) || !/\b(Control|Shift)\b/.test(value), `${key}: ${value}`);
+    // the right-click menus: each entry with a shortcut, in a French workspace, as Blockly's own line with French keys
+    const registry = Blockly.ContextMenuRegistry.registry;
+    const line = (id: string, scope: object): string | HTMLElement => {
+      const item = registry.getItem(id) as { displayText: (scope: object) => string | HTMLElement };
+      return item.displayText(scope);
+    };
+    const block = Blockly.serialization.blocks.append(toolboxBlock('mbot2_stop', undefined, 'fr') as never, french);
+    for (const [id, scope, words, keys] of [
+      ['undoWorkspace', { workspace: french }, 'Annuler', ' Ctrl + Z'],
+      ['redoWorkspace', { workspace: french }, 'Rétablir', ' Ctrl + Y'],
+      ['blockDuplicate', { block }, 'Dupliquer', ' D'],
+      ['blockDelete', { block }, msg.DELETE_BLOCK, ' Suppr'],
+    ] as const) {
+      const element = line(id, scope) as HTMLElement;
+      assert.ok(element instanceof HTMLElement, id);
+      assert.equal(element.outerHTML, `<div class="blocklyShortcutContainer"><span>${words}</span><span class="blocklyShortcut">${keys}</span></div>`, id);
+    }
+    // an English workspace gets what Blockly's entry gives, a plain text: Blockly writes its own shortcut ("Control + Z")
+    applyBlocklyMessages(Blockly, 'en');
+    assert.equal(line('undoWorkspace', { workspace: english }), 'Undo');
+    assert.equal(msg.KEYBOARD_NAV_COPIED_HINT, (createRequire(import.meta.url)('blockly/msg/en') as Record<string, string>).KEYBOARD_NAV_COPIED_HINT);
+    assert.ok(msg.KEYBOARD_NAV_COPIED_HINT.includes('%1'), 'Blockly fills it in itself, as before');
+    applyBlocklyMessages(Blockly, 'fr', blocklyFrench);
+    block.dispose();
+  });
+
+  test("what a screen reader says of a French block: a no-break space before Blockly's \":\" (\"menu : rouge\", \"Modifier nombre : 100\"), no lone \"?\"; the English labels as they were", () => {
+    const label = (block: unknown): string => (block as { getFocusableElement(): Element }).getFocusableElement().getAttribute('aria-label') ?? '';
+    const fr = Blockly.serialization.blocks.append(toolboxBlock('sensing_claw_color_is', undefined, 'fr') as never, french);
+    assert.equal(label(fr), 'Début de pile, le capteur de couleur de la pince détecte, rouge, a une entrée,');
+    const dropdown = fr.inputList.flatMap((input) => input.fieldRow).find((field) => field instanceof Blockly.FieldDropdown);
+    assert.equal(dropdown?.computeAriaLabel(true), 'menu : rouge');
+    const straight = Blockly.serialization.blocks.append(toolboxBlock('mbot2_straight_cm', undefined, 'fr') as never, french);
+    const bubble = straight.getInput('DISTANCE')!.connection!.targetBlock()!;
+    assert.equal(label(bubble), 'Modifier nombre : 100');
+    // every French type name ends with the no-break space Blockly's ": " needs
+    for (const key of Object.keys(FR_BLOCKLY_MSG).filter((k) => k.startsWith('ARIA_TYPE_FIELD_'))) assert.ok(FR_BLOCKLY_MSG[key].endsWith(NB), key);
+    // English: Blockly's own labels, the lone "?" included
+    const en = Blockly.serialization.blocks.append(toolboxBlock('sensing_claw_color_is') as never, english);
+    assert.match(label(en), /, \?, /);
+    for (const block of [fr, straight, en]) block.dispose();
   });
 
   test("one writer of Blockly's words: the Gripper window (registerBlocks) leaves French; an English editor is English again, key for key", () => {

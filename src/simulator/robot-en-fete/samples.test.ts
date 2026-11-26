@@ -278,7 +278,7 @@ describe('the list of the examples', () => {
       ],
       'fete-all-cubes': [
         new RegExp(`Bleu${NB}: il laisse le cube où il est\\.`),
-        /Il marque 80 points avec les 24 dispositions, en 53 à 61 secondes sur 90\. Il ne déplace jamais le cube bleu\./,
+        /Il marque 80 points sur chacune des 24 dispositions, en 53 à 61 secondes sur 90\. Il ne déplace jamais le cube bleu\./,
         /Il ne devine jamais une couleur\./,
       ],
     };

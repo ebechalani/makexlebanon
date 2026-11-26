@@ -11,7 +11,10 @@ import { DEFAULT_ROBOT_CONFIG } from '../core/robot';
 import type { ProgramJson } from '../core/types';
 import { addedMessage, convertedMessage, GRIPPER_CODE_WORDS, gripperCodeIntro } from './gripper-code-words';
 import { blankProgram } from './program-file';
-import { EN_GRIPPER_TEXT, FR_GRIPPER_TEXT } from './text/gripper';
+// (the French words of the blocks, for the French My Blocks: what the French page loads with its word table)
+import '../blocks/fr';
+import { FR_GRIPPER_TEXT } from './text/fr-gripper';
+import { EN_GRIPPER_TEXT } from './text/gripper';
 
 /** The blank program with some Gripper blocks under the yellow block. */
 function withGripperBlocks(actions: Array<'open' | 'close'>): ProgramJson {

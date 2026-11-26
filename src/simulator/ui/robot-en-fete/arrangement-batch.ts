@@ -33,7 +33,7 @@ export const ROBOT_EN_FETE_BATCH_PRESETS: BatchPreset<WarehouseSortScenario>[] =
 /** With equal points the rules rank by the cubes in the right bay, then by the time of the last delivery (as in Warehouse Sort). */
 export const ROBOT_EN_FETE_TIE_BREAK: BatchTieBreak = {
   label: 'Dernière livraison',
-  hint: 'Le temps au chrono quand le dernier cube qui compte a été posé dans sa baie. À points égaux, les règles classent devant plus de cubes dans la bonne baie, puis le temps le plus tôt.',
+  hint: 'Le temps au chrono quand le dernier cube qui compte a été posé dans sa baie. À points égaux, les règles classent d’abord l’essai qui a le plus de cubes dans la bonne baie, puis celui dont la dernière livraison est la plus tôt.',
   timeOf: lastDeliveryTime,
   none: 'aucun cube dans la bonne baie',
   compare: compareArrangementRuns,

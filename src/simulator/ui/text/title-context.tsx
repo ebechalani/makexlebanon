@@ -13,7 +13,9 @@
  * imports from it too: what it reads must stay small. The whole English table imports every text
  * function of the screen (the block catalog with them, for the notes about program files) - about
  * 100 kB that a loading screen would download before it is drawn. So the title row reads the same
- * context, with only its own English words (./en-title.tsx) to fall back on.
+ * context, with only its own English words (./en-title.tsx) to fall back on. The French table is
+ * as large, so the French page's loading screen does not set it: it sets only the French words of
+ * the title row (./fr-title.tsx), in a second context, `TitleTextContext`.
  *
  * ('use client' first: the title row is on pages whose page file is a Server Component, and a
  * context exists only on the client.)
@@ -25,5 +27,16 @@ import type { ScreenText, TitleText } from './types';
 /** The word table of the screen: empty (null) where a page sets none - the English table is read then. */
 export const ScreenTextContext = createContext<ScreenText | null>(null);
 
-/** The words of the title row, in the language of the screen. */
-export const useTitleText = (): TitleText => useContext(ScreenTextContext) ?? EN_TITLE_TEXT;
+/**
+ * The words of the title row alone, for a loading screen: the French page's loader sets its French
+ * title words here (./fr-title.tsx), without the whole French table. Empty where nobody sets them.
+ */
+export const TitleTextContext = createContext<TitleText | null>(null);
+
+/** The words of the title row, in the language of the screen (or of the loading screen). */
+export function useTitleText(): TitleText {
+  // (both read every time: a hook is never skipped)
+  const screen = useContext(ScreenTextContext);
+  const title = useContext(TitleTextContext);
+  return screen ?? title ?? EN_TITLE_TEXT;
+}

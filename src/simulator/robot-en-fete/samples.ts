@@ -153,7 +153,7 @@ const BLUE = '#0000ff';
 
 /** On the first block of every program that drives by distance. */
 const BY_DISTANCE_NOTE =
-  `Ce programme fait rouler le robot sur des distances mesurées. Le robot du simulateur roule exactement. Un vrai robot dévie un peu${NB}: là-bas, sers-toi des lignes blanches pour corriger sa route.`;
+  `Ce programme fait rouler le robot sur des distances mesurées. Le robot du simulateur roule sans aucune erreur. Un vrai robot dévie un peu${NB}: sur un vrai tapis, sers-toi des lignes blanches pour corriger sa route.`;
 
 /** On "moves forward" towards a cube with the open claw. */
 const AROUND_THE_CUBE_NOTE = `La pince est ouverte${NB}: ses doigts arrivent des deux côtés du cube, sans le toucher.`;
@@ -268,7 +268,7 @@ const whiteLine: SampleProgram = {
     'Au T du bout de la ligne, les quatre sondes voient du blanc, et le robot s’arrête. ' +
     'Il marque 10 points quelle que soit la disposition (sortie de la zone de départ, parcours propre), en 3 secondes. ' +
     'Il ne touche pas le cube devant lui. ' +
-    `Essaie la ligne à gauche de la zone de départ${NB}: tourne à gauche au lieu de droite.`,
+    `Essaie la ligne à gauche de la zone de départ${NB}: tourne à gauche au lieu de tourner à droite.`,
   program: program([
     script(note(whenStart(), `Sur ce tapis, la ligne est blanche. Le robot du simulateur le sait${NB}: «${NB}détecte la ligne${NB}» veut dire blanc ici.`), [
       note(moveCm('forward', TO_BOTTOM_LINE_CM), ONTO_THE_BOTTOM_LINE_NOTE),
@@ -317,7 +317,7 @@ const cubeColour: SampleProgram = {
     `L’écran montre la couleur du cube, avec le nom que donne le capteur${NB}: red, green ou blue. Les LED s’allument de cette couleur. ` +
     'Il montre toujours la bonne couleur, quelle que soit la disposition. Il ne touche pas le cube. ' +
     'Il marque 10 points (sortie de la zone de départ, parcours propre), en 3 secondes. ' +
-    `Essaie le cube en bas à droite${NB}: tourne à droite au lieu de gauche.`,
+    `Essaie le cube en bas à droite${NB}: tourne à droite au lieu de tourner à gauche.`,
   program: program([
     script(note(whenStart(), BY_DISTANCE_NOTE), [
       note(moveCm('forward', TO_BOTTOM_LINE_CM), ONTO_THE_BOTTOM_LINE_NOTE),
@@ -356,7 +356,7 @@ const oneCube: SampleProgram = {
     'Le robot roule jusqu’au cube en bas à droite, la pince ouverte autour de lui. ' +
     `D’abord il regarde${NB}: le capteur de couleur de la pince lit le cube. ` +
     `Bleu${NB}: le robot le laisse où il est et prend à la place le cube en bas à gauche. ` +
-    'Il attrape le cube et le soulève. Puis il monte le long de la grande ligne blanche, entre les deux baies. ' +
+    'Il attrape le cube et le soulève. Puis il monte le long de la longue ligne blanche, entre les deux baies. ' +
     `Rouge${NB}: il tourne vers la baie rouge. Vert${NB}: il tourne vers la baie verte. Là, il pose le cube. ` +
     'Il marque 30 points quelle que soit la disposition, en 11 à 17 secondes. Il ne déplace jamais le cube bleu. ' +
     'Essaie de te garer sur une aire d’arrivée à la fin, pour 10 points de plus.',
@@ -556,7 +556,7 @@ const allCubes: SampleProgram = {
     `Bleu${NB}: il laisse le cube où il est. Rouge ou vert${NB}: il amène le cube à la baie de cette couleur. ` +
     'Il ne devine jamais une couleur. ' +
     `«${NB}place rouge${NB}» et «${NB}place verte${NB}» disent où va le cube suivant dans chaque baie. À la fin, il se gare sur l’aire de gauche. ` +
-    'Il marque 80 points avec les 24 dispositions, en 53 à 61 secondes sur 90. Il ne déplace jamais le cube bleu. ' +
+    'Il marque 80 points sur chacune des 24 dispositions, en 53 à 61 secondes sur 90. Il ne déplace jamais le cube bleu. ' +
     `Essaie un autre ordre des quatre entrepôts. Quel ordre est le plus rapide${NB}?`,
   program: program([
     driveOnTheLongLine(),
