@@ -6,7 +6,7 @@
 // (seasons.ts and standalone.ts import nothing, so there is no import cycle; they are plain data,
 // which the menu of every page then carries: the Header is a client component)
 import { simulatorSeasons } from './seasons';
-import { standaloneCategories, type StandaloneCategory } from './standalone';
+import { simulatorCategories, standaloneCategories, type StandaloneCategory } from './standalone';
 
 export const site = {
   name: 'MakeX Lebanon',
@@ -48,42 +48,90 @@ export const site = {
   },
 } as const;
 
-export type NavItem = {
+/** A line of a dropdown, or of a group of one: a link to a page. */
+export type NavLink = {
   label: string;
   href: string;
-  children?: { label: string; href: string }[];
-  /**
-   * The desktop dropdown is as wide as its longest line (never narrower than the usual w-56), so
-   * that no line breaks: "Warehouse Sort — Season 2026" does not fit in w-56. It is at most
-   * max-w-sm wide, so that it still ends inside the window at 1024 px: a longer line breaks. (Set
-   * only where it is needed, so that the other dropdowns stay as they are.)
-   */
-  childrenOnOneLine?: boolean;
+  /** (never: a link has no lines of its own; see NavGroup) */
+  children?: never;
 };
 
 /**
- * The dropdown of "Simulator": the Simulator page, then every simulator in the order of that page
- * (Season 2026 first), as "Warehouse Sort — Season 2026". Built from `simulatorSeasons()`, the
- * list the page shows, so a simulator added in content/seasons.ts appears here by itself, in its
- * season's place. After the seasons, as on the page, the simulators of the categories of their own
- * (content/standalone.ts), one line each: "Tri d’entrepôt — Robot en fête 2027" - the French name
- * of the simulator, then of its category, both French proper names in this English menu, written
- * as they are. (The sections and the categories can be handed in, for the tests.)
+ * A group of lines in a dropdown: on a computer a row of the dropdown whose lines show beside it
+ * when the row is hovered or has the focus; on a phone a button that shows them under it. The row
+ * itself is a link too (`href`), so that a tap on a touch screen, which cannot hover, leads to the
+ * part of the page that lists the same lines.
+ */
+export type NavGroup = {
+  label: string;
+  href: string;
+  /** the language of the group's label and of its lines, when it is not the menu's English (lang="fr") */
+  lang?: StandaloneCategory['lang'];
+  /**
+   * what the row holds, in the menu's English, for a screen reader ("5 simulators"): on a computer
+   * the row is a link, and this tells that a list of lines goes with it (its aria-describedby)
+   */
+  description: string;
+  children: NavLink[];
+};
+
+/** What a dropdown holds: links, and groups of links. */
+export type NavChild = NavLink | NavGroup;
+
+export type NavItem = {
+  label: string;
+  href: string;
+  children?: NavChild[];
+};
+
+/** Whether a line of a dropdown is a group of lines (NavGroup) rather than one link. */
+export function isNavGroup(child: NavChild): child is NavGroup {
+  return child.children !== undefined;
+}
+
+/**
+ * The dropdown of "Simulator": the Simulator page ("All simulators"), then one group per part of
+ * that page, in its order. First the seasons, the newest first ("Season 2027", then "Season
+ * 2026"): each group leads to its part of the page (/simulator#season-2027) and holds its
+ * simulators by their name, in the order of the page ("Fire Cadet", ... "Fire Chief"; a long name
+ * gives way to its `menuName`: "Locker Room"). Then the categories of their own
+ * (content/standalone.ts), each a group under its own name ("Robot en fête 2027", leading to
+ * /simulator#category-robot-en-fete) with its simulators by their name ("Tri d’entrepôt"), in the
+ * category's language (lang="fr"). Built from `simulatorSeasons()`, the parts the page shows, and
+ * from `simulatorCategories()`, so that a simulator, a season or a category added later appears
+ * here by itself, in its place; a season or a category without a simulator has no part and no
+ * group. Each group also says how many simulators it holds ("5 simulators"), for a screen reader.
+ * (The sections and the categories can be handed in, for the tests.)
  */
 export function simulatorMenu(
   sections = simulatorSeasons(),
   standalone: StandaloneCategory[] = standaloneCategories,
-): NonNullable<NavItem['children']> {
+): NavChild[] {
   return [
     { label: 'All simulators', href: '/simulator' },
-    ...sections.flatMap((section) =>
-      section.simulators.map((simulator) => ({
-        label: `${simulator.menuName ?? simulator.name} — Season ${section.year}`,
-        href: simulator.href,
-      })),
+    ...sections.map(
+      (section): NavGroup => ({
+        label: `Season ${section.year}`,
+        href: `/simulator#season-${section.year}`,
+        description: simulatorCount(section.simulators.length),
+        children: section.simulators.map((simulator) => ({ label: simulator.menuName ?? simulator.name, href: simulator.href })),
+      }),
     ),
-    ...standalone.flatMap((category) => category.simulators.map((simulator) => ({ label: simulator.menuLabel, href: simulator.href }))),
+    ...simulatorCategories(standalone).map(
+      (category): NavGroup => ({
+        label: category.name,
+        href: `/simulator#category-${category.slug}`,
+        lang: category.lang,
+        description: simulatorCount(category.simulators.length),
+        children: category.simulators.map((simulator) => ({ label: simulator.name, href: simulator.href })),
+      }),
+    ),
   ];
+}
+
+/** "1 simulator", "5 simulators" */
+function simulatorCount(count: number): string {
+  return `${count} simulator${count === 1 ? '' : 's'}`;
 }
 
 export const nav: NavItem[] = [
@@ -115,8 +163,8 @@ export const nav: NavItem[] = [
     ],
   },
   // the simulators: one page that lists them by season (src/app/simulator/page.tsx), and a
-  // dropdown that opens each one directly
-  { label: 'Simulator', href: '/simulator', children: simulatorMenu(), childrenOnOneLine: true },
+  // dropdown with a group per part of that page, from which each one opens directly
+  { label: 'Simulator', href: '/simulator', children: simulatorMenu() },
   { label: 'Videos', href: '/media' },
   { label: 'Contact', href: '/contact' },
 ];
