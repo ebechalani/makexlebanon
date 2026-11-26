@@ -20,9 +20,12 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import ts from 'typescript';
 import { robotEnFeteGame } from '../../robot-en-fete/game';
-import { warehouseSortGame } from '../../warehouse-sort/game';
+import { MAX_SCORE, warehouseSortGame } from '../../warehouse-sort/game';
 import { START_POSE } from '../../warehouse-sort/robot';
+import { ControlBar } from '../ControlBar';
 import { EXAMPLES_GAMES } from '../member-unlock';
+import { ScreenTextContext } from '../text/context';
+import { FR_TEXT } from '../text/fr';
 import { FR_TITLE_TEXT } from '../text/fr-title';
 import { TitleTextContext } from '../text/title-context';
 import { TitleBar } from '../TitleBar';
@@ -138,11 +141,67 @@ test('a 360 px phone: the French-only rule of the stylesheet gives the four view
   const css = readFileSync(path.join(HERE, '../simulator.css'), 'utf8');
   const rule = /@container \(max-width: 21\.875rem\) \{\s*\[lang='fr'\] \.mbot2-stage-column \[role='group'\]:first-child > button\[aria-pressed\] \{\s*padding-inline: 0\.4375rem;\s*\}\s*\}/;
   assert.match(css, rule);
-  // the only rule of the stylesheet that names a language
-  assert.equal(css.match(/\[lang=/g)?.length, 1);
+  // the only rules of the stylesheet that name a language: this one and the three of the referee's row over the mat (next test)
+  assert.equal(css.match(/\[lang=/g)?.length, 4);
   // ... and it finds the view buttons: the first group of the row under the mat, buttons that say whether they are on
   const app = code(read('../SimulatorApp.tsx'));
   assert.match(app, /<div className="@container">\s*<div className="flex flex-wrap items-center gap-x-3 gap-y-2">\s*<div className="flex items-center gap-1\.5" role="group" aria-label=\{text\.showOnStage\}>\s*<button type="button" aria-pressed=\{view\.overlays\}/);
+});
+
+test('the referee\'s row over the mat keeps its size during a match: on lang="fr" the score always has room for two digits, and Démarrer and Stop have less padding', () => {
+  const css = readFileSync(path.join(HERE, '../simulator.css'), 'utf8');
+  // the score of the clock box: two digits wide from the start ("5" stands where the "5" of "15" would)
+  assert.match(css, /\[lang='fr'\] \.mbot2-stage-column \[role='timer'\] \+ div > span:last-child > span:first-child \{\s*min-width: 2ch;\s*text-align: right;\s*\}/);
+  // ... which is enough: 80 is the most a match gives (and the total is never below 0: ../../warehouse-sort/game.test.ts)
+  assert.equal(MAX_SCORE, 80);
+  assert.equal(robotEnFeteGame.restartPenalty, warehouseSortGame.restartPenalty);
+  // Démarrer and Stop: 7px on each side on a narrow bar, 12px on a wide one (the bar's own 34rem: its "@[34rem]:" classes)
+  const buttons = String.raw`\[lang='fr'\] \.mbot2-stage-column div:has\(> div > \[role='timer'\]\) > button:nth-child\(-n \+ 2\)`;
+  assert.match(css, new RegExp(String.raw`@container \(width < 34rem\) \{\s*${buttons} \{\s*padding-inline: 0\.4375rem;\s*\}\s*\}`));
+  assert.match(css, new RegExp(String.raw`@container \(width >= 34rem\) \{\s*${buttons} \{\s*padding-inline: 0\.75rem;\s*\}\s*\}`));
+  assert.match(code(read('../ControlBar.tsx')), /'inline-flex h-11 select-none items-center justify-center gap-2 rounded-xl px-2\.5 text-sm font-bold text-white shadow-sm transition ' \+\s*`@\[34rem\]:h-12 @\[34rem\]:px-5 @\[34rem\]:text-base `/);
+  // every rule that names the clock is a rule of lang="fr" only
+  const timerRules = css.split('\n').filter((line) => line.includes("[role='timer']"));
+  assert.equal(timerRules.length, 3);
+  for (const line of timerRules) assert.match(line, /^\s*\[lang='fr'\] \.mbot2-stage-column /);
+
+  // ... and they find what they are meant to: in the French bar (inside the stage column), the row of
+  // Démarrer, Stop and Pause, then the box whose first part is the clock; the score's number is the
+  // first piece of the last part of the box's second part
+  assert.match(code(read('../SimulatorApp.tsx')), /className="mbot2-stage-column [^"]*"[^]*?<ControlBar\b/);
+  const nothing = (): void => undefined;
+  const bar = renderToStaticMarkup(
+    createElement(
+      ScreenTextContext.Provider,
+      { value: FR_TEXT },
+      createElement(ControlBar, {
+        runState: 'ready',
+        canStart: true,
+        timeLeft: 90,
+        score: { lines: [], total: 5, max: 80, complete: false },
+        restartPenalty: 10,
+        speed: 1,
+        onSpeed: nothing,
+        onStart: nothing,
+        onStop: nothing,
+        onPause: nothing,
+        onResume: nothing,
+        onRestart: nothing,
+        onFinished: nothing,
+        onReset: nothing,
+      }),
+    ),
+  );
+  const row = new RegExp(
+    String.raw`^<div class="@container flex flex-col gap-2"><div class="flex flex-wrap items-center gap-2">(<button[^>]*>.*?</button>)(<button[^>]*>.*?</button>)(<button[^>]*>.*?</button>)` +
+      String.raw`<div class="[^"]*"><div class="[^"]*" role="timer"[^>]*><span[^>]*>Temps</span><span[^>]*>1:30</span></div>` +
+      String.raw`<div class="[^"]*" aria-label="[^"]*"><span[^>]*>Score</span><span class="flex items-baseline gap-1"><span class="[^"]*">(\d+)</span><span[^>]*>/ 80</span></span></div></div></div>`,
+  ).exec(bar);
+  assert.ok(row, bar.slice(0, 400));
+  const words = (button: string): string => button.replace(/<[^>]+>/g, '');
+  assert.deepEqual([words(row[1]), words(row[2])], ['Démarrer', 'Stop']);
+  assert.match(row[3], /aria-label="Pause"/);
+  assert.equal(row[4], '5');
 });
 
 test('the English page of Warehouse Sort is as it was: no language, no French table, nothing of Robot en fête', () => {

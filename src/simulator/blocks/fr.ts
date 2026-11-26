@@ -503,13 +503,17 @@ export const FR_BLOCKLY_MSG: Record<string, string> = {
   SHORTCUTS_JUMP_FIRST_BLOCK: 'Aller au premier bloc',
   SHORTCUTS_JUMP_LAST_BLOCK: 'Aller au dernier bloc',
   // left in English by Blockly's French file - said by a screen reader on this page (moving a block with the keyboard,
-  // the my-block editor) - measured on the English page by the French critic, and read in blockly/msg/fr.js
-  ANNOUNCE_MOVE_WORKSPACE: 'Déplacement de %1 dans l’espace de travail.',
-  ANNOUNCE_MOVE_TO: 'Déplacement de %1 vers %2.',
-  ANNOUNCE_MOVE_BEFORE: 'Déplacement de %1 avant %2.',
-  ANNOUNCE_MOVE_AFTER: 'Déplacement de %1 après %2.',
-  ANNOUNCE_MOVE_INSIDE: 'Déplacement de %1 dans %2.',
-  ANNOUNCE_MOVE_AROUND: 'Déplacement de %1 autour de %2.',
+  // the my-block editor) - measured on the English page by the French critic, and read in blockly/msg/fr.js.
+  // Blockly names the block (%1) only in the first sentence of a move; at every arrow key after it %1 is empty, and
+  // Blockly closes the gap ("Moving on workspace.", "Moving after …" in English). So the French says it with the verb,
+  // which reads with or without the name: "Déplacer la pince… dans …", then "Déplacer après …" (a noun said
+  // "Déplacement de dans l’espace de travail."). And no "de" before a name: "pour entourer", not "autour de le bras".
+  ANNOUNCE_MOVE_WORKSPACE: 'Déplacer %1 dans l’espace de travail.',
+  ANNOUNCE_MOVE_TO: 'Déplacer %1 vers %2.',
+  ANNOUNCE_MOVE_BEFORE: 'Déplacer %1 avant %2.',
+  ANNOUNCE_MOVE_AFTER: 'Déplacer %1 après %2.',
+  ANNOUNCE_MOVE_INSIDE: 'Déplacer %1 dans %2.',
+  ANNOUNCE_MOVE_AROUND: 'Déplacer %1 pour entourer %2.',
   ANNOUNCE_MOVE_CANCELED: 'Déplacement annulé.',
   ANNOUNCE_MOVE_OF: '%1 sur %2',
   FIELD_LABEL_CHECKBOX_CHECKED: 'coché',

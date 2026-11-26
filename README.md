@@ -1792,7 +1792,11 @@ point); `src/simulator/ui/comma-texts.ts` finds them. The English screen says no
 gives the shortcuts in its menus, toasts and screen-reader hints the French names of the keys
 ("Annuler   Ctrl + Z", "Alt + Maj + A"), puts `lang="fr"` on Blockly's question windows ("Nom de
 la nouvelle variable"), and reads "menu : rouge", "Modifier nombre : 100" with a no-break space
-(`src/simulator/blocks/locale.ts`, `register.ts`, `ui/BlocklyEditor.tsx`). What Blockly writes in
+(`src/simulator/blocks/locale.ts`, `register.ts`, `ui/BlocklyEditor.tsx`). The hover texts of the
+French blocks reach Blockly already cut into lines (`frenchTooltipLines` in `register.ts`): Blockly
+cuts a long one at every space, the no-break space too, so a `»` or a `:` could start a line. A
+block moved with the keyboard is read "Déplacer la pince… après …", then "Déplacer après …":
+Blockly names the block only in the first sentence of a move. What Blockly writes in
 its own code stays as it is: the ", " between the parts of a block it reads out, and its
 "%1 piles de blocs" (one form).
 
@@ -1878,6 +1882,10 @@ English pages did not change.
   `lang="en"` with the whole site: design D8).
 - **On a phone** the strip above the blocks takes two rows (English: one) and "Son activé" two
   lines: no shorter French says the same.
+- **In a window narrower than 404 px** (phones of 390 and 360 px) the box of the clock and the
+  score stands under Démarrer, Stop and Pause, on a second line (English: on a 360 px phone too).
+  It has room for a score of two digits from the start, so it never moves during a match
+  (`src/simulator/ui/simulator.css`).
 - **Blockly's own punctuation**: the ", " between the parts of a block that a screen reader hears
   is written by Blockly's code.
 

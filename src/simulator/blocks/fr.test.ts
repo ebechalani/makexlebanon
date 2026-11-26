@@ -36,7 +36,7 @@ import { addGripperMyBlocks, convertGripperBlocks, gripperDefinitionProgram, gri
 import { applyBlocklyMessages, blocklyMessagesOf, frenchShortcutKeys, localeOfWorkspace, setWorkspaceLocale, SHORTCUTS_IN_MESSAGES, withBlocklyMessage } from './locale';
 import { withDecimalPoint } from './number-field';
 import { GAME_VERSIONS, LANGUAGE_VERSIONS, PALETTE_IDS, PALETTE_TOOLTIPS, paletteCategories, paletteOf, paletteTooltip, versionOf } from './palettes';
-import { createEditor, disposeEditor, frenchBlockJson, GRIPPER_CODE_MENU_ID, MAKE_LIST_CALLBACK, registerBlocks, variablesFlyout, type BlocklyApi } from './register';
+import { createEditor, disposeEditor, frenchBlockJson, frenchTooltipLines, GRIPPER_CODE_MENU_ID, MAKE_LIST_CALLBACK, registerBlocks, variablesFlyout, type BlocklyApi } from './register';
 import { estimateStackWidth } from './stack-size';
 import { buildToolbox, paletteToolbox, SEE_MBLOCK_CODE, TOOLBOX, toolboxBlock, toolboxBlockTypes, type ToolboxJson } from './toolbox';
 
@@ -432,10 +432,10 @@ describe('a French workspace (real Blockly)', () => {
         if (!norm(wanted).endsWith(norm(fr.getField(arg.name)!.getText()))) problems.push(`${def.type}.${arg.name}: shows "${fr.getField(arg.name)!.getText()}"`);
       }
       if (shape(Blockly.serialization.blocks.save(fr)) !== shape(Blockly.serialization.blocks.save(en))) problems.push(`${def.type}: saved differently`);
-      // the hover text (in this editor's game: Warehouse Sort)
+      // the hover text (in this editor's game: Warehouse Sort), in the lines Blockly shows (frenchTooltipLines: see below)
       const tip = Blockly.Tooltip.getTooltipOfObject(fr);
       const wanted = FR_PALETTE_TOOLTIPS[def.type] ?? FR_BLOCKS[def.type].tooltip;
-      if (tip !== wanted) problems.push(`${def.type}: tooltip ${JSON.stringify(tip)}`);
+      if (tip !== frenchTooltipLines(Blockly, wanted) || tip.replace(/\n/g, ' ') !== wanted) problems.push(`${def.type}: tooltip ${JSON.stringify(tip)}`);
       const englishTip = Blockly.Tooltip.getTooltipOfObject(en);
       if (englishTip !== (paletteTooltip(def.type, 'warehouse-sort') ?? def.tooltip)) problems.push(`${def.type}: English tooltip ${JSON.stringify(englishTip)}`);
       en.dispose(false);
@@ -651,6 +651,80 @@ describe('a French workspace (real Blockly)', () => {
     assert.ok(msg.KEYBOARD_NAV_COPIED_HINT.includes('%1'), 'Blockly fills it in itself, as before');
     applyBlocklyMessages(Blockly, 'fr', blocklyFrench);
     block.dispose();
+  });
+
+  test('hover texts in French: Blockly shows them in lines that never start at a no-break space, and keeps every no-break space; English as it was', () => {
+    const limit = Blockly.Tooltip.LIMIT;
+    const msg = Blockly.Msg as Record<string, string>;
+    applyBlocklyMessages(Blockly, 'fr', blocklyFrench);
+    const texts: Array<[string, string]> = [
+      ...Object.entries(FR_BLOCKS).map(([type, fr]): [string, string] => [type, fr.tooltip]),
+      ...Object.entries(FR_PALETTE_TOOLTIPS).map(([type, text]): [string, string] => [`palette ${type}`, text]),
+      ['text bubble', FR_TEXT_BUBBLE_TOOLTIP],
+      ...Object.keys(msg)
+        .filter((key) => key.endsWith('_TOOLTIP') && typeof msg[key] === 'string')
+        .map((key): [string, string] => [key, msg[key]]),
+    ];
+    const problems: string[] = [];
+    let cut = 0;
+    for (const [where, text] of texts) {
+      const lines = frenchTooltipLines(Blockly, text);
+      // only line breaks are added, in place of plain spaces: the same text, every no-break space kept
+      if (lines.replace(/\n/g, ' ') !== text) problems.push(`${where}: not the same text ${JSON.stringify(lines)}`);
+      // ... in lines Blockly shows as they are (it cuts only a line longer than its limit)
+      if (Blockly.utils.string.wrap(lines, limit) !== lines) problems.push(`${where}: Blockly cuts it again ${JSON.stringify(lines)}`);
+      if (lines.split('\n').some((line) => line.length > limit)) problems.push(`${where}: a line longer than ${limit}`);
+      // ... and no line starts with what a no-break space holds to the word before it (a %1 of Blockly's is no "%"), nor ends with a «
+      if (lines.split('\n').some((line) => /^(?:[»;:!?]|%(?!\d))/.test(line) || /«$/.test(line))) problems.push(`${where}: ${JSON.stringify(lines)}`);
+      if (lines.includes('\n')) cut++;
+    }
+    assert.deepEqual(problems, []);
+    assert.ok(cut >= 100, `${cut} texts are long enough to be cut`);
+    // the text that showed it: Blockly's own cut put the » of « quand je reçois » at the start of a line
+    const broadcast = FR_BLOCKS.event_broadcast.tooltip;
+    assert.equal(Blockly.utils.string.wrap(broadcast, limit), 'Démarre tous les scripts « quand je reçois\n» de ce message, et continue tout de suite.');
+    assert.equal(frenchTooltipLines(Blockly, broadcast), `Démarre tous les scripts «${NB}quand je reçois${NB}»\nde ce message, et continue tout de suite.`);
+    // a text that fits on one line comes back as it is
+    assert.equal(frenchTooltipLines(Blockly, FR_TEXT_BUBBLE_TOOLTIP), FR_TEXT_BUBBLE_TOOLTIP);
+
+    // in the editors: a French block shows its text in those lines - also a text it is given later (a renamed
+    // "my block" gives its own again); an English block keeps the text it is given, which Blockly cuts itself
+    const fr = Blockly.serialization.blocks.append({ type: 'event_broadcast' } as never, french);
+    const en = Blockly.serialization.blocks.append({ type: 'event_broadcast' } as never, english);
+    assert.equal(Blockly.Tooltip.getTooltipOfObject(fr), frenchTooltipLines(Blockly, broadcast));
+    assert.equal(Blockly.Tooltip.getTooltipOfObject(en), getBlockDef('event_broadcast')?.tooltip);
+    const later = `Exécute ton bloc «${NB}avancer jusqu’à la ligne noire du dépôt${NB}».`;
+    fr.setTooltip(later);
+    en.setTooltip(later);
+    assert.equal(Blockly.Tooltip.getTooltipOfObject(fr), frenchTooltipLines(Blockly, later));
+    assert.ok(Blockly.Tooltip.getTooltipOfObject(fr).includes('\n'));
+    assert.equal(Blockly.Tooltip.getTooltipOfObject(en), later);
+    for (const block of [fr, en]) block.dispose();
+  });
+
+  test('a block moved with the keyboard: what Blockly says reads as French with the name of the block (its first sentence) and without it (every arrow key after it)', () => {
+    const msg = Blockly.Msg as Record<string, string>;
+    applyBlocklyMessages(Blockly, 'fr', blocklyFrench);
+    // as Blockly fills them (block_drag_strategy.ts announceMove, block_aria_composer.ts computeMoveLabel): %1 the
+    // moving block - '' after the first sentence of a move -, %2 the block next to it; white space closed up
+    const say = (key: string, block: string): string => msg[key].replace('%1', block).replace('%2', 'le bras, monte').replace(/\s+/g, ' ');
+    const where: Record<string, string> = {
+      ANNOUNCE_MOVE_WORKSPACE: 'dans l’espace de travail.',
+      ANNOUNCE_MOVE_TO: 'vers le bras, monte.',
+      ANNOUNCE_MOVE_BEFORE: 'avant le bras, monte.',
+      ANNOUNCE_MOVE_AFTER: 'après le bras, monte.',
+      ANNOUNCE_MOVE_INSIDE: 'dans le bras, monte.',
+      ANNOUNCE_MOVE_AROUND: 'pour entourer le bras, monte.',
+    };
+    for (const [key, rest] of Object.entries(where)) {
+      assert.equal(say(key, ''), `Déplacer ${rest}`, key);
+      assert.equal(say(key, 'la pince, se ferme'), `Déplacer la pince, se ferme ${rest}`, key);
+    }
+    assert.equal(msg.ANNOUNCE_MOVE_CANCELED, 'Déplacement annulé.');
+    // English: Blockly's own sentences ("Moving on workspace." once the name is left out)
+    const blocklyEnglish = createRequire(import.meta.url)('blockly/msg/en') as Record<string, string>;
+    for (const key of Object.keys(where)) assert.equal(englishMessages[key], blocklyEnglish[key], key);
+    assert.equal(englishMessages.ANNOUNCE_MOVE_WORKSPACE.replace('%1', '').replace(/\s+/g, ' '), 'Moving on workspace.');
   });
 
   test("what a screen reader says of a French block: a no-break space before Blockly's \":\" (\"menu : rouge\", \"Modifier nombre : 100\"), no lone \"?\"; the English labels as they were", () => {

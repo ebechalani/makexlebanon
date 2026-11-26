@@ -188,6 +188,9 @@ export function registerBlocks(Blockly: BlocklyApi): void {
   frenchMenuShortcuts(Blockly);
 
   useGameTooltips(Blockly);
+
+  // (last: it takes the hover text a block has once every other part above has set it)
+  useFrenchTooltipLines(Blockly);
 }
 
 // =============================================================================================
@@ -366,6 +369,101 @@ function useGameTooltips(Blockly: BlocklyApi): void {
       const catalogText = this.tooltip;
       const gameText = localeOfWorkspace(this.workspace) === 'fr' ? frenchPaletteTooltip : paletteTooltip;
       this.setTooltip(() => gameText(type, gameOfBlock(this)) ?? (typeof catalogText === 'function' ? catalogText() : catalogText));
+    };
+    definition[marker] = true;
+  }
+}
+
+// =============================================================================================
+// Hover texts in French: cut into lines, never at a no-break space
+// =============================================================================================
+// Blockly shows a hover text in lines of about 50 characters (Blockly.Tooltip.LIMIT). A longer
+// line it cuts into words at every white space - the no-break space too (JavaScript's \s) - and
+// glues them again with plain spaces: in a French text a » ; : ! ? could then start a line
+// ("… « quand je reçois" / "» de ce message …"), and the no-break spaces of a long text became
+// plain ones. So a block of a French workspace hands Blockly its hover text already in lines of
+// at most 50 characters, cut only at plain spaces - which Blockly then shows as they are (it cuts
+// only a line longer than its limit). English blocks are not touched: they keep the texts Blockly
+// cuts itself.
+
+/**
+ * A French hover text in lines ("\n") of at most Blockly.Tooltip.LIMIT characters, cut only at
+ * plain spaces - never at a no-break space (U+00A0, U+202F) - in as few lines as the words allow,
+ * as even as they can be (as Blockly's own lines are). A text that fits on one line comes back as
+ * it is.
+ */
+export function frenchTooltipLines(Blockly: Pick<BlocklyApi, 'Tooltip'>, text: string): string {
+  const limit = Blockly.Tooltip.LIMIT;
+  return text
+    .split('\n')
+    .map((paragraph) => (paragraph.length <= limit ? paragraph : evenLines(paragraph, limit)))
+    .join('\n');
+}
+
+/** One paragraph in the fewest lines of at most `limit` characters, the most even of them (cut at plain spaces only). */
+function evenLines(paragraph: string, limit: number): string {
+  // (a "word" is what plain spaces separate: a no-break space keeps the two sides of it in one word)
+  const words = paragraph.trim().split(/ +/);
+  const n = words.length;
+  const width = (from: number, to: number): number => words.slice(from, to).reduce((sum, word) => sum + word.length, 0) + (to - from - 1);
+  /** where the line that starts at word `from` can end: as far as fits, at least one word */
+  const ends = (from: number): number[] => {
+    const out = [from + 1];
+    for (let to = from + 2; to <= n && width(from, to) <= limit; to++) out.push(to);
+    return out;
+  };
+  // the fewest lines: each line as full as it goes
+  let count = 0;
+  for (let from = 0; from < n; count++) from = ends(from).at(-1) as number;
+  // of all ways to cut into that many lines, the one with the least sum of squared room left at the line ends
+  const memo = new Map<string, { cost: number; cuts: number[] }>();
+  const best = (from: number, lines: number): { cost: number; cuts: number[] } => {
+    if (from === n) return lines === 0 ? { cost: 0, cuts: [] } : { cost: Infinity, cuts: [] };
+    if (lines === 0) return { cost: Infinity, cuts: [] };
+    const key = `${from} ${lines}`;
+    const known = memo.get(key);
+    if (known) return known;
+    let found = { cost: Infinity, cuts: [] as number[] };
+    for (const to of ends(from)) {
+      const rest = best(to, lines - 1);
+      const cost = (limit - width(from, to)) ** 2 + rest.cost;
+      if (cost < found.cost) found = { cost, cuts: [to, ...rest.cuts] };
+    }
+    memo.set(key, found);
+    return found;
+  };
+  const out: string[] = [];
+  let from = 0;
+  for (const to of best(0, count).cuts) {
+    out.push(words.slice(from, to).join(' '));
+    from = to;
+  }
+  return out.join('\n');
+}
+
+/**
+ * Every block made in a French workspace (an editor, its palette, the Gripper window's) gives
+ * Blockly its hover text in lines (frenchTooltipLines) - the text it has once made, and every text
+ * it is given later (Blockly's "my blocks" give theirs again when they are renamed). A hover text
+ * that is a function is asked each time it is shown, as before; one that points to another object
+ * (Blockly's way to show a parent's text) is left as it is. Done once per block type (a marker).
+ */
+function useFrenchTooltipLines(Blockly: BlocklyApi): void {
+  const marker = 'mbot2FrenchTooltipLines';
+  const inLines = (tip: BlocklyModule.Tooltip.TipInfo): BlocklyModule.Tooltip.TipInfo => {
+    if (typeof tip === 'string') return frenchTooltipLines(Blockly, tip);
+    if (typeof tip === 'function') return () => frenchTooltipLines(Blockly, Blockly.Tooltip.getTooltipOfObject({ tooltip: tip }));
+    return tip;
+  };
+  for (const definition of Object.values(Blockly.Blocks) as Array<(Record<string, unknown> & { init?: () => void }) | undefined>) {
+    if (!definition || definition[marker] || typeof definition.init !== 'function') continue;
+    const init = definition.init;
+    definition.init = function (this: BlocklyModule.Block) {
+      init.call(this);
+      if (localeOfWorkspace(this.workspace) !== 'fr') return;
+      const setTooltip = this.setTooltip;
+      this.setTooltip = (tip) => setTooltip.call(this, inLines(tip));
+      this.setTooltip(this.tooltip);
     };
     definition[marker] = true;
   }
