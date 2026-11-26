@@ -46,7 +46,7 @@ export const LOGISTIQUE_WORDS = {
   // (on the closed Score sheet: « 150 / 500 points · cubes : 3/10 »)
   goalsShort: 'cubes',
   // (the zones as the game draws them: ../../logistique-intelligente/game.ts overlays)
-  zonesHint: `Montrer les zones en couleur${NB}: ${LOGISTIQUE_START_ZONE}, zone de stockage et les ${inLetters(WAREHOUSE_COUNT)} entrepôts`,
+  zonesHint: `Montrer les zones en couleur${NB}: la ${LOGISTIQUE_START_ZONE}, la zone de stockage et les ${inLetters(WAREHOUSE_COUNT)} entrepôts`,
   finishedHint: `Dire «${NB}Terminé${NB}» à l’arbitre${NB}: le robot s’arrête, le chrono aussi, et le terrain est noté tel qu’il est`,
   // (the screen adds « Possible à tout moment, même pendant un match. »)
   resetHint: `Remettre les ${inLetters(CUBE_COUNT)} cubes sur la croix et le robot dans la ${LOGISTIQUE_START_ZONE}, prêt pour un nouveau match.`,
@@ -55,10 +55,11 @@ export const LOGISTIQUE_WORDS = {
   // shared word, unchanged; only this heading is the game's.)
   sheetNotesHeading: 'Fautes',
   sheetNote:
-    `Le terrain est noté à la fin du match. Un cube valide rapporte ${POINTS_PER_CUBE} points${NB}; un entrepôt compte au plus ${inLetters(MAX_PER_WAREHOUSE)} cubes valides. ` +
-    `Chaque sortie du robot coûte ${VIOLATION_POINTS} points. Le total n’est jamais en dessous de 0. ` +
+    // (a no-break space keeps a number on the line of its unit, and « × -20 » together, on a phone too)
+    `Le terrain est noté à la fin du match. Un cube valide rapporte ${POINTS_PER_CUBE}${NB}points${NB}; un entrepôt compte au plus ${inLetters(MAX_PER_WAREHOUSE)} cubes valides. ` +
+    `Chaque sortie du robot coûte ${VIOLATION_POINTS}${NB}points. Le total n’est jamais en dessous de 0. ` +
     // (the four numbers of the official score sheet, p. 31/27: "Quantity of Cube (50 points each)", "Violation (-20points each)", "Total Score", "Completion Time")
-    `Comme sur la feuille officielle${NB}: cubes valides × ${POINTS_PER_CUBE}, fautes × -${VIOLATION_POINTS}, total, temps de fin.`,
+    `Comme sur la feuille officielle${NB}: cubes valides ×${NB}${POINTS_PER_CUBE}, fautes ×${NB}-${VIOLATION_POINTS}, total, temps de fin.`,
   cleanLine: 'Aucune faute',
   randomLabel: 'Disposition au hasard',
   randomHint: `Ici, il n’y a qu’une disposition${NB}: c’est toujours la même.`,

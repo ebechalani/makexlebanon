@@ -19,7 +19,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { createElement, type ComponentType } from 'react';
+import { createElement, type ComponentType, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import ts from 'typescript';
 import { standaloneCategories } from '../../../../content/standalone';
@@ -28,6 +28,7 @@ import { LOGISTIQUE_ID, MATCH_DURATION, MAX_SCORE, logistiqueGame } from '../../
 import { LOGISTIQUE_ROBOT, START_POSE } from '../../logistique-intelligente/robot';
 import { WAREHOUSE_SORT_ROBOT } from '../../warehouse-sort/robot';
 import { ControlBar, type ControlBarProps } from '../ControlBar';
+import { Section } from '../widgets';
 import { EXAMPLES_GAMES } from '../member-unlock';
 import { ScreenTextContext } from '../text/context';
 import { FR_TEXT } from '../text/fr';
@@ -191,6 +192,23 @@ test('the screen drawn as the page draws it: French everywhere, « Proposé par 
   for (const hint of hints) for (const word of [' the ', ' and ', 'Start ', 'Reset', 'Restart', 'Powered', 'Breadcrumb', 'Simulator']) assert.ok(!hint.includes(word), `${word}: ${hint}`);
 });
 
+test('the closed Score sheet: with scoreDigits its summary (« 500 / 500 points · cubes : 10/10 », wider than a 360 px phone has room for) may take a second line instead of being cut; left out, the heading is exactly as it was', () => {
+  // the general screen (it cannot be loaded here: it imports its stylesheet) hands the summary through sheetSummary
+  const app = code(read('../SimulatorApp.tsx'));
+  assert.match(app, /function sheetSummary\(summary: string, scoreDigits: number \| undefined\): ReactNode \{\s*return scoreDigits \? <span style=\{\{ whiteSpace: 'normal' \}\}>\{summary\}<\/span> : summary;\s*\}/);
+  assert.match(app, /\ssummary=\{sheetSummary\(text\.scoreSheetSummary\(snapshot\.score, missionsDone, missions\.length, words\), props\.scoreDigits\)\}/);
+  // what the heading becomes: left out (the other games), the plain text in the span that cuts it with an ellipsis; with
+  // three digits, the same span with the text inside a span that may wrap
+  const heading = (summary: ReactNode) => renderToStaticMarkup(createElement(Section, { title: FR_TEXT.scoreSheet, summary, open: false, onToggle: nothing, children: null }));
+  const text = FR_TEXT.scoreSheetSummary({ total: 500, max: MAX_SCORE }, 10, 10, LOGISTIQUE_WORDS);
+  assert.equal(text, `500 / 500 points · cubes${NB}: 10/10`);
+  const plain = heading(text);
+  assert.ok(plain.includes(`<span class="ml-auto min-w-0 truncate text-xs font-medium text-ink-500">${text}</span>`), plain);
+  assert.ok(!plain.includes('style='));
+  const three = heading(createElement('span', { style: { whiteSpace: 'normal' } }, text));
+  assert.equal(three, plain.replace(`>${text}<`, `><span style="white-space:normal">${text}</span><`));
+});
+
 test('the match controls: with scoreDigits the score\'s number is always three digits wide; left out, the bar is exactly as it was', () => {
   const bar = (props: Partial<ControlBarProps>, total = 0) =>
     renderToStaticMarkup(
@@ -239,7 +257,8 @@ test('the match controls: with scoreDigits the score\'s number is always three d
   const app = code(read('../SimulatorApp.tsx'));
   assert.match(app, /\sscoreDigits\?: 3;/);
   assert.match(app, /<ControlBar\b[^>]*\sscoreDigits=\{props\.scoreDigits\}\s/);
-  assert.equal(app.split('scoreDigits').length - 1, 3, 'the prop, and handing it on (scoreDigits={props.scoreDigits}): nowhere else');
+  assert.match(app, /\ssummary=\{sheetSummary\(text\.scoreSheetSummary\([^)]*\), props\.scoreDigits\)\}/);
+  assert.equal(app.split('props.scoreDigits').length - 1, 2, 'handed on to the bar and to the closed sheet\'s summary (sheetSummary): nowhere else');
   assert.match(code(read('../ControlBar.tsx')), /style=\{props\.scoreDigits \? \{ minWidth: `\$\{props\.scoreDigits\}ch` \} : undefined\}/);
   const screens = readdirSync(path.join(HERE, '..'), { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
@@ -267,10 +286,10 @@ test('page: its address and its French title and description; the loader shows t
   assert.equal(
     metadata.description,
     'Construis un programme avec des blocs comme dans mBlock et regarde un mBot2 de Makeblock ranger dix cubes jaunes dans les entrepôts du tapis ' +
-      `MakeX Inspire «${NB}Smart Logistics${NB}»${NB}: deux cubes au plus par entrepôt, le deuxième posé sur le premier — avec le score de la mission normale ` +
-      `des règles MakeX Inspire 2024${NB}: 500 points au plus. Gratuit, dans le navigateur.`,
+      `MakeX Inspire «${NB}Smart Logistics${NB}»${NB}: deux cubes au plus par entrepôt, le deuxième posé sur le premier${NB}— avec le score de la mission normale ` +
+      `des règles MakeX Inspire 2024${NB}: 500${NB}points au plus. Gratuit, dans le navigateur.`,
   );
-  assert.ok(!/ [:;!?»%]|« /.test(metadata.description ?? ''), 'a no-break space before : ; ! ? » % and after «');
+  assert.ok(!/ [:;!?»%—]|« |\d points/.test(metadata.description ?? ''), 'a no-break space before : ; ! ? » % — and after «, and between a number and its unit');
   const source = code(read('../../../app/simulator/logistique-intelligente/page.tsx'));
   assert.ok(!source.includes('hreflang') && !source.includes('languages:'), 'no English twin to link');
   // the loader: the French words of the title row above the loading screen (not the whole table), lang="fr" on its frame, the title row of this page

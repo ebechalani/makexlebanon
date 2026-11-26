@@ -122,6 +122,11 @@ const ENGLISH =
 const D7_VALUES = ['yellow (jaune)'];
 
 /** What is wrong with a French text, or null (Tri d'entrepôt's rules, with the no-break space before "%" too). */
+/** In a description or a note (not a short title), a number stays on the line of its unit: « 25 cm », « 2 secondes », « 50 points ». */
+function unitProblem(text: string): string | null {
+  return /\d (cm|mm|secondes?|points?)(?![\p{L}])/u.test(text) ? 'a plain space between a number and its unit (French: a no-break space)' : null;
+}
+
 function frenchProblem(text: string): string | null {
   if (text.trim() === '') return 'empty';
   if (/\bW[1-8]\b/.test(text)) return 'names a warehouse W1 - W8 (here: E1 - E8)';
@@ -134,7 +139,7 @@ function frenchProblem(text: string): string | null {
   if (/«(?!\u00a0)/.test(text) || /(?<!\u00a0)»/.test(text)) return 'no no-break space inside « »';
   if (/(?<!\u00a0)[:;!?%]/.test(text)) return 'no no-break space before : ; ! ? %';
   if (/ - /.test(text)) return 'a hyphen used as a dash (French writes « – »)';
-  if (/\u00a0(?![:;!?%»–])/.test(text.replace(/«\u00a0/g, ''))) return 'a no-break space where none belongs';
+  if (/\u00a0(?![:;!?%»–]|(cm|secondes?|points?)(?![\p{L}]))/u.test(text.replace(/«\u00a0/g, ''))) return 'a no-break space where none belongs';
   // (the arm is « en haut » or « en bas »: that is the arm, not a layer)
   if (/(?<![\p{L}])en (haut|bas)(?![\p{L}])/u.test(text.replace(/[Bb]ras (tout )?en (haut|bas)/g, ''))) return '« en haut / en bas » for a layer (French here: « dessous / dessus »)';
   return null;
@@ -227,33 +232,33 @@ describe('the list of the examples', () => {
 /** What each description promises, as the matches below measure it. */
 const PROMISED: Record<string, RegExp[]> = {
   'logi-ligne-croix': [
-    new RegExp(`^Le robot avance de 5 cm${NB}: son capteur quad RGB arrive sur la ligne blanche`),
-    new RegExp(`Quand il voit la première pile de cubes à moins de 10 cm, le robot s’arrête et l’écran affiche «${NB}Arrivé${NB}!${NB}»\\.`),
-    /Il ne touche aucun cube et ne marque pas de points\. Il a fini au bout de 2 secondes\./,
-    new RegExp(`Essaie 5 cm au lieu de 10${NB}: les doigts ouverts arrivent des deux côtés du cube du dessous, sans le toucher\\.$`),
+    new RegExp(`^Le robot avance de 5${NB}cm${NB}: son capteur quad RGB arrive sur la ligne blanche`),
+    new RegExp(`Quand il voit la première pile de cubes à moins de 10${NB}cm, le robot s’arrête et l’écran affiche «${NB}Arrivé${NB}!${NB}»\\.`),
+    new RegExp(`Il ne touche aucun cube et ne marque pas de points\\. Il a fini au bout de 2${NB}secondes\\.`),
+    new RegExp(`Essaie 5${NB}cm au lieu de 10${NB}: les doigts ouverts arrivent des deux côtés du cube du dessous, sans le toucher\\.$`),
   ],
   'logi-cube-dessus': [
-    new RegExp(`^Le robot lève le bras tout en haut \\(100${NB}%\\) et avance de 32,5 cm, jusqu’à la pile du carré du bas, la plus proche\\.`),
+    new RegExp(`^Le robot lève le bras tout en haut \\(100${NB}%\\) et avance de 32,5${NB}cm, jusqu’à la pile du carré du bas, la plus proche\\.`),
     new RegExp(`L’écran affiche sa couleur, avec le nom que donne le capteur${NB}: yellow \\(jaune\\)\\.`),
-    /pas encore de points\. Il a fini au bout de 3 secondes\./,
+    new RegExp(`pas encore de points\\. Il a fini au bout de 3${NB}secondes\\.`),
     new RegExp(`Essaie le bras à 50${NB}%${NB}: la pince prend alors le cube du dessous, et le cube 10 vient avec lui\\.$`),
   ],
   'logi-un-cube-e8': [
-    new RegExp(`Le cube couvre tout l’entrepôt E8 et ne touche pas le robot${NB}: 50 points, en 8 secondes\\.`),
+    new RegExp(`Le cube couvre tout l’entrepôt E8 et ne touche pas le robot${NB}: 50${NB}points, en 8${NB}secondes\\.`),
     new RegExp(`Essaie l’entrepôt E7, à gauche${NB}: tourne à gauche au lieu de tourner à droite\\.$`),
   ],
   'logi-pile-e7': [
     /^Bras en bas, le robot avance jusqu’à la pile du carré du bas\./,
-    new RegExp(`Le cube 5 couvre tout l’entrepôt E7 et le cube 10 ne touche que lui${NB}: 100 points, en 7 secondes\\.`),
+    new RegExp(`Le cube 5 couvre tout l’entrepôt E7 et le cube 10 ne touche que lui${NB}: 100${NB}points, en 7${NB}secondes\\.`),
     new RegExp(`Essaie l’entrepôt E8${NB}: tourne à droite au lieu de tourner à gauche\\.$`),
   ],
   'logi-empiler-e6': [
-    new RegExp(`Le cube 9 couvre tout l’entrepôt E6 et le cube 6 ne touche que lui${NB}: 100 points, en 22 secondes\\.`),
-    new RegExp(`Essaie un nombre plus petit que 23,25 cm à la fin${NB}: jusqu’où le cube 6 peut-il dépasser du cube 9 et compter encore${NB}\\?$`),
+    new RegExp(`Le cube 9 couvre tout l’entrepôt E6 et le cube 6 ne touche que lui${NB}: 100${NB}points, en 22${NB}secondes\\.`),
+    new RegExp(`Essaie un nombre plus petit que 23,25${NB}cm à la fin${NB}: jusqu’où le cube 6 peut-il dépasser du cube 9 et compter encore${NB}\\?$`),
   ],
   'logi-toute-mission': [
     /Il porte la pile du carré du bas dans E7, celle de droite dans E8, celle de gauche dans E5, celle du haut dans E6 et celle du centre dans E3\./,
-    new RegExp(`chaque cube du dessus ne touche que lui${NB}: 500 points, en 57 secondes sur 150\\.`),
+    new RegExp(`chaque cube du dessus ne touche que lui${NB}: 500${NB}points, en 57${NB}secondes sur 150\\.`),
     new RegExp(`Essaie un autre ordre des piles, ou d’autres entrepôts${NB}: quel trajet est le plus rapide${NB}\\?$`),
   ],
 };
@@ -267,10 +272,11 @@ describe('the descriptions', () => {
       assert.ok(!/\s{2,}|\n/.test(s.description), `${s.id}: one paragraph, single blanks`);
       assert.match(s.description, /[.?]$/, `${s.id} ends with a full sentence`);
       assert.equal(frenchProblem(s.description), null, `${s.id}: ${frenchProblem(s.description)}`);
+      assert.equal(unitProblem(s.description), null, s.id);
       for (const sentence of s.description.split(/(?<=[.?!])\s+/)) {
         assert.ok(sentence.length <= 150, `${s.id}: a sentence of ${sentence.length} characters ("${sentence.slice(0, 40)}...")`);
       }
-      for (const number of s.description.match(/\d+(?= points)/g) ?? []) assert.ok(Number(number) <= MAX_SCORE, `${s.id}: ${number} points`);
+      for (const number of s.description.match(/\d+(?=\u00a0points)/g) ?? []) assert.ok(Number(number) <= MAX_SCORE, `${s.id}: ${number} points`);
       for (const promise of PROMISED[s.id]) assert.match(s.description, promise, s.id);
     }
   });
@@ -312,7 +318,7 @@ describe('the programs', () => {
       for (const text of [...notesOf(s.program), ...bubbleTextsOf(s.program)]) {
         texts++;
         // (a printed text that ends where the sensor's value is joined to it ends with a blank)
-        const problem = frenchProblem(text.replace(/ $/, ''));
+        const problem = frenchProblem(text.replace(/ $/, '')) ?? unitProblem(text);
         if (problem) problems.push(`${s.id}: "${text}" - ${problem}`);
       }
     }
@@ -564,8 +570,8 @@ describe('the matches, as measured: 0, 0, 50, 100, 100 and 500 points', () => {
   test('every description gives its end time rounded to the second, and its points', () => {
     for (const s of SAMPLE_PROGRAMS) {
       const r = RESULTS[s.id];
-      assert.match(s.description, new RegExp(`(au bout de|en) ${Math.round(r.ends)} secondes`), s.id);
-      if (r.points > 0) assert.match(s.description, new RegExp(`${r.points} points`), s.id);
+      assert.match(s.description, new RegExp(`(au bout de|en) ${Math.round(r.ends)}${NB}secondes`), s.id);
+      if (r.points > 0) assert.match(s.description, new RegExp(`${r.points}${NB}points`), s.id);
     }
   });
 });

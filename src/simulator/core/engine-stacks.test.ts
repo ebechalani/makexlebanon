@@ -453,6 +453,62 @@ test('stacks: a pair held with the arm down, driven into another stack - the top
 });
 
 // =============================================================================================
+// The two other places where the engine moves a held pair's bottom cube by itself: the claw
+// squares it up (squareUpInClaw), and it slides off a cube it is put down on (comeDown)
+// =============================================================================================
+
+test('stacks: a stack gripped by its bottom cube with the robot off its axis (turned 8 degrees; shifted 3 mm and turned -6) - the claw squares the bottom cube up, and the top cube turns and moves with it: 0 mm and 0 degrees off, gripped and put down', () => {
+  for (const [shift, degrees] of [
+    [0, 8],
+    [3, -6],
+  ] as const) {
+    const heading = (degrees * Math.PI) / 180;
+    const reach = G.gripForward + 120;
+    const seen: string[] = [];
+    const { after, events } = run(() => pair('cube:p', 600, 600), { x: 600 + shift - reach * Math.sin(heading), y: 600 + reach * Math.cos(heading), heading }, function* (io) {
+      yield* claw(io, false);
+      yield* lift(io, 20);
+      yield* drive(io, 120, 40);
+      yield* claw(io, true);
+      seen.push(`gripped: bottom ${deg(liveBody('cube:p').angle)} deg, top ${offset(liveBody('cube:p:dessus'), liveBody('cube:p'))}`);
+      yield* lift(io, 40);
+      yield* drive(io, -150, 40);
+      yield* lift(io, 5);
+      yield* claw(io, false);
+      seen.push(`put down: top ${offset(liveBody('cube:p:dessus'), liveBody('cube:p'))}`);
+      yield* drive(io, -100, 40);
+    });
+    const what = `shifted ${shift} mm, turned ${degrees} degrees`;
+    // (the bottom cube now stands square to the robot: turned as the robot is)
+    assert.deepEqual(seen, [`gripped: bottom ${degrees} deg, top dx 0, dy 0, dangle 0`, 'put down: top dx 0, dy 0, dangle 0'], what);
+    assert.equal(after['cube:p:dessus'], after['cube:p'].replace('z 0', 'z 50').replace('on null', 'on cube:p'), what);
+    assert.equal(events.length, 2, what);
+  }
+});
+
+test('stacks: a pair let go with its bottom cube half over a cube on the mat - the bottom cube lands on the mat and slides 12 mm off that cube (the single cube then gives way the 8 mm left), and the top cube slides with it: 0 mm off, still on it', () => {
+  const seen: string[] = [];
+  const { before, after, events } = run(() => [...pair('cube:p', 600, 650), cube('cube:seul', 600, 520)], { x: 600, y: 650 + G.gripForward + 120, heading: UP }, function* (io) {
+    yield* claw(io, false);
+    yield* lift(io, 20);
+    yield* drive(io, 120, 40);
+    yield* claw(io, true);
+    yield* lift(io, 75);
+    yield* drive(io, 100, 40); // the bottom cube's middle 30 mm past the single cube's edge: not over it
+    seen.push(`over it: ${where(liveBody('cube:p'))}`);
+    yield* claw(io, false);
+    seen.push(`let go: ${where(liveBody('cube:p'))}; top ${offset(liveBody('cube:p:dessus'), liveBody('cube:p'))}`);
+    yield* drive(io, -150, 40);
+  });
+  assert.deepEqual(seen, ['over it: (600, 550) z 55 0 deg on null HELD', 'let go: (600, 562) z 0 0 deg on null; top dx 0, dy 0, dangle 0']);
+  assert.equal(after['cube:p'], '(600, 562) z 0 0 deg on null');
+  assert.equal(after['cube:p:dessus'], '(600, 562) z 50 0 deg on cube:p');
+  assert.equal(after['cube:seul'], '(600, 512) z 0 0 deg on null');
+  assert.deepEqual(movedIds(before, after), ['cube:p', 'cube:p:dessus', 'cube:seul']);
+  assert.equal(events.length, 2);
+});
+
+// =============================================================================================
 // A held pair pushed back by the engine (critic c4a, c4b: shiftRobot)
 // =============================================================================================
 
@@ -512,6 +568,23 @@ test('stacks: the frame - a cube on the mat pushed into it stops inside the aren
   }, { walls: true });
   assert.equal(carried.after['cube:M'], '(600, -45) z 0 0 deg on null');
   assert.deepEqual(carried.events, ['0.1 s grab cube:M', '3.15 s bump cadre:haut', '3.64 s release cube:M onto null']);
+});
+
+test('stacks: the frame - a top cube pushed 26 mm off a pair that stands closer than one cube to the frame (in E3, 26.1 mm from the top frame; 32.5 mm from the right frame) has no room beside the pair: it goes over the frame and lands flush outside, and the bottom cube does not move', () => {
+  for (const [what, x, y, start, top] of [
+    ['E3, pushed up', WAREHOUSES.E3.x, WAREHOUSES.E3.y, { x: WAREHOUSES.E3.x, y: WAREHOUSES.E3.y + 25 + 167 + 10, heading: UP }, '(813.41, -45) z 0 0 deg on null'],
+    ['E8, pushed right', WAREHOUSES.E8.x, WAREHOUSES.E8.y, { x: WAREHOUSES.E8.x - 25 - 167 - 10, y: WAREHOUSES.E8.y, heading: RIGHT }, '(1245, 985.25) z 0 0 deg on null'],
+  ] as const) {
+    const { before, after } = run(() => pair('cube:p', x, y), start, function* (io) {
+      yield* lift(io, 60);
+      yield* claw(io, true);
+      yield* drive(io, 10 + 26, 20);
+      yield* drive(io, -40, 20);
+    }, { walls: true });
+    assert.equal(after['cube:p:dessus'], top, what);
+    assert.equal(after['cube:p'], before['cube:p'], `${what}: the bottom cube stays where it was`);
+    assert.deepEqual(movedIds(before, after), ['cube:p:dessus'], what);
+  }
 });
 
 // =============================================================================================

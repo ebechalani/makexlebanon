@@ -40,9 +40,10 @@
  *   Logistique intelligente   the second simulator of Robot en fête 2027 (the regular mission of
  *                 MakeX Inspire 2024, in French only): the robot of Warehouse Sort, so the
  *                 categories of Warehouse Sort, as a palette of its own - it is no version of
- *                 Warehouse Sort (a program saved there is a Warehouse Sort program, not one of
- *                 this game). No English hover texts: the page is French only, and its French
- *                 ones are Warehouse Sort's (./register.ts frenchPaletteTooltip).
+ *                 Warehouse Sort (were it in LANGUAGE_VERSIONS, a program saved on its page would
+ *                 be filed as a Warehouse Sort program). No English hover texts: the page is
+ *                 French only, and its French ones are Warehouse Sort's (./register.ts
+ *                 frenchPaletteTooltip).
  *
  * Plain data: no Blockly, no DOM.
  */

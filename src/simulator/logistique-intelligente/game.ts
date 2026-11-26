@@ -93,8 +93,9 @@
  * (Q12 is about the site's pages.)
  *
  * Not simulated: a referee's judgement by eye (the simulator measures to the millimetre); a cube
- * that tips, rolls or bounces (a cube that loses its support comes down flat beside it); the
- * conduct and safety rules (R01 - R17, R20 - R24 but R18 and R19), which no program can break.
+ * that tips, rolls or bounces (a cube that loses its support comes down flat beside it, or over the
+ * frame where there is no room beside it: core/engine.ts overTheWall); the
+ * conduct and safety rules (R01 - R17, R20 - R24), which no program can break.
  */
 import { obbContainsOBB, obbCorners, obbOverlap, obbTouches, type OBB } from '../core/geometry';
 import type { Body, FixedWall, Game, Referee, RefereeCall, ScoreContext, ScoreLine, ScoreReport, ZoneOverlay } from '../core/types';
@@ -174,8 +175,13 @@ export const LEAVE_MM = 0.5;
 export const KIND_CUBE = 'cube';
 /** How a cube is drawn: Fire Fighter's strong yellow. */
 export const CUBE_FILL = '#ffd21f';
-/** How the frame is drawn: a dark grey (the rules' Fig 4.1 shows low dark walls). */
-export const FRAME_FILL = '#52525b';
+/**
+ * How the frame is drawn: almost black (the rules' Fig 4.1 shows low dark walls), so that it stands out
+ * at 3:1 or more from every colour of the mat it borders - the grey band (6.2:1), the blue and red
+ * bands (4.1 and 3.0:1), the start area - and from a cube pushed against it: the arena ends at the
+ * frame's inner side (WCAG 1.4.11).
+ */
+export const FRAME_FILL = '#09090b';
 
 /** Body id of cube n (1 - 10): 'cube:1' ... 'cube:10'. The console names it « le cube 3 ». */
 export const cubeId = (n: number): string => `cube:${n}`;
@@ -394,7 +400,7 @@ export const SAY = {
   cubeOut: (n: number, time: string): string =>
     `Le cube ${n} sort du terrain à ${time}${NB}: vu de dessus, il passe au-dessus du cadre. L’arbitre l’enlève${NB}: il ne rapporte plus rien.`,
   /** R19: the robot leaves the arena. */
-  robotOut: (time: string): string => `Faute à ${time}${NB}: le robot sort du terrain (vu de dessus, il passe au-dessus du cadre). -${VIOLATION_POINTS} points.`,
+  robotOut: (time: string): string => `Faute à ${time}${NB}: le robot sort du terrain (vu de dessus, il passe au-dessus du cadre). -${VIOLATION_POINTS}${NB}points.`,
   /** A cube that rested on another one has come down (pushed off, or the cube under it was taken away). */
   fell: (n: number, from: number): string => `Le cube ${n} est tombé du cube ${from}.`,
 } as const;
@@ -444,9 +450,9 @@ export const SHEET = {
 /** The line of the faults (R19). */
 export const FAULTS = {
   label: 'Robot sorti du terrain',
-  none: 'Le robot est resté dans le terrain.',
-  once: (time: string): string => `Une fois, à ${time}${NB}: -${VIOLATION_POINTS} points.`,
-  many: (times: readonly string[]): string => `${times.length} fois (${times.join(`${NB}; `)})${NB}: -${VIOLATION_POINTS} points chacune.`,
+  none: 'Le robot est resté sur le terrain.',
+  once: (time: string): string => `Une fois, à ${time}${NB}: -${VIOLATION_POINTS}${NB}points.`,
+  many: (times: readonly string[]): string => `${times.length} fois (${times.join(`${NB}; `)})${NB}: -${VIOLATION_POINTS}${NB}points chacune.`,
 } as const;
 
 /** The label of a cube's line: « Cube 3 ». */
@@ -674,6 +680,7 @@ function createReferee(_scenario: LogistiqueScenario): LogistiqueReferee {
     const before = seen as Map<string, Seen>;
     for (const c of cubes) {
       const was = before.get(c.id);
+      // (`was.held` is a guard only: grab() clears restingOn of what it takes, so a cube held last tick rested on nothing)
       if (!was || was.restingOn === null || was.held || isHeld(c, holding) || c.restingOn === was.restingOn) continue;
       say.push(SAY.fell(cubeNumber(c.id) ?? 0, cubeNumber(was.restingOn) ?? 0));
     }

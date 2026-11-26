@@ -53,7 +53,7 @@ export const SETUP_LINES = {
   top: `chacun sur un cube du dessous${NB}– ${TOP.map((n) => `${n} sur ${under(n)}`).join(', ')}.`,
   warehousesLabel: `Entrepôts${NB}:`,
   warehouses:
-    `${WAREHOUSE_IDS[0]} à ${WAREHOUSE_IDS[WAREHOUSE_IDS.length - 1]}, ${inLetters(WAREHOUSE_COUNT)} carrés orange de ${cm(WAREHOUSE_SIZE)} cm. ` +
+    `${WAREHOUSE_IDS[0]} à ${WAREHOUSE_IDS[WAREHOUSE_IDS.length - 1]}, ${inLetters(WAREHOUSE_COUNT)} carrés orange de ${cm(WAREHOUSE_SIZE)}${NB}cm. ` +
     `${listed(DIAMONDS)}, dans les coins du haut, sont tournés en losange.`,
   robot: `Le robot part de la ${LOGISTIQUE_START_ZONE}.`,
   // (« Replacer » is the screen's button, FR_TEXT.resetLabel: ./words.test.ts checks that they agree)

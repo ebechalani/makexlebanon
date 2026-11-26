@@ -162,7 +162,9 @@ export interface Body {
    * true = what stands on this body stays on it when the claw holds it, and when the fingers turn
    * or centre it: the riders move, turn, rise and come down with it (Logistique intelligente: a
    * stack of two cubes gripped by its bottom cube). Left out = whatever stood on it comes down onto
-   * the mat when the claw takes it, as before. Left out by every game before Logistique intelligente.
+   * the mat when the claw takes it, as before. Also: such a body that comes down flush beside what
+   * it fell from, where a fixed wall leaves it no room, goes over that wall instead of shoving what
+   * it fell from (engine.ts overTheWall). Left out by every game before Logistique intelligente.
    */
   keepsRiders?: boolean;
 }

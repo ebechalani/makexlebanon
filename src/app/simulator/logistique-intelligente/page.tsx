@@ -19,7 +19,7 @@ const TITLE = 'Simulateur mBot2 — Logistique intelligente (Robot en fête 2027
 const DESCRIPTION =
   'Construis un programme avec des blocs comme dans mBlock et regarde un mBot2 de Makeblock ranger dix cubes ' +
   'jaunes dans les entrepôts du tapis MakeX Inspire « Smart Logistics » : deux cubes au plus par entrepôt, le ' +
-  'deuxième posé sur le premier — avec le score de la mission normale des règles MakeX Inspire 2024 : 500 points ' +
+  'deuxième posé sur le premier — avec le score de la mission normale des règles MakeX Inspire 2024 : 500 points ' +
   'au plus. Gratuit, dans le navigateur.';
 
 /**

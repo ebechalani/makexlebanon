@@ -7,10 +7,10 @@ import { Button, Section, SectionHeading } from '@/components/ui';
 /**
  * The page of Robot en fête 2027, a category of its own (content/standalone.ts): outside every
  * season, so it has no season page above it, no photos, no downloads and no other categories next
- * to it - only what it is and its simulators, one part each (today one: Tri d’entrepôt; a simulator
- * added to the entry gets its part by itself). Its texts are French (lang="fr" on each of them); the
- * breadcrumbs are the website's own path and stay English, as the menu and the footer do. No age
- * group is shown (the organiser asked for none).
+ * to it - only what it is and its simulators, one part each (today two: Tri d’entrepôt, then
+ * Logistique intelligente; a simulator added to the entry gets its part by itself). Its texts are
+ * French (lang="fr" on each of them); the breadcrumbs are the website's own path and stay English,
+ * as the menu and the footer do. No age group is shown (the organiser asked for none).
  */
 function entryOf(slug: string): StandaloneCategory {
   const found = standaloneCategories.find((entry) => entry.slug === slug);
@@ -82,7 +82,12 @@ export default function RobotEnFetePage() {
           <Section className="bg-slate-50">
             <div className="flex flex-wrap items-center justify-between gap-8">
               <SectionHeading eyebrow={category.page.simulatorEyebrow} title={simulator.pageTitle} lead={simulator.summary} />
-              <Button href={simulator.href}>{category.page.open}</Button>
+              {/* (seen, « Ouvrir le simulateur » under the heading of its part; heard, with the simulator's
+                  name: two links of one page must not have the same name for a screen reader) */}
+              <Button href={simulator.href}>
+                {category.page.open}
+                <span className="sr-only"> {simulator.name}</span>
+              </Button>
             </div>
           </Section>
         </div>

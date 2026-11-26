@@ -130,6 +130,13 @@ const num = (value: number): string => String(value).replace('.', ',');
 const cm = (mm: number): string => num(Math.round(mm) / 10);
 /** « … » with its no-break spaces. */
 const quote = (text: string): string => `«${NB}${text}${NB}»`;
+/**
+ * A number stays on the line of its unit, and a deduction on the line of its sign: a no-break space
+ * in « 25 cm », « 20 points », « 150 secondes », « 17,1 degrés » (the window is read on a phone, where
+ * a plain space there would break the line between them).
+ */
+const keepTogether = (text: string): string => text.replace(/(\d) (cm|mm|kg|points?|secondes?|minutes|degrés)(?![\p{L}])/gu, `$1${NB}$2`);
+const keepUnits = (sections: RulesSection[]): RulesSection[] => sections.map((section) => ({ title: keepTogether(section.title), items: section.items.map(keepTogether) }));
 
 const FIRST = WAREHOUSE_IDS[0];
 const LAST = WAREHOUSE_IDS[WAREHOUSE_IDS.length - 1];
@@ -142,7 +149,7 @@ const HALF = CUBE_COUNT / LAYERS;
 /** The sentence under the heading of the rules window. */
 export const LOGISTIQUE_RULES_NOTE = `La mission normale du thème ${quote('Smart Logistics')} de MakeX Inspire ${RULES_SEASON} (guide des règles ${RULES_VERSION}), résumée en français.`;
 
-export const LOGISTIQUE_RULES: RulesSection[] = [
+export const LOGISTIQUE_RULES: RulesSection[] = keepUnits([
   {
     title: 'La mission',
     items: [
@@ -184,7 +191,7 @@ export const LOGISTIQUE_RULES: RulesSection[] = [
     title: 'Le match',
     items: [
       `Un match dure ${MATCH_DURATION} secondes, c’est-à-dire ${Math.floor(MATCH_DURATION / 60)} minutes et ${MATCH_DURATION % 60} secondes.`,
-      `L’arbitre compte ${inLetters(RULES_COUNTDOWN_S)} secondes à rebours, puis le match commence.`,
+      `L’arbitre fait un compte à rebours de ${inLetters(RULES_COUNTDOWN_S)} secondes, puis le match commence.`,
       'Pendant le match, personne ne peut relancer le robot ni le modifier.',
       `Le match finit quand les ${MATCH_DURATION} secondes sont passées, ou plus tôt si l’équipe demande à l’arbitre d’arrêter. L’arbitre arrête alors le chrono.`,
       'Ensuite, l’arbitre regarde où sont les cubes et compte les points.',
@@ -218,7 +225,7 @@ export const LOGISTIQUE_RULES: RulesSection[] = [
       'Une personne touche le robot ou un cube pendant le match.',
       'Une personne appuie sur le terrain pour gagner des points, ou une personne ou le robot abîme le terrain exprès.',
       'Les points gagnés grâce à une faute ne comptent pas.',
-      'Pendant une faute, le chrono continue.',
+      'Une faute n’arrête pas le chrono.',
     ],
   },
   {
@@ -229,13 +236,13 @@ export const LOGISTIQUE_RULES: RulesSection[] = [
       'Si c’est encore égal, ces équipes jouent un match de plus.',
     ],
   },
-];
+]);
 
 /** The second part of the window: what the simulator had to choose because the rules do not say it, or say two things. */
 export const LOGISTIQUE_ASSUMPTIONS: RulesPart = {
   title: 'Ce que ce simulateur suppose',
   note: `Ce ne sont pas des règles. Les règles ne disent pas ces choses, ou disent deux choses différentes${NB}: alors le simulateur a dû choisir.`,
-  sections: [
+  sections: keepUnits([
     {
       title: 'Le tapis et le cadre',
       items: [
@@ -247,7 +254,8 @@ export const LOGISTIQUE_ASSUMPTIONS: RulesPart = {
         `Les règles ne donnent pas la hauteur du cadre. Ici, il mesure ${cm(FRAME_HEIGHT)} cm. Le robot et les cubes posés sur le tapis ne passent pas à travers.`,
         `Bras levé, la pince passe au-dessus du cadre${NB}: le robot sort alors du terrain, et c’est une faute.`,
         `Un cube qui passe au-dessus du cadre, même tenu par la pince, sort du terrain${NB}: l’arbitre l’enlève.`,
-        `Les règles appellent cela une ${quote('violation')}, mais ne donnent pas de pénalité. Ici, le cube est seulement enlevé${NB}: 0 point, pas de -${VIOLATION_POINTS}.`,
+        `Les règles appellent cela une ${quote('violation')}, mais ne donnent pas de pénalité. Ici, le cube est seulement enlevé${NB}: il ne rapporte rien et ne coûte rien.`,
+        `Mais la pince qui porte un cube passe au-dessus du cadre avec lui${NB}: cette faute du robot coûte ${VIOLATION_POINTS} points.`,
       ],
     },
     {
@@ -261,9 +269,10 @@ export const LOGISTIQUE_ASSUMPTIONS: RulesPart = {
         `${quote('Toucher')} veut dire${NB}: à moins de ${num(TOUCH_MM)} mm, vu de dessus comme de côté. Une pince levée bien au-dessus d’un cube ne le touche pas.`,
         'Un cube du dessus qui repose aussi en partie sur un cube voisin touche ce cube-là. Deux cubes qui se rencontrent seulement par une arête ne se touchent pas.',
         'Un cube posé sur un autre cube compte seulement si le cube du dessous compte.',
-        'Le cube du dessus peut dépasser un peu. Il tombe sur le tapis si son milieu n’est plus au-dessus du cube du dessous. La console le dit.',
-        `Les cubes restent toujours à plat${NB}: ils ne roulent pas et ne basculent pas. Un cube tombé reste en jeu.`,
-        `On peut poser une pile de deux cubes sur un troisième cube. Mais un entrepôt compte au plus ${inLetters(MAX_PER_WAREHOUSE)} cubes valides${NB}: le troisième ne rapporte rien.`,
+        `Le cube du dessus peut dépasser un peu. Poussé, il tombe à côté, sur le tapis ou sur un cube voisin, si son milieu n’est plus au-dessus du cube du dessous${NB}: la console le dit.`,
+        `Si une pile est à moins de ${cm(CUBE_SIZE)} cm du cadre, son cube du dessus qui tombe de ce côté n’a pas la place de se poser${NB}: il passe par-dessus le cadre, et l’arbitre l’enlève. Le cube du dessous ne bouge pas.`,
+        `Les cubes restent toujours à plat${NB}: ils ne roulent pas et ne basculent pas. Un cube tombé sur le tapis reste en jeu.`,
+        `On peut poser une pile de deux cubes sur un troisième cube. Mais un entrepôt compte au plus ${inLetters(MAX_PER_WAREHOUSE)} cubes valides${NB}: le cube du troisième étage ne rapporte rien, seuls les ${inLetters(MAX_PER_WAREHOUSE)} du dessous peuvent compter.`,
       ],
     },
     {
@@ -280,7 +289,7 @@ export const LOGISTIQUE_ASSUMPTIONS: RulesPart = {
         `Le bouton ${quote('Terminé')}, c’est l’équipe qui demande d’arrêter. Le match finit aussi quand le programme est fini et que le robot ne bouge plus.`,
         `Le temps de fin, c’est ce moment-là. Si le temps est écoulé, c’est ${MATCH_DURATION} secondes.`,
         'Ensuite, le terrain est jugé tel qu’il est.',
-        `Le simulateur ne compte qu’une faute${NB}: le robot qui sort du terrain. Les autres ne peuvent pas arriver ici.`,
+        `Le simulateur ne compte qu’une faute${NB}: le robot qui sort du terrain. Les autres ne peuvent pas arriver ici, sauf toucher les boutons du CyberPi (voir plus bas).`,
         `Chaque sortie du robot coûte ${VIOLATION_POINTS} points tout de suite, sans avertissement avant. S’il sort, revient, puis ressort, cela fait deux fautes.`,
         'Le total n’est jamais en dessous de 0.',
         `Il n’y a pas de relance. Pour recommencer, appuie sur Démarrer${NB}: le terrain est remis en place.`,
@@ -293,7 +302,7 @@ export const LOGISTIQUE_ASSUMPTIONS: RulesPart = {
       items: [
         `C’est le mBot2 de Tri d’entrepôt, avec la pince à l’avant${NB}: ${cm(ROBOT_LENGTH)} cm de long, ${cm(ROBOT_WIDTH)} cm de large, des roues de ${cm(LOGISTIQUE_ROBOT.wheelDiameter)} cm, ${cm(ROBOT_HEIGHT)} cm de haut bras levé. Il respecte les tailles des règles.`,
         `Le servo ${G.liftServo} lève le bras, le servo ${G.clawServo} ouvre et ferme la pince.`,
-        `Le capteur quad RGB voit les lignes blanches. Il prend aussi pour une ligne le jaune clair${NB}: les ${inLetters(Object.keys(YELLOW_LINE_PATCHES).length)} bandes jaunes de la ligne du haut, le carré du centre de la croix et le bord fin des entrepôts.`,
+        `Le capteur quad RGB voit les lignes blanches. Il prend aussi pour une ligne le jaune clair${NB}: les ${inLetters(Object.keys(YELLOW_LINE_PATCHES).length)} bandes jaunes de la ligne du haut et le carré du centre de la croix.`,
         // (worded so that it shares no run of six words or more with a sentence of an example's description: the
         // client guard looks for those in every file a browser gets - members/client-guard.test.ts)
         `Le capteur à ultrasons voit les cubes et le cadre. Quand la pince tient un cube, son capteur de couleur voit ${frSensorValue('yellow')}.`,
@@ -306,5 +315,5 @@ export const LOGISTIQUE_ASSUMPTIONS: RulesPart = {
       title: 'Pas dans le simulateur',
       items: ['Les missions mystères, la manette Bluetooth, le contrôle du robot avant le match (poids, pièces, électronique) et les règles pour l’équipe.'],
     },
-  ],
+  ]),
 };

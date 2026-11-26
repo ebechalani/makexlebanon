@@ -51,7 +51,7 @@ import {
 } from '../../logistique-intelligente/game';
 import { LOGISTIQUE_ROBOT, START_POSE } from '../../logistique-intelligente/robot';
 import { RULES_SETUP, type LogistiqueScenario } from '../../logistique-intelligente/scenario';
-import { armHeight, gripper, moveCm, program, script, whenStart } from '../../vm/builder';
+import { armHeight, gripper, moveCm, print, probeDetects, program, script, wait, whenStart } from '../../vm/builder';
 import { LIGHT_LINE_THRESHOLD, WAREHOUSE_SORT_ROBOT, robotReach } from '../../warehouse-sort/robot';
 import type { RulesSection } from '../SimulatorApp';
 import { FR_TEXT } from '../text/fr';
@@ -170,12 +170,13 @@ const KNOWN_COUNTS: ReadonlyArray<[RegExp, number | null, number, string]> = [
   [/^cinq cubes/, HALF, 5, 'the cubes of a layer'],
   [/^deux cubes : un dessous, un dessus/, LAYERS, 2, 'a stack at the start'],
   [/^deux entrepôts des coins du haut/, DIAMONDS.length, 2, 'the diamonds'],
-  [/^cinq secondes à rebours/, RULES_COUNTDOWN_S, 5, 'the countdown of the rules'],
+  [/^cinq secondes, puis le match commence/, RULES_COUNTDOWN_S, 5, 'the countdown of the rules'],
   [/^deux cubes valides/, MAX_PER_WAREHOUSE, 2, 'MAX_PER_WAREHOUSE'],
   [/^deux piles de deux cubes/, STACKS_NEEDED, 2, 'the stacks a score of 500 needs'],
   [/^deux cubes\.$/, MAX_PER_WAREHOUSE, 2, 'the cubes of such a stack'],
   [/^deux cubes ne peuvent pas couvrir le même entrepôt/i, MAX_PER_WAREHOUSE, 2, 'two cubes on the mat'],
   [/^deux cubes sur un troisième/, LAYERS, 2, 'a stack put on a cube'],
+  [/^deux du dessous peuvent compter/, MAX_PER_WAREHOUSE, 2, 'the two lower cubes of a stack of three'],
   [/^deux bandes jaunes/, Object.keys(YELLOW_LINE_PATCHES).length, 2, 'the yellow patches of the top line'],
   [/^deux fautes/, null, 2, 'out, in, out again: the example of two exits'],
   [/^deux cubes qui se rencontrent seulement par une arête/i, null, 2, 'two cubes that meet (Q18)'],
@@ -382,6 +383,33 @@ test('the robot of the window: its size within the rules, its start, its servos,
   assert.equal(frSensorValue('yellow'), 'yellow (jaune)');
 });
 
+/** What the probe L1 of the quad RGB sensor reports (« line » or not) with its spot's middle at (x, y), the robot facing up. */
+function probeSeesLine(x: number, y: number): boolean {
+  // (L1 is 85 mm ahead of the axle and 7.5 mm to its left)
+  const sim = createSimulation({ game: logistiqueGame, scenario: RULES_SETUP, program: program([script(whenStart(), [print(probeDetects('L1', 'line')), wait(1)])]), startPose: { x: x + 7.5, y: y + 85, heading: 0 } });
+  sim.start();
+  for (let i = 0; i < 5; i++) sim.step(1);
+  const said = String(sim.world.robot.screen?.lines?.[0] ?? '');
+  assert.match(said, /^(true|false)$/, `the probe at (${x}, ${y})`);
+  return said === 'true';
+}
+
+test('« le jaune clair » the window names is a line for the quad RGB sensor; the 1 mm yellow border of a warehouse is not: wherever the probe stands across it, its spot takes in orange or black too', () => {
+  // a yellow patch of the top line: a line; the orange of a warehouse and the black field: not
+  const patch = YELLOW_LINE_PATCHES.left;
+  assert.equal(probeSeesLine(patch.x + patch.w / 2, patch.y + patch.h / 2), true, 'a yellow patch of the top line');
+  const cross = WAREHOUSES.E5.centre;
+  assert.equal(probeSeesLine(cross.x, cross.y), false, 'the orange of E5');
+  assert.equal(probeSeesLine(cross.x - 40, cross.y), false, 'the black field beside E5');
+  // across the left and right borders of E5, every 0.2 mm from 3 mm outside to 3 mm inside: never a line
+  const seen: string[] = [];
+  for (const edge of [cross.x - WAREHOUSE_SIZE / 2, cross.x + WAREHOUSE_SIZE / 2]) {
+    for (let d = -3; d <= 3 + 1e-9; d += 0.2) if (probeSeesLine(edge + d, cross.y)) seen.push(`x ${(edge + d).toFixed(1)}`);
+  }
+  assert.deepEqual(seen, []);
+  assert.doesNotMatch(ASSUMED_TEXT, /bord fin/);
+});
+
 test('the match of the window: no restart, the buttons are the screen’s, one fault only', () => {
   // « Il n’y a pas de relance. Pour recommencer, appuie sur Démarrer »; « Le bouton « Terminé » »
   assert.deepEqual(logistiqueGame.restartRules, { maxRestarts: 0 });
@@ -417,7 +445,8 @@ test('what the simulator only assumes is in the second part; the rules part does
     ['the height of the frame (Q2)', /Les règles ne donnent pas la hauteur du cadre\. Ici, il mesure 5 cm\./],
     ['the raised claw over the frame', /Bras levé, la pince passe au-dessus du cadre : le robot sort alors du terrain, et c’est une faute\./],
     ['a cube over the frame, held or not', /Un cube qui passe au-dessus du cadre, même tenu par la pince, sort du terrain : l’arbitre l’enlève\./],
-    ['no -20 for a cube (Q16)', /Les règles appellent cela une « violation », mais ne donnent pas de pénalité\. Ici, le cube est seulement enlevé : 0 point, pas de -20\./],
+    ['no -20 for a cube (Q16)', /Les règles appellent cela une « violation », mais ne donnent pas de pénalité\. Ici, le cube est seulement enlevé : il ne rapporte rien et ne coûte rien\./],
+    ['but the claw that carries it over the frame: -20', /Mais la pince qui porte un cube passe au-dessus du cadre avec lui : cette faute du robot coûte 20 points\./],
     ['the cube exactly 5 cm (Q11)', /Un cube mesure exactement 5 cm\. Les règles permettent 2 mm de plus ou de moins\./],
     ['the numbers of the cubes (Q14)', /Ici, les cubes portent un numéro, de 1 à 10, pour que tu les reconnaisses : dessous les cubes 1 à 5, dessus les cubes 6 à 10/],
     ['« couvrir »', /« Couvrir tout l’entrepôt » veut dire : vu de dessus, le cube cache tout le carré, bord jaune compris\./],
@@ -426,22 +455,23 @@ test('what the simulator only assumes is in the second part; the rules part does
     ['« toucher »', /« Toucher » veut dire : à moins de 0,5 mm, vu de dessus comme de côté\. Une pince levée bien au-dessus d’un cube ne le touche pas\./],
     ['a face touches, an edge does not (Q18)', /Un cube du dessus qui repose aussi en partie sur un cube voisin touche ce cube-là\. Deux cubes qui se rencontrent seulement par une arête ne se touchent pas\./],
     ['the cube below must count (Q3)', /Un cube posé sur un autre cube compte seulement si le cube du dessous compte\./],
-    ['the fall, and the console', /Il tombe sur le tapis si son milieu n’est plus au-dessus du cube du dessous\. La console le dit\./],
-    ['flat cubes', /Les cubes restent toujours à plat : ils ne roulent pas et ne basculent pas\. Un cube tombé reste en jeu\./],
-    ['the third cube (Q17)', /On peut poser une pile de deux cubes sur un troisième cube\. Mais un entrepôt compte au plus deux cubes valides : le troisième ne rapporte rien\./],
+    ['the fall, and the console', /Poussé, il tombe à côté, sur le tapis ou sur un cube voisin, si son milieu n’est plus au-dessus du cube du dessous : la console le dit\./],
+    ['by the frame: over it, and taken off', /Si une pile est à moins de 5 cm du cadre, son cube du dessus qui tombe de ce côté n’a pas la place de se poser : il passe par-dessus le cadre, et l’arbitre l’enlève\. Le cube du dessous ne bouge pas\./],
+    ['flat cubes', /Les cubes restent toujours à plat : ils ne roulent pas et ne basculent pas\. Un cube tombé sur le tapis reste en jeu\./],
+    ['the third cube (Q17)', /On peut poser une pile de deux cubes sur un troisième cube\. Mais un entrepôt compte au plus deux cubes valides : le cube du troisième étage ne rapporte rien, seuls les deux du dessous peuvent compter\./],
     ['the arm: the top cube alone', /Bras à 63,58 % ou plus/],
     ['the arm: the pair (Q8)', /Bras à 63,57 % ou moins : .* Les règles laissent choisir la méthode\./],
     ['no countdown', /Il n’y a pas de compte à rebours : le chrono part quand le programme démarre\./],
     ['« Terminé », the program ended (Q7)', /Le match finit aussi quand le programme est fini et que le robot ne bouge plus\./],
     ['the end time (Q7)', /Le temps de fin, c’est ce moment-là\. Si le temps est écoulé, c’est 150 secondes\./],
-    ['one fault only', /Le simulateur ne compte qu’une faute : le robot qui sort du terrain\. Les autres ne peuvent pas arriver ici\./],
+    ['one fault only, and the CyberPi buttons (Q9)', /Le simulateur ne compte qu’une faute : le robot qui sort du terrain\. Les autres ne peuvent pas arriver ici, sauf toucher les boutons du CyberPi \(voir plus bas\)\./],
     ['no warning, one per exit (Q4, Q5)', /Chaque sortie du robot coûte 20 points tout de suite, sans avertissement avant\. S’il sort, revient, puis ressort, cela fait deux fautes\./],
     ['the total never below 0 (Q6)', /Le total n’est jamais en dessous de 0\./],
     ['no restart; « Démarrer »', /Il n’y a pas de relance\. Pour recommencer, appuie sur Démarrer : le terrain est remis en place\./],
     ['nobody moves anything by hand', /Pendant un match, personne ne peut déplacer le robot ou un cube à la main\./],
     ['the CyberPi buttons (Q9)', /Les boutons du CyberPi marchent pendant un match\. En compétition, toucher le robot après le départ est une faute : le simulateur ne la compte pas\./],
     ['the robot of Tri d’entrepôt', /C’est le mBot2 de Tri d’entrepôt, avec la pince à l’avant/],
-    ['the light yellow reads as a line', /Il prend aussi pour une ligne le jaune clair : les deux bandes jaunes de la ligne du haut, le carré du centre de la croix et le bord fin des entrepôts\./],
+    ['the light yellow reads as a line (not the 1 mm border of a warehouse: the probe never reads it as a line)', /Il prend aussi pour une ligne le jaune clair : les deux bandes jaunes de la ligne du haut et le carré du centre de la croix\./],
     ['the colour sensor reads yellow (jaune)', /Quand la pince tient un cube, son capteur de couleur voit yellow \(jaune\)\./],
     ['the start pose, movable (Q10)', /Au départ, il regarde vers le haut, au milieu de la zone de départ\. Avant le match, tu peux le déplacer et le tourner dans la zone de départ\./],
     ['a held cube is not the robot’s size (Q13)', /Un cube que le robot tient ne compte pas dans sa taille\./],
@@ -469,7 +499,7 @@ test('what the simulator only assumes is in the second part; the rules part does
   }
   // the order of the window: the mission first, the scoring and the faults, the ranking last; the second part ends with what is left out
   assert.deepEqual(
-    LOGISTIQUE_RULES.map((section) => section.title),
+    LOGISTIQUE_RULES.map((section) => plain(section.title)),
     ['La mission', 'Le terrain', 'Au départ', 'Le robot', 'Le match', 'Les points (500 au plus)', 'Les cubes enlevés', 'Les fautes (-20 points chacune)', 'Le classement'],
   );
   assert.deepEqual(
@@ -493,6 +523,8 @@ test('French for children: « tu », short sentences, French typography, « dess
     assert.doesNotMatch(text, / - |(?<! )–/, `a dash: « – » after a no-break space: ${text}`);
     assert.doesNotMatch(text, / {2}|^\s|\s$/, `two spaces, or a space at an end: ${text}`);
     assert.doesNotMatch(text, /\bW[1-8]\b/, `the warehouses are E1 - E8: ${text}`);
+    // a number on the line of its unit: « 25 cm », « 20 points » with a no-break space
+    assert.doesNotMatch(text, /\d (cm|mm|kg|points?|secondes?|minutes|degrés)(?![\p{L}])/u, `a plain space between a number and its unit: ${text}`);
     // a layer is « dessous / dessus »; « de haut en bas » is the reading order of the mat
     assert.doesNotMatch(text.replace(/de haut en bas/g, ''), /(?<![\p{L}])en (haut|bas)(?![\p{L}])/u, `« en haut / en bas »: ${text}`);
     // English words a French line must not have (the names are allowed: Smart Logistics, MakeX Inspire, CyberPi, mBot2, quad RGB, Bluetooth, EVA, and the sensor's value yellow)

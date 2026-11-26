@@ -218,8 +218,9 @@ and move it to the top of the `seasons` array. Then create matching folders unde
 ### `content/standalone.ts`
 
 The categories of their own, outside every season: today **Robot en fête 2027**, whose French
-simulators are named by their mission — today **Tri d’entrepôt**, the French version of Warehouse
-Sort (a second, « Logistique intelligente », is to come: one more item of its `simulators`). Its
+simulators are named by their mission — **Tri d’entrepôt**, the French version of Warehouse Sort,
+and **Logistique intelligente**, the regular mission of MakeX Inspire 2024 (a third would be one
+more item of its `simulators`). Its
 name, its texts (in French: the cards of its simulators on the Simulator page, its page
 `/robot-en-fete`), its simulators and their lines in the menu, and who it is proposed by
 (`poweredBy`: **Eddy Bachaalany**, the organiser's choice, with `page.poweredByLabel` "Proposé
@@ -229,7 +230,8 @@ hands it to its loader, which sets it in `PoweredByContext`
 (`src/simulator/ui/text/title-context.tsx`) above the loading screen and the screen — at the end of
 its part of the Simulator page and in the hero of its own page. On the Simulator page the academy's
 "Powered by RoboHolic Robotics Academy" stands right after the seasons, before that part. No season
-counts it (see "The Tri d’entrepôt simulator (Robot en fête 2027)").
+counts it (see "The Tri d’entrepôt simulator (Robot en fête 2027)" and "The Logistique intelligente
+simulator (Robot en fête 2027)").
 
 ---
 
@@ -370,13 +372,15 @@ Both cards show the picture of the Fire Rescue mat, the one the game itself show
 
 The same simulator has more games: **Fire Chief** (the maze, ages 14–17), **Warehouse Sort**
 (the beginner mission of the MakeX Lebanon Inspire category, local event), **Locker Room**
-(Season 2026), **Fire Fighter** (the letter towers, ages 8–10) and **Tri d’entrepôt** (Warehouse
-Sort all in French, of Robot en fête 2027, a category of its own): see "The Fire Chief simulator", "The
-Warehouse Sort simulator", "The Tri d’entrepôt simulator (Robot en fête 2027)", "The Locker Room simulator" and
+(Season 2026), **Fire Fighter** (the letter towers, ages 8–10), and **Tri d’entrepôt** (Warehouse
+Sort all in French) and **Logistique intelligente** (the regular mission of MakeX Inspire 2024, in
+French), the two simulators of Robot en fête 2027, a category of its own: see "The Fire Chief
+simulator", "The Warehouse Sort simulator", "The Tri d’entrepôt simulator (Robot en fête 2027)",
+"The Logistique intelligente simulator (Robot en fête 2027)", "The Locker Room simulator" and
 "The Fire Fighter simulator" further down. One more simulator, **Fire Cadet**, is for another
 robot, the mTiny, and has a screen of its own: see "The Fire Cadet simulator". `/simulator`
-lists the eight simulators: seven by season, then Tri d’entrepôt in the part of Robot en fête 2027 — see
-"The Simulator page" there. Nothing is installed, and the
+lists the nine simulators: seven by season, then Tri d’entrepôt and Logistique intelligente in the
+part of Robot en fête 2027 — see "The Simulator page" there. Nothing is installed, and the
 student's blocks are saved in their own browser — they are never sent anywhere. The one thing
 the simulator asks the website's server for is the ready-made examples: the server decides,
 visitor by visitor, which of them to show and to open. See "Member codes for the simulator
@@ -474,18 +478,20 @@ the second is only the summary students read. Change both when a rule changes.
 
 ### Member codes for the simulator examples
 
-The simulators have seven games with examples: **Fire Rescue** (both pages, Fire Rescue Junior
+The simulators have eight games with examples: **Fire Rescue** (both pages, Fire Rescue Junior
 and Fire Rescue Senior, show the same examples: both ask for the game `'fire-rescue'`), **Fire
 Chief** (the maze), **Warehouse Sort** (Inspire, beginner), **Locker Room** (Capelli Starter,
-Season 2026), **Fire Fighter** (Season 2027, ages 8–10) and **Robot en fête 2027** (Warehouse
-Sort in French: the game `'robot-en-fete'`) for the mBot2, and **Fire Cadet** (Season 2027,
-ages 4–7) for the mTiny. Each has its own **Examples** window with ready-made programs (in Fire
-Cadet: rows of coding cards): seven in Fire Rescue, six in Fire Chief, six in Warehouse Sort,
-six in Locker Room, six in Fire Cadet, six in Fire Fighter, six in Robot en fête 2027 (the six
-of Warehouse Sort, in French). In every game the examples are in three groups, and there are two
-kinds of codes:
+Season 2026), **Fire Fighter** (Season 2027, ages 8–10), and the two of Robot en fête 2027,
+**Tri d’entrepôt** (Warehouse Sort in French: the game `'robot-en-fete'`) and **Logistique
+intelligente** (the regular mission of MakeX Inspire 2024 in French: the game
+`'logistique-intelligente'`), for the mBot2, and **Fire Cadet** (Season 2027, ages 4–7) for the
+mTiny. Each has its own **Examples** window with ready-made programs (in Fire Cadet: rows of
+coding cards): seven in Fire Rescue, six in Fire Chief, six in Warehouse Sort, six in Locker Room,
+six in Fire Cadet, six in Fire Fighter, six in Tri d’entrepôt (the six of Warehouse Sort, in
+French), six in Logistique intelligente. In every game the examples are in three groups, and there
+are two kinds of codes:
 
-| Group | Now in it, in Fire Rescue | Now in it, in Fire Chief, Warehouse Sort, Locker Room, Fire Cadet, Fire Fighter and Robot en fête 2027 | Who sees the card | Who can open it |
+| Group | Now in it, in Fire Rescue | Now in it, in Fire Chief, Warehouse Sort, Locker Room, Fire Cadet, Fire Fighter, Tri d’entrepôt and Logistique intelligente | Who sees the card | Who can open it |
 | --- | --- | --- | --- | --- |
 | **Open to everyone** | the three starter examples | the three starter examples | everybody | everybody, without a code |
 | **For members** | the two intermediate examples | the two intermediate examples | everybody — with a lock and "Members only" | a **member code** or an advanced code |
@@ -496,16 +502,17 @@ So there are three kinds of visitor, and each sees the same in every game:
 - **No code.** Three open cards, two locked ones. Nothing else.
 - **A member code** (one of the 500 you already have). Five open cards. Nothing else.
 - **An advanced code.** All the cards of that game — seven in Fire Rescue, six in Fire Chief,
-  Warehouse Sort, Locker Room, Fire Cadet, Fire Fighter and Robot en fête 2027 — under the
-  headings Starter, Intermediate and Advanced (in Robot en fête 2027: Premiers pas,
-  Intermédiaire, Avancé).
+  Warehouse Sort, Locker Room, Fire Cadet, Fire Fighter, Tri d’entrepôt and Logistique
+  intelligente — under the headings Starter, Intermediate and Advanced (in the two games of Robot
+  en fête 2027: Premiers pas, Intermédiaire, Avancé).
 
-**One set of codes for all seven games.** There is no code "for Fire Rescue", "for Fire Chief",
-"for Warehouse Sort", "for Locker Room", "for Fire Cadet", "for Fire Fighter" or "for Robot en
-fête 2027". A member code opens the examples for members in every game, and an advanced code
-opens every example in every game. The codes you have already handed out work in Fire Chief,
-Warehouse Sort, Locker Room, Fire Cadet, Fire Fighter and Robot en fête 2027 as they are: there
-is nothing to make and nothing to hand out again. Cancelling a code cancels it in every game.
+**One set of codes for all eight games.** There is no code "for Fire Rescue", "for Fire Chief",
+"for Warehouse Sort", "for Locker Room", "for Fire Cadet", "for Fire Fighter", "for Tri
+d’entrepôt" or "for Logistique intelligente". A member code opens the examples for members in
+every game, and an advanced code opens every example in every game. The codes you have already
+handed out work in Fire Chief, Warehouse Sort, Locker Room, Fire Cadet, Fire Fighter, Tri
+d’entrepôt and Logistique intelligente as they are: there is nothing to make and nothing to hand
+out again. Cancelling a code cancels it in every game.
 
 An example of the third group is *hidden*, not locked. A visitor, and a member with an ordinary
 member code, do not see its card, its title, the "Advanced" heading or a count — nothing on
@@ -526,7 +533,7 @@ it is typed once per device, and the simulator checks it with the server again o
 
 The code is remembered once for all games. Somebody who typed a code in Fire Rescue — also
 long ago, before Fire Chief existed — finds the examples of Fire Chief, Warehouse Sort, Locker
-Room, Fire Cadet, Fire Fighter and Robot en fête 2027 open in the same browser without typing anything, and the other way round. Other tabs of the same browser that
+Room, Fire Cadet, Fire Fighter, Tri d’entrepôt and Logistique intelligente open in the same browser without typing anything, and the other way round. Other tabs of the same browser that
 have a simulator open follow at once: a code that is accepted in one tab opens the examples in
 the others too (each asks the server what the code opens in its own game). A tab that follows
 stands as it does after a fresh load with that code: what an earlier code had opened there is
@@ -557,7 +564,7 @@ this order, each with its own explanation:
 After any change: save, commit and push. The change is live once Vercel has redeployed.
 
 **Moving an example between the three groups.** Every example has an id; the ids of all
-seven games are listed at the top of the file:
+eight games are listed at the top of the file:
 
 - Fire Rescue: `'hello'`, `'line-follow'`, `'gripper-demo'`, `'one-bucket'`, `'one-person'`,
   `'smart-bucket'`, `'full-mission'`
@@ -571,15 +578,18 @@ seven games are listed at the top of the file:
   `'cadet-two-rescues'`, `'cadet-round-the-sign'`, `'cadet-all-four'`
 - Fire Fighter: `'fighter-first-grab'`, `'fighter-line-to-t'`, `'fighter-yellow-x'`,
   `'fighter-left-bay'`, `'fighter-right-bay'`, `'fighter-whole-mission'`
-- Robot en fête 2027: `'fete-leave-start'`, `'fete-white-line'`, `'fete-cube-colour'`,
-  `'fete-one-cube'`, `'fete-two-cubes'`, `'fete-all-cubes'`
+- Tri d’entrepôt (Robot en fête 2027): `'fete-leave-start'`, `'fete-white-line'`,
+  `'fete-cube-colour'`, `'fete-one-cube'`, `'fete-two-cubes'`, `'fete-all-cubes'`
+- Logistique intelligente (Robot en fête 2027): `'logi-ligne-croix'`, `'logi-cube-dessus'`,
+  `'logi-un-cube-e8'`, `'logi-pile-e7'`, `'logi-empiler-e6'`, `'logi-toute-mission'`
 
-Lists 1 and 2 hold the ids of all seven games together, one below the other. Every id of Fire
+Lists 1 and 2 hold the ids of all eight games together, one below the other. Every id of Fire
 Chief begins with `chief-`, every id of Warehouse Sort with `sort-`, every id of Locker Room
 with `locker-`, every id of Fire Cadet with `cadet-`, every id of Fire Fighter with
-`fighter-` and every id of Robot en fête 2027 with `fete-`, so they cannot be mixed up: `'full-mission'` is the full mission of Fire Rescue, `'chief-full-mission'` the one
+`fighter-`, every id of Tri d’entrepôt with `fete-` and every id of Logistique intelligente with
+`logi-`, so they cannot be mixed up: `'full-mission'` is the full mission of Fire Rescue, `'chief-full-mission'` the one
 of Fire Chief. A line decides about that one example, in its own game, and about nothing in
-another game. Robot en fête 2027 shows the six programs of Warehouse Sort in French, but it is a
+another game. Tri d’entrepôt shows the six programs of Warehouse Sort in French, but it is a
 game of its own: a line about `'sort-one-cube'` decides nothing for `'fete-one-cube'`. To open
 or to hide an example on both pages, write both ids.
 
@@ -733,13 +743,13 @@ The honest limits:
 npm run test:sim
 ```
 
-It runs about nineteen hundred checks (1,917 at the end of November 2026, with Tri d’entrepôt); among them,
+It runs about two thousand checks (2,093 at the end of November 2026, with Logistique intelligente); among them,
 every example program of every game is played on the real engine with the real referee and its
 score is compared, and every practice map of Fire Cadet is proved. They also check
 `content/simulator-codes.ts` (a misspelt example id, an example that is on both lists, a
 damaged line, a code that is on both lists of codes) and that nothing about an example —
 not even a title — can slip back into what every visitor's browser downloads. It takes
-around two and a half minutes (136 to 146 s measured at the end of November 2026) and must end with `fail 0`. If it does not, do not deploy — a failing
+around three minutes (184 s measured at the end of November 2026) and must end with `fail 0`. If it does not, do not deploy — a failing
 test means a program would now score differently, a block would behave differently, or an
 example would be shown to somebody who should not see it.
 
@@ -861,10 +871,10 @@ with "Powered by …", the header height.
 
 The simulators have a section of their own on the website: **Simulator** in the menu, between
 Training and Videos, leads to `/simulator`. It is one page (`src/app/simulator/page.tsx`, titled
-"Robot simulators") that lists the eight simulators of two robots — Fire Cadet, Fire Fighter, Fire
+"Robot simulators") that lists the nine simulators of two robots — Fire Cadet, Fire Fighter, Fire
 Rescue Junior, Fire Rescue Senior and Fire Chief (Season 2027), Locker Room and Warehouse Sort
-(Season 2026), and Tri d’entrepôt (Robot en fête 2027, no season); Fire Cadet is played with the
-mTiny, the others with the mBot2 — with one part per season, the newest first — "Season 2027", then
+(Season 2026), and Tri d’entrepôt and Logistique intelligente (Robot en fête 2027, no season); Fire
+Cadet is played with the mTiny, the others with the mBot2 — with one part per season, the newest first — "Season 2027", then
 "Season 2026" (the organiser's order: "season 2027, season 2026, robot en fête"; `simulatorSeasons()`
 sorts them so, and the menu and the Training card take this order from it; the page's description,
 written by hand in `src/app/simulator/page.tsx`, lists them in the same order and must be edited
@@ -894,12 +904,12 @@ is not a category of a season (Warehouse Sort, the beginner mission of a local e
 entry of `missionSimulators` in the same file instead: its `season` (a year) says in which part
 it is shown, after the categories of that season; it has two labels of its own (`label`,
 `event`) and no "About" link. A season without a simulator gets no part. A category that belongs
-to no season at all (Robot en fête 2027, whose simulator Tri d’entrepôt is the French version of
-Warehouse Sort) is an entry of `standaloneCategories` in `content/standalone.ts`: after the seasons
+to no season at all (Robot en fête 2027, whose two simulators are in French: Tri d’entrepôt, the
+French version of Warehouse Sort, and Logistique intelligente) is an entry of `standaloneCategories` in `content/standalone.ts`: after the seasons
 it gets a part of its own (if it has a simulator: `simulatorCategories()`, which the menu takes
 too, so a category without one has neither a part nor a group, as a season without one), headed
 with its name and in its language (`lang="fr"`), with one card
-per item of its `simulators`, which takes all its words from that entry ("Ouvrir le simulateur
+per item of its `simulators` (two cards side by side from 768 px), each of which takes all its words from that entry ("Ouvrir le simulateur
 Tri d’entrepôt", "À propos de Robot en fête 2027"), and whose "About" link leads to the category's
 own page, `/<slug>`. `content/seasons.ts` does not know it, so no
 season, count or list changes for it. The Training page
@@ -915,7 +925,7 @@ The **Simulator** item of the menu has a dropdown, built by `simulatorMenu()` in
 simulators" (this page), then one **group** per part of the page, in its order — "Season 2027",
 "Season 2026", then "Robot en fête 2027" — each holding its simulators by their name only, in the
 order of the page ("Fire Cadet", "Fire Fighter", "Fire Rescue Junior", "Fire Rescue Senior", "Fire
-Chief"; "Locker Room", "Warehouse Sort"; « Tri d’entrepôt »). The menu is English; the group of a
+Chief"; "Locker Room", "Warehouse Sort"; « Tri d’entrepôt », « Logistique intelligente »). The menu is English; the group of a
 category of its own shows French names only, its own and its simulators', and says so
 (`lang="fr"`). A simulator, a season or a category added later gets its line or its group by
 itself, in its place; a season or a category without a simulator gets no group (and no part of
@@ -1377,7 +1387,7 @@ Use only blocks of the Fire Chief palette — blocks that exist in real mBlock. 
 
 Described in full in "Member codes for the simulator examples" above. In short:
 
-- **One address, seven games.** Every simulator asks `/api/simulator/unlock`, and each says which
+- **One address, eight games.** Every simulator asks `/api/simulator/unlock`, and each says which
   game it is (Fire Rescue Junior and Senior both say `'fire-rescue'`: they show the same
   examples). The answer holds the cards and the programs of that game only, and says the name
   of the game back. A page takes an answer only when it is about its own game: should a tab
@@ -1392,7 +1402,8 @@ Described in full in "Member codes for the simulator examples" above. In short:
   server back.
 - **One set of codes.** A member code opens the member examples of every game, an advanced
   code shows every example of every game. There is nothing to make or to hand out for Fire
-  Chief, Warehouse Sort, Locker Room, Fire Cadet, Fire Fighter or Robot en fête 2027.
+  Chief, Warehouse Sort, Locker Room, Fire Cadet, Fire Fighter, Tri d’entrepôt or Logistique
+  intelligente.
 - **Typed once.** The browser keeps the code in one place for all games.
 - **The same three groups.** Fire Chief has three starter examples open to everyone, two for
   members and one that only an advanced code shows — and, without such a code, no card, no
@@ -1748,8 +1759,8 @@ in French, the blocks included ("tout, blocs compris"); exactly the same mission
 la même"); no age group ("pas d'âge affiché"); a category on its own, "Robot en fête 2027", with its
 own card and page, in French ("une catégorie seule", "à part, sa propre fiche", "fiche en
 français"). Robot en fête 2027 names its French simulators by their mission: this one is « Tri
-d’entrepôt »; a second one, « Logistique intelligente » (MakeX Inspire Smart Logistics), is to
-come. It lives at:
+d’entrepôt »; the second, « Logistique intelligente » (the regular mission of MakeX Inspire 2024,
+"Smart Logistics"), has a section of its own below. It lives at:
 
 ```
 https://www.makexlebanon.com/simulator/tri-entrepot
@@ -1781,8 +1792,8 @@ A few names are this game's own:
 | Starter, Intermediate, Advanced | Premiers pas, Intermédiaire, Avancé |
 
 **What stays English.** The website around it: the header, the menu (in the Simulator dropdown,
-after the seasons, its group "Robot en fête 2027" holds the line "Tri d’entrepôt": French names in
-the English menu, the group marked `lang="fr"`), the footer, the breadcrumbs of `/robot-en-fete` (Home / Simulator / Robot en fête 2027) and the
+after the seasons, its group "Robot en fête 2027" holds the lines "Tri d’entrepôt" and "Logistique
+intelligente": French names in the English menu, the group marked `lang="fr"`), the footer, the breadcrumbs of `/robot-en-fete` (Home / Simulator / Robot en fête 2027) and the
 share picture. And the **values a program gets**:
 the colour sensor gives `red`, `green`, `blue`, … `none`, a condition is `true` or `false`, the
 same on both pages, as we believe the robot gives them (not verified: question 1 below). The
@@ -1794,12 +1805,13 @@ French in brackets: `red (rouge)`. The block menus show French and store the Eng
 ### Where it is on the website
 
 Its entry is **`content/standalone.ts`**, a list of the categories of their own: its name, its
-robot, the lead of its page, the words of its page, and its `simulators` — today one, Tri
-d’entrepôt, with its address, its sentences, the words of its card and its picture (the mat of
-Warehouse Sort); its line in the menu is its name. Every text is in French, and every one
-is required, so nothing on a card or a page can fall back to English. A second simulator is one
-more item of `simulators`: its card, its part of the category's page, its line in the menu and the
-sitemap follow by themselves, with no change to any page. `content/seasons.ts`
+robot, the lead of its page, the words of its page, and its `simulators` — Tri d’entrepôt, with
+its address, its sentences, the words of its card and its picture (the mat of Warehouse Sort), then
+Logistique intelligente (see its section below); a simulator's line in the menu is its name. Every
+text is in French, and every one is required, so nothing on a card or a page can fall back to
+English. Another simulator is one more item of `simulators`, as Logistique intelligente was: its
+card, its part of the category's page, its line in the menu and the sitemap follow by themselves,
+with no change to any page. `content/seasons.ts`
 does not know it: no season page, no count of categories, the homepage, the Training card and
 the lists of Season 2026 and Season 2027 are exactly as they were. From that entry:
 
@@ -1808,15 +1820,16 @@ the lists of Season 2026 and Season 2027 are exactly as they were. From that ent
   labels "En français" and "mBot2", "Simulateur Tri d’entrepôt", its sentences, "Ouvrir le
   simulateur Tri d’entrepôt", and under it "À propos de Robot en fête 2027", the link to the
   category's page. The page's English description says it in one more sentence: "And Robot en
-  fête 2027 (in French): Tri d’entrepôt, the French version of Warehouse Sort."
+  fête 2027 (in French): Tri d’entrepôt, the French version of Warehouse Sort, and Logistique
+  intelligente, the regular mission of MakeX Inspire 2024."
 - **Its page `/robot-en-fete`** (`src/app/robot-en-fete/page.tsx`): its name, its lead, the robot
-  ("mBot2", no age) and one part per simulator, "Essaie le simulateur Tri d’entrepôt" with the
-  button "Ouvrir le simulateur". The French texts say `lang="fr"`; the breadcrumbs are English. It
+  ("mBot2", no age) and one part per simulator, "Essaie le simulateur Tri d’entrepôt" then "Essaie
+  le simulateur Logistique intelligente", each with the button "Ouvrir le simulateur". The French texts say `lang="fr"`; the breadcrumbs are English. It
   has no photos, no downloads and no other categories next to it: it belongs to no season.
 - **The menu**: a group "Robot en fête 2027" in the Simulator dropdown, after the groups of the
-  seasons, with the line "Tri d’entrepôt"; the group and its line say `lang="fr"` (`simulatorMenu()`
-  in `content/site.ts`, drawn by `src/components/Header.tsx`).
-- **The sitemap** has the category's page and the simulator's page.
+  seasons, with the lines "Tri d’entrepôt" and "Logistique intelligente"; the group and its lines
+  say `lang="fr"` (`simulatorMenu()` in `content/site.ts`, drawn by `src/components/Header.tsx`).
+- **The sitemap** has the category's page and the pages of its simulators.
 
 The simulator's page itself, `src/app/simulator/tri-entrepot/page.tsx`, has a French title
 ("Simulateur mBot2 — Tri d’entrepôt (Robot en fête 2027)") and description; its title row reads
@@ -1888,7 +1901,7 @@ same program).
 | the Rules window | `src/simulator/ui/robot-en-fete/rules.ts` (`rules.test.ts` checks every number against the game and the English window) |
 | the other words of this game (score sheet notes, hints), the Cube colours panel, the test lists, the messages about a typed code | `words.ts`, `arrangement-words.ts`, `arrangement-batch.ts`, `arrangement-code.ts` in `src/simulator/ui/robot-en-fete/` |
 | an example | `src/simulator/robot-en-fete/samples.ts` and `sample-catalog.ts`; its group in `content/simulator-codes.ts` and the same lines in `scripts/generate-simulator-codes.mjs` |
-| its card, its category's page, its menu line, a second simulator | `content/standalone.ts` |
+| its card, its category's page, its menu line, another simulator | `content/standalone.ts` |
 | the title and description of the simulator's page | `src/app/simulator/tri-entrepot/page.tsx`; its name in the title row: `src/simulator/ui/robot-en-fete/title.ts` |
 | a rule of the mission | in Warehouse Sort first (`src/simulator/warehouse-sort/game.ts`), then the sentences of both Rules windows: the two games share the referee |
 
@@ -1910,8 +1923,8 @@ English pages did not change.
    French mBot sheets) or "quand CyberPi démarre"? And "lorsque le bouton A est pressé", "bouton A
    pressé ?"?
 3. **What stays English.** The site's menu, header, footer and breadcrumbs stay English; in the
-   menu, after the seasons, the group "Robot en fête 2027" holds the line "Tri d’entrepôt" (French
-   names, marked `lang="fr"`). Warehouses E1 – E4 and codes with V for "vert": fine?
+   menu, after the seasons, the group "Robot en fête 2027" holds the lines "Tri d’entrepôt" and
+   "Logistique intelligente" (French names, marked `lang="fr"`). Warehouses E1 – E4 and codes with V for "vert": fine?
 4. **Its page and its place.** Its own page at `/robot-en-fete`; on the Simulator page a part of
    its own after the seasons, headed "Robot en fête 2027"; not on the Training page's card. Is
    that what you want?
@@ -1942,6 +1955,383 @@ English pages did not change.
   (`src/simulator/ui/simulator.css`).
 - **Blockly's own punctuation**: the ", " between the parts of a block that a screen reader hears
   is written by Blockly's code.
+
+---
+
+## The Logistique intelligente simulator (Robot en fête 2027)
+
+**Logistique intelligente** is the second simulator of **Robot en fête 2027**, the category of its
+own in French (the first is Tri d’entrepôt, above): the **regular mission of MakeX Inspire 2024,
+"Smart Logistics"**, played with the mBot2, **all in French** — the screen, the blocks, the Rules
+window, the score sheet, the console and the six examples. The organiser chose it and decided: the
+regular mission only ("Mission normale seule"; the mysterious missions may come later), named by
+its mission ("Nom de la mission"), programs only, with the French blocks ("Programmes seulement":
+no controller mode), everything in French as Tri d’entrepôt, and no age group. Its title row and
+its loading screen say « Proposé par Eddy Bachaalany », the category's `poweredBy`. It lives at:
+
+```
+https://www.makexlebanon.com/simulator/logistique-intelligente
+https://www.makexlebanon.com/robot-en-fete           (the category's page: a part for each of its two simulators)
+```
+
+**The mission.** Ten yellow cubes of 5 cm stand on the **storage cross** in the middle of a black
+mat with white lines, in **two layers of five**: on each of the five squares of the cross a stack
+of two, a cube below (cubes 1 – 5) and a cube on top (cubes 6 – 10). The robot starts in the
+**start area** at the bottom middle and takes them to the **eight warehouses** E1 – E8, orange
+squares of 4 cm on the mat (E1 and E4, in the top corners, are turned 45°: diamonds). At the end of
+the match a cube is **valid** when it covers a whole warehouse, stands on the mat and does not touch
+the robot — or when it lies on such a cube and touches only that one; a warehouse counts at most
+two valid cubes. 50 points for each valid cube, at most 500 (ten cubes in eight warehouses: at least
+two stacks of two are needed). 20 points off each time the robot leaves the arena. A match lasts
+150 seconds. Nothing is drawn: the cubes always start the same way (one setup, code `CROIX`).
+
+There is **no English twin**: the game is French only, so the referee writes its French sentences
+itself (`game.ts`), with no word table of its own (Tri d’entrepôt needs one because Warehouse Sort
+exists in English). Everything general is Tri d’entrepôt's: the French screen (`text={FR_TEXT}`),
+the French blocks, "tu" for the student, a decimal comma (`63,58 %`, `1:02,3`), a no-break space
+before `:` `;` `!` `?` `%` and inside « », the sensor values as the program holds them, shown
+`yellow (jaune)` (see "How the French is put together" above). The robot is Tri d’entrepôt's mBot2,
+the very same object: the gripper, the colour sensor at the claw, the ultrasonic sensor, the quad
+RGB sensor set for white lines on black.
+
+### How the game is put together
+
+| File | What is in it |
+| --- | --- |
+| `src/simulator/logistique-intelligente/field.ts` | Every measure of the print file `map_inspire.pdf` (1250 mm), each a named constant with its source (MEASURED, PICTURE, RULE, ASSUMPTION, DECISION): the arena and the frame (`ARENA_SIZE` 1200, `GREY_BAND`, `FRAME_HEIGHT`, `FRAME_THICKNESS`), the white lines (`WHITE_LINES`, `DIAGONALS`, `LINE_WIDTH`), the warehouses (`WAREHOUSES`, `WAREHOUSE_IDS`, `WAREHOUSE_SIZE`), the storage cross (`STORAGE_SQUARES`, `STORAGE_CENTRE`), the start area (`START_AREA`, `START_LINE_X`), the cubes (`CUBE_SIZE`, `CUBE_MASS`), the colours, and the drawn stand-in of the mat the tests read (`MAT_VECTOR`, 127 layers in the order of the print file) |
+| `src/simulator/logistique-intelligente/robot.ts` | The robot: Tri d’entrepôt's mBot2 (`LOGISTIQUE_ROBOT` is `WAREHOUSE_SORT_ROBOT`, imported, not copied); where it starts (`START_POSE`) |
+| `src/simulator/logistique-intelligente/scenario.ts` | The **one setup** (`RULES_SETUP`, code `CROIX`, read in any case): nothing is drawn |
+| `src/simulator/logistique-intelligente/game.ts` | The game and its referee: the ten cubes, the four walls of the frame, the zones, the score sheet and every French sentence of the referee. At its top, the open points Q1 – Q18 (the questions below) with the constant behind each |
+| `src/simulator/logistique-intelligente/play.ts` | Play a program without a screen (`playLogistique`; the tests use it) |
+| `src/simulator/logistique-intelligente/sample-catalog.ts`, `samples.ts` | The six examples. They stay on the server (see "Member codes" above) |
+| `src/simulator/ui/logistique-intelligente/` | What only this game shows: `LogistiqueSimulator.tsx` (what the general screen is given: `text={FR_TEXT}`, `fixedSetup`, `restartButton={false}`, `scoreDigits={3}`), `LogistiqueLoader.tsx` (the loading screen; it takes the category's `poweredBy`), `SetupList.tsx` (the panel « Le terrain »), `rules.ts` (the Rules window), `words.ts` (the screen's words), `title.ts` (its name in the title row) |
+| `src/app/simulator/logistique-intelligente/page.tsx` | The page: its address, its French title ("Simulateur mBot2 — Logistique intelligente (Robot en fête 2027)") and description; no `hreflang` (it has no English page) |
+| `public/simulator/logistique-intelligente/` | The two pictures of the mat, both lossless: `mat.webp` (2400 px) is shown on the stage and on the card of the Simulator page, `mat-sensor.webp` (1200 px) is what the line sensor reads |
+
+Its tests: `field.test.ts`, `scenario.test.ts`, `game.test.ts`, `integration.test.ts` and
+`samples.test.ts` in `src/simulator/logistique-intelligente/`; `words.test.ts`, `rules.test.ts` and
+`screen.test.ts` in `src/simulator/ui/logistique-intelligente/`; `core/engine-stacks.test.ts` and
+`ui/render-stacks.test.ts` for the two additions below.
+
+**On the website** it is the second item of the `simulators` of Robot en fête 2027 in
+**`content/standalone.ts`**, and nothing else had to be written for it: the Simulator page shows its
+card in the part "Robot en fête 2027", after Tri d’entrepôt's (side by side from 768 px: "Simulateur
+Logistique intelligente", its own mat, "Ouvrir le simulateur Logistique intelligente", "À propos de
+Robot en fête 2027"); the page `/robot-en-fete` has a second part, « Essaie le simulateur Logistique
+intelligente », with the button « Ouvrir le simulateur »; in the Simulator dropdown of the menu, the
+group "Robot en fête 2027" holds the lines "Tri d’entrepôt" and "Logistique intelligente" (French
+names, the group marked `lang="fr"`, "2 simulators" for a screen reader); the sitemap has its page.
+The lead of `/robot-en-fete` names both simulators now (question 12 below). Its program files are
+named `logistique-intelligente-program-<day>.json`; the work a student saves in the browser is under
+`mbot2-sim:logistique-intelligente:*`.
+
+What the shared code got for this game. Every change is behind something the other eight games
+leave out (an optional field, an optional prop, a new key), so they run exactly the lines they ran
+before: in scratch scripts, their examples were played on the engine before and after the change
+(six hashes, the same), and every drawing call of the stage was recorded while they played (the
+same, byte for byte); every older test still passes (only the tests that count the games changed).
+
+| File | The change |
+| --- | --- |
+| `src/simulator/core/types.ts`, `core/engine.ts` | **`Body.keepsRiders`**: a cube that keeps the cube resting on it. Gripped by the claw, it carries that cube along — moved, raised, turned and put down with it, and pushed back with it by the frame — instead of letting it drop through. Only the cubes of this game set it (`carryRiders`, called in five places of the engine) |
+| `src/simulator/ui/render.ts` | A cube that is a platform is drawn as a cube (with a dark number on yellow), and the cubes riding on the held cube are drawn over the robot |
+| `src/simulator/ui/SimulatorApp.tsx`, `ui/ControlBar.tsx` | `scoreDigits`: the score's number keeps room for three digits from the first second (0, 50 … 500), as an inline width; the stylesheet is unchanged |
+| `src/simulator/blocks/palettes.ts`, `blocks/register.ts` | the palette `'logistique-intelligente'` (Warehouse Sort's categories), and Warehouse Sort's French hover texts for it |
+| `src/simulator/ui/program-file.ts` | its name, "Logistique intelligente", for its program files |
+| `src/simulator/ui/text/fr-common.tsx` | the four walls of the frame read « le cadre » in the console |
+
+### The field (measured from the print file)
+
+All in mm, **origin at the top-left inner corner of the frame** (not of the printed mat, as in
+Warehouse Sort), +y down. Measured from the vectors of the organiser's print file (InDesign, at 1:1:
+every designed size is a round number — lines 25.000, storage squares 50.000, warehouses 40.000);
+`field.test.ts` holds the print file's numbers and checks every constant against them.
+
+| What | Measure |
+| --- | --- |
+| Arena | 1200 × 1200 inside the frame (rules p. 10/6). The print is 1250 mm: a grey band 30 wide round a black field of 1190. The frame is taken as centred on the print (assumption: the print is symmetric to 0.001 pt), so 5 of the grey band show inside it on every side; the printed mat runs from −25 to 1225 |
+| Frame (simulator) | four fixed walls just outside 0 … 1200, 20 thick and **50 high (assumption: the rules give no height)**: the robot's chassis (90 high) and a cube on the mat cannot pass; the raised claw can |
+| White lines | 25 wide, RGB 255, 255, 255 on the black field (35, 31, 32): the top line with two light-yellow patches; the square loop round the cross (centre (600, 602)); the stem from the loop down through the bottom line, 43 into the start area; the bottom line with its arms and T bars towards E5 – E8; the two 45° arms towards E1 and E4; two lone bars under E2 and E3 |
+| Storage cross | five 50 squares, centre (600, 602): x 525 … 675, y 527 … 677; the centre square yellow, the four round it orange; a dashed magenta circle round it |
+| Warehouses (middles) | E1 (69.484, 71.684) turned 45°, E2 (384.66, 51.1), E3 (813.41, 51.1), E4 (1130.716, 71.684) turned 45°, E5 (220.5, 391), E6 (979.5, 391), E7 (57.5, 985.25), E8 (1142.5, 985.25). Each a yellow 40 square with an orange 38 one on it (a 1 mm yellow border). The rules' text says 50 mm, their figure and the mat 40 (question 1) |
+| Start area | x 476 … 724, y 950 … 1200 (248 × 250; the rules: 250 × 250), a blue and a red half |
+| Robot | 237 × 130 with its claw open; it starts facing up with its middle on the stem at (600, 1123.5): 6.5 free in front and behind, 59 on each side |
+
+The drawn stand-in agrees with the picture the line sensor reads on 99.64 % of the points for line
+or background and 99.24 % for the colour name; the edges of the lines lie 0.274 mm apart on average,
+0.65 mm at most (94 crossings). The examples score the same on both.
+
+**What the sensors read** (the quad RGB sensor is set for a light line, threshold 70):
+
+| Mat colour | Light (0 – 100) | Line? | Colour name |
+| --- | --- | --- | --- |
+| black field | 12.7 | background | black |
+| white lines | 100.0 | **line** | white |
+| light yellow (the two patches of the top line, the centre square of the cross; also the 1 mm border of a warehouse, see below) | 85.6 | **line** | yellow |
+| orange (a warehouse, the four other squares of the cross) | 64.6 | background | yellow |
+| grey band inside the frame | 56.3 | background | white |
+| magenta circle | 33.9 | background | purple |
+| a cube, at the claw's colour sensor | — | — | yellow |
+
+So the line blocks follow the white lines and the light yellow too (the Rules window says so), and
+a program can tell a yellow patch (yellow and line) from a warehouse (yellow and background). The
+85.6 is the colour at one point: the 1 mm yellow border of a warehouse has it too, but a probe reads a
+spot of five points 1.8 mm across, which always takes in orange or black with the border — swept
+across the borders of E5 in 0.05 mm steps, on the drawing and on the picture, it reads at most 69,
+never a line (`ui/logistique-intelligente/rules.test.ts`).
+
+### The cubes and the stacks
+
+The ten cubes are 50 mm, light (a robot always pushes them), and numbered on the stage (real cubes
+have no number): cubes 1 – 5 below, on the squares « haut », « gauche », « centre », « droite »,
+« bas », and cubes 6 – 10 on top, each on the cube whose number is 5 less. Measured in the engine
+(`core/engine-stacks.test.ts`):
+
+- **The arm decides what the claw takes.** The block "le bras va à la hauteur … %" puts the claw's
+  underside at 5 + 0.7 × the number mm. At **63,58 %** or more (49.5 mm and up) the claw takes the
+  top cube of a stack alone; at **63,57 %** or less it takes the bottom cube, and **the cube on it
+  comes along** (`keepsRiders`): the pair is carried, turned and put down together, and only those
+  two cubes move (tried at claw heights from 5 to 49.4 mm, with turns at 180 RPM: the top cube ends
+  0 mm and 0° off).
+- **A cube put down on a cube** stays on it when its middle is over the cube below (put down 24.9
+  mm off: it stays; 25.1 mm: it lands on the mat). A top cube pushed 20 or 24 mm stays on; pushed
+  26 mm or more it comes down **flat, flush beside** its support, and the console says « Le cube n
+  est tombé du cube m. ». **Next to the frame there is no room for it**: where its support stands
+  closer than one cube (50 mm) to the frame — the faces of a cube in E2, E3, E7 or E8 are 26.1 or 32.5
+  mm from it — a top cube that falls towards the frame goes over it instead, lands flush outside and is
+  taken off by the referee (R18, no −20); the cube under it does not move (cubes with `keepsRiders`
+  only: `core/engine.ts` `overTheWall`). Without that, the frame would push it back and it would shove
+  the cube under it out of its warehouse (23.9 mm in E2, 17.5 mm in E8: 100 points became 0).
+- **A stack can be built higher than two.** A pair taken by its bottom cube can be put on a single
+  cube (3 high); three trips build a tower of 5, its top at 250 mm. A single cube cannot be put on a
+  pair (the arm cannot raise it high enough). The referee counts at most two cubes a warehouse.
+- **The frame** stops the robot's body and a cube on the mat. A cube carried high enough in the claw
+  (its base 49.5 mm or more above the mat) passes over it and leaves the arena as it crosses, still
+  held: the referee takes it off (R18); the claw carrying it is over the frame too, and that costs
+  −20 (R19). A cube held lower is stopped by the frame, as the robot is.
+- Nothing tips, rolls or bounces; a pushed cube slides and stops when the push stops.
+
+### The referee
+
+| Line | Points | When |
+| --- | --- | --- |
+| Cube 1 … Cube 10 (one line per cube) | 50 / 0 | at the end: valid by rule (1) — it covers a whole warehouse (every corner of the 40 mm square, its yellow border included, under the cube seen from above), stands on the mat and does not touch the robot — or by rule (2) — it rests on a cube valid by (1), touches no other cube and not the robot. A warehouse counts at most two valid cubes (rule (3)) |
+| Robot sorti du terrain | 0, −20 per exit | each time a part of the robot passes over the frame (R19): −20 at once, no warning first; out, back in, out again is two |
+
+**The field is judged once, at the end**, as it lies at the last moment of the match, **bottom-up**:
+the cubes on the mat first, then the cubes on them, and a cube on a cube reads the result of the cube
+under it — it counts only if that one counts by rule (1) (question 3). Every line says why it scores
+or not: « Couvre tout l’entrepôt E8 et touche le tapis. », « Posé sur le cube 5, qui couvre tout
+l’entrepôt E7. », « Couvre seulement une partie de l’entrepôt E2. », « Posé sur le cube 4, mais touche
+aussi le cube 3. », « Troisième cube de la pile de l’entrepôt E5 : un entrepôt compte au plus deux
+cubes valides. », « Dans la pince du robot. ». At 0:00 the sheet reads five « Dans la zone de
+stockage. » and five « Dans la zone de stockage, sur le cube m. ».
+
+- **Covers** has no tolerance: a centred cube has 5.0 mm to spare on each side and may be turned up
+  to 17.1°; E1 and E4 are covered only by a cube turned 45° ± 17.1°.
+- **Touches** means closer than 0.5 mm, seen from above **and** in height: a raised claw above a cube
+  does not touch it. A top cube lying partly on a neighbour's top touches it; two cubes that meet only
+  along an edge do not (question 18); a cube resting on a cube is not that cube's contact, so a stack
+  of three in one warehouse scores 100, the third cube 0 (question 17).
+- **A cube that leaves the arena** (a corner of it more than 0.5 mm past the inner side of the frame,
+  question 15), held or not, is taken off the field at once (R18): « Le cube n sort du terrain à 1:02,3 :
+  vu de dessus, il passe au-dessus du cadre. L’arbitre l’enlève : il ne rapporte plus rien. » It costs
+  no points (R18 gives no penalty: question 16).
+- **The total** is never below 0. The match ends at 150 s, with « Terminé » (the team's "over"), or
+  when the program has ended and the robot stands still; the **completion time** is that moment, and
+  the sheet gives it (« Temps de ce score – à points égaux, les règles classent devant le temps le plus
+  court »). There is **no Restart button** (the rules: "teams are not allowed to restart"); to try
+  again, press Démarrer. The countdown of 5 s is not simulated.
+- The conduct and safety rules (R01 – R17, R20 – R24) cannot be broken by a program, and the referee
+  does not judge them; the Rules window says so in one sentence — except R14 ("contacting robots"),
+  which a student breaks by pressing a CyberPi button during a match: the buttons work and cost
+  nothing here, and the window says it is a fault in competition (question 9).
+
+The referee costs 3.1 µs a tick (45 ms for a match of 150 s).
+
+### The examples, as measured
+
+Six examples in `src/simulator/logistique-intelligente/samples.ts`, measured by `samples.test.ts` on
+the drawn mat and on the picture the browser reads (the same on both). All end with the program
+ended; none bumps anything, makes the referee speak (no fall, no fault) or presses against anything.
+They drive by distance (« avancer de … cm », 50 RPM), quarter and half turns, but the line follower.
+
+| Id | Level | Title | What it does | Points | Ends at |
+| --- | --- | --- | --- | --- | --- |
+| `logi-ligne-croix` | starter | Suivre la ligne jusqu’à la croix | 5 cm onto the white line, follows it up with the quad RGB sensor, stops when the ultrasonic sensor sees the first stack closer than 10 cm (its finger tips 34.3 mm before cube 5); the screen says « Arrivé ! » | 0 | 1.85 s |
+| `logi-cube-dessus` | starter | Prendre le cube du dessus | arm up (100 %), up to the stack of the square « bas », the claw closes on cube 10 (2.60 s) and keeps it; the screen says « Cube : yellow » | 0 (the cube is in the claw) | 3.27 s |
+| `logi-un-cube-e8` | starter | Un cube dans l’entrepôt E8 | cube 10 as before, carried to the right to E8 and let go (7.14 s), 0.25 mm off the middle | 50 | 7.91 s |
+| `logi-pile-e7` | intermediate | Une pile entière dans l’entrepôt E7 | arm down: the claw takes cube 5 (2.10 s) and cube 10 comes along; the pair to E7 (let go 6.28 s), cube 5 0.25 mm off the middle | 100 | 7.05 s |
+| `logi-empiler-e6` | intermediate | Empiler deux cubes dans l’entrepôt E6 | arm up: cube 9 (taken 8.05 s) into E6 (10.58 s), then cube 6 (taken 19.34 s) on it (21.52 s), 0 mm off | 100 | 22.29 s |
+| `logi-toute-mission` | advanced | Toute la mission : 500 points | the five stacks, each taken by its bottom cube: the square « bas » to E7, « droite » to E8, « gauche » to E5, « haut » to E6, « centre » to E3 (let go 6.32, 20.82, 32.69, 43.10, 55.87 s); every lower cube within 0.05 mm of the middle, every upper cube 0 mm off; the screen counts « Piles posées : 1 » … « 5 » | **500** (complete) | 56.64 s |
+
+No example covers E1 or E4 (a cube turned 45°): the Rules window says « Aucun exemple ne le fait : à
+toi d’essayer. ». The "Essaie"s, measured too: the line follower with 5 cm instead of 10 stops with
+the open fingers 15.3 mm along cube 5, on both sides, touching nothing; the arm at 50 % or 63,57 %
+takes the pair, at 63,58 % cube 10 alone; turning the other way gives the same points in E7 or E8;
+in `logi-empiler-e6`, 20,75 cm instead of 23,25 leaves cube 6 25 mm off cube 9 and still worth 100,
+20,65 cm makes it fall beside cube 9 and push it out of E6 (0).
+
+**A start that is moved or turned is not made up for** — the examples drive by distance. Tried in
+steps of 0.5 mm and 0.1°, each does the same only for a start
+
+| Example | left / right | up / down | turned |
+| --- | --- | --- | --- |
+| `logi-ligne-croix` | 45.5 mm either way | the whole start area (6.5 mm) | the whole start area (6°) |
+| `logi-cube-dessus` | 7 mm either way | 4.5 mm up … 6.5 mm down | 0.8° either way |
+| `logi-un-cube-e8` | 5 mm either way | 4.5 mm either way | 0.5° left … 0.4° right |
+| `logi-pile-e7` | 5 mm either way | 4.5 mm either way | 0.4° left … 0.5° right |
+| `logi-empiler-e6` | 5 mm either way | 5 mm either way | 0.3° either way |
+| `logi-toute-mission` | 2.5 mm either way | 5 mm up … 4.5 mm down | 0.2° either way |
+
+and one step further it does something else. The screen moves the robot in steps of 5 mm and turns
+it in steps of 1°; one such step:
+
+| Example | 5 mm left | 5 mm right | 5 mm up | 5 mm down | 1° left | 1° right |
+| --- | --- | --- | --- | --- | --- | --- |
+| `logi-ligne-croix` | 0 | 0 | 0 | 0 | 0 | 0 |
+| `logi-cube-dessus` | 0 (holds cube 10) | 0 (holds cube 10) | 0 (bumps cubes 7 and 9) | 0 (holds cube 10) | 0 (bumps cubes 6 and 8) | 0 (bumps cubes 6 and 8) |
+| `logi-un-cube-e8` | 50 | 50 | 50 (bumps cubes 7 and 9) | 0 | 0 | 0 |
+| `logi-pile-e7` | 100 | 100 | 100 (bumps the stacks beside) | 0 | 0 | 0 |
+| `logi-empiler-e6` | 100 | 100 | 100 | 100 | 0 | 0 |
+| `logi-toute-mission` | 300 | 400 | 500 | 300 | 0 | 0 |
+
+The line follower drives straight on when neither middle probe sees the line: without that, a start
+21 mm to the side, or 5 mm lower, sat still until 150 s. The advanced example is the scripted route
+that proved 500 possible in the design (60.65 s), written as blocks with two my-blocks « prendre la
+pile » and « poser la pile »: 56.64 s. On a real robot all of them will drift.
+
+The same member and advanced codes open them, by the same rule: three open to everyone, two for
+members, one for advanced codes only. Their ids begin with `logi-` (see "Member codes for the
+simulator examples" above).
+
+### What this simulator assumes
+
+The second part of the **Rules** window, « Ce que ce simulateur suppose », tells a child or a
+teacher what they can notice (`src/simulator/ui/logistique-intelligente/rules.ts`; `rules.test.ts`
+checks every number of every sentence against the game's constants). Its note says these are not
+rules: the rules do not say them, or say two different things, so the simulator had to choose. The
+whole list, with the question below that would settle each:
+
+| Q | What the simulator does | The constant |
+| --- | --- | --- |
+| 1 | A warehouse is 40 mm (the mat and the rules' figure; the rules' text says 50) | `WAREHOUSE_SIZE` |
+| 2 | The frame is 50 mm high: the robot's body and a cube on the mat cannot pass; the raised claw passes over it, and that is a fault | `FRAME_HEIGHT` |
+| 3 | A cube on a cube counts only if the cube under it counts by rule (1) | `judgeCubes()` |
+| 4 | The first fault costs 20 points at once: no warning first | `VIOLATION_POINTS` |
+| 5 | One fault per exit of the robot: out, back in, out again is two | `observe()` |
+| 6 | The total is never below 0 | `score()` |
+| 7 | « Terminé », or the program ended and the robot still, is the team's "over"; the completion time is that moment (150 s when the time runs out) | `finished()` |
+| 8 | The claw may take a stack by its bottom cube and carry the pair | `Body.keepsRiders` |
+| 9 | The CyberPi buttons work during a match and cost nothing (in competition, touching the robot is a fault: the window says so) | — |
+| 10 | The robot starts facing up, in the middle of the start area, on the stem; the student may move and turn it inside the start area before the match | `START_POSE` |
+| 11 | A cube is exactly 50 mm (the rules: ± 2 mm) | `CUBE_SIZE` |
+| 12 | The lead of `/robot-en-fete` names both simulators | `content/standalone.ts` |
+| 13 | A cube the robot holds does not count in its size | — |
+| 14 | The warehouses are E1 – E8, from left to right and from the top down, and the cubes 1 – 10 (the rules name neither) | `WAREHOUSE_IDS`, `cubeId()` |
+| 15 | The arena ends at the inner side of the frame, and "leave" means any part (more than 0.5 mm) | `LEAVE_MM` |
+| 16 | A cube that leaves the arena is taken off: 0 points, no −20 (the claw that carries a cube over the frame is over it too: that fault of the robot costs −20) | `observe()` |
+| 17 | A stack of three in one warehouse scores 100; the third cube 0 | `cubesTouch()` |
+| 18 | A top cube that meets a neighbouring cube only along an edge still counts | `cubesTouch()` |
+| — | « Couvrir tout l’entrepôt »: seen from above, the cube hides the whole square, its yellow border included; « toucher »: closer than 0.5 mm, from above and from the side | `TOUCH_MM` |
+| — | The start area on the mat is 24,8 cm wide (25 cm in the rules); the grey band of 5 mm inside the frame is part of the field | `START_AREA`, `GREY_BAND` |
+| — | No countdown: the clock starts with the program; during a match nobody can move the robot or a cube by hand | the simulator |
+| — | The robot is perfect: no wheel slip, no sensor noise; it keeps to the sizes of the rules (23,7 × 13 cm, 9,5 cm high arm up) | the simulator |
+
+### Questions for the organiser
+
+In French, to pass on as they are; each says what the simulator does now. The list Q1 – Q18 at the
+top of `src/simulator/logistique-intelligente/game.ts` names the constant behind each.
+
+1. **Taille des entrepôts.** Le texte des règles dit 5 cm × 5 cm (p. 11), le dessin et le tapis 4
+   cm. Le simulateur utilise 4 cm. Est-ce juste ? (Un cube de 5 cm ne pourrait couvrir un carré de 5
+   cm que posé sans aucune erreur.)
+2. **Hauteur du cadre.** Les règles ne la donnent pas. Le simulateur met 5 cm : bras levé, la pince
+   peut passer au-dessus, et c’est une faute. Quelle est la hauteur du cadre de vos terrains ?
+3. **Cube du dessus.** Un cube posé sur un autre cube compte-t-il si le cube du dessous ne compte
+   pas (par exemple s’il est encore dans la pince ou s’il touche le robot) ? Le simulateur dit :
+   non.
+4. **Avertissement.** La première faute est-elle un simple avertissement ? Le simulateur enlève 20
+   points dès la première.
+5. **Robot qui reste dehors.** Le robot sort du terrain et y reste : une faute ou plusieurs ? Le
+   simulateur compte une faute par sortie (sortir, revenir, ressortir = deux fautes).
+6. **Score négatif.** Le total peut-il descendre sous 0 ? Le simulateur dit : non.
+7. **Temps de fin.** Quand le programme est fini et que le robot ne bouge plus, est-ce comme si
+   l’équipe disait « terminé » ? Le simulateur dit : oui, et le temps de fin est ce moment-là.
+8. **Porter une pile entière.** Le robot peut-il prendre une pile par son cube du dessous et porter
+   les deux cubes ensemble ? Les règles ne limitent pas la méthode (p. 6). Le simulateur dit : oui.
+9. **Boutons du CyberPi.** Appuyer sur un bouton du CyberPi pendant le match, c’est toucher le robot
+   (R14). Le simulateur laisse les boutons marcher et ne compte pas de faute, mais la fenêtre des
+   règles dit que c’est une faute en compétition. D’accord ?
+10. **Position de départ.** Le simulateur place le robot au milieu de la zone de départ, tourné vers
+    le haut, et l’élève peut le déplacer dans la zone avant le match. D’accord ?
+11. **Taille des cubes.** Les règles disent 5 cm à 2 mm près. Le simulateur utilise 5 cm exactement.
+    D’accord ?
+12. **Page Robot en fête 2027.** Le texte d’accueil de la page ne parlait que de Tri d’entrepôt. Le
+    site dit maintenant : « Deux simulateurs du mBot2, entièrement en français, blocs compris : Tri
+    d’entrepôt, la version française de Warehouse Sort, et Logistique intelligente, la mission
+    normale de MakeX Inspire 2024. » D’accord ?
+13. **Hauteur du robot.** Un cube que le robot tient compte-t-il dans les 20 cm de hauteur ? Le
+    simulateur dit : non.
+14. **Noms sur l’écran.** Le simulateur appelle les entrepôts E1 à E8 et numérote les cubes de 1 à
+    10 (les règles ne les nomment pas). D’accord ?
+15. **Où finit le terrain ?** Les règles disent que le terrain, c’est le tapis et le cadre (p. 10).
+    Pour R18 et R19, le terrain s’arrête-t-il au bord intérieur du cadre ou à son bord extérieur ?
+    Et « sortir », est-ce une partie du robot ou le robot entier ? Le simulateur dit : bord
+    intérieur, et une partie suffit.
+16. **Cube sorti du terrain.** R18 s’appelle « Scoring Props Leaving Arena Violation », mais ne
+    donne pas de pénalité. Un cube qui sort coûte-t-il 20 points ? Le simulateur dit : non, le cube
+    est seulement enlevé et ne rapporte rien.
+17. **Pile de trois cubes.** Si une équipe pose trois cubes l’un sur l’autre dans un entrepôt,
+    combien de points ? Le simulateur dit : 100 (le cube du dessous et celui du milieu ; le
+    troisième ne compte pas). L’autre lecture donne 50 : le cube du milieu touche deux cubes.
+18. **Cubes qui se touchent par une arête.** Un cube du dessus, bien posé, dont l’arête touche un
+    cube voisin posé sur le tapis, compte-t-il ? Le simulateur dit : oui. (Un cube du dessus qui
+    repose en partie sur un cube voisin ne compte pas.)
+
+### What to change, and where
+
+| To change … | Change … |
+| --- | --- |
+| a measure of the field (a line, a warehouse, the cross, the start area) | its constant in `src/simulator/logistique-intelligente/field.ts`, with its source; `field.test.ts` compares the print file's numbers. The game, the zones, the Rules window and « Le terrain » read it from there |
+| the warehouse size or the frame's height, once the organiser answers (questions 1, 2) | `WAREHOUSE_SIZE`, `FRAME_HEIGHT` in `field.ts`; then measure the examples again (`samples.test.ts` fails first) and the numbers here |
+| a rule the organiser decides | the constant or the referee in `game.ts` (its list Q1 – Q18 says which), then the sentence in `src/simulator/ui/logistique-intelligente/rules.ts` — its test compares every number with the constants. Move a sentence from « Ce que ce simulateur suppose » into the rules once it is decided, and change the lists here |
+| the points, the penalty, the match time | `POINTS_PER_CUBE`, `VIOLATION_POINTS`, `MATCH_DURATION` in `game.ts` (`MAX_SCORE` follows) |
+| a sentence of the referee (the score sheet, the console) | `game.ts` (`SAY`, `SHEET`, `FAULTS`); `game.test.ts` holds each one |
+| a word of the screen | `src/simulator/ui/logistique-intelligente/words.ts`; the panel « Le terrain »: `SetupList.tsx`; the shared French: `src/simulator/ui/text/fr-*.tsx` |
+| a word of the blocks | `src/simulator/blocks/fr.ts` (shared with Tri d’entrepôt) |
+| an example | `samples.ts` (and `sample-catalog.ts` for a new id, title or level), `samples.test.ts`, the tables here; the id begins with `logi-`. Then its group in `content/simulator-codes.ts` and the same lines in `scripts/generate-simulator-codes.mjs`. Do not write the title of an example, or a sentence of its text, anywhere a browser gets: the guard (`client-guard.test.ts`) fails |
+| its card, its part of `/robot-en-fete`, its line in the menu, the lead of `/robot-en-fete` | its item of `simulators`, and the category's `summary` and `page.description`, in `content/standalone.ts` |
+| the title and description of its page | `src/app/simulator/logistique-intelligente/page.tsx`; its name in the title row: `src/simulator/ui/logistique-intelligente/title.ts` |
+
+Keep the French as Tri d’entrepôt's: "tu", a no-break space before `:` `;` `!` `?` `%` and inside
+« », `’` as the apostrophe, a decimal comma, and « dessous / dessus » for the two layers (never « en
+haut / en bas »).
+
+### Known limits of Logistique intelligente
+
+- **Many points of the rules are open** (the questions above); every choice is in the second part
+  of the Rules window. The frame's height (5 cm) and the warehouse size (4 cm) are the two that
+  change most what a program must do.
+- **Nothing tips.** A cube that loses its support comes down flat on the mat, flush beside the cube
+  it was on — it may jump up to 25 mm sideways — and the console says « Le cube n est tombé du cube
+  m. »; a pushed cube slides without turning over. Next to the frame, where there is no room beside
+  its support, it goes over the frame and is taken off; a real cube would tip against the frame.
+- **A stack can be built higher than two** (a pair put on a single cube, a tower of 5): nothing
+  stops it, and a third cube never scores.
+- **The cube is exactly 50 mm** (the rules allow ± 2 mm), and the robot is perfect: no wheel slip,
+  no sensor noise. The examples drive by distance: here they score exactly, on a real robot they
+  will drift; turned 1° at the start, the scoring ones score 0.
+- **The frame's height is an assumption** (5 cm): another height changes what passes over it — the
+  raised claw (its underside up to 75 mm) and a cube it carries.
+- **The claw holds one cube**; the others only ride on it (`keepsRiders`), as they would on a real
+  cube.
+- **No example covers E1 or E4**: they need a cube turned 45°.
+- **Not simulated**: the mysterious missions, the controller, the robot inspection before the match,
+  the countdown, a referee's judgement by eye (every cube is measured to the millimetre), and the
+  team's conduct.
+- **Not tried on a real phone or Safari**, nor with a screen reader: the page was checked in
+  Chromium only, at 1440, 1024 and 390 px wide.
 
 ---
 
@@ -3506,12 +3896,12 @@ These are marked with `TODO` or `NOTE` comments in `content/seasons.ts`:
 content/            All editable text and data
   site.ts           Contact details, nav, org info
   seasons.ts        Seasons, categories, downloads, events, training
-  standalone.ts     Categories of their own, outside the seasons (Robot en fête 2027, in French)
+  standalone.ts     Categories of their own, outside the seasons (Robot en fête 2027, in French: Tri d’entrepôt, Logistique intelligente)
   simulator-codes.ts  Member codes for the simulator examples (fingerprints only)
 public/
   gallery/          Competition photos, by year and category
   downloads/        Rules, scoresheets, STL archives
-  simulator/        Pictures of the six mats, for the simulators (Fire Rescue Junior and Senior share one)
+  simulator/        Pictures of the seven mats, for the simulators (Fire Rescue Junior and Senior share one; Tri d’entrepôt shows Warehouse Sort's)
 scripts/
   fetch-legacy-assets.mjs
   generate-simulator-codes.mjs   Makes new member codes for the simulator
@@ -3519,5 +3909,5 @@ src/
   app/              Pages and routing
   components/       Header, Footer, Gallery, shared UI
   lib/gallery.ts    Reads the photo folders
-  simulator/        The simulators: Fire Rescue Junior and Senior, Fire Chief, Warehouse Sort, Robot en fête 2027 (Warehouse Sort in French), Locker Room, Fire Fighter (mBot2) and Fire Cadet (mTiny) (see their sections above)
+  simulator/        The simulators: Fire Rescue Junior and Senior, Fire Chief, Warehouse Sort, Tri d’entrepôt (Warehouse Sort in French) and Logistique intelligente of Robot en fête 2027, Locker Room, Fire Fighter (mBot2) and Fire Cadet (mTiny) (see their sections above)
 ```

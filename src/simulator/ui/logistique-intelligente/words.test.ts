@@ -86,13 +86,13 @@ test('the screen words are the design’s texts (its table 7.2), with French typ
     goal: 'objectif',
     goals: 'objectifs',
     goalsShort: 'cubes',
-    zonesHint: `Montrer les zones en couleur${NB}: zone de départ, zone de stockage et les huit entrepôts`,
+    zonesHint: `Montrer les zones en couleur${NB}: la zone de départ, la zone de stockage et les huit entrepôts`,
     finishedHint: `Dire «${NB}Terminé${NB}» à l’arbitre${NB}: le robot s’arrête, le chrono aussi, et le terrain est noté tel qu’il est`,
     resetHint: 'Remettre les dix cubes sur la croix et le robot dans la zone de départ, prêt pour un nouveau match.',
     sheetNotesHeading: 'Fautes',
     sheetNote:
-      `Le terrain est noté à la fin du match. Un cube valide rapporte 50 points${NB}; un entrepôt compte au plus deux cubes valides. ` +
-      `Chaque sortie du robot coûte 20 points. Le total n’est jamais en dessous de 0. Comme sur la feuille officielle${NB}: cubes valides × 50, fautes × -20, total, temps de fin.`,
+      `Le terrain est noté à la fin du match. Un cube valide rapporte 50${NB}points${NB}; un entrepôt compte au plus deux cubes valides. ` +
+      `Chaque sortie du robot coûte 20${NB}points. Le total n’est jamais en dessous de 0. Comme sur la feuille officielle${NB}: cubes valides ×${NB}50, fautes ×${NB}-20, total, temps de fin.`,
     cleanLine: 'Aucune faute',
     randomLabel: 'Disposition au hasard',
     randomHint: `Ici, il n’y a qu’une disposition${NB}: c’est toujours la même.`,
@@ -123,7 +123,9 @@ test('the numbers and counts of the words are the game’s: 50 points a cube, tw
   // (a count the table does not have is written in digits: never a wrong word)
   assert.deepEqual([0, 1, 11, 2.5].map(inLetters), ['0', '1', '11', '2.5']);
   // « × -20 »: the faults' line of the sheet takes 20 points per exit
-  assert.ok(LOGISTIQUE_WORDS.sheetNote.includes(`cubes valides × ${POINTS_PER_CUBE}, fautes × -${VIOLATION_POINTS}`));
+  assert.ok(LOGISTIQUE_WORDS.sheetNote.includes(`cubes valides ×${NB}${POINTS_PER_CUBE}, fautes ×${NB}-${VIOLATION_POINTS}`));
+  // (a number never on another line than its unit, nor « -20 » than its « × »: no-break spaces)
+  for (const text of Object.values(LOGISTIQUE_WORDS)) assert.doesNotMatch(text, /\d (cm|mm|points?|secondes?)(?![\p{L}])|× /u, text);
 });
 
 test('what the words say is true of the game: one setup, nothing drawn; the zones; ten goals on the sheet; the closed sheet fits', () => {
@@ -167,7 +169,7 @@ test('« Le terrain »: the design’s list (its 7.3) - the two layers of cubes,
   assert.deepEqual(lines, [
     `Cubes 1 à 5 (dessous)${NB}: 1 sur le carré du haut, 2 à gauche, 3 au centre, 4 à droite, 5 sur le carré du bas.`,
     `Cubes 6 à 10 (dessus)${NB}: chacun sur un cube du dessous${NB}– 6 sur 1, 7 sur 2, 8 sur 3, 9 sur 4, 10 sur 5.`,
-    `Entrepôts${NB}: E1 à E8, huit carrés orange de 4 cm. E1 et E4, dans les coins du haut, sont tournés en losange.`,
+    `Entrepôts${NB}: E1 à E8, huit carrés orange de 4${NB}cm. E1 et E4, dans les coins du haut, sont tournés en losange.`,
     'Le robot part de la zone de départ.',
   ]);
   const note = /<p class="[^"]*">([^<]*)<\/p>/.exec(html);

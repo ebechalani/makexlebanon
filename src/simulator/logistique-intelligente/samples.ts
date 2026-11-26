@@ -142,7 +142,7 @@ export const AWAY_CM = 10;
 const BY_DISTANCE_NOTE = `Ce programme fait rouler le robot sur des distances mesurées. Le robot du simulateur roule sans aucune erreur. Un vrai robot dévie un peu${NB}: sur un vrai tapis, sers-toi des lignes blanches pour corriger sa route.`;
 
 /** On "arm to 100 %". */
-const ARM_UP_NOTE = `Bras en haut${NB}: le dessous de la pince est à 7,5 cm du tapis. Elle prendra le cube du dessus d’une pile, tout seul.`;
+const ARM_UP_NOTE = `Bras en haut${NB}: le dessous de la pince est à 7,5${NB}cm du tapis. Elle prendra le cube du dessus d’une pile, tout seul.`;
 
 /** On "arm to 0 %". */
 const ARM_DOWN_NOTE = `Bras en bas${NB}: la pince prendra le cube du dessous d’une pile. Le cube posé dessus viendra avec lui.`;
@@ -168,12 +168,12 @@ const AWAY_NOTE = 'Les doigts ouverts laissent le cube où il est. Un cube qui t
 const lineToTheCross: SampleProgram = {
   ...exampleCard('logi-ligne-croix'),
   description:
-    `Le robot avance de ${ONTO_THE_LINE_CM} cm${NB}: son capteur quad RGB arrive sur la ligne blanche qui sort de la zone de départ. ` +
+    `Le robot avance de ${ONTO_THE_LINE_CM}${NB}cm${NB}: son capteur quad RGB arrive sur la ligne blanche qui sort de la zone de départ. ` +
     'Il suit cette ligne vers le haut. ' +
     `Les deux sondes du milieu (L1 et R1) voient la ligne${NB}: tout droit. Seulement L1${NB}: un peu à gauche. Seulement R1${NB}: un peu à droite. Aucune des deux${NB}: tout droit. ` +
-    `Le capteur à ultrasons regarde devant. Quand il voit la première pile de cubes à moins de ${STOP_AT_CM} cm, le robot s’arrête et l’écran affiche «${NB}Arrivé${NB}!${NB}». ` +
-    'Il ne touche aucun cube et ne marque pas de points. Il a fini au bout de 2 secondes. ' +
-    `Essaie 5 cm au lieu de 10${NB}: les doigts ouverts arrivent des deux côtés du cube du dessous, sans le toucher.`,
+    `Le capteur à ultrasons regarde devant. Quand il voit la première pile de cubes à moins de ${STOP_AT_CM}${NB}cm, le robot s’arrête et l’écran affiche «${NB}Arrivé${NB}!${NB}». ` +
+    `Il ne touche aucun cube et ne marque pas de points. Il a fini au bout de 2${NB}secondes. ` +
+    `Essaie 5${NB}cm au lieu de 10${NB}: les doigts ouverts arrivent des deux côtés du cube du dessous, sans le toucher.`,
   program: program([
     script(note(whenStart(), `Sur ce tapis, la ligne est blanche. Le robot du simulateur le sait${NB}: «${NB}détecte la ligne${NB}» veut dire blanc ici.`), [
       note(moveCm('forward', ONTO_THE_LINE_CM), 'Le capteur quad RGB est maintenant sur la ligne blanche qui monte vers la croix.'),
@@ -197,7 +197,7 @@ const lineToTheCross: SampleProgram = {
             ],
           ),
         ]),
-        `Jusqu’à ce que le capteur à ultrasons voie la pile à moins de 10 cm. La ligne blanche du bas, en travers, ne gêne pas${NB}: L1 et R1 la voient, tout droit.`,
+        `Jusqu’à ce que le capteur à ultrasons voie la pile à moins de 10${NB}cm. La ligne blanche du bas, en travers, ne gêne pas${NB}: L1 et R1 la voient, tout droit.`,
       ),
       stopMotors('all'),
       ledColor('all', '#00ff00'),
@@ -229,12 +229,12 @@ function takeCubeTen(): DefinitionNode {
 const topCube: SampleProgram = {
   ...exampleCard('logi-cube-dessus'),
   description:
-    `Le robot lève le bras tout en haut (${ARM_UP}${NB}%) et avance de 32,5 cm, jusqu’à la pile du carré du bas, la plus proche. ` +
+    `Le robot lève le bras tout en haut (${ARM_UP}${NB}%) et avance de 32,5${NB}cm, jusqu’à la pile du carré du bas, la plus proche. ` +
     'Sa pince ouverte arrive des deux côtés du cube du dessus, le cube 10. Elle se ferme sur lui. ' +
-    `Le robot recule de 10 cm${NB}: le cube 5, dessous, ne bouge pas. ` +
+    `Le robot recule de 10${NB}cm${NB}: le cube 5, dessous, ne bouge pas. ` +
     'Le capteur de couleur de la pince regarde le cube 10. ' +
     `L’écran affiche sa couleur, avec le nom que donne le capteur${NB}: yellow (jaune). ` +
-    `Le cube est dans la pince, pas dans un entrepôt${NB}: pas encore de points. Il a fini au bout de 3 secondes. ` +
+    `Le cube est dans la pince, pas dans un entrepôt${NB}: pas encore de points. Il a fini au bout de 3${NB}secondes. ` +
     `Essaie le bras à 50${NB}%${NB}: la pince prend alors le cube du dessous, et le cube 10 vient avec lui.`,
   program: program([
     takeCubeTen(),
@@ -259,7 +259,7 @@ const oneCubeE8: SampleProgram = {
     'Le robot prend le cube 10 comme dans l’exemple d’avant. ' +
     'Puis il recule jusqu’à la hauteur de l’entrepôt E8, tourne à droite et avance. Le cube est alors au-dessus de l’entrepôt. ' +
     'Le bras descend et s’arrête quand le cube touche le tapis. La pince s’ouvre et le robot recule. ' +
-    `Le cube couvre tout l’entrepôt E8 et ne touche pas le robot${NB}: 50 points, en 8 secondes. ` +
+    `Le cube couvre tout l’entrepôt E8 et ne touche pas le robot${NB}: 50${NB}points, en 8${NB}secondes. ` +
     `Essaie l’entrepôt E7, à gauche${NB}: tourne à gauche au lieu de tourner à droite.`,
   program: program([
     takeCubeTen(),
@@ -288,7 +288,7 @@ const stackE7: SampleProgram = {
     'Bras en bas, le robot avance jusqu’à la pile du carré du bas. ' +
     `La pince se ferme sur le cube 5, le cube du dessous. Le cube 10 est posé dessus${NB}: il vient avec lui. ` +
     'Le robot recule, tourne à gauche et porte la pile jusqu’à l’entrepôt E7. La pince s’ouvre et le robot recule. ' +
-    `Le cube 5 couvre tout l’entrepôt E7 et le cube 10 ne touche que lui${NB}: 100 points, en 7 secondes. ` +
+    `Le cube 5 couvre tout l’entrepôt E7 et le cube 10 ne touche que lui${NB}: 100${NB}points, en 7${NB}secondes. ` +
     `Essaie l’entrepôt E8${NB}: tourne à droite au lieu de tourner à gauche.`,
   program: program([
     script(note(whenStart(), BY_DISTANCE_NOTE), [
@@ -322,12 +322,12 @@ const stackUpE6: SampleProgram = {
     'Il prend le cube 9, le cube du dessus du carré de droite, et le pose dans l’entrepôt E6. ' +
     'Puis il prend le cube 6, le cube du dessus du carré du haut, et le pose sur le cube 9. ' +
     'Le bras descend et s’arrête quand le cube touche le cube du dessous. ' +
-    `Le cube 9 couvre tout l’entrepôt E6 et le cube 6 ne touche que lui${NB}: 100 points, en 22 secondes. ` +
-    `Essaie un nombre plus petit que 23,25 cm à la fin${NB}: jusqu’où le cube 6 peut-il dépasser du cube 9 et compter encore${NB}?`,
+    `Le cube 9 couvre tout l’entrepôt E6 et le cube 6 ne touche que lui${NB}: 100${NB}points, en 22${NB}secondes. ` +
+    `Essaie un nombre plus petit que 23,25${NB}cm à la fin${NB}: jusqu’où le cube 6 peut-il dépasser du cube 9 et compter encore${NB}?`,
   program: program([
     script(note(whenStart(), BY_DISTANCE_NOTE), [
       note(armHeight(ARM_UP), ARM_UP_NOTE),
-      note(moveCm('forward', 25), `Les doigts levés s’arrêtent à 3 cm de la pile du carré du bas${NB}: le robot peut tourner sans la toucher.`),
+      note(moveCm('forward', 25), `Les doigts levés s’arrêtent à 3${NB}cm de la pile du carré du bas${NB}: le robot peut tourner sans la toucher.`),
       turn('right', 90),
       note(moveCm('forward', 29.7), 'À droite de la zone de stockage.'),
       turn('left', 90),
@@ -335,13 +335,13 @@ const stackUpE6: SampleProgram = {
       note(turn('left', 90), 'Maintenant, le robot regarde à gauche, vers la pile du carré de droite.'),
       note(moveCm('forward', AWAY_CM), AROUND_THE_STACK_NOTE),
       note(gripper('close'), 'La pince se ferme sur le cube 9, tout seul. Le cube 4, dessous, ne bouge pas.'),
-      note(moveCm('backward', 18.25), 'Le robot recule jusque sous l’entrepôt E6.'),
+      note(moveCm('backward', 18.25), 'Le robot recule jusqu’en face de l’entrepôt E6, plus bas que lui.'),
       note(turn('right', 90), 'Maintenant, le robot regarde vers le haut, vers l’entrepôt E6.'),
       note(moveCm('forward', 6.4), 'Le cube 9 est au-dessus du milieu de l’entrepôt E6.'),
       note(arm('lower'), DOWN_TO_THE_MAT_NOTE),
       gripper('open'),
       note(moveCm('backward', AWAY_CM), AWAY_NOTE),
-      note(armHeight(ARM_UP), `Le bras remonte${NB}: maintenant, le cube 6, sur le carré du haut.`),
+      note(armHeight(ARM_UP), 'Le bras remonte. Au tour du cube 6, sur le carré du haut.'),
       note(turn('left', 90), 'Maintenant, le robot regarde à gauche.'),
       note(moveCm('forward', 15.95), 'Les doigts levés passent au-dessus du cube 4, resté seul sur son carré.'),
       turn('right', 90),
@@ -379,7 +379,7 @@ function takeTheStack(): DefinitionNode {
       note(moveCm('forward', AWAY_CM), AROUND_THE_STACK_NOTE),
       note(gripper('close'), 'La pince se ferme sur le cube du dessous. Le cube du dessus vient avec lui.'),
     ]),
-    `Le robot est à 10 cm d’une pile, tourné vers elle, le bras en bas. Il avance, et la pince se ferme sur le cube du dessous${NB}: toute la pile vient.`,
+    `Le robot est à 10${NB}cm d’une pile, tourné vers elle, le bras en bas. Il avance, et la pince se ferme sur le cube du dessous${NB}: toute la pile vient.`,
   );
 }
 
@@ -402,7 +402,7 @@ const wholeMission: SampleProgram = {
     'Les dix cubes dans cinq entrepôts. Bras en bas, le robot prend chaque pile par son cube du dessous, et le cube du dessus vient avec lui. ' +
     'Il porte la pile du carré du bas dans E7, celle de droite dans E8, celle de gauche dans E5, celle du haut dans E6 et celle du centre dans E3. ' +
     'Il roule sur des distances mesurées et tourne d’un quart de tour ou d’un demi-tour. ' +
-    `Chaque cube du dessous couvre tout son entrepôt, chaque cube du dessus ne touche que lui${NB}: 500 points, en 57 secondes sur 150. ` +
+    `Chaque cube du dessous couvre tout son entrepôt, chaque cube du dessus ne touche que lui${NB}: 500${NB}points, en 57${NB}secondes sur 150. ` +
     `Essaie un autre ordre des piles, ou d’autres entrepôts${NB}: quel trajet est le plus rapide${NB}?`,
   program: program([
     takeTheStack(),
@@ -411,14 +411,14 @@ const wholeMission: SampleProgram = {
       note(setVar('piles posées', 0), 'Le robot compte les piles posées. Le CyberPi l’affiche.'),
       note(armHeight(ARM_DOWN), ARM_DOWN_NOTE),
       // 1. the stack of the bottom square (cubes 5 and 10) into E7
-      note(moveCm('forward', 22.45), `Première pile${NB}: celle du carré du bas (cubes 5 et 10). Le robot s’arrête à 10 cm d’elle.`),
+      note(moveCm('forward', 22.45), `Première pile${NB}: celle du carré du bas (cubes 5 et 10). Le robot s’arrête à 10${NB}cm d’elle.`),
       call('prendre la pile'),
       note(moveCm('backward', 18.63), 'À la hauteur de l’entrepôt E7.'),
       note(turn('left', 90), 'Maintenant, le robot regarde à gauche, vers l’entrepôt E7.'),
       note(moveCm('forward', 39.55), 'La pile est au-dessus du milieu de l’entrepôt E7.'),
       call('poser la pile'),
       // 2. the stack of the right square (cubes 4 and 9) into E8
-      note(turn('right', 180), `Deuxième pile${NB}: celle du carré de droite (cubes 4 et 9). Le robot passe sous la zone de stockage.`),
+      note(turn('right', 180), `Deuxième pile${NB}: celle du carré de droite (cubes 4 et 9). Le robot passe plus bas que la zone de stockage.`),
       moveCm('forward', 59.25),
       turn('left', 90),
       note(moveCm('forward', 38.33), 'À la hauteur du carré du centre, à droite de la zone de stockage.'),
@@ -437,7 +437,7 @@ const wholeMission: SampleProgram = {
       note(moveCm('forward', 38.33), 'À la hauteur du carré du centre, à gauche de la zone de stockage.'),
       note(turn('right', 90), 'Maintenant, le robot regarde à droite, vers la pile du carré de gauche.'),
       call('prendre la pile'),
-      note(moveCm('backward', 18.25), 'Le robot recule jusque sous l’entrepôt E5.'),
+      note(moveCm('backward', 18.25), 'Le robot recule jusqu’en face de l’entrepôt E5, plus bas que lui.'),
       note(turn('left', 90), 'Maintenant, le robot regarde vers le haut, vers l’entrepôt E5.'),
       note(moveCm('forward', 6.4), 'La pile est au-dessus du milieu de l’entrepôt E5.'),
       call('poser la pile'),
@@ -458,12 +458,12 @@ const wholeMission: SampleProgram = {
       note(turn('right', 90), `Cinquième pile${NB}: celle du carré du centre (cubes 3 et 8). Le robot passe à droite de la zone de stockage.`),
       moveCm('forward', 45.8),
       turn('right', 90),
-      note(moveCm('forward', 13.25), 'Sous la zone de stockage, au milieu.'),
+      note(moveCm('forward', 13.25), 'Plus bas que la zone de stockage, au milieu.'),
       note(turn('right', 90), 'Maintenant, le robot regarde vers le haut, vers la pile du carré du centre.'),
       call('prendre la pile'),
       note(moveCm('forward', 44.4), 'La pile passe sur le carré du haut, vide maintenant.'),
       turn('right', 90),
-      note(moveCm('forward', 21.34), 'Sous l’entrepôt E3.'),
+      note(moveCm('forward', 21.34), 'En face de l’entrepôt E3, plus bas que lui.'),
       note(
         turn('left', 90),
         `Maintenant, le robot regarde vers le haut, vers l’entrepôt E3. Pour E1 ou E4, les losanges, il faudrait y arriver tourné de 45°${NB}: la pile tourne avec le robot.`,

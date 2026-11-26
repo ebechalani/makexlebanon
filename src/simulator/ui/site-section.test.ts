@@ -31,6 +31,8 @@ import { simulatorCategories, standaloneCategories, type StandaloneCategory } fr
 import { fireFighterGame } from '../fire-fighter/game';
 import { SAMPLE_CATALOG as FIGHTER_CATALOG } from '../fire-fighter/sample-catalog';
 import { SAMPLE_CATALOG as FETE_CATALOG } from '../robot-en-fete/sample-catalog';
+import { logistiqueGame } from '../logistique-intelligente/game';
+import { SAMPLE_CATALOG as LOGISTIQUE_CATALOG } from '../logistique-intelligente/sample-catalog';
 import { fireRescueGame } from '../fire-rescue/game';
 import { GAME_OF_AN_UNNAMED_ANSWER } from './member-unlock';
 import { TitleBar } from './TitleBar';
@@ -102,14 +104,17 @@ test('menu: the dropdown of "Simulator" is the Simulator page, then a group per 
         { label: 'Warehouse Sort', href: '/simulator/warehouse-sort' },
       ],
     },
-    // (after the seasons, the category of its own, content/standalone.ts: its name and its simulator's, both French, and it says so;
+    // (after the seasons, the category of its own, content/standalone.ts: its name and its simulators', all French, and it says so;
     // what the row holds, for a screen reader, is in the menu's English)
     {
       label: 'Robot en fête 2027',
       href: '/simulator#category-robot-en-fete',
       lang: 'fr',
-      description: '1 simulator',
-      children: [{ label: 'Tri d’entrepôt', href: '/simulator/tri-entrepot' }],
+      description: '2 simulators',
+      children: [
+        { label: 'Tri d’entrepôt', href: '/simulator/tri-entrepot' },
+        { label: 'Logistique intelligente', href: '/simulator/logistique-intelligente' },
+      ],
     },
   ]);
   // the same parts as /simulator, in the same order, and in each the same simulators as its cards, in the same order:
@@ -202,8 +207,11 @@ test('menu: a simulator, a season or a category added later appears in the dropd
     label: 'Robot en fête 2027',
     href: '/simulator#category-robot-en-fete',
     lang: 'fr',
-    description: '1 simulator',
-    children: [{ label: 'Tri d’entrepôt', href: '/simulator/tri-entrepot' }],
+    description: '2 simulators',
+    children: [
+      { label: 'Tri d’entrepôt', href: '/simulator/tri-entrepot' },
+      { label: 'Logistique intelligente', href: '/simulator/logistique-intelligente' },
+    ],
   };
   // a simulator of an older season gets a group of its own, after the newer ones; a mission added to a season, its line at the end of its group
   assert.deepEqual(simulatorMenu(simulatorSeasons(added, missions)), [
@@ -231,12 +239,18 @@ test('menu: a simulator, a season or a category added later appears in the dropd
   // no simulator at all: only the Simulator page; no season but the category of its own: its group alone
   assert.deepEqual(simulatorMenu([], []), [{ label: 'All simulators', href: '/simulator' }]);
   assert.deepEqual(simulatorMenu([]), [{ label: 'All simulators', href: '/simulator' }, robotEnFete]);
-  // a second simulator of the category (the organiser's « Logistique intelligente », to come) gets its line after the first, by itself
+  // a third simulator of the category gets its line after the other two, by itself (as « Logistique intelligente » got its
+  // own after « Tri d’entrepôt »)
   const [fete] = standaloneCategories;
   const later = { ...fete.simulators[0], name: 'Plus tard', href: '/simulator/plus-tard' };
   assert.deepEqual(simulatorMenu([], [{ ...fete, simulators: [...fete.simulators, later] }]), [
     { label: 'All simulators', href: '/simulator' },
-    { ...robotEnFete, description: '2 simulators', children: [...robotEnFete.children, { label: 'Plus tard', href: '/simulator/plus-tard' }] },
+    { ...robotEnFete, description: '3 simulators', children: [...robotEnFete.children, { label: 'Plus tard', href: '/simulator/plus-tard' }] },
+  ]);
+  // ... and one simulator alone says so in the singular
+  assert.deepEqual(simulatorMenu([], [{ ...fete, simulators: [fete.simulators[0]] }]), [
+    { label: 'All simulators', href: '/simulator' },
+    { ...robotEnFete, description: '1 simulator', children: [robotEnFete.children[0]] },
   ]);
   // a second category of its own gets its group after the first; a category without a simulator gets none
   const other: StandaloneCategory = { ...fete, slug: 'autre-fete', name: 'Autre fête', simulators: [later] };
@@ -285,7 +299,8 @@ test('menu: every line of the Simulator dropdown opens a page of the website (a 
   assert.ok(simulator?.children?.length);
   const html = await simulatorPageHtml();
   const links = linksOf(simulator.children);
-  assert.equal(links.length, 12);
+  // ("All simulators", three group rows, and their 5 + 2 + 2 simulators)
+  assert.equal(links.length, 13);
   for (const { href } of links) {
     const [address, id] = href.split('#');
     const page = `src/app${address}/page.tsx`;
@@ -476,9 +491,9 @@ test('menu on a computer: a line picked in a dropdown lets go of the focus, so t
         lines += 1;
       }
     }
-    // (the Simulator dropdown: "All simulators", three rows of groups and their eight simulators)
+    // (the Simulator dropdown: "All simulators", three rows of groups and their nine simulators)
     assert.equal(lines, nav.reduce((sum, item) => sum + linksOf(item.children ?? []).length, 0));
-    assert.equal(linksOf(nav.find((item) => item.label === 'Simulator')?.children ?? []).length, 12);
+    assert.equal(linksOf(nav.find((item) => item.label === 'Simulator')?.children ?? []).length, 13);
     // the menu item itself keeps the focus after a click: on a touch screen, which has no hover, a tap on
     // "Simulator" opens the Simulator page and shows its list, from which a game is then picked
     const simulator = groupOf('Simulator').querySelector<HTMLAnchorElement>(':scope > a');
@@ -534,7 +549,8 @@ test('menu on a computer: the Simulator dropdown closes as soon as one of its li
     const focusOn = (element: HTMLElement) => act(async () => element.focus());
     const simulator = itemOf('Simulator');
     const links = [...simulator.querySelectorAll<HTMLAnchorElement>(':scope > div a')];
-    assert.equal(links.length, 12);
+    // ("All simulators", three rows of groups and their nine simulators)
+    assert.equal(links.length, 13);
     for (const link of links) {
       // the pointer comes onto the item, then onto the line (or the row), and clicks it: the dropdown closes at once,
       // and the focus is let go (from 1024 to 1279 px its lists lie over a game's Start, Stop and Pause buttons)
@@ -783,8 +799,8 @@ test('menu on a computer: the Simulator dropdown shows "All simulators" and a ro
   }
   // (each description has its own id)
   assert.equal(new Set(groups.map((group) => /aria-describedby="([^"]+)"/.exec(group[3])?.[1])).size, 3);
-  // the Simulator dropdown is "All simulators" and the three groups, nothing else
-  assert.equal(simulator.match(/<li/g)?.length, 1 + 3 + 8);
+  // the Simulator dropdown is "All simulators" and the three groups, nothing else (5 + 2 + 2 lines)
+  assert.equal(simulator.match(/<li/g)?.length, 1 + 3 + 9);
   // the other dropdowns keep their markup exactly: same box, same list (overflow-hidden), same lines, no group
   const line = (label: string, href: string) => `<li><a class="block px-4 py-2 text-sm text-ink-700 hover:bg-brand-50 hover:text-brand-700" href="${href}">${label}</a></li>`;
   const box = (lines: string) =>
@@ -881,6 +897,20 @@ test('menu on a phone: under "Simulator", "All simulators" and a button per grou
     menu = await openMenu();
     item = simulatorItem(menu);
     assert.deepEqual(groupsOf(item).map(({ name, expanded }) => [name, expanded]), [['Season 2027', 'false'], ['Season 2026', 'false'], ['Robot en fête 2027', 'true']]);
+    // its second line, « Logistique intelligente », opens its own page the same way, and that page opens the same group
+    const logistique = item.querySelector<HTMLAnchorElement>('a[href="/simulator/logistique-intelligente"]');
+    assert.ok(logistique);
+    assert.equal(logistique.textContent, 'Logistique intelligente');
+    await act(async () => logistique.click());
+    await header.moveTo('/simulator/logistique-intelligente');
+    assert.equal(document.getElementById('mobile-nav'), null, 'the menu is closed');
+    menu = await openMenu();
+    item = simulatorItem(menu);
+    assert.deepEqual(groupsOf(item).map(({ name, expanded }) => [name, expanded]), [['Season 2027', 'false'], ['Season 2026', 'false'], ['Robot en fête 2027', 'true']]);
+    assert.deepEqual(groupsOf(item)[2].lines, [
+      ['Tri d’entrepôt', '/simulator/tri-entrepot'],
+      ['Logistique intelligente', '/simulator/logistique-intelligente'],
+    ]);
     // ... and on a page of no simulator, all closed
     await act(async () => toggle().click());
     await header.moveTo('/contact');
@@ -945,7 +975,7 @@ test('pages: every simulator is /simulator/<game>, with its page folder, its add
   const folders = readdirSync(fromRoot('src/app/simulator'), { withFileTypes: true });
   assert.deepEqual(
     folders.map((entry) => (entry.isDirectory() ? `${entry.name}/` : entry.name)).sort(),
-    ['fire-cadet/', 'fire-chief/', 'fire-fighter/', 'fire-rescue-junior/', 'fire-rescue-senior/', 'locker-room/', 'page.tsx', 'tri-entrepot/', 'warehouse-sort/'],
+    ['fire-cadet/', 'fire-chief/', 'fire-fighter/', 'fire-rescue-junior/', 'fire-rescue-senior/', 'locker-room/', 'logistique-intelligente/', 'page.tsx', 'tri-entrepot/', 'warehouse-sort/'],
   );
   assert.ok(!existsSync(fromRoot('src/app/training/simulator')), 'the old folder is gone');
   assert.ok(!existsSync(fromRoot('src/app/simulator/fire-rescue')), 'the page of before the split is gone: its address is a redirect');
@@ -1513,13 +1543,16 @@ function textsOf(value: unknown, at = ''): Array<[at: string, text: string]> {
   return [];
 }
 
-test('Robot en fête 2027: a category of its own - in no season, with no age group, and every text of its page and its cards given, in French; its one simulator is « Tri d’entrepôt »', () => {
+test('Robot en fête 2027: a category of its own - in no season, with no age group, and every text of its page and its cards given, in French; its two simulators are « Tri d’entrepôt » and « Logistique intelligente »', async () => {
   assert.deepEqual(standaloneCategories.map((category) => category.slug), ['robot-en-fete']);
   const entry = fete();
   assert.deepEqual([entry.name, entry.lang, entry.platform], ['Robot en fête 2027', 'fr', 'mBot2']);
+  // (its lead and its description name both simulators: the design's question 12 to the organiser)
   assert.deepEqual(entry.page, {
     title: 'Robot en fête 2027',
-    description: 'La version française de Warehouse Sort : la même mission pour débutants, entièrement en français, blocs compris.',
+    description:
+      'Deux simulateurs du mBot2, entièrement en français, blocs compris : Tri d’entrepôt, la version française de Warehouse Sort, ' +
+      'et Logistique intelligente, la mission normale de MakeX Inspire 2024.',
     eyebrow: '2027',
     simulatorEyebrow: 'S’entraîner en ligne',
     open: 'Ouvrir le simulateur',
@@ -1527,14 +1560,16 @@ test('Robot en fête 2027: a category of its own - in no season, with no age gro
   });
   assert.equal(
     entry.summary,
-    'La version française de Warehouse Sort : la même mission pour débutants, entièrement en français, blocs compris. ' +
-      'Le robot trie des cubes rouges et verts, laisse le cube bleu à sa place, puis se gare.',
+    'Deux simulateurs du mBot2, entièrement en français, blocs compris : Tri d’entrepôt, la version française de Warehouse Sort, ' +
+      'et Logistique intelligente, la mission normale de MakeX Inspire 2024. ' +
+      'Dans le premier, le robot trie des cubes rouges et verts ; dans le second, il range dix cubes jaunes dans huit entrepôts.',
   );
   // (the page's description is the first sentence of its lead)
   assert.ok(entry.summary.startsWith(`${entry.page.description} `));
-  // its simulators, named by their mission (the organiser): today one, the French Warehouse Sort
-  assert.deepEqual(entry.simulators.map((simulator) => simulator.name), ['Tri d’entrepôt']);
-  const [simulator] = entry.simulators;
+  // its simulators, named by their mission (the organiser), in this order: the French Warehouse Sort, then the
+  // regular mission of MakeX Inspire 2024
+  assert.deepEqual(entry.simulators.map((simulator) => simulator.name), ['Tri d’entrepôt', 'Logistique intelligente']);
+  const [simulator, logistique] = entry.simulators;
   assert.deepEqual(
     [simulator.href, simulator.mat, simulator.pageTitle],
     ['/simulator/tri-entrepot', '/simulator/warehouse-sort/mat.webp', 'Essaie le simulateur Tri d’entrepôt'],
@@ -1549,11 +1584,36 @@ test('Robot en fête 2027: a category of its own - in no season, with no age gro
     about: 'À propos de Robot en fête 2027',
     labels: ['En français', 'mBot2'],
   });
+  // Logistique intelligente: its page, its own mat (the picture its game shows), its sentences and every word of its card
+  assert.deepEqual(
+    [logistique.href, logistique.mat, logistique.pageTitle],
+    ['/simulator/logistique-intelligente', '/simulator/logistique-intelligente/mat.webp', 'Essaie le simulateur Logistique intelligente'],
+  );
+  assert.equal(
+    logistique.summary,
+    'Construis un programme avec des blocs comme dans mBlock et regarde le mBot2 ranger dix cubes jaunes dans les entrepôts du tapis MakeX Inspire : ' +
+      'deux cubes au plus par entrepôt, le deuxième posé sur le premier — avec le score de la mission normale : 500 points au plus. ' +
+      'Tout est en français, les blocs aussi. Le simulateur fonctionne dans le navigateur : pas besoin de robot ni d’installation.',
+  );
+  // (a no-break space before the dash and between a number and its unit: neither starts a line on a phone)
+  assert.ok(!/ —|\d points/.test(logistique.summary), logistique.summary);
+  assert.deepEqual(logistique.card, {
+    heading: 'Simulateur Logistique intelligente',
+    open: 'Ouvrir le simulateur Logistique intelligente',
+    matAlt: 'Le tapis du simulateur Logistique intelligente, vu de dessus',
+    about: 'À propos de Robot en fête 2027',
+    labels: ['En français', 'mBot2'],
+  });
   // in no season: no category and no mission of content/seasons.ts is it, and that file does not name it
   for (const season of seasons) assert.ok(!season.categories.some((category) => category.slug === entry.slug || category.name === entry.name), `Season ${season.year}`);
-  assert.ok(!missionSimulators.some((mission) => mission.href === simulator.href));
-  assert.ok(!simulatorSeasons().some((section) => section.simulators.some((card) => card.href === simulator.href)));
-  assert.ok(!/robot-en-f[eê]te|Robot en f[eê]te|tri-entrepot|Tri d.entrep[oô]t|standalone/i.test(readFileSync(fromRoot('content/seasons.ts'), 'utf8')), 'content/seasons.ts does not name it');
+  for (const card of entry.simulators) {
+    assert.ok(!missionSimulators.some((mission) => mission.href === card.href), card.name);
+    assert.ok(!simulatorSeasons().some((section) => section.simulators.some((seasonCard) => seasonCard.href === card.href)), card.name);
+  }
+  assert.ok(
+    !/robot-en-f[eê]te|Robot en f[eê]te|tri-entrepot|Tri d.entrep[oô]t|logistique-intelligente|Logistique intelligente|standalone/i.test(readFileSync(fromRoot('content/seasons.ts'), 'utf8')),
+    'content/seasons.ts does not name it',
+  );
   // no age group (the organiser: "pas d'âge affiché"): no field for one, and no text that gives one
   const texts = textsOf(entry);
   assert.ok(!texts.some(([at]) => at.split('.').some((key) => /^(age|ages|ageRange|ageGroup)$/i.test(key))), 'no field for an age');
@@ -1564,30 +1624,44 @@ test('Robot en fête 2027: a category of its own - in no season, with no age gro
     assert.ok(text.trim().length > 0, at);
     assert.ok(!/ [:;!?]/.test(text), `${at}: a plain space before : ; ! ? - ${text}`);
     assert.ok(!/'/.test(text), `${at}: ’, not ' - ${text}`);
+    assert.ok(!/ - /.test(text), `${at}: a dash, not a hyphen - ${text}`);
   }
   // in the menu, which is English, a group of its own after the seasons': its name, then its simulators by their
-  // name, all French and saying so (lang="fr"); no English line of it of its own (no menuLabel any more)
+  // name, all French and saying so (lang="fr"), and how many it holds; no English line of it of its own (no menuLabel)
   assert.deepEqual(simulatorMenu().at(-1), {
     label: entry.name,
     href: `/simulator#category-${entry.slug}`,
     lang: entry.lang,
-    description: '1 simulator',
-    children: entry.simulators.map((card) => ({ label: card.name, href: card.href })),
+    description: '2 simulators',
+    children: [
+      { label: 'Tri d’entrepôt', href: '/simulator/tri-entrepot' },
+      { label: 'Logistique intelligente', href: '/simulator/logistique-intelligente' },
+    ],
   });
-  assert.ok(!('menuLabel' in simulator));
-  // the mat is Warehouse Sort's picture (the same mission on the same mat), and nothing in public/ has the page's address
+  for (const card of entry.simulators) assert.ok(!('menuLabel' in card), card.name);
+  // Tri d’entrepôt's mat is Warehouse Sort's picture (the same mission on the same mat), and nothing in public/ has its page's address
   assert.equal(simulator.mat, missionSimulators.find((mission) => mission.name === 'Warehouse Sort')?.mat);
-  assert.ok(statSync(fromRoot(`public${simulator.mat}`)).isFile());
+  for (const card of entry.simulators) assert.ok(statSync(fromRoot(`public${card.mat}`)).isFile(), card.mat);
   for (const folder of ['public/simulator/tri-entrepot', 'public/simulator/robot-en-fete']) assert.ok(!existsSync(fromRoot(folder)), `no file or folder at ${folder}`);
   assert.ok(!existsSync(fromRoot('public/robot-en-fete')), 'no file or folder at the address of its page');
-  // its two pages exist; the address the simulator had before its name, never published, is gone (no redirect)
-  for (const page of ['src/app/robot-en-fete/page.tsx', 'src/app/simulator/tri-entrepot/page.tsx']) assert.ok(existsSync(fromRoot(page)), page);
+  // Logistique intelligente's mat is the one its game shows on its stage, in the folder next to its page (a folder,
+  // not a file that would hide the page)
+  assert.equal(logistique.mat, logistiqueGame.mat.imageUrl);
+  assert.ok(statSync(fromRoot('public/simulator/logistique-intelligente')).isDirectory());
+  // its three pages exist; the address Tri d’entrepôt had before its name, never published, is gone (no redirect)
+  for (const page of ['src/app/robot-en-fete/page.tsx', 'src/app/simulator/tri-entrepot/page.tsx', 'src/app/simulator/logistique-intelligente/page.tsx']) {
+    assert.ok(existsSync(fromRoot(page)), page);
+  }
   assert.ok(!existsSync(fromRoot('src/app/simulator/robot-en-fete')), 'no page at /simulator/robot-en-fete');
+  // each simulator's page has its address as its own (canonical, share data), and says it is French
+  for (const card of entry.simulators) {
+    const { metadata } = (await import(`../../app${card.href}/page`)) as { metadata: { alternates?: { canonical?: string }; openGraph?: { url?: string; locale?: string } } };
+    assert.deepEqual([metadata.alternates?.canonical, metadata.openGraph?.url, metadata.openGraph?.locale], [card.href, card.href, 'fr_LB'], card.href);
+  }
 });
 
-test('Robot en fête 2027: its page /robot-en-fete is French (lang="fr" on its texts), with English breadcrumbs, no age, and a part for its simulator Tri d’entrepôt', async () => {
+test('Robot en fête 2027: its page /robot-en-fete is French (lang="fr" on its texts), with English breadcrumbs, no age, and a part for each of its two simulators, Tri d’entrepôt then Logistique intelligente', async () => {
   const entry = fete();
-  const [simulator] = entry.simulators;
   const { default: Page, metadata } = (await import('../../app/robot-en-fete/page')) as {
     default: () => Parameters<typeof renderToStaticMarkup>[0];
     metadata: { title?: string; description?: string; alternates?: { canonical?: string }; openGraph?: { url?: string; locale?: string; title?: string } };
@@ -1609,36 +1683,55 @@ test('Robot en fête 2027: its page /robot-en-fete is French (lang="fr" on its t
     ],
   );
   assert.ok(!nav.includes('lang='));
-  // the eyebrow, the title, the lead and the robot's pill say lang="fr"; the part about the simulator is inside lang="fr"
+  // the eyebrow, the title, the lead and the robot's pill say lang="fr"; each part about a simulator is inside lang="fr"
   assert.match(html, /<p class="[^"]*" lang="fr">2027<\/p>/);
   assert.match(html, /<h1 class="[^"]*" lang="fr">Robot en fête 2027<\/h1>/);
   assert.ok(html.includes(` lang="fr">${entry.summary}</p>`), 'the lead');
+  // (the lead names both simulators)
+  for (const card of entry.simulators) assert.ok(entry.summary.includes(card.name), card.name);
   // (the robot, then who it is proposed by: content/standalone.ts `poweredBy`)
   assert.match(html, /<div class="mt-8" lang="fr"><div class="[^"]*"><span class="[^"]*">mBot2<\/span><\/div><p class="[^"]*">Proposé par <span class="[^"]*">Eddy Bachaalany<\/span><\/p><\/div>/);
-  const part = html.slice(html.indexOf('<div lang="fr"><section'));
-  assert.ok(part.startsWith('<div lang="fr"><section'), 'the part about the simulator');
-  assert.ok(part.includes('>S’entraîner en ligne<') && part.includes('>Essaie le simulateur Tri d’entrepôt</h2>'));
-  assert.ok(part.includes(`>${simulator.summary}</p>`), 'the sentences of its simulator');
-  assert.match(part, /<a[^>]*href="\/simulator\/tri-entrepot"[^>]*>Ouvrir le simulateur<\/a>/);
-  assert.equal(part.match(/<section/g)?.length, 1, 'one part: one simulator');
-  assert.equal(html.match(/ lang="fr"/g)?.length, 5, 'eyebrow, title, lead, pill and the part about the simulator');
+  const after = html.slice(html.indexOf('<div lang="fr"><section'));
+  assert.ok(after.startsWith('<div lang="fr"><section'), 'the parts about the simulators');
+  const parts = after.split('<div lang="fr"><section').slice(1);
+  assert.equal(parts.length, 2, 'two parts: two simulators');
+  assert.equal(after.match(/<section/g)?.length, 2, 'two parts, nothing else after them');
+  // in the order of the entry, each with the same eyebrow, its heading, its sentences and one button to its page
+  assert.deepEqual(
+    parts.map((part) => /<h2[^>]*>([^<]+)<\/h2>/.exec(part)?.[1]),
+    ['Essaie le simulateur Tri d’entrepôt', 'Essaie le simulateur Logistique intelligente'],
+  );
+  entry.simulators.forEach((card, i) => {
+    const part = parts[i];
+    assert.ok(part.includes('>S’entraîner en ligne<'), `${card.name}: the eyebrow`);
+    assert.ok(part.includes(`>${card.summary}</p>`), `${card.name}: the sentences of its simulator`);
+    // (one button: seen « Ouvrir le simulateur », heard with the simulator's name - two links of the page never have the same name)
+    assert.deepEqual(
+      [...part.matchAll(/<a[^>]*href="([^"]+)"[^>]*>([^]*?)<\/a>/g)].map((match) => [match[1], match[2]]),
+      [[card.href, `Ouvrir le simulateur<span class="sr-only"> ${card.name}</span>`]],
+      card.name,
+    );
+  });
+  // what a screen reader lists: the two links' names differ
+  const names = [...after.matchAll(/<a[^>]*>([^]*?)<\/a>/g)].map((match) => match[1].replace(/<!-- -->/g, '').replace(/<[^>]+>/g, ''));
+  assert.deepEqual(names, ['Ouvrir le simulateur Tri d’entrepôt', 'Ouvrir le simulateur Logistique intelligente']);
+  assert.equal(html.match(/ lang="fr"/g)?.length, 6, 'eyebrow, title, lead, pill and the two parts about the simulators');
   // nothing of a season's category page: no age, no downloads, no photos, no other categories - and no English of those pages
   for (const word of ['Ages', 'years', 'Season', 'Practise online', 'Try the', 'Open the simulator', 'Rules and downloads', 'Gallery', 'photos', 'undefined']) {
     assert.ok(!html.includes(word), word);
   }
 });
 
-test('Simulator page: after the seasons, a part of its own for Robot en fête 2027 - in French, with a card like the others for Tri d’entrepôt - and the English cards keep their words', async () => {
+test('Simulator page: after the seasons, a part of its own for Robot en fête 2027 - in French, with a card like the others for Tri d’entrepôt and one for Logistique intelligente, side by side from 768 px - and the English cards keep their words', async () => {
   const entry = fete();
-  const [simulator] = entry.simulators;
   const { default: SimulatorPage, metadata } = (await import('../../app/simulator/page')) as {
     default: () => Parameters<typeof renderToStaticMarkup>[0];
     metadata: { description?: string };
   };
-  // the page's description names it after the seasons' categories (Season 2027's, then Season 2026's, as the page), in one more English sentence
+  // the page's description names them after the seasons' categories (Season 2027's, then Season 2026's, as the page), in one more English sentence
   assert.match(
     metadata.description ?? '',
-    /Warehouse Sort, the beginner mission of the Inspire category \(Season 2026\)\. And Robot en fête 2027 \(in French\): Tri d’entrepôt, the French version of Warehouse Sort\. Free, nothing to install\.$/,
+    /Warehouse Sort, the beginner mission of the Inspire category \(Season 2026\)\. And Robot en fête 2027 \(in French\): Tri d’entrepôt, the French version of Warehouse Sort, and Logistique intelligente, the regular mission of MakeX Inspire 2024\. Free, nothing to install\.$/,
   );
   const html = renderToStaticMarkup(createElement(SimulatorPage));
   const start = html.indexOf('<section aria-labelledby="category-robot-en-fete" lang="fr">');
@@ -1647,59 +1740,78 @@ test('Simulator page: after the seasons, a part of its own for Robot en fête 20
   const season2026 = html.indexOf('<section aria-labelledby="season-2026"');
   assert.ok(season2027 > 0 && season2026 > season2027 && start > season2026, 'after Season 2027 and Season 2026');
   const part = html.slice(start, html.indexOf('</section>', start) + '</section>'.length);
-  // the last part of the page, with its own heading and one card
+  // the last part of the page, with its own heading and two cards, in a grid of two columns from 768 px (md)
   assert.equal(html.indexOf('<section', start + 1), -1, 'the last part');
   assert.match(part, /<h2 id="category-robot-en-fete" class="[^"]*">Robot en fête 2027<\/h2>/);
-  assert.equal(part.match(/<li /g)?.length, 1, 'one card');
-  const linkStart = part.indexOf('<a aria-label="Ouvrir le simulateur Tri d’entrepôt"');
-  assert.ok(linkStart > 0, 'a link named in French after the simulator');
-  const link = part.slice(linkStart, part.indexOf('</a>', linkStart) + 4);
-  assert.match(link, /href="\/simulator\/tri-entrepot"/);
-  assert.match(link, /aria-describedby="simulator-tri-entrepot-summary"/);
-  assert.ok(!link.slice(2).includes('<a '), 'no link inside the link');
-  // its picture (the mat of Warehouse Sort), its two labels, its name, its sentences and its hint, all in French
-  assert.match(link, /<img [^>]*alt="Le tapis du simulateur Tri d’entrepôt, vu de dessus"/);
-  assert.match(link, /<img [^>]*src="[^"]*%2Fsimulator%2Fwarehouse-sort%2Fmat\.webp/);
-  for (const label of ['En français', 'mBot2']) assert.ok(link.includes(`>${label}</span>`), label);
-  assert.ok(link.includes('>Simulateur Tri d’entrepôt</h3>'));
-  assert.ok(link.includes(`<p id="simulator-tri-entrepot-summary" class="mt-2 flex-1 text-sm leading-relaxed text-ink-600 text-pretty">${simulator.summary}</p>`));
-  assert.ok(link.includes('>Ouvrir le simulateur Tri d’entrepôt<'));
-  // under the card, outside the link, "À propos de" leads to its own page
-  const rest = part.slice(linkStart + link.length);
-  assert.match(rest, /^<a class="[^"]*" href="\/robot-en-fete">À propos de Robot en fête 2027</);
+  assert.match(part, /<ul class="mt-8 grid gap-6 md:grid-cols-2"><li /);
+  assert.equal(part.match(/<li /g)?.length, 2, 'two cards');
+  // each card, in the order of the entry: its picture, its two labels, its name, its sentences and its hint, all in French
+  const pictures: Record<string, string> = {
+    '/simulator/tri-entrepot': '%2Fsimulator%2Fwarehouse-sort%2Fmat\\.webp',
+    '/simulator/logistique-intelligente': '%2Fsimulator%2Flogistique-intelligente%2Fmat\\.webp',
+  };
+  let from = 0;
+  for (const card of entry.simulators) {
+    const slug = card.href.split('/').pop();
+    const linkStart = part.indexOf(`<a aria-label="${card.card.open}"`, from);
+    assert.ok(linkStart > from, `${card.name}: a link named in French after the simulator, after the card before it`);
+    const link = part.slice(linkStart, part.indexOf('</a>', linkStart) + 4);
+    assert.match(link, new RegExp(`href="${card.href}"`));
+    assert.match(link, new RegExp(`aria-describedby="simulator-${slug}-summary"`));
+    assert.ok(!link.slice(2).includes('<a '), `${card.name}: no link inside the link`);
+    assert.ok(link.includes(`<img alt="${card.card.matAlt}"`) || new RegExp(`<img [^>]*alt="${card.card.matAlt}"`).test(link), `${card.name}: the picture's words`);
+    assert.match(link, new RegExp(`<img [^>]*src="[^"]*${pictures[card.href]}`), `${card.name}: its picture`);
+    for (const label of card.card.labels) assert.ok(link.includes(`>${label}</span>`), `${card.name}: ${label}`);
+    assert.ok(link.includes(`>${card.card.heading}</h3>`), card.name);
+    assert.ok(link.includes(`<p id="simulator-${slug}-summary" class="mt-2 flex-1 text-sm leading-relaxed text-ink-600 text-pretty">${card.summary}</p>`), card.name);
+    assert.ok(link.includes(`>${card.card.open}<`), card.name);
+    // under the card, outside the link, "À propos de" leads to its own page
+    const rest = part.slice(linkStart + link.length);
+    assert.match(rest, /^<a class="[^"]*" href="\/robot-en-fete">À propos de Robot en fête 2027</);
+    from = linkStart + link.length;
+  }
+  assert.deepEqual(
+    [...part.matchAll(/<a aria-label="([^"]+)"/g)].map((match) => match[1]),
+    ['Ouvrir le simulateur Tri d’entrepôt', 'Ouvrir le simulateur Logistique intelligente'],
+  );
+  // who they are proposed by, once, at the end of the part
+  assert.equal(part.split('Proposé par').length - 1, 1, 'the credit once');
   // not one English word of the other cards in it, and no age
   for (const word of ['Open the', ' simulator<', 'About', 'The mat of', 'seen from above', 'Season', 'years']) assert.ok(!part.includes(word), word);
   // ... and no French outside it: the seasons' parts are as they were, with no lang of their own
   const before = html.slice(0, start);
   assert.ok(!before.includes('lang='));
-  for (const word of ['Simulateur', 'Ouvrir', 'À propos', 'tapis', 'français']) assert.ok(!before.includes(word), word);
+  for (const word of ['Simulateur', 'Ouvrir', 'À propos', 'tapis', 'français', 'Logistique']) assert.ok(!before.includes(word), word);
   // the English cards keep the very pieces of text they had: "<name>" " simulator", "About " "<name>" (the server's markers between them)
   const markup = renderToString(createElement(SimulatorPage));
   for (const card of simulatorSeasons().flatMap((section) => section.simulators)) {
     assert.ok(markup.includes(`>${card.name.replace(/&/g, '&amp;')}<!-- --> simulator</h3>`), card.name);
     if (card.about) assert.ok(markup.includes(`About <!-- -->${card.name.replace(/&/g, '&amp;')}`), card.name);
   }
-  // (the French card's words are whole texts: no markers in them)
-  assert.ok(markup.includes('>Simulateur Tri d’entrepôt</h3>') && markup.includes('>À propos de Robot en fête 2027<'));
+  // (the French cards' words are whole texts: no markers in them)
+  assert.ok(markup.includes('>Simulateur Tri d’entrepôt</h3>') && markup.includes('>Simulateur Logistique intelligente</h3>') && markup.includes('>À propos de Robot en fête 2027<'));
 });
 
-test('sitemap: the page of Robot en fête 2027 and its simulator Tri d’entrepôt, after the seasons, each once', async () => {
+test('sitemap: the page of Robot en fête 2027 and its two simulators, Tri d’entrepôt then Logistique intelligente, after the seasons, each once - 47 addresses in all', async () => {
   const { default: sitemap } = (await import('../../app/sitemap')) as { default: () => Array<{ url: string; priority?: number }> };
   const entries = sitemap().map((entry) => [entry.url.slice(site.url.length), entry.priority]);
-  assert.deepEqual(entries.slice(-2), [
+  assert.deepEqual(entries.slice(-3), [
     ['/robot-en-fete', 0.6],
     ['/simulator/tri-entrepot', 0.7],
+    ['/simulator/logistique-intelligente', 0.7],
   ]);
   const urls = entries.map(([url]) => url);
   assert.equal(urls.length, new Set(urls).size, 'no address twice');
+  // (46 before Logistique intelligente: its page is the one new address)
+  assert.equal(urls.length, 47);
 });
 
-test('README: the section of Tri d’entrepôt (Robot en fête 2027), after Warehouse Sort\'s - its two addresses, its entry outside the seasons, the six examples, the five questions - and every place that counts the games', () => {
+test('README: the section of Tri d’entrepôt (Robot en fête 2027), after Warehouse Sort\'s and before Logistique intelligente\'s - its two addresses, its entry outside the seasons, the six examples, the five questions - and every place that counts the games', () => {
   const readme = readFileSync(fromRoot('README.md'), 'utf8');
   const start = readme.indexOf('\n## The Tri d’entrepôt simulator (Robot en fête 2027)\n');
   const end = readme.indexOf('\n## ', start + 1);
   assert.ok(start > readme.indexOf('\n## The Warehouse Sort simulator\n') && readme.indexOf('\n## The Warehouse Sort simulator\n') > 0, 'after the Warehouse Sort section');
-  assert.ok(readme.startsWith('\n## The Locker Room simulator\n', end), 'and before the Locker Room section');
+  assert.ok(readme.startsWith('\n## The Logistique intelligente simulator (Robot en fête 2027)\n', end), 'and before the Logistique intelligente section');
   const section = readme.slice(start, end);
   const flat = section.replace(/\s+/g, ' ');
   for (const address of ['https://www.makexlebanon.com/simulator/tri-entrepot', 'https://www.makexlebanon.com/robot-en-fete']) assert.ok(flat.includes(address), address);
@@ -1707,11 +1819,12 @@ test('README: the section of Tri d’entrepôt (Robot en fête 2027), after Ware
   assert.ok(!/(?<!src)\/simulator\/robot-en-fete\b/.test(readme), 'the simulator\'s address before its name is nowhere');
   // where it is: its own entry, outside the seasons, which content/seasons.ts does not know
   assert.ok(flat.includes('**`content/standalone.ts`**') && flat.includes('`content/seasons.ts` does not know it'));
-  assert.ok(flat.includes('`text={FR_TEXT}`') && flat.includes('its group "Robot en fête 2027" holds the line "Tri d’entrepôt"'));
-  // (its line of before, "<simulator> — <category>", is gone with the menu of before)
+  assert.ok(flat.includes('`text={FR_TEXT}`') && flat.includes('its group "Robot en fête 2027" holds the lines "Tri d’entrepôt" and "Logistique intelligente"'));
+  // (its line of before, "<simulator> — <category>", is gone with the menu of before; the second simulator is no longer "to come")
   assert.ok(!readme.includes('Tri d’entrepôt — Robot en fête 2027'));
+  assert.ok(!/is to come|today one/.test(readme), 'nothing "to come" or "today one" any more');
   // the six examples of its catalog, each with its level and its title, in catalog order, and the points they score
-  const rows = [...section.matchAll(/^\| `(fete-[a-z-]+)` \| (starter|intermediate|advanced) \| ([^|]+) \| ([^|]+) \|/gm)];
+  const rows = [...section.matchAll(/^\| `(fete-[a-z0-9-]+)` \| (starter|intermediate|advanced) \| ([^|]+) \| ([^|]+) \|/gm)];
   assert.deepEqual(
     rows.map((row) => [row[1], row[2], row[3].trim()]),
     FETE_CATALOG.map((card) => [card.id, card.level, card.title]),
@@ -1720,14 +1833,134 @@ test('README: the section of Tri d’entrepôt (Robot en fête 2027), after Ware
   // the five questions of the design, numbered
   for (let q = 1; q <= 5; q++) assert.match(section, new RegExp(`^${q}\\. \\*\\*`, 'm'), `question ${q}`);
   assert.ok(!/^6\. \*\*/m.test(section));
-  // every place of the README that counts the games or the simulators counts it too
+  // every place of the README that counts the games or the simulators counts both simulators of Robot en fête 2027
   const all = readme.replace(/\s+/g, ' ');
-  assert.ok(all.includes('The simulators have seven games with examples:'));
-  assert.ok(all.includes('**One set of codes for all seven games.**') && all.includes('the ids of all seven games are listed at the top of the file:'));
-  assert.ok(all.includes('Lists 1 and 2 hold the ids of all seven games together') && all.includes('- **One address, seven games.**'));
-  assert.ok(all.includes('`/simulator` lists the eight simulators') && all.includes('lists the eight simulators of two robots'));
-  assert.ok(all.includes("- Robot en fête 2027: `'fete-leave-start'`, `'fete-white-line'`, `'fete-cube-colour'`, `'fete-one-cube'`, `'fete-two-cubes'`, `'fete-all-cubes'`"));
-  for (const old of ['six games with examples', 'all six games', 'One address, six games', 'the seven simulators']) assert.ok(!all.includes(old), old);
+  assert.ok(all.includes('The simulators have eight games with examples:'));
+  assert.ok(all.includes('**One set of codes for all eight games.**') && all.includes('the ids of all eight games are listed at the top of the file:'));
+  assert.ok(all.includes('Lists 1 and 2 hold the ids of all eight games together') && all.includes('- **One address, eight games.**'));
+  assert.ok(all.includes('`/simulator` lists the nine simulators') && all.includes('lists the nine simulators of two robots'));
+  assert.ok(all.includes("- Tri d’entrepôt (Robot en fête 2027): `'fete-leave-start'`, `'fete-white-line'`, `'fete-cube-colour'`, `'fete-one-cube'`, `'fete-two-cubes'`, `'fete-all-cubes'`"));
+  assert.ok(
+    all.includes(
+      "- Logistique intelligente (Robot en fête 2027): `'logi-ligne-croix'`, `'logi-cube-dessus'`, `'logi-un-cube-e8'`, `'logi-pile-e7'`, `'logi-empiler-e6'`, `'logi-toute-mission'`",
+    ),
+  );
+  assert.ok(all.includes('every id of Tri d’entrepôt with `fete-` and every id of Logistique intelligente with `logi-`'));
+  assert.ok(all.includes('Pictures of the seven mats'));
+  // the menu as it is: the group of Robot en fête 2027 lists both, by their name
+  assert.ok(all.includes('"Locker Room", "Warehouse Sort"; « Tri d’entrepôt », « Logistique intelligente »)'));
+  for (const old of [
+    'six games with examples',
+    'seven games with examples',
+    'all six games',
+    'all seven games',
+    'One address, six games',
+    'One address, seven games',
+    'the seven simulators',
+    'the eight simulators',
+    'Pictures of the six mats',
+    '- Robot en fête 2027: `',
+    'every id of Robot en fête 2027 with',
+  ]) {
+    assert.ok(!all.includes(old), old);
+  }
+});
+
+test('README: the section of Logistique intelligente (Robot en fête 2027), after Tri d’entrepôt\'s and before Locker Room\'s - its two addresses, its sub-sections, the six examples as measured, its assumptions, the eighteen questions in French and its known limits', () => {
+  const readme = readFileSync(fromRoot('README.md'), 'utf8');
+  const start = readme.indexOf('\n## The Logistique intelligente simulator (Robot en fête 2027)\n');
+  const end = readme.indexOf('\n## ', start + 1);
+  assert.ok(start > readme.indexOf('\n## The Tri d’entrepôt simulator (Robot en fête 2027)\n') && readme.indexOf('\n## The Tri d’entrepôt simulator (Robot en fête 2027)\n') > 0, 'after the Tri d’entrepôt section');
+  assert.ok(readme.startsWith('\n## The Locker Room simulator\n', end), 'and before the Locker Room section');
+  const section = readme.slice(start, end);
+  const flat = section.replace(/\s+/g, ' ');
+  for (const address of ['https://www.makexlebanon.com/simulator/logistique-intelligente', 'https://www.makexlebanon.com/robot-en-fete']) assert.ok(flat.includes(address), address);
+  // its sub-sections, in this order
+  assert.deepEqual(
+    [...section.matchAll(/^### (.+)$/gm)].map((match) => match[1]),
+    [
+      'How the game is put together',
+      'The field (measured from the print file)',
+      'The cubes and the stacks',
+      'The referee',
+      'The examples, as measured',
+      'What this simulator assumes',
+      'Questions for the organiser',
+      'What to change, and where',
+      'Known limits of Logistique intelligente',
+    ],
+  );
+  // where it is: the second item of the category's simulators, and what follows by itself
+  assert.ok(flat.includes('the second item of the `simulators` of Robot en fête 2027 in **`content/standalone.ts`**'));
+  assert.ok(flat.includes('the group "Robot en fête 2027" holds the lines "Tri d’entrepôt" and "Logistique intelligente"'));
+  assert.ok(flat.includes('« Proposé par Eddy Bachaalany »'));
+  for (const file of ['field.ts', 'robot.ts', 'scenario.ts', 'game.ts', 'play.ts', 'samples.ts']) assert.ok(existsSync(fromRoot(`src/simulator/logistique-intelligente/${file}`)), file);
+  for (const file of ['LogistiqueSimulator.tsx', 'LogistiqueLoader.tsx', 'SetupList.tsx', 'rules.ts', 'words.ts', 'title.ts']) {
+    assert.ok(flat.includes(`\`${file}\``), file);
+    assert.ok(existsSync(fromRoot(`src/simulator/ui/logistique-intelligente/${file}`)), file);
+  }
+  // the six examples of its catalog, each with its level and its title, in catalog order (ids with digits), and the
+  // points and end times measured by samples.test.ts
+  const rows = [...section.matchAll(/^\| `(logi-[a-z0-9-]+)` \| (starter|intermediate|advanced) \| ([^|]+) \| [^|]+ \| ([^|]+) \| ([^|]+) \|/gm)];
+  assert.deepEqual(
+    rows.map((row) => [row[1], row[2], row[3].trim()]),
+    LOGISTIQUE_CATALOG.map((card) => [card.id, card.level, card.title]),
+  );
+  assert.deepEqual(
+    rows.map((row) => [row[4].replace(/\*\*/g, '').replace(/ \(.*\)$/, '').trim(), row[5].trim()]),
+    [
+      ['0', '1.85 s'],
+      ['0', '3.27 s'],
+      ['50', '7.91 s'],
+      ['100', '7.05 s'],
+      ['100', '22.29 s'],
+      ['500', '56.64 s'],
+    ],
+  );
+  // ... and so samples.test.ts pins them
+  const samplesTest = readFileSync(fromRoot('src/simulator/logistique-intelligente/samples.test.ts'), 'utf8');
+  for (const time of ['1.85', '3.27', '7.91', '7.05', '22.29', '56.64']) assert.ok(samplesTest.includes(time), `samples.test.ts: ${time}`);
+  // the robustness, the measured limits and what one step of the screen does, for each example
+  for (const id of LOGISTIQUE_CATALOG.map((card) => card.id)) assert.equal(section.match(new RegExp(`^\\| \`${id}\` \\|`, 'gm'))?.length, 3, id);
+  // what it assumes: the questions Q1 - Q18 of game.ts, one row each
+  for (let q = 1; q <= 18; q++) assert.match(section, new RegExp(`^\\| ${q} \\| `, 'm'), `assumption ${q}`);
+  // the eighteen questions for the organiser, in French as the design wrote them, numbered, each with what the
+  // simulator does now, and written as French is written
+  const questions = section.slice(section.indexOf('### Questions for the organiser'), section.indexOf('### What to change, and where'));
+  for (let q = 1; q <= 18; q++) assert.match(questions, new RegExp(`^${q}\\. \\*\\*[^*]+[.?]\\*\\* `, 'm'), `question ${q}`);
+  assert.ok(!/^19\. \*\*/m.test(questions));
+  // (lines joined, the no-break spaces kept: \s would take them too)
+  const questionsFlat = questions.replace(/[ \n]+/g, ' ');
+  for (const part of [
+    '1. **Taille des entrepôts.** Le texte des règles dit 5 cm × 5 cm (p. 11), le dessin et le tapis 4 cm. Le simulateur utilise 4 cm.',
+    '2. **Hauteur du cadre.** Les règles ne la donnent pas. Le simulateur met 5 cm :',
+    '12. **Page Robot en fête 2027.**',
+    '17. **Pile de trois cubes.**',
+    '18. **Cubes qui se touchent par une arête.**',
+  ]) {
+    assert.ok(questionsFlat.includes(part), part);
+  }
+  assert.equal(questionsFlat.match(/Le simulateur (dit|met|utilise|enlève|compte|laisse|place|appelle)/g)?.length, 17, 'what the simulator does, in every question but the twelfth');
+  const french = questions.split('\n').filter((line) => /^\s*\d+\. \*\*|^ {3,4}\S/.test(line)).join(' ');
+  assert.ok(!/ [:;!?%]/.test(french), 'a no-break space before : ; ! ? %');
+  assert.ok(!/« | »/.test(french), 'a no-break space inside « »');
+  assert.ok(!/'/.test(french), '’, not \'');
+  // its known limits
+  for (const limit of [
+    '**Nothing tips.**',
+    'it may jump up to 25 mm sideways',
+    'Le cube n est tombé du cube m.',
+    '**A stack can be built higher than two**',
+    '**The cube is exactly 50 mm**',
+    'the robot is perfect',
+    "**The frame's height is an assumption**",
+    '**The claw holds one cube**',
+    '**No example covers E1 or E4**',
+  ]) {
+    assert.ok(flat.includes(limit), limit);
+  }
+  // the layers are « dessous / dessus », never « en haut / en bas »
+  assert.ok(!/en haut|en bas/.test(section.replace(/«\s*en\s+haut \/ en\s+bas\s*»/g, '')), 'no « en haut » or « en bas » for a layer');
 });
 
 test('Robot en fête 2027 is proposed by Eddy Bachaalany: its page and its part of the Simulator page name him, not the academy; the season simulators keep the academy', async () => {
@@ -1745,6 +1978,10 @@ test('Robot en fête 2027 is proposed by Eddy Bachaalany: its page and its part 
   assert.ok(french, 'the French part');
   assert.match(french, /<p[^>]*>Proposé par <span[^>]*>Eddy Bachaalany<\/span><\/p><\/section>$/);
   assert.ok(!french.includes('RoboHolic') && !french.includes('Powered by'), french);
+  // (once for the part, after both its cards: Tri d’entrepôt's and Logistique intelligente's)
+  assert.equal(french.split('Eddy Bachaalany').length - 1, 1);
+  assert.equal(french.match(/<li /g)?.length, fete.simulators.length);
+  assert.equal(fete.simulators.length, 2);
   const academy = html.indexOf('Powered by <span class="font-semibold text-ink-700">RoboHolic Robotics Academy</span>');
   assert.ok(
     academy > html.indexOf('<section aria-labelledby="season-2026"') && academy > html.indexOf('<section aria-labelledby="season-2027"') && academy < html.indexOf('lang="fr"'),

@@ -18,8 +18,8 @@ import { describe, test } from 'node:test';
 import { createEngineSimulation } from '../core/engine';
 import { robotShapesAt } from '../core/robot';
 import { forever, scripted } from '../core/test-helpers';
-import type { Body, FinishReason, Pose, RefereeCall, ScoreContext, ScoreLine, ScoreReport } from '../core/types';
-import { CUBE_SIZE, FRAME_HEIGHT, MAT_VECTOR, START_AREA, STORAGE_BOX, STORAGE_OUTLINE, WAREHOUSES, warehouseCorners, warehouseFrame, type WarehouseId } from './field';
+import type { Body, FinishReason, Pose, RefereeCall, RGB, ScoreContext, ScoreLine, ScoreReport } from '../core/types';
+import { BAND_BLUE, BAND_RED, CUBE_SIZE, FRAME_HEIGHT, GREY, MAT_VECTOR, START_BLUE, START_RED, START_AREA, STORAGE_BOX, STORAGE_OUTLINE, WAREHOUSES, warehouseCorners, warehouseFrame, type WarehouseId } from './field';
 import {
   CUBE_COUNT,
   CUBE_FILL,
@@ -85,13 +85,13 @@ const sheet = {
 };
 const faults = {
   label: 'Robot sorti du terrain',
-  none: 'Le robot est resté dans le terrain.',
-  once: (time: string): string => `Une fois, à ${time}${NB}: -20 points.`,
-  many: (n: number, times: string[]): string => `${n} fois (${times.join(`${NB}; `)})${NB}: -20 points chacune.`,
+  none: 'Le robot est resté sur le terrain.',
+  once: (time: string): string => `Une fois, à ${time}${NB}: -20${NB}points.`,
+  many: (n: number, times: string[]): string => `${n} fois (${times.join(`${NB}; `)})${NB}: -20${NB}points chacune.`,
 };
 const say = {
   cubeOut: (n: number, time: string): string => `Le cube ${n} sort du terrain à ${time}${NB}: vu de dessus, il passe au-dessus du cadre. L’arbitre l’enlève${NB}: il ne rapporte plus rien.`,
-  robotOut: (time: string): string => `Faute à ${time}${NB}: le robot sort du terrain (vu de dessus, il passe au-dessus du cadre). -20 points.`,
+  robotOut: (time: string): string => `Faute à ${time}${NB}: le robot sort du terrain (vu de dessus, il passe au-dessus du cadre). -20${NB}points.`,
   fell: (n: number, m: number): string => `Le cube ${n} est tombé du cube ${m}.`,
 };
 
@@ -292,6 +292,31 @@ test('the frame: four walls 50 mm high and 20 mm thick, just outside the arena',
     assert.equal(w.h, FRAME_HEIGHT);
     assert.equal(w.fill, FRAME_FILL);
     assert.equal(w.colorName, undefined);
+  }
+});
+
+/** WCAG's contrast ratio of two colours (1 - 21). */
+function contrast(a: RGB, b: RGB): number {
+  const luminance = ({ r, g, b: blue }: RGB): number => {
+    const channel = (v: number): number => (v / 255 <= 0.03928 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(blue);
+  };
+  const [light, dark] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (light + 0.05) / (dark + 0.05);
+}
+const hex = (css: string): RGB => ({ r: parseInt(css.slice(1, 3), 16), g: parseInt(css.slice(3, 5), 16), b: parseInt(css.slice(5, 7), 16) });
+
+test('the frame stands out at 3:1 or more (WCAG 1.4.11) from every colour of the mat along it - the arena ends at its inner side - and from a cube pushed against it', () => {
+  for (const [what, colour] of [
+    ['the grey band', GREY],
+    ['the blue band', BAND_BLUE],
+    ['the red band', BAND_RED],
+    ['the blue half of the start area', START_BLUE],
+    ['the red half of the start area', START_RED],
+    ['a cube', hex(CUBE_FILL)],
+  ] as const) {
+    const ratio = contrast(hex(FRAME_FILL), colour);
+    assert.ok(ratio >= 3, `against ${what}: ${ratio.toFixed(2)}`);
   }
 });
 

@@ -9,7 +9,9 @@
  *   - a pair carried over the frame: the referee takes both cubes off as they cross, while the
  *     claw still holds the lower one, and it costs no points;
  *   - a pair put on a single cube in E5: three high, 100 points, the third cube's line;
- *   - the upper cube of a pair pushed off: « Le cube 10 est tombé du cube 5. ».
+ *   - the upper cube of a pair pushed off: « Le cube 10 est tombé du cube 5. »; pushed off a pair in
+ *     E2 or E8, closer than one cube to the frame, it goes over the frame and is taken off, and the
+ *     cube under it stays in its warehouse.
  * The examples (block programs) are measured in ./samples.test.ts.
  */
 import assert from 'node:assert/strict';
@@ -145,7 +147,7 @@ test('the five stacks of the cross, each taken by its bottom cube, into E7, E8, 
     `Cube 8${NB}: 50 - Posé sur le cube 3, qui couvre tout l’entrepôt E3.`,
     `Cube 9${NB}: 50 - Posé sur le cube 4, qui couvre tout l’entrepôt E8.`,
     `Cube 10${NB}: 50 - Posé sur le cube 5, qui couvre tout l’entrepôt E7.`,
-    `Robot sorti du terrain${NB}: 0 - Le robot est resté dans le terrain.`,
+    `Robot sorti du terrain${NB}: 0 - Le robot est resté sur le terrain.`,
   ]);
   // the referee said nothing: no cube fell, nothing left the arena
   assert.deepEqual(said, []);
@@ -178,11 +180,11 @@ test('R19: the raised claw passes over the frame, 62 mm out - one fault, -20; ba
     yield* drive(io, -200, 50);
   }, { x: 600, y: 400, heading: UP });
   assert.deepEqual(seen, ['fingers\' tips at y -62.00']);
-  const out = (t: string): string => `Faute à ${t}${NB}: le robot sort du terrain (vu de dessus, il passe au-dessus du cadre). -20 points.`;
+  const out = (t: string): string => `Faute à ${t}${NB}: le robot sort du terrain (vu de dessus, il passe au-dessus du cadre). -20${NB}points.`;
   assert.deepEqual(said, [`1.94 ${out('0:01,9')}`, `3.86 ${out('0:03,8')}`]);
   const faults = line(report, LINE_FAULTS);
   assert.deepEqual([faults.points, faults.ok], [-40, false]);
-  assert.equal(faults.detail, `2 fois (0:01,9${NB}; 0:03,8)${NB}: -20 points chacune.`);
+  assert.equal(faults.detail, `2 fois (0:01,9${NB}; 0:03,8)${NB}: -20${NB}points chacune.`);
   assert.equal(report.total, 0);
 });
 
@@ -203,7 +205,7 @@ test('R18: a pair carried over the frame (the claw holds the lower cube) - both 
   assert.deepEqual(said, [
     `6.94 Le cube 5 sort du terrain à 0:06,9${NB}: vu de dessus, il passe au-dessus du cadre. L’arbitre l’enlève${NB}: il ne rapporte plus rien.`,
     `6.94 Le cube 10 sort du terrain à 0:06,9${NB}: vu de dessus, il passe au-dessus du cadre. L’arbitre l’enlève${NB}: il ne rapporte plus rien.`,
-    `6.97 Faute à 0:06,9${NB}: le robot sort du terrain (vu de dessus, il passe au-dessus du cadre). -20 points.`,
+    `6.97 Faute à 0:06,9${NB}: le robot sort du terrain (vu de dessus, il passe au-dessus du cadre). -20${NB}points.`,
   ]);
   assert.equal(body(sim, 5), undefined);
   assert.equal(body(sim, 10), undefined);
@@ -211,7 +213,7 @@ test('R18: a pair carried over the frame (the claw holds the lower cube) - both 
   const removed = `Sorti du terrain à 0:06,9${NB}: l’arbitre l’a enlevé.`;
   assert.deepEqual([line(report, 'cube:5').detail, line(report, 'cube:10').detail], [removed, removed]);
   // one fault, the robot's; the two cubes add nothing to it
-  assert.deepEqual([line(report, LINE_FAULTS).points, line(report, LINE_FAULTS).detail], [-20, `Une fois, à 0:06,9${NB}: -20 points.`]);
+  assert.deepEqual([line(report, LINE_FAULTS).points, line(report, LINE_FAULTS).detail], [-20, `Une fois, à 0:06,9${NB}: -20${NB}points.`]);
   assert.equal(report.total, 0);
   // the eight others are still on the cross
   for (const n of [1, 2, 3, 4]) assert.equal(line(report, `cube:${n}`).detail, 'Dans la zone de stockage.');
@@ -288,4 +290,49 @@ test('the upper cube of a pair pushed off by the closed claw: « Le cube 10 est 
   assert.deepEqual([ten.z, ten.restingOn, Math.round(ten.y), Math.round(five.y)], [0, null, Math.round(five.y) - CUBE_SIZE, Math.round(five.y)]);
   assert.deepEqual([line(report, 'cube:5').detail, line(report, 'cube:10').detail], ['Ne couvre aucun entrepôt.', 'Ne couvre aucun entrepôt.']);
   assert.equal(report.total, 0);
+});
+
+test('the upper cube of a pair in E2 (E8) pushed 26 mm towards the frame, 26.1 (32.5) mm away: no room to come down beside the pair there - it goes over the frame and is taken off, with no -20; cube 5 stays where it is and still scores 50', () => {
+  for (const [w, at, clockText] of [
+    ['E2', '13.23', '0:13,2'],
+    ['E8', '16.20', '0:16,2'],
+  ] as const) {
+    const m = centre(w);
+    const towards = w === 'E2' ? UP : RIGHT;
+    const { sim, report, said } = play(function* (io) {
+      // the stack of the square « bas » (cubes 5 and 10), taken by its bottom cube, set down in the warehouse
+      yield* lift(io, G.liftDownHeight);
+      const c = storageSquareCentre('bas');
+      yield* clawOver(io, c.x, c.y + 5, UP);
+      yield* claw(io, true);
+      yield* drive(io, -100, 50);
+      yield* goTo(io, 350, 894, 50);
+      if (w === 'E8') yield* goTo(io, 900, 894, 50);
+      yield* clawOver(io, m.x - 5 * Math.sin(towards), m.y + 5 * Math.cos(towards), towards, 50);
+      yield* claw(io, false);
+      yield* drive(io, -60, 50);
+      // the closed claw at 60 mm (over cube 5) pushes cube 10 towards the frame until its middle is 26 mm past cube 5's
+      yield* lift(io, 60);
+      yield* claw(io, true);
+      const ten = body(live as Simulation<LogistiqueScenario>, 10);
+      assert.ok(ten);
+      const tips = G.gripForward + G.fingerLength / 2;
+      const gap = towards === UP ? pose().y - tips - (ten.y + CUBE_SIZE / 2) : ten.x - CUBE_SIZE / 2 - (pose().x + tips);
+      yield* drive(io, gap + 26, 10);
+      yield* drive(io, -60, 50);
+    });
+    assert.equal(body(sim, 10), undefined, `${w}: cube 10 is off the field`);
+    const five = body(sim, 5);
+    assert.ok(five);
+    const r2 = (v: number): number => Math.round(v * 100) / 100;
+    assert.deepEqual([r2(five.x), r2(five.y), five.z, five.restingOn], [m.x, m.y, 0, null], `${w}: cube 5 did not move`);
+    // the fall, and in the same tick the cube over the frame
+    assert.deepEqual(said, [
+      `${at} Le cube 10 est tombé du cube 5.`,
+      `${at} Le cube 10 sort du terrain à ${clockText}${NB}: vu de dessus, il passe au-dessus du cadre. L’arbitre l’enlève${NB}: il ne rapporte plus rien.`,
+    ], w);
+    assert.equal(line(report, 'cube:5').detail, `Couvre tout l’entrepôt ${w} et touche le tapis.`, w);
+    assert.equal(line(report, 'cube:10').detail, `Sorti du terrain à ${clockText}${NB}: l’arbitre l’a enlevé.`, w);
+    assert.deepEqual([line(report, LINE_FAULTS).points, report.total], [0, 50], w);
+  }
 });
