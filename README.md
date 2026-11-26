@@ -724,13 +724,13 @@ The honest limits:
 npm run test:sim
 ```
 
-It runs about nineteen hundred checks (1,781 in November 2026 with Fire Fighter, about 1,900 with Robot en fête 2027); among them,
+It runs about nineteen hundred checks (1,909 at the end of November 2026, with Robot en fête 2027); among them,
 every example program of every game is played on the real engine with the real referee and its
 score is compared, and every practice map of Fire Cadet is proved. They also check
 `content/simulator-codes.ts` (a misspelt example id, an example that is on both lists, a
 damaged line, a code that is on both lists of codes) and that nothing about an example —
 not even a title — can slip back into what every visitor's browser downloads. It takes
-around a minute and a half (78 to 107 s measured) and must end with `fail 0`. If it does not, do not deploy — a failing
+around two and a half minutes (136 to 146 s measured at the end of November 2026) and must end with `fail 0`. If it does not, do not deploy — a failing
 test means a program would now score differently, a block would behave differently, or an
 example would be shown to somebody who should not see it.
 
