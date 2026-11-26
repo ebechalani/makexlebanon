@@ -69,11 +69,12 @@
  *       not fit, so the robot lets go and pushes the cube in. The simulator takes 60 mm; with the
  *       organiser's 10.5 cm width the supports are solid, 22.5 mm thick (the rules' photos show thin
  *       plates). A cube in the middle has 5 mm on each side.   TOWER_GAP, SUPPORT_WIDTH (./field.ts)
- *   F3. The tower's height: 10 cm (ASSUMPTION). The flap with the letter is drawn from 7 cm (the top
+ *   F3. The tower's height: 10 cm - ANSWERED by the organiser ("Tower height is 10 cm"). The flap with the letter is drawn from 7 cm (the top
  *       of a cube) up; nothing collides with it. The lever a real cube pushes is not simulated: the
  *       letter follows the rule above.                       TOWER_HEIGHT, FLAP_BOTTOM (./field.ts)
- *   F4. When the letter shows: the white dashed square to the OUTER edge of its dashes (ASSUMPTION;
- *       its inner edge or its centre line would leave less room). The dashed line counts; "half
+ *   F4. When the letter shows: only when the whole cube is inside the white dashed square - ANSWERED
+ *       by the organiser ("yes"). Read to the OUTER edge of its dashes (ASSUMPTION; its inner edge
+ *       or its centre line would leave less room). The dashed line counts; "half
  *       in" never does. A cube pushed so far towards the back that its base leaves the square does
  *       not show the letter either.                                       LETTER_AREA (./field.ts)
  *   F5. The robot's gripper and the supports: a claw that holds a cube (66 mm) is wider than the
@@ -87,7 +88,8 @@
  *       so a robot that stops when its sensor sees the bar has its claw in the tower already. At X
  *       the bar lies 130 mm before the tower.            robot.ts clawAheadOfLineSensor(), TOWER_STEMS
  *   F7. "Collect" the yellow cube: the claw holds it, or it was pushed off its red square - either
- *       counts (ASSUMPTION).                                         YELLOW_SQUARE (./field.ts)
+ *       counts - ANSWERED by the organiser: pushing it off its square is "collecting it".
+ *                                                                YELLOW_SQUARE (./field.ts)
  *   F8. What is a delivery: a cube under any tower with its letter showing and the robot clear of
  *       it - also a cube under the wrong tower ("A cube at the wrong tower must be moved to its
  *       correct destination"), so the yellow cube under K first breaks the yellow rule. Touching or

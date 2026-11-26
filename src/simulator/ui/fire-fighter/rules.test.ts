@@ -190,10 +190,15 @@ test('the organiser\'s two answers are said as the organiser\'s: tower X opens t
   // the gap: with the tower's size (the organiser's too) in the second part, beside the simulator's own numbers of the tower
   assert.ok(ASSUMED.includes('A tower is 10.5 cm wide and 4 cm deep (the organiser\'s size).'));
   assert.ok(ASSUMED.includes('Its two sides stand 6 cm apart, as wide as the white dashed square (the organiser\'s answer: "about 6 cm").'));
-  assert.ok(ASSUMED.includes('Here the sides are 2.25 cm thick and 10 cm high.'));
+  assert.ok(ASSUMED.includes('Here the sides are 2.25 cm thick.'));
+  // the organiser's later answers: the height, sliding towers, the letter rule, taking the yellow cube
+  assert.ok(ASSUMED.includes("A tower is 10 cm high (the organiser's answer)."));
+  assert.match(ASSUMED_TEXT, /A tower can slide when the robot pushes it \(the organiser's answer\)\./);
+  assert.match(ASSUMED_TEXT, /the whole bottom of the cube is inside the white dashed square \(the organiser's answer\)\./);
+  assert.match(ASSUMED_TEXT, /has left its red square \(the organiser's answer\)\./);
   // ... and the part says, above all, that these two are not its choices
   assert.equal(FIRE_FIGHTER_ASSUMPTIONS.title, 'What this simulator assumes');
-  assert.equal(FIRE_FIGHTER_ASSUMPTIONS.note, "Choices of the simulator, not rules, except what the organiser gave: the tower's size and the room between its sides.");
+  assert.equal(FIRE_FIGHTER_ASSUMPTIONS.note, "Choices of the simulator, not rules, except the lines that say they are the organiser's.");
   // nothing calls them a question or a guess
   for (const text of SCREEN_TEXTS) assert.doesNotMatch(text, /assum(?:e|ption)s? (?:that )?(?:tower )?X|question|not (?:yet )?known|we guess|probably/i, text);
   // a cube that goes into X from the back (from the yellow square below it) does not count: the simulator's rule for every tower
@@ -202,9 +207,10 @@ test('the organiser\'s two answers are said as the organiser\'s: tower X opens t
 
 test('what the simulator only assumes is in the second part; the rules part does not say it', () => {
   const assumed: Array<[string, RegExp]> = [
-    ['solid sides of 2.25 cm', /Here the sides are 2\.25 cm thick and 10 cm high\./],
-    ['towers slide, never turn or tip', /A tower can slide when the robot pushes it\. It never turns and never falls over: the simulator cannot turn or tip things\./],
-    ['the letter rule', /The letter shows when the cube went in through the tower's opening and its whole bottom is inside the white dashed square\. The dashed line counts as inside\./],
+    ['solid sides of 2.25 cm', /Here the sides are 2\.25 cm thick\./],
+    ['towers slide, never turn or tip', /A tower can slide when the robot pushes it \(the organiser's answer\)\. It never turns and never falls over: the simulator cannot turn or tip things\./],
+    ['the letter rule', /The letter shows only when the whole bottom of the cube is inside the white dashed square \(the organiser's answer\)\. The dashed line counts as inside\./],
+    ['the opening', /The cube must also have gone in through the tower's opening\./],
     ['the back of a tower', /A cube that goes in from the back of a tower does not count\./],
     ['the room in a tower', /The cube may be up to 7\.8 mm off the middle towards the opening or the back\. Sideways it has 5 mm on each side: more, and it can catch a side and push the tower away\./],
     ['upright cubes', /A cube always stands upright here\./],
@@ -212,7 +218,7 @@ test('what the simulator only assumes is in the second part; the rules part does
     ['how to push a cube in', /Let the cube go in front of the tower, move back more than 5 cm, close the empty claw and push the cube in\./],
     ['the claw inside a tower', /Opening the claw inside a tower pushes the tower\. A real claw would stop\./],
     ['where the cubes start', /Each cube starts in the middle of its marked square\./],
-    ['taking the yellow cube', /The robot has taken the yellow cube when its claw holds it, or when the middle of the cube has left its red square\./],
+    ['taking the yellow cube', /The robot has taken the yellow cube when its claw holds it, or when the middle of the cube has left its red square \(the organiser's answer\)\./],
     ['when a delivery counts', /A delivery counts when the letter shows and no part of the robot touches the cube\./],
     ['touching at the end', /A cube the robot still touches at the end scores 0: the robot must move clear\./],
     ['one delivery per stay', /Touching or nudging a cube that is already under a tower is not a new delivery; taking it out and pushing it in again is\./],

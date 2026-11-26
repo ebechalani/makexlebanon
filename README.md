@@ -2904,6 +2904,10 @@ is **"Width 10.5 cm length 4 cm"**, and "the extra white is the square where the
 (5×5cm) under the tower". After the design the organiser answered two more of our questions (the
 same day): tower X opens **"Up, toward the hydrant line"**, and the space between a tower's two side
 supports is **"About 6 cm"** — both as the simulator already played them (questions 1 and 2 below).
+Later the organiser answered four more, again as the simulator already played them: the tower is
+**10 cm** high, the letter shows **only when the whole cube is inside the white dashed square**, the
+towers **can slide**, and pushing the yellow cube off its square counts as **collecting it**
+(questions 3, 4, 7 and 15 below).
 The rules file is **not** published on the site: whether it may be, with its proposed scoring, is a
 question for the organiser (question 11). So the category has no download (`content/seasons.ts`
 has no `downloads` for it, and says why), and the Rules window tells the rules in short. The map is
@@ -3168,11 +3172,11 @@ would settle it:
 | --- | --- | --- |
 | F1 | Tower X opens to the top, towards the hydrant line; M and A open to the top, K and E to the bottom (towards their stems). A cube that goes in from the back does not count, and the sheet and the console say why. (`OPENING`) | **the organiser** ("Up, toward the hydrant line"); the corner towers: the rules ("toward its track") and the map |
 | F2 | The two sides of a tower stand 60 mm apart; with the 10.5 cm width they are solid, 22.5 mm thick; a cube in the middle has 5 mm on each side. (`TOWER_GAP`, `SUPPORT_WIDTH`) | **the organiser** ("About 6 cm"); the thickness follows from it, solid sides are our choice (the photos show thin plates: question 2) |
-| F3 | A tower is 10 cm high; the flap with the letter is drawn from 7 cm up, and nothing collides with it. The lever a real cube pushes is not simulated: the letter follows the rule above. (`TOWER_HEIGHT`, `FLAP_BOTTOM`) | assumption (question 3) |
-| F4 | The letter shows when the whole base of the cube is inside the white dashed square, measured to the outer edge of its dashes; a cube pushed 8 mm or more past the middle towards the back does not show it either. (`LETTER_AREA`) | assumption (question 4) |
+| F3 | A tower is 10 cm high; the flap with the letter is drawn from 7 cm up, and nothing collides with it. The lever a real cube pushes is not simulated: the letter follows the rule above. (`TOWER_HEIGHT`, `FLAP_BOTTOM`) | **the organiser** ("Tower height is 10 cm"); the flap and the lever are ours (question 3) |
+| F4 | The letter shows when the whole base of the cube is inside the white dashed square, measured to the outer edge of its dashes; a cube pushed 8 mm or more past the middle towards the back does not show it either. (`LETTER_AREA`) | **the organiser** (the whole cube inside the dashed square: "yes"); measuring to the outer edge of the dashes, and the back, are our choices (question 4) |
 | F5 | A claw that holds a cube (66 mm) is too wide for the 60 mm between the sides: the robot lets go and pushes the cube in with the closed claw (36 mm). Opening the claw inside a tower pushes the tower (no motor stalls here). | follows from F2 (the organiser's answer says the same); still asked (question 5) |
 | F6 | The claw reaches 8.2 cm further than the line sensor: at M, A, K and E the T bar is so close to the tower that the claw would already be inside the tower when the sensor sees the bar. (`clawAheadOfLineSensor`, `TOWER_STEMS`) | the robot and the map (question 6) |
-| F7 | The robot has taken the yellow cube when its claw holds it, or when the middle of the cube has left its red square. (`YELLOW_SQUARE`) | assumption (question 7) |
+| F7 | The robot has taken the yellow cube when its claw holds it, or when the middle of the cube has left its red square. (`YELLOW_SQUARE`) | **the organiser** (pushing it off its square: "collecting it") |
 | F8 | A delivery: a cube under any tower with its letter showing and the robot clear of it — also under the wrong tower, so the yellow cube under K first breaks the yellow rule. Touching or nudging a cube already under a tower is not a new delivery; taking it out and pushing it in again is. | assumption (question 8) |
 | F9 | A cube the robot still touches at the end scores 0: "move clear" is read as "no longer touching" (0.5 mm). (`TOUCH_MM`) | assumption (question 9) |
 | F10 | A tower that moved but still touches its picture square keeps its 20 points; its letter is judged where it now stands. | the rules (§7.2) (question 10) |
@@ -3180,14 +3184,14 @@ would settle it:
 | F12 | No restarts, no Restart button. | the rules name none (question 12) |
 | F13 | The robot starts inside the Fire Station, at first facing up with its middle on the Fire Station stem; a student may move and turn it inside the Fire Station picture. (`START_POSE`) | assumption (question 13) |
 | — | Each cube starts in the middle of its marked square, upright and square to the mat. (`CUBE_HOMES`) | assumption (question 14) |
-| — | A support weighs as much as a cube: a robot that bumps a tower slides it. (`TOWER_MASS`) | assumption (question 15) |
+| — | A support weighs as much as a cube: a robot that bumps a tower slides it. (`TOWER_MASS`) | **the organiser** (the towers "can slide"); the weight is our choice |
 | — | A tower can slide but never turns and never falls over; a cube always stands upright (the engine cannot turn or tip things: the rules' "A tower may slide or turn" is half simulated). | the engine |
 | — | The match also ends with "Finished", or when the program has ended and the robot stands still. | the simulator, as in the other mBot2 games |
 | — | A referee's judgement by eye is not simulated: the simulator measures every cube to the millimetre. | the simulator |
 
 ### Questions for the organiser
 
-Each says what the simulator does now; questions 1 and 2 are answered. The list F1 – F13 at the top
+Each says what the simulator does now; questions 1, 2, 3, 7 and 15 are answered, and question 4 in part. The list F1 – F13 at the top
 of `src/simulator/fire-fighter/game.ts` names the constant behind questions 1 – 13.
 
 1. **Which way does tower X face, and can a cube go in from the back? — Answered by the
@@ -3203,9 +3207,11 @@ of `src/simulator/fire-fighter/game.ts` names the constant behind questions 1 �
    the simulator has solid sides 2.25 cm thick (with the organiser's 10.5 cm). Thin sides would
    change where the robot can turn near tower A ("The tower and the letter" above). And are the
    cube's edges rounded enough to guide it in when it is a little off the middle?
-3. **The tower's height** (F3, `TOWER_HEIGHT`): the simulator assumes 10 cm. Is the flap high
-   enough for a 7 cm cube, and how low does its lever hang?
-4. **When does the letter show?** (F4, `LETTER_AREA`) The white dashed square can be read three
+3. **The tower's height — Answered by the organiser** (F3, `TOWER_HEIGHT`): "Tower height is
+   10 cm", as the simulator already had it. Still open, if it matters: how low does the flap's lever
+   hang?
+4. **When does the letter show? — Answered in part by the organiser** (F4, `LETTER_AREA`): only
+   when the whole cube is inside the white dashed square ("yes"). Still open: the square can be read three
    ways: its inner edge (55.1 × 55.8 mm: 2.5 mm of room across, 2.9 along), its centre line
    (60.0 × 60.7 mm: 5.0 / 5.35) or its outer edge (64.9 × 65.6 mm: 7.47 / 7.82). The simulator takes
    the outer edge, the dashed line included. Which does a referee use? And: a cube pushed past the
@@ -3217,8 +3223,8 @@ of `src/simulator/fire-fighter/game.ts` names the constant behind questions 1 �
 6. **The T bars at M, A, K and E** (F6): with a claw like the simulator's mBot2 (8.2 cm ahead of the
    line sensor), the claw would be 2.2 – 2.5 cm inside the tower when the sensor reaches the bar.
    Are the bars meant as the place to stop?
-7. **"Collect" the yellow cube** (F7): picking it up only, or also pushing it off its square? The
-   simulator: either.
+7. **"Collect" the yellow cube — Answered by the organiser** (F7): pushing it off its square counts
+   as "collecting it", as does picking it up — as the simulator already did.
 8. **What is a delivery?** (F8) The simulator: a cube under any tower with its letter showing and
    the robot no longer touching it — also a cube under the wrong tower (the rules: "A cube at the
    wrong tower must be moved"), so the yellow cube put under K first breaks the yellow rule. Touching
@@ -3237,8 +3243,8 @@ of `src/simulator/fire-fighter/game.ts` names the constant behind questions 1 �
     the robot facing up on the black line, and lets a student move it inside the tile.
 14. **The cubes' places**: in the middle of each marked square? The yellow cube in the middle of the
     red corner marks (5.6 mm below the middle of its red frame)?
-15. **The towers' weight** (`TOWER_MASS`): a robot that bumps a tower makes it slide in the
-    simulator. Are the real towers light enough to slide? Fixed to the mat?
+15. **Can the towers slide? — Answered by the organiser** (`TOWER_MASS`): "towers can slide", as
+    in the simulator, where a robot that bumps a tower slides it. Their weight is still our choice.
 16. **The ages**: the rules say 8–10, the Drive folder "8-9 yo"; the site keeps 8–10 (as the
     organiser said earlier).
 17. **The map**: the hydrant stem is 3.87 mm right of the middle of tower X (in the simulator a cube
