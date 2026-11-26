@@ -1393,11 +1393,15 @@ class EngineSimulation<S> implements Simulation<S> {
     const s = Math.sin(pose.heading);
     const c = Math.cos(pose.heading);
     const along = (b.x - pose.x) * s - (b.y - pose.y) * c;
+    const fromX = b.x;
+    const fromY = b.y;
+    const fromAngle = b.angle;
     b.angle = pose.heading + quarterTurns * (Math.PI / 2);
     b.x = pose.x + along * s;
     b.y = pose.y - along * c;
     this.dirty[i] = 1;
     this.unsettled = true;
+    if (b.keepsRiders) this.carryRiders(i, fromX, fromY, fromAngle);
     return width;
   }
 
@@ -1424,6 +1428,9 @@ class EngineSimulation<S> implements Simulation<S> {
     const width = quarterTurns % 2 === 0 ? b.w : b.l;
     if (width + 2 * FINGER_PLAY > gap) return false; // too wide: it has to be pushed out
     const along = (b.x - pose.x) * s - (b.y - pose.y) * c;
+    const fromX = b.x;
+    const fromY = b.y;
+    const fromAngle = b.angle;
     b.angle = pose.heading + quarterTurns * (Math.PI / 2);
     b.x = pose.x + along * s;
     b.y = pose.y - along * c;
@@ -1431,6 +1438,7 @@ class EngineSimulation<S> implements Simulation<S> {
     this.unsettled = true;
     this.bodiesShifted = true;
     this.shiftCount++;
+    if (b.keepsRiders) this.carryRiders(i, fromX, fromY, fromAngle);
     return true;
   }
 
@@ -1491,7 +1499,7 @@ class EngineSimulation<S> implements Simulation<S> {
     b.held = true;
     b.restingOn = null;
     this.robot.gripper.holding = b.id;
-    if (b.platform) {
+    if (b.platform && !b.keepsRiders) {
       // whatever stood on top of it does not come along
       for (let j = 0; j < this.bodies.length; j++) {
         const rider = this.bodies[j];
@@ -1510,6 +1518,36 @@ class EngineSimulation<S> implements Simulation<S> {
     this.robotRadius = Math.max(this.baseRadius, Math.abs(this.heldForward) + this.bodyRadius[i]);
     this.dirty[i] = 0;
     this.pushEvent({ type: 'grab', bodyId: b.id, time: this.world.time });
+  }
+
+  /**
+   * Body i (Body.keepsRiders) has just been moved or turned without being pushed - the claw holds it,
+   * the fingers turned it, it came down - from (fromX, fromY) turned by fromAngle to where it is now:
+   * whatever stands on it goes with it, the same move and turn, and sits on its top. Riders of riders
+   * too. (Nothing collides here; what a rider now overlaps is sorted out by the next resolveContacts.)
+   */
+  private carryRiders(i: number, fromX: number, fromY: number, fromAngle: number): void {
+    const bodies = this.bodies;
+    const b = bodies[i];
+    const turn = b.angle - fromAngle;
+    const ts = Math.sin(turn);
+    const tc = Math.cos(turn);
+    for (let j = 0; j < bodies.length; j++) {
+      const rider = bodies[j];
+      if (j === i || rider.held || rider.restingOn !== b.id) continue;
+      const riderX = rider.x;
+      const riderY = rider.y;
+      const riderAngle = rider.angle;
+      const dx = rider.x - fromX;
+      const dy = rider.y - fromY;
+      rider.x = b.x + dx * tc - dy * ts;
+      rider.y = b.y + dx * ts + dy * tc;
+      rider.angle += turn;
+      rider.z = b.z + b.h;
+      this.dirty[j] = 1;
+      this.unsettled = true;
+      if (rider.platform && rider.keepsRiders) this.carryRiders(j, riderX, riderY, riderAngle);
+    }
   }
 
   /** Take the held body out of the claw without deciding where it goes. Returns its index. */
@@ -1557,6 +1595,8 @@ class EngineSimulation<S> implements Simulation<S> {
       support = p;
       supportTop = top;
     }
+    const fromX = b.x;
+    const fromY = b.y;
     if (support) {
       b.z = supportTop;
       b.restingOn = support.id;
@@ -1568,6 +1608,7 @@ class EngineSimulation<S> implements Simulation<S> {
     this.dirty[i] = 1;
     this.unsettled = true;
     this.cameDown = true;
+    if (b.keepsRiders) this.carryRiders(i, fromX, fromY, b.angle);
     return support;
   }
 
@@ -1659,10 +1700,14 @@ class EngineSimulation<S> implements Simulation<S> {
     if (this.heldIndex >= 0) {
       // the object in the claw is rigidly attached to the robot
       const b = this.bodies[this.heldIndex];
+      const fromX = b.x;
+      const fromY = b.y;
+      const fromAngle = b.angle;
       b.x = pose.x + this.heldForward * s;
       b.y = pose.y - this.heldForward * c;
       b.angle = pose.heading + this.heldTurn;
       b.z = robot.gripper.height + this.heldLift;
+      if (b.keepsRiders) this.carryRiders(this.heldIndex, fromX, fromY, fromAngle);
       const carried = shapes[CARRIED];
       carried.x = b.x;
       carried.y = b.y;
@@ -1737,6 +1782,7 @@ class EngineSimulation<S> implements Simulation<S> {
       const b = this.bodies[this.heldIndex];
       b.x += dx;
       b.y += dy;
+      if (b.keepsRiders) this.carryRiders(this.heldIndex, b.x - dx, b.y - dy, b.angle);
     }
     this.poseVersion++;
   }

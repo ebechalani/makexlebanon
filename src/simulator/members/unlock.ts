@@ -504,7 +504,7 @@ function sentRequest(body: string): Sent | 'bad' {
  *   anything that is not such a request                ->  4xx  { ok: false, reason }                        never any example
  *
  * "game" is the name of a game of the setup ("fire-rescue", "fire-chief", "warehouse-sort", "locker-room", "fire-cadet",
- * "fire-fighter", "robot-en-fete"), written exactly like that. A request WITHOUT "game" is about Fire Rescue (see GAME_WHEN_NONE_IS_NAMED): `{}` and
+ * "fire-fighter", "robot-en-fete", "logistique-intelligente"), written exactly like that. A request WITHOUT "game" is about Fire Rescue (see GAME_WHEN_NONE_IS_NAMED): `{}` and
  * `{ "code": "..." }` are answered as they always were - without "game" in the answer. A request
  * that names its game gets the name back, so that its page can see that the answer is about the
  * game it asked for.
