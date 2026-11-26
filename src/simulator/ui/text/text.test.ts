@@ -263,11 +263,15 @@ function reachedFrom(entry: string, dynamic: boolean): Set<string> {
   return seen;
 }
 
+/** The folders of the French screens (Robot en fête 2027): Tri d’entrepôt and Logistique intelligente. */
+const FRENCH_SCREENS = ['robot-en-fete', 'logistique-intelligente'];
+
 /** The French tables: the screen's (fr.tsx and its parts) and the blocks' (../../blocks/fr.ts). */
 const isFrench = (file: string): boolean => /^src\/simulator\/ui\/text\/fr[^/]*\.tsx$/.test(file) || file === 'src/simulator/blocks/fr.ts';
 
 test('no English page downloads French: no English loader, screen or editor, nor the menu, reaches a French table (an import() included)', () => {
-  const games = readdirSync(path.join(HERE, '..'), { withFileTypes: true }).filter((entry) => entry.isDirectory() && entry.name !== 'text' && entry.name !== 'robot-en-fete');
+  // (the French screens: Tri d’entrepôt and Logistique intelligente, both of Robot en fête 2027)
+  const games = readdirSync(path.join(HERE, '..'), { withFileTypes: true }).filter((entry) => entry.isDirectory() && entry.name !== 'text' && !FRENCH_SCREENS.includes(entry.name));
   const entries = [
     ...games.flatMap((game) => readdirSync(path.join(HERE, '..', game.name)).filter((name) => /(Loader|Simulator)\.tsx$/.test(name)).map((name) => `src/simulator/ui/${game.name}/${name}`)),
     'src/simulator/ui/TitleBar.tsx',
@@ -285,17 +289,24 @@ test('no English page downloads French: no English loader, screen or editor, nor
     const french = [...reachedFrom(entry, true)].filter(isFrench);
     assert.deepEqual(french, [], `${entry} brings along ${french.join(', ')}`);
   }
-  // ... while the French screen does reach both tables (it hands the screen's to the general screen, which loads the blocks' words)
-  const screen = reachedFrom('src/simulator/ui/robot-en-fete/RobotEnFeteSimulator.tsx', false);
-  for (const table of ['src/simulator/ui/text/fr.tsx', 'src/simulator/blocks/fr.ts']) assert.ok(screen.has(table), table);
+  // ... while each French screen does reach both tables (it hands the screen's to the general screen, which loads the blocks' words)
+  for (const file of ['src/simulator/ui/robot-en-fete/RobotEnFeteSimulator.tsx', 'src/simulator/ui/logistique-intelligente/LogistiqueSimulator.tsx']) {
+    const screen = reachedFrom(file, false);
+    for (const table of ['src/simulator/ui/text/fr.tsx', 'src/simulator/blocks/fr.ts']) assert.ok(screen.has(table), `${file}: ${table}`);
+  }
 });
 
 test('the French loading screen is small: the title row and its five French words, not the screen, not either word table, not the blocks - every page fetches it ahead, through the menu', () => {
-  const loader = reachedFrom('src/simulator/ui/robot-en-fete/RobotEnFeteLoader.tsx', false);
-  for (const heavy of ['src/simulator/ui/text/en.tsx', 'src/simulator/ui/text/fr.tsx', 'src/simulator/blocks/catalog.ts', 'src/simulator/blocks/fr.ts', 'src/simulator/ui/SimulatorApp.tsx']) {
-    assert.ok(!loader.has(heavy), `the loader brings along ${heavy}`);
+  // (the loaders of both French screens, Tri d’entrepôt and Logistique intelligente)
+  for (const file of ['src/simulator/ui/robot-en-fete/RobotEnFeteLoader.tsx', 'src/simulator/ui/logistique-intelligente/LogistiqueLoader.tsx']) {
+    const loader = reachedFrom(file, false);
+    for (const heavy of ['src/simulator/ui/text/en.tsx', 'src/simulator/ui/text/fr.tsx', 'src/simulator/blocks/catalog.ts', 'src/simulator/blocks/fr.ts', 'src/simulator/ui/SimulatorApp.tsx']) {
+      assert.ok(!loader.has(heavy), `${file} brings along ${heavy}`);
+    }
+    assert.ok(loader.has('src/simulator/ui/text/fr-title.tsx') && loader.has('src/simulator/ui/TitleBar.tsx'), file);
+    // (and nothing of its game: the game, the field and the mat come with the screen)
+    for (const reached of loader) assert.ok(!/^src\/simulator\/(?:robot-en-fete|warehouse-sort|logistique-intelligente|core)\//.test(reached), `${file} brings along ${reached}`);
   }
-  assert.ok(loader.has('src/simulator/ui/text/fr-title.tsx') && loader.has('src/simulator/ui/TitleBar.tsx'));
   // (the French words of the title row are those of the French table: one object)
   assert.equal(FR_TEXT.homeCrumb, FR_TITLE_TEXT.homeCrumb);
   assert.deepEqual(
@@ -590,6 +601,43 @@ test('console: the cubes are E1 - E4 in every French sentence, never W1 - W4 (ev
   assert.equal(FR_TEXT.describeEvent({ type: 'grab', bodyId: 'cube:W1', time: 1 }, { penalty: 10, grabbed: 'Pince fermée sur' })?.text, 'Pince fermée sur le cube E1.');
   assert.equal(FR_TEXT.describeEvent({ type: 'release', bodyId: 'cube:W1', onto: null, time: 1 })?.text, `Posé${NB}: le cube E1 sur le tapis.`);
   assert.equal(FR_TEXT.describeEvent({ type: 'bump', bodyId: 'cube:W3', time: 1 })?.text, 'Choc contre le cube E3.');
+});
+
+test('the second French page, Logistique intelligente: its cubes are « le cube 1 » … « le cube 10 », the four walls of its frame « le cadre »; its name and its program files', async () => {
+  const { logistiqueGame, FRAME_IDS, CUBE_IDS } = await import('../../logistique-intelligente/game');
+  const { RULES_SETUP } = await import('../../logistique-intelligente/scenario');
+  const { LOGISTIQUE_ROBOT } = await import('../../logistique-intelligente/robot');
+  const { ARENA, START_AREA } = await import('../../logistique-intelligente/field');
+  const sim = createSimulation({ game: logistiqueGame, scenario: RULES_SETUP, robotConfig: LOGISTIQUE_ROBOT, program: {}, startPose: logistiqueGame.defaultStartPose });
+  assert.deepEqual(sim.world.bodies.map((body) => body.id).sort(), [...CUBE_IDS].sort());
+  assert.deepEqual((sim.world.walls ?? []).map((wall) => wall.id), [...FRAME_IDS]);
+  const edge = 'le bord de la table';
+  for (const body of sim.world.bodies) assert.equal(FR_TEXT.bodyName(body.id, edge), `le cube ${body.id.slice('cube:'.length)}`, body.id);
+  for (const id of FRAME_IDS) assert.equal(FR_TEXT.bodyName(id, edge), 'le cadre', id);
+  assert.equal(FR_TEXT.bodyName('cube:7'), 'le cube 7');
+  assert.equal(FR_TEXT.bodyName('cadre:haut'), 'le cadre');
+  // (Tri d'entrepôt's names are as they were)
+  assert.equal(FR_TEXT.bodyName('cube:W2'), 'le cube E2');
+  assert.equal(FR_TEXT.bodyName('wall', edge), edge);
+  // ... in the lines of the console
+  const words = { penalty: 0, grabbed: 'Pince fermée sur', tableEdge: edge };
+  assert.equal(FR_TEXT.describeEvent({ type: 'grab', bodyId: 'cube:5', time: 1 }, words)?.text, 'Pince fermée sur le cube 5.');
+  assert.equal(FR_TEXT.describeEvent({ type: 'release', bodyId: 'cube:10', onto: 'cube:5', time: 1 }, words)?.text, `Posé${NB}: le cube 10 sur le cube 5.`);
+  assert.equal(FR_TEXT.describeEvent({ type: 'bump', bodyId: 'cadre:gauche', time: 1 }, words)?.text, 'Choc contre le cadre.');
+  // the start area lies inside the frame, so a robot that fits in it never stands in a wall (fr-console.tsx: that sentence is not on the French pages)
+  assert.ok(START_AREA.x >= ARENA.x && START_AREA.y >= ARENA.y && START_AREA.x + START_AREA.w <= ARENA.x + ARENA.w && START_AREA.y + START_AREA.h <= ARENA.y + ARENA.h);
+  sim.start();
+  sim.step(10);
+  assert.deepEqual(
+    sim.drainEvents().filter((event) => event.type === 'log' && /wall|game element/.test(event.text)),
+    [],
+  );
+  // its name, as its title row writes it - not "Logistique Intelligente" - and its program files, named after its id
+  assert.equal(programFile.gameName('logistique-intelligente'), 'Logistique intelligente');
+  assert.equal(programFile.gameNameFromId('logistique-intelligente'), 'Logistique Intelligente');
+  assert.equal(programFile.programFileName('logistique-intelligente', new Date('2026-11-26T10:00:00Z')), 'logistique-intelligente-program-2026-11-26.json');
+  assert.equal(FR_TEXT.otherGameNote({}, 'logistique-intelligente', 'robot-en-fete'), 'Ce programme a été enregistré dans le simulateur Logistique intelligente. Tous ses blocs marchent aussi ici.');
+  assert.equal(FR_TEXT.otherGameNote({}, 'robot-en-fete', 'logistique-intelligente'), 'Ce programme a été enregistré dans le simulateur Tri d’entrepôt. Tous ses blocs marchent aussi ici.');
 });
 
 // =============================================================================================

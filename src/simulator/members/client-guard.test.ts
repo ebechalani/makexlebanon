@@ -704,6 +704,10 @@ describe('the examples stay on the server', () => {
       // Cube colours panel is Warehouse Sort's, with French words)
       'src/simulator/ui/robot-en-fete/RobotEnFeteSimulator.tsx',
       'src/simulator/ui/robot-en-fete/RobotEnFeteLoader.tsx',
+      // Robot en fête 2027's Logistique intelligente: its loader, its screen (the general one, in French) and its list of the one setup
+      'src/simulator/ui/logistique-intelligente/LogistiqueSimulator.tsx',
+      'src/simulator/ui/logistique-intelligente/LogistiqueLoader.tsx',
+      'src/simulator/ui/logistique-intelligente/SetupList.tsx',
       // ... and the French word table of the screen, which the screen and the loader set above it
       'src/simulator/ui/text/context.tsx',
       'src/simulator/ui/text/title-context.tsx',
@@ -719,6 +723,7 @@ describe('the examples stay on the server', () => {
       ['src/app/simulator/locker-room/page.tsx', 'src/simulator/ui/locker-room/LockerRoomLoader.tsx', 'src/simulator/ui/locker-room/LockerRoomSimulator.tsx', 'src/simulator/locker-room/game.ts'],
       ['src/app/simulator/fire-fighter/page.tsx', 'src/simulator/ui/fire-fighter/FireFighterLoader.tsx', 'src/simulator/ui/fire-fighter/FireFighterSimulator.tsx', 'src/simulator/fire-fighter/game.ts'],
       ['src/app/simulator/tri-entrepot/page.tsx', 'src/simulator/ui/robot-en-fete/RobotEnFeteLoader.tsx', 'src/simulator/ui/robot-en-fete/RobotEnFeteSimulator.tsx', 'src/simulator/robot-en-fete/game.ts'],
+      ['src/app/simulator/logistique-intelligente/page.tsx', 'src/simulator/ui/logistique-intelligente/LogistiqueLoader.tsx', 'src/simulator/ui/logistique-intelligente/LogistiqueSimulator.tsx', 'src/simulator/logistique-intelligente/game.ts'],
     ]) {
       assert.ok(roots.pages.includes(page), page);
       const fromPage = reachableFrom(graph, page);
@@ -852,6 +857,35 @@ describe('the examples stay on the server', () => {
     // (its loading screen is French already: the loader reaches the French table itself, and not the examples)
     const feteLoader = reachableFrom(graph, 'src/simulator/ui/robot-en-fete/RobotEnFeteLoader.tsx');
     assert.ok(feteLoader.has('src/simulator/ui/text/fr.tsx') && feteLoader.has('src/simulator/ui/robot-en-fete/RobotEnFeteSimulator.tsx'));
+    // ... and so has the screen of Logistique intelligente, Robot en fête 2027's second: its name, French words, rules
+    // window and list « Le terrain », the field, robot, scenario and game it plays (French itself: its referee writes
+    // French), and the screen's French table and French blocks. A French title, heading or sentence of a description of
+    // one of its examples written into any of them is caught (its examples are in the guard's lists: CATALOGS, ALL_GAMES)
+    const logiScreen = reachableFrom(graph, 'src/simulator/ui/logistique-intelligente/LogistiqueSimulator.tsx');
+    for (const file of [
+      'src/simulator/ui/logistique-intelligente/title.ts',
+      'src/simulator/ui/logistique-intelligente/words.ts',
+      'src/simulator/ui/logistique-intelligente/rules.ts',
+      'src/simulator/ui/logistique-intelligente/SetupList.tsx',
+      'src/simulator/logistique-intelligente/field.ts',
+      'src/simulator/logistique-intelligente/robot.ts',
+      'src/simulator/logistique-intelligente/scenario.ts',
+      'src/simulator/logistique-intelligente/game.ts',
+      'src/simulator/warehouse-sort/robot.ts',
+      'src/simulator/ui/text/fr.tsx',
+      'src/simulator/ui/text/fr-common.tsx',
+      'src/simulator/ui/text/fr-screen.tsx',
+      'src/simulator/ui/text/fr-console.tsx',
+      'src/simulator/ui/text/gripper.tsx',
+      'src/simulator/blocks/fr.ts',
+    ]) {
+      assert.ok(logiScreen.has(file), `the Logistique intelligente screen -> ${file}`);
+    }
+    // (its loader: the French words of its title row and its name, and through import() the screen; not the examples)
+    const logiLoader = reachableFrom(graph, 'src/simulator/ui/logistique-intelligente/LogistiqueLoader.tsx');
+    for (const file of ['src/simulator/ui/text/fr-title.tsx', 'src/simulator/ui/logistique-intelligente/title.ts', 'src/simulator/ui/logistique-intelligente/LogistiqueSimulator.tsx', 'src/simulator/ui/text/fr.tsx']) {
+      assert.ok(logiLoader.has(file), `the Logistique intelligente loader -> ${file}`);
+    }
     // the page that lists the simulators is a page of the website like any other, and so is the page of Robot en fête 2027
     assert.ok(roots.pages.includes('src/app/simulator/page.tsx'));
     assert.ok(roots.pages.includes('src/app/robot-en-fete/page.tsx'));

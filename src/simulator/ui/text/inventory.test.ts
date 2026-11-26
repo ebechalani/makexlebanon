@@ -33,6 +33,10 @@ const rel = (file: string): string => path.relative(SIMULATOR, file).split(path.
 
 /** The page of Robot en fête 2027 (design 7.3) - and, while it is not written yet, the shared screen it shows. */
 const FRENCH_PAGE = path.join(SRC, 'app', 'simulator', 'tri-entrepot', 'page.tsx');
+/** ... and its second French page, Logistique intelligente: the walk starts at both. */
+const FRENCH_PAGES = [FRENCH_PAGE, path.join(SRC, 'app', 'simulator', 'logistique-intelligente', 'page.tsx')];
+/** The folders of the French games and screens (each a folder of src/simulator and of src/simulator/ui). */
+const FRENCH_FOLDERS = ['robot-en-fete', 'logistique-intelligente'];
 const SCREEN_ENTRIES = [path.join(UI, 'SimulatorApp.tsx'), path.join(UI, 'TitleBar.tsx')];
 
 /** The files of the shared screen: directly in ../ (not a game's folder, not the tables), no test. */
@@ -102,7 +106,7 @@ function kindOf(file: string): Kind {
   const inSrc = path.relative(SRC, file).split(path.sep);
   // (the site's data, the codes of the members, a stylesheet: never read here)
   if (inSrc[0] === '..' || (inSrc[0] === 'simulator' && inSrc[1] === 'members') || !/\.(ts|tsx|mts)$/.test(file)) return 'unread';
-  if (inSrc.includes('robot-en-fete')) return 'french';
+  if (inSrc.includes('robot-en-fete') || (inSrc[0] === 'simulator' && inSrc.includes('logistique-intelligente'))) return 'french';
   if (inSrc[0] !== 'simulator') return 'site';
   const [, top, sub] = inSrc;
   if (top === 'ui') return sub === 'text' ? 'table' : inSrc.length > 3 ? 'game' : 'shared';
@@ -111,9 +115,10 @@ function kindOf(file: string): Kind {
   return 'game';
 }
 
-/** Every file the page reaches through its imports (the French page; while it is not there, the shared screen). */
+/** Every file the pages reach through their imports (the French pages; while there is none, the shared screen). */
 function reachedFiles(): { entries: string[]; files: Map<string, Kind> } {
-  const entries = existsSync(FRENCH_PAGE) ? [FRENCH_PAGE] : SCREEN_ENTRIES;
+  const pages = FRENCH_PAGES.filter((page) => existsSync(page));
+  const entries = pages.length > 0 ? pages : SCREEN_ENTRIES;
   const files = new Map<string, Kind>();
   const queue = [...entries];
   while (queue.length > 0) {
@@ -284,6 +289,12 @@ const ALLOWED_IN_COMPONENTS: Record<string, string> = {
 test('(a) the phrase inventory: from the French page, no phrase of the shared screen is outside the word table', async (t) => {
   const { entries, files } = reachedFiles();
   if (entries[0] !== FRENCH_PAGE) t.diagnostic('the French page (src/app/simulator/tri-entrepot/page.tsx) is not there yet: the walk starts at the shared screen');
+  // (from both French pages: the walk goes through each French screen, Tri d’entrepôt's and Logistique intelligente's)
+  const screens: Record<string, string> = { 'tri-entrepot': 'robot-en-fete/RobotEnFeteSimulator.tsx', 'logistique-intelligente': 'logistique-intelligente/LogistiqueSimulator.tsx' };
+  for (const [page, screen] of Object.entries(screens)) {
+    if (entries.includes(path.join(SRC, 'app', 'simulator', page, 'page.tsx'))) assert.equal(files.get(path.join(UI, screen)), 'french', screen);
+    else t.diagnostic(`src/app/simulator/${page}/page.tsx is not there yet`);
+  }
   const shared = [...files].filter(([, kind]) => kind === 'shared').map(([file]) => file);
   // (the walk reaches the whole shared screen, the table and the plain modules of the table)
   for (const name of ['SimulatorApp.tsx', 'TitleBar.tsx', 'ControlBar.tsx', 'ScoreSheet.tsx', 'SensorDashboard.tsx', 'ConsolePanel.tsx', 'format.ts', 'match-words.ts', 'ruler.ts', 'program-file.ts']) {
@@ -532,16 +543,19 @@ test('(c) every element of SimulatorApp.tsx whose component takes `words` is giv
 });
 
 test("(c) the French page's word list leaves no word to its English default: Required<ScreenWords>", (t) => {
-  // (the French screen's own folder: its word list is ./robot-en-fete/words.ts, design 8.1)
-  const folder = path.join(UI, 'robot-en-fete');
-  const files = existsSync(folder) ? readdirSync(folder).filter((name) => /\.tsx?$/.test(name) && !name.endsWith('.test.ts')) : [];
-  const sources = files.map((name) => readFileSync(path.join(folder, name), 'utf8'));
-  if (!sources.some((source) => /\bScreenWords\b/.test(source))) {
-    t.diagnostic('the French screen has no word list yet (ui/robot-en-fete)');
-    return;
+  // (each French screen's own folder: its word list is ./robot-en-fete/words.ts, design 8.1, and ./logistique-intelligente/words.ts)
+  for (const name of FRENCH_FOLDERS) {
+    const folder = path.join(UI, name);
+    const files = existsSync(folder) ? readdirSync(folder).filter((file) => /\.tsx?$/.test(file) && !file.endsWith('.test.ts')) : [];
+    // (the code only: a comment that names the type proves nothing)
+    const sources = files.map((file) => readFileSync(path.join(folder, file), 'utf8').replace(/\/\*[^]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1'));
+    if (!sources.some((source) => /\bScreenWords\b/.test(source))) {
+      t.diagnostic(`the French screen has no word list yet (ui/${name})`);
+      continue;
+    }
+    assert.ok(
+      sources.some((source) => /satisfies Required<ScreenWords>/.test(source)),
+      `the French ScreenWords of ui/${name} are typed \`satisfies Required<ScreenWords>\``,
+    );
   }
-  assert.ok(
-    sources.some((source) => /satisfies Required<ScreenWords>/.test(source)),
-    'the French ScreenWords are typed `satisfies Required<ScreenWords>`',
-  );
 });
