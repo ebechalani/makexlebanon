@@ -115,7 +115,7 @@ export const FR_MATCH_TEXT: MatchText = {
   earnedAt: 'gagné à ',
   howEnded: (match) => `Fin du ${match}${NB}: `,
   total: 'Total',
-  scoreTimeNote: 'Temps de ce score - à points égaux, les règles classent devant le temps le plus court',
+  scoreTimeNote: 'Temps de ce score\u00a0– à points égaux, les règles classent devant le temps le plus court',
   statusRunning: (Match, done, total, _goals, penalty) => (
     <>
       <span className="font-bold">{`${Match} en cours.`}</span> {frPlural(done, `${done} objectif atteint sur ${total}.`, `${done} objectifs atteints sur ${total}.`)}
@@ -135,7 +135,7 @@ export const FR_MATCH_TEXT: MatchText = {
   ),
   statusStopped: (time, points) => (
     <>
-      <span className="font-bold">Tu as arrêté le match</span> {`à ${time} - pas de score final (pour l’instant `}
+      <span className="font-bold">Tu as arrêté le match</span> {`à ${time}\u00a0– pas de score final (pour l’instant `}
       {points}
       {'). Démarrer recommence, Replacer remet le terrain en place.'}
     </>
@@ -145,7 +145,7 @@ export const FR_MATCH_TEXT: MatchText = {
       <span className="font-bold">{`${o.Match} terminé.`}</span>{' '}
       {o.ending !== null ? `${o.ending} Score final${NB}: ` : `${o.reason} à ${o.time}. Score final${NB}: `}
       {points}
-      {o.perfect ? ` - un parcours parfait${NB}!` : o.complete ? ` - tous les ${o.goals} atteints.` : ''}
+      {o.perfect ? `\u00a0– un parcours parfait${NB}!` : o.complete ? `\u00a0– tous les ${o.goals} atteints.` : ''}
       {o.penaltyNote && ` (${o.penaltyNote})`}
     </>
   ),
@@ -153,7 +153,7 @@ export const FR_MATCH_TEXT: MatchText = {
     `${o.Match} terminé. ` +
     (o.ending !== null ? `${o.ending} Score final${NB}: ` : `${o.reason} à ${o.time}. Score final${NB}: `) +
     `${o.total} / ${o.max}` +
-    (o.perfect ? ` - un parcours parfait${NB}!` : o.complete ? ` - tous les ${o.goals} atteints.` : '') +
+    (o.perfect ? `\u00a0– un parcours parfait${NB}!` : o.complete ? `\u00a0– tous les ${o.goals} atteints.` : '') +
     (o.penaltyNote ? ` (${o.penaltyNote})` : ''),
   scoreSheetSummary: (score: { total: number; max: number }, done: number, of: number, words: ScreenWords) =>
     // ("1/9": short, so that the heading of the score sheet is never cut on a 360 px phone)

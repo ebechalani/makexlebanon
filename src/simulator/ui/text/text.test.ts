@@ -409,13 +409,13 @@ test('French sentences: the status line as one sentence, the title row, the cons
   assert.equal(plain(FR_TEXT.statusPaused(FR_TEXT.moment(41.53), 'match')), 'En pause à 0:41,5. Le chrono du match est aussi en pause.');
   assert.equal(
     plain(FR_TEXT.statusStopped('0:41,5', '35 / 80')),
-    'Tu as arrêté le match à 0:41,5 - pas de score final (pour l’instant 35 / 80). Démarrer recommence, Replacer remet le terrain en place.',
+    'Tu as arrêté le match à 0:41,5\u00a0– pas de score final (pour l’instant 35 / 80). Démarrer recommence, Replacer remet le terrain en place.',
   );
   const over: MatchOver = { Match: 'Match', ending: null, reason: FR_TEXT.finishText('time'), time: '1:30,0', total: 80, max: 80, perfect: true, complete: true, goal: 'objectif', goals: 'objectifs', penaltyNote: '' };
-  assert.equal(plain(FR_TEXT.statusOver(over, '80 / 80')), `Match terminé. Le temps est écoulé à 1:30,0. Score final${NB}: 80 / 80 - un parcours parfait${NB}!`);
+  assert.equal(plain(FR_TEXT.statusOver(over, '80 / 80')), `Match terminé. Le temps est écoulé à 1:30,0. Score final${NB}: 80 / 80\u00a0– un parcours parfait${NB}!`);
   assert.equal(FR_TEXT.statusOverText(over), plain(FR_TEXT.statusOver(over, '80 / 80')));
   const some: MatchOver = { ...over, ending: 'La pince a lâché le cube.', perfect: false, total: 35, penaltyNote: FR_TEXT.restartSummary(1, { penalty: 10 }) };
-  assert.equal(FR_TEXT.statusOverText(some), `Match terminé. La pince a lâché le cube. Score final${NB}: 35 / 80 - tous les objectifs atteints. (1 relance${NB}: -10 points)`);
+  assert.equal(FR_TEXT.statusOverText(some), `Match terminé. La pince a lâché le cube. Score final${NB}: 35 / 80\u00a0– tous les objectifs atteints. (1 relance${NB}: -10 points)`);
   assert.equal(FR_TEXT.statusOverText(some), plain(FR_TEXT.statusOver(some, '35 / 80')));
   // the referee's first words: a French colon has its no-break space, which goes with it
   assert.equal(FR_TEXT.finishHeadline(`Parcours terminé à 0:53,5 avec 80 points${NB}: tous les cubes sont triés.`), 'Parcours terminé à 0:53,5 avec 80 points.');
@@ -429,7 +429,7 @@ test('French sentences: the status line as one sentence, the title row, the cons
   assert.equal(FR_TEXT.cyberPiSummary(['Cube : red'], true), `écran${NB}: «${NB}Cube : red${NB}»`);
   // the ruler
   const line = { points: [{ x: 300, y: 900 }, { x: 300, y: 600 }, { x: 600, y: 600 }], startHeading: null };
-  assert.equal(FR_TEXT.rulerReading(line), '30,0 cm, puis 90° à droite, puis 30,0 cm - 60,0 cm en tout');
+  assert.equal(FR_TEXT.rulerReading(line), '30,0 cm, puis 90° à droite, puis 30,0 cm\u00a0– 60,0 cm en tout');
   assert.equal(FR_TEXT.rulerText(ruler.EMPTY_RULER), 'Clique sur le tapis pour poser le premier point. Clique sur le robot pour que la règle parte d’entre ses roues.');
   assert.equal(FR_TEXT.rulerText({ points: [{ x: 1, y: 1 }], startHeading: null }), 'Premier point posé. Clique maintenant pour poser le deuxième point.');
   assert.equal(FR_TEXT.rulerText({ points: [{ x: 1, y: 1 }], startHeading: 0 }, false), 'La règle part de la place du robot. Clique maintenant pour poser le deuxième point.');

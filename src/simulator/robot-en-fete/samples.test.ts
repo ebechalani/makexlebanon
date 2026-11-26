@@ -154,7 +154,8 @@ function frenchProblem(text: string): string | null {
   if (/\.\.\./.test(text)) return '"..." (French writes …)';
   if (/«(?! )/.test(text) || /(?<! )»/.test(text)) return 'no no-break space inside « »';
   if (/(?<! )[:;!?]/.test(text)) return 'no no-break space before : ; ! ?';
-  if (/ (?![:;!?»])/.test(text.replace(/« /g, ''))) return 'a no-break space where none belongs';
+  if (/ - /.test(text)) return 'a hyphen used as a dash (French writes « – »)';
+  if (/ (?![:;!?»–])/.test(text.replace(/« /g, ''))) return 'a no-break space where none belongs';
   return null;
 }
 

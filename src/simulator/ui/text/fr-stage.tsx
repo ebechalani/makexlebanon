@@ -41,7 +41,7 @@ function rulerReading(ruler: Ruler, robotThere = true): string {
     steps.push(cmText(piece.mm));
   });
   const start = ruler.startHeading === null ? '' : robotThere ? `Depuis le robot${NB}: ` : `Depuis la place du robot${NB}: `;
-  const total = pieces.length > 1 ? ` - ${cmText(totalMm)} en tout` : '';
+  const total = pieces.length > 1 ? `\u00a0– ${cmText(totalMm)} en tout` : '';
   return `${start}${steps.join(', puis ')}${total}`;
 }
 

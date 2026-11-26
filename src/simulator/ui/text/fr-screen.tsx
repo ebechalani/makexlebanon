@@ -169,7 +169,7 @@ function waitInWords(seconds: number | undefined): string {
 function codeMessage(status: CodeStatus, organisation: string, unlocked = false): CodeMessage {
   const saved = status.about === 'saved';
   const looksLike = `Un code ressemble à ${CODE_LOOKS_LIKE}.`;
-  const checkTyping = `Vérifie s’il y a une faute de frappe - un code ressemble à ${CODE_LOOKS_LIKE}.`;
+  const checkTyping = `Vérifie s’il y a une faute de frappe\u00a0– un code ressemble à ${CODE_LOOKS_LIKE}.`;
   switch (status.phase) {
     case 'none':
       return unlocked

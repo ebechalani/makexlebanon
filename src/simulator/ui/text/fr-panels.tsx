@@ -72,7 +72,7 @@ export const FR_SENSOR_TEXT: SensorText = {
   em1Angle: 'Angle EM1 (g.)',
   em1AngleHint: 'Encodeur du moteur EM1, la roue gauche',
   em2Angle: 'Angle EM2 (d.)',
-  em2AngleHint: `Encodeur du moteur EM2, la roue droite. Il est monté en miroir${NB}: il compte à l’envers quand le robot avance - comme sur le vrai mBot2.`,
+  em2AngleHint: `Encodeur du moteur EM2, la roue droite. Il est monté en miroir${NB}: il compte à l’envers quand le robot avance\u00a0– comme sur le vrai mBot2.`,
   em1Speed: 'Vitesse EM1',
   em2Speed: 'Vitesse EM2',
   em2SpeedHint: 'Négative quand le robot avance (moteur en miroir)',
@@ -147,7 +147,7 @@ function describeEvent(
     case 'restart':
       return { time: event.time, level: 'warn', text: frRestartLine(game, game.left) };
     case 'finish':
-      return { time: event.time, level: 'info', text: event.detail ? event.detail : `${frFinishText(event.reason)} - le ${game.match ?? 'match'} est terminé.` };
+      return { time: event.time, level: 'info', text: event.detail ? event.detail : `${frFinishText(event.reason)}\u00a0– le ${game.match ?? 'match'} est terminé.` };
     case 'tone':
       return null;
   }

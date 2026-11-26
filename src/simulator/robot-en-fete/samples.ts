@@ -423,7 +423,7 @@ function takeACubeFromThisRow(): DefinitionNode {
         LOOK_FIRST_NOTE,
       ),
     ]),
-    'Sur la ligne blanche qui traverse une rangée, tourné vers le haut. Prendre le cube de droite - ou, s’il est bleu, le cube de gauche. Puis se tourner de nouveau vers le haut.',
+    'Sur la ligne blanche qui traverse une rangée, tourné vers le haut. Prendre le cube de droite\u00a0– ou, s’il est bleu, le cube de gauche. Puis se tourner de nouveau vers le haut.',
   );
 }
 

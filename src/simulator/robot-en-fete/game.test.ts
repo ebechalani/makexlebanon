@@ -341,13 +341,13 @@ test('the sheet before anything happened, in French', () => {
   // the default arrangement: E1 vert, E2 rouge, E3 bleu, E4 rouge
   const lines = b.score().lines.map((line) => [line.id, line.label, line.detail]);
   assert.deepEqual(lines, [
-    [LINE_LEAVE_START, 'Sortir de la zone de départ', 'pas encore - sors de la zone de départ'],
-    [pickLineId('W1'), 'Prendre le cube E1 (vert)', 'pas encore - saisis-le, puis soulève-le de 1 cm ou porte-le sur 4 cm'],
-    [pickLineId('W2'), 'Prendre le cube E2 (rouge)', 'pas encore - saisis-le, puis soulève-le de 1 cm ou porte-le sur 4 cm'],
-    [pickLineId('W4'), 'Prendre le cube E4 (rouge)', 'pas encore - saisis-le, puis soulève-le de 1 cm ou porte-le sur 4 cm'],
-    [deliverLineId('W1'), 'Cube E1 (vert) dans la baie verte', 'pas encore - mets-le dans la baie verte'],
-    [deliverLineId('W2'), 'Cube E2 (rouge) dans la baie rouge', 'pas encore - mets-le dans la baie rouge'],
-    [deliverLineId('W4'), 'Cube E4 (rouge) dans la baie rouge', 'pas encore - mets-le dans la baie rouge'],
+    [LINE_LEAVE_START, 'Sortir de la zone de départ', 'pas encore\u00a0– sors de la zone de départ'],
+    [pickLineId('W1'), 'Prendre le cube E1 (vert)', 'pas encore\u00a0– saisis-le, puis soulève-le de 1 cm ou porte-le sur 4 cm'],
+    [pickLineId('W2'), 'Prendre le cube E2 (rouge)', 'pas encore\u00a0– saisis-le, puis soulève-le de 1 cm ou porte-le sur 4 cm'],
+    [pickLineId('W4'), 'Prendre le cube E4 (rouge)', 'pas encore\u00a0– saisis-le, puis soulève-le de 1 cm ou porte-le sur 4 cm'],
+    [deliverLineId('W1'), 'Cube E1 (vert) dans la baie verte', 'pas encore\u00a0– mets-le dans la baie verte'],
+    [deliverLineId('W2'), 'Cube E2 (rouge) dans la baie rouge', 'pas encore\u00a0– mets-le dans la baie rouge'],
+    [deliverLineId('W4'), 'Cube E4 (rouge) dans la baie rouge', 'pas encore\u00a0– mets-le dans la baie rouge'],
     [LINE_PARK, 'Se garer sur une aire d’arrivée', 'à la fin, le robot doit toucher une aire d’arrivée ronde (à gauche ou à droite)'],
     [LINE_CLEAN, `Parcours propre${NB}: aucune relance`, 'aucune relance pour l’instant'],
     [LINE_RESTARTS, 'Relances', 'aucune relance'],
@@ -406,27 +406,27 @@ test('a cube in its bay, held, lifted, touching the robot, partly in: the consol
   // held in its bay
   b.hold('W1', 0);
   b.tick(10.5);
-  assert.equal(b.line(deliverLineId('W1')).detail, 'le robot le tient - pose-le dans la baie verte');
+  assert.equal(b.line(deliverLineId('W1')).detail, 'le robot le tient\u00a0– pose-le dans la baie verte');
   // lifted, not held
   b.place('W1', b.cube('W1').x, b.cube('W1').y);
   b.cube('W1').z = 20;
   b.tick(11);
-  assert.equal(b.line(deliverLineId('W1')).detail, 'pas posé sur le tapis - pose-le dans la baie verte');
+  assert.equal(b.line(deliverLineId('W1')).detail, 'pas posé sur le tapis\u00a0– pose-le dans la baie verte');
   // in its bay, touching the robot
   b.inBay('W1', 'green');
   b.robotAt({ x: b.cube('W1').x, y: b.cube('W1').y + 75, heading: 0 });
   b.tick(11.5);
-  assert.equal(b.line(deliverLineId('W1')).detail, 'dans la baie verte, mais il touche le robot - éloigne-toi');
+  assert.equal(b.line(deliverLineId('W1')).detail, 'dans la baie verte, mais il touche le robot\u00a0– éloigne-toi');
   // only partly in its bay
   b.place('W4', BAYS.red.x - 5, BAYS.red.y + BAYS.red.h / 2);
   b.tick(12);
-  assert.equal(b.line(deliverLineId('W4')).detail, 'seulement en partie dans la baie rouge - tout le cube doit être dedans');
+  assert.equal(b.line(deliverLineId('W4')).detail, 'seulement en partie dans la baie rouge\u00a0– tout le cube doit être dedans');
   // after the match
   b.hold('W2', 0);
   b.tick(12.5);
   b.end();
   assert.equal(b.line(deliverLineId('W1')).detail, 'dans la baie verte, mais il touche le robot');
-  assert.equal(b.line(deliverLineId('W2')).detail, 'le robot le tenait encore - pose-le dans la baie rouge');
+  assert.equal(b.line(deliverLineId('W2')).detail, 'le robot le tenait encore\u00a0– pose-le dans la baie rouge');
 });
 
 test('a cube in a bay that was never seen standing there: "dans la baie rouge" without a time', () => {
@@ -443,8 +443,8 @@ test('the wrong bay: -5 and no points for that cube, one cube or several', () =>
   b.tick(2.5);
   b.inBay('W2', 'green');
   b.tick(4);
-  assert.deepEqual(b.heard(), [`0:04,0${NB}: le cube E2 (rouge) est dans la baie verte - la mauvaise baie.`]);
-  assert.equal(b.line(deliverLineId('W2')).detail, 'dans la baie verte - mauvaise baie, -5');
+  assert.deepEqual(b.heard(), [`0:04,0${NB}: le cube E2 (rouge) est dans la baie verte\u00a0– la mauvaise baie.`]);
+  assert.equal(b.line(deliverLineId('W2')).detail, 'dans la baie verte\u00a0– mauvaise baie, -5');
   assert.equal(b.line(pickLineId('W2')).detail, `pris à 0:02,5, mais le cube est dans la mauvaise baie${NB}: aucun point`);
   assert.equal(b.line(LINE_WRONG_BAY).detail, 'cube E2 (rouge), -5');
   b.inBay('W1', 'red');
@@ -550,7 +550,7 @@ test('a robot that does not start inside the start zone', () => {
   b.tick(0.01);
   assert.deepEqual(b.words(LINE_START_POSITION), [
     'Partir de l’intérieur de la zone de départ',
-    'le robot n’est pas parti tout entier dans la zone de départ - un arbitre ne lancerait pas ce match',
+    'le robot n’est pas parti tout entier dans la zone de départ\u00a0– un arbitre ne lancerait pas ce match',
   ]);
 });
 
