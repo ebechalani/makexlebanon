@@ -512,12 +512,15 @@ export type SimulatorCard = {
 };
 
 /**
- * The sections of the Simulator page: one per season that has a simulator, the oldest season
- * first (Season 2026, then Season 2027). In a section: the categories of that season that have a
- * `simulator`, in the order of `seasons`, then the `missionSimulators` of that season, in their
- * order. Everything comes from the lists above, so a simulator added later appears in its
- * section by itself, and a season without a simulator gets no section. (The two lists can be
- * handed in, for the tests; the page uses the ones of this file.)
+ * The sections of the Simulator page: one per season that has a simulator, the newest season
+ * first (Season 2027, then Season 2026: the organiser's order, "season 2027, season 2026, robot en
+ * fête"). In a section: the categories of that season that have a `simulator`, in the order of
+ * `seasons`, then the `missionSimulators` of that season, in their order. Everything comes from
+ * the lists above, so a simulator added later appears in its section by itself, and a season
+ * without a simulator gets no section. The page, the Simulator dropdown of the menu
+ * (content/site.ts) and the Training page's card (`simulatorTrack()` below) all take the seasons
+ * in this order, so they list them alike. (The two lists can be handed in, for the tests; the page
+ * uses the ones of this file.)
  */
 export function simulatorSeasons(
   seasonList: Season[] = seasons,
@@ -525,7 +528,7 @@ export function simulatorSeasons(
 ): Array<{ year: number; simulators: SimulatorCard[] }> {
   const years = [...new Set([...seasonList.map((season) => season.year), ...missions.map((mission) => mission.season)])];
   return years
-    .sort((a, b) => a - b)
+    .sort((a, b) => b - a)
     .map((year) => ({
       year,
       simulators: [

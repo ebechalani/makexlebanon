@@ -26,8 +26,8 @@ import {
   type MissionSimulator,
   type Season,
 } from '../../../content/seasons';
-import { nav, simulatorMenu, site } from '../../../content/site';
-import { standaloneCategories, type StandaloneCategory } from '../../../content/standalone';
+import { isNavGroup, nav, simulatorMenu, site, type NavChild } from '../../../content/site';
+import { simulatorCategories, standaloneCategories, type StandaloneCategory } from '../../../content/standalone';
 import { fireFighterGame } from '../fire-fighter/game';
 import { SAMPLE_CATALOG as FIGHTER_CATALOG } from '../fire-fighter/sample-catalog';
 import { SAMPLE_CATALOG as FETE_CATALOG } from '../robot-en-fete/sample-catalog';
@@ -66,36 +66,105 @@ test('menu: "Simulator" links to /simulator, between Training and Videos; Traini
   }
 });
 
-test('menu: the dropdown of "Simulator" is the Simulator page, then each simulator in the order of that page', () => {
+/** The Simulator page, drawn as the server sends it. */
+async function simulatorPageHtml(): Promise<string> {
+  const { default: SimulatorPage } = (await import('../../app/simulator/page')) as { default: () => Parameters<typeof renderToStaticMarkup>[0] };
+  return renderToStaticMarkup(createElement(SimulatorPage));
+}
+
+/** Every link of a dropdown, in the order of the menu: a group's row, then its lines. */
+function linksOf(children: NavChild[]): Array<{ label: string; href: string }> {
+  return children.flatMap((child) => (isNavGroup(child) ? [{ label: child.label, href: child.href }, ...child.children] : [child]));
+}
+
+test('menu: the dropdown of "Simulator" is the Simulator page, then a group per part of that page, in its order - Season 2027, Season 2026, Robot en fête 2027 - each with its simulators by their name', () => {
   const simulator = nav.find((item) => item.label === 'Simulator');
   assert.deepEqual(simulator?.children, [
     { label: 'All simulators', href: '/simulator' },
-    { label: 'Locker Room — Season 2026', href: '/simulator/locker-room' },
-    { label: 'Warehouse Sort — Season 2026', href: '/simulator/warehouse-sort' },
-    { label: 'Fire Cadet — Season 2027', href: '/simulator/fire-cadet' },
-    { label: 'Fire Fighter — Season 2027', href: '/simulator/fire-fighter' },
-    { label: 'Fire Rescue Junior — Season 2027', href: '/simulator/fire-rescue-junior' },
-    { label: 'Fire Rescue Senior — Season 2027', href: '/simulator/fire-rescue-senior' },
-    { label: 'Fire Chief — Season 2027', href: '/simulator/fire-chief' },
-    // (after the seasons, the simulator of the category of its own: content/standalone.ts. The menu is English;
-    // the two names in its line are French proper names, the simulator's and its category's)
-    { label: 'Tri d’entrepôt — Robot en fête 2027', href: '/simulator/tri-entrepot' },
+    {
+      label: 'Season 2027',
+      href: '/simulator#season-2027',
+      description: '5 simulators',
+      children: [
+        { label: 'Fire Cadet', href: '/simulator/fire-cadet' },
+        { label: 'Fire Fighter', href: '/simulator/fire-fighter' },
+        { label: 'Fire Rescue Junior', href: '/simulator/fire-rescue-junior' },
+        { label: 'Fire Rescue Senior', href: '/simulator/fire-rescue-senior' },
+        { label: 'Fire Chief', href: '/simulator/fire-chief' },
+      ],
+    },
+    {
+      label: 'Season 2026',
+      href: '/simulator#season-2026',
+      description: '2 simulators',
+      children: [
+        { label: 'Locker Room', href: '/simulator/locker-room' },
+        { label: 'Warehouse Sort', href: '/simulator/warehouse-sort' },
+      ],
+    },
+    // (after the seasons, the category of its own, content/standalone.ts: its name and its simulator's, both French, and it says so;
+    // what the row holds, for a screen reader, is in the menu's English)
+    {
+      label: 'Robot en fête 2027',
+      href: '/simulator#category-robot-en-fete',
+      lang: 'fr',
+      description: '1 simulator',
+      children: [{ label: 'Tri d’entrepôt', href: '/simulator/tri-entrepot' }],
+    },
   ]);
-  // the same simulators as the cards of /simulator, in the same order: the seasons' first, then the categories of their own
+  // the same parts as /simulator, in the same order, and in each the same simulators as its cards, in the same order:
+  // the seasons' first, the newest first, then the categories of their own
+  const groups = (simulator?.children ?? []).filter(isNavGroup);
   assert.deepEqual(
-    simulator?.children?.slice(1).map((child) => child.href),
+    groups.map((group) => [group.label, group.children.map((link) => link.href)]),
     [
-      ...simulatorSeasons().flatMap((section) => section.simulators.map((card) => card.href)),
-      ...standaloneCategories.flatMap((category) => category.simulators.map((card) => card.href)),
+      ...simulatorSeasons().map((section) => [`Season ${section.year}`, section.simulators.map((card) => card.href)]),
+      ...standaloneCategories.map((category) => [category.name, category.simulators.map((card) => card.href)]),
     ],
   );
+  const years = groups.flatMap((group) => /^Season (\d+)$/.exec(group.label)?.[1] ?? []).map(Number);
+  assert.deepEqual(years, [2027, 2026]);
+  assert.deepEqual(years, [...years].sort((a, b) => b - a), 'the newest season first');
   // (built from the season data, not typed by hand)
   assert.deepEqual(simulator?.children, simulatorMenu());
-  // (on a computer the dropdown is as wide as its longest line: "Warehouse Sort — Season 2026" would break in the usual width)
-  assert.equal(simulator?.childrenOnOneLine, true);
+  // "All simulators" first, and only there: every other line is a group; a line of a group is the simulator's name
+  // alone, without its season or its category (the group says it)
+  assert.deepEqual(simulator?.children?.[0], { label: 'All simulators', href: '/simulator' });
+  assert.equal(groups.length, (simulator?.children?.length ?? 0) - 1);
+  for (const group of groups) {
+    for (const link of group.children) assert.ok(!/ — |Season|Robot en fête/.test(link.label), link.label);
+  }
+  // only the French group has a language of its own
+  assert.deepEqual(groups.filter((group) => 'lang' in group).map((group) => [group.label, group.lang]), [['Robot en fête 2027', 'fr']]);
+  // each group says how many simulators it holds (its row's description, for a screen reader)
+  for (const group of groups) assert.equal(group.description, `${group.children.length} simulator${group.children.length === 1 ? '' : 's'}`, group.label);
+  // (the dropdown of "Simulator" is now as wide as the others: no line of it is long any more)
+  assert.ok(!('childrenOnOneLine' in (simulator ?? {})));
 });
 
-test('menu: a simulator added to a season appears in the dropdown by itself, in its season\'s place', () => {
+test('menu: each group of the Simulator dropdown leads to its part of the Simulator page - an id of that page, in the order of its parts', async () => {
+  const html = await simulatorPageHtml();
+  // the parts of the page, by the id of their heading, in their order
+  const ids = [...html.matchAll(/<h2 id="([^"]+)"/g)].map((match) => match[1]);
+  assert.deepEqual(ids, ['season-2027', 'season-2026', 'category-robot-en-fete']);
+  const groups = simulatorMenu().filter(isNavGroup);
+  assert.deepEqual(
+    groups.map((group) => group.href),
+    ids.map((id) => `/simulator#${id}`),
+  );
+  for (const group of groups) {
+    const id = group.href.split('#')[1];
+    // the heading of the part is the group's name, and the part holds the cards of the group's simulators
+    const heading = new RegExp(`<h2 id="${id}" class="[^"]*">([^<]+)</h2>`).exec(html);
+    assert.equal(heading?.[1], group.label, id);
+    const part = html.slice(html.indexOf(`<section aria-labelledby="${id}"`), html.indexOf('</section>', html.indexOf(`id="${id}"`)));
+    assert.deepEqual([...part.matchAll(/<a aria-label="[^"]*"[^>]*href="([^"]+)"/g)].map((match) => match[1]), group.children.map((link) => link.href), id);
+    // (the heading keeps the height of the sticky header above it, when the page scrolls to it)
+    assert.match(heading?.[0] ?? '', /class="scroll-mt-24 /);
+  }
+});
+
+test('menu: a simulator, a season or a category added later appears in the dropdown by itself, in its place; one without a simulator has no group, and no part on the Simulator page either', () => {
   const withSummary = { summary: 'Two sentences.', mat: '/simulator/new/mat.webp' };
   const added: Season[] = seasons.map((season) =>
     season.year === 2025
@@ -108,34 +177,81 @@ test('menu: a simulator added to a season appears in the dropdown by itself, in 
     ...missionSimulators,
     { name: 'Later Mission', season: 2027, label: 'Level', event: 'Local event', href: '/simulator/later', ...withSummary },
   ];
+  const season2027 = {
+    label: 'Season 2027',
+    href: '/simulator#season-2027',
+    description: '5 simulators',
+    children: [
+      { label: 'Fire Cadet', href: '/simulator/fire-cadet' },
+      { label: 'Fire Fighter', href: '/simulator/fire-fighter' },
+      { label: 'Fire Rescue Junior', href: '/simulator/fire-rescue-junior' },
+      { label: 'Fire Rescue Senior', href: '/simulator/fire-rescue-senior' },
+      { label: 'Fire Chief', href: '/simulator/fire-chief' },
+    ],
+  };
+  const season2026 = {
+    label: 'Season 2026',
+    href: '/simulator#season-2026',
+    description: '2 simulators',
+    children: [
+      { label: 'Locker Room', href: '/simulator/locker-room' },
+      { label: 'Warehouse Sort', href: '/simulator/warehouse-sort' },
+    ],
+  };
+  const robotEnFete = {
+    label: 'Robot en fête 2027',
+    href: '/simulator#category-robot-en-fete',
+    lang: 'fr',
+    description: '1 simulator',
+    children: [{ label: 'Tri d’entrepôt', href: '/simulator/tri-entrepot' }],
+  };
+  // a simulator of an older season gets a group of its own, after the newer ones; a mission added to a season, its line at the end of its group
   assert.deepEqual(simulatorMenu(simulatorSeasons(added, missions)), [
     { label: 'All simulators', href: '/simulator' },
-    { label: `${first2025} — Season 2025`, href: '/simulator/new' },
-    { label: 'Locker Room — Season 2026', href: '/simulator/locker-room' },
-    { label: 'Warehouse Sort — Season 2026', href: '/simulator/warehouse-sort' },
-    { label: 'Fire Cadet — Season 2027', href: '/simulator/fire-cadet' },
-    { label: 'Fire Fighter — Season 2027', href: '/simulator/fire-fighter' },
-    { label: 'Fire Rescue Junior — Season 2027', href: '/simulator/fire-rescue-junior' },
-    { label: 'Fire Rescue Senior — Season 2027', href: '/simulator/fire-rescue-senior' },
-    { label: 'Fire Chief — Season 2027', href: '/simulator/fire-chief' },
-    { label: 'Later Mission — Season 2027', href: '/simulator/later' },
+    { ...season2027, description: '6 simulators', children: [...season2027.children, { label: 'Later Mission', href: '/simulator/later' }] },
+    season2026,
+    { label: 'Season 2025', href: '/simulator#season-2025', description: '1 simulator', children: [{ label: first2025, href: '/simulator/new' }] },
     // (the category of its own stays at the end, after every season)
-    { label: 'Tri d’entrepôt — Robot en fête 2027', href: '/simulator/tri-entrepot' },
+    robotEnFete,
   ]);
-  // no simulator at all: only the Simulator page; no season but the category of its own: its line alone
-  assert.deepEqual(simulatorMenu([], []), [{ label: 'All simulators', href: '/simulator' }]);
-  assert.deepEqual(simulatorMenu([]), [
+  // a newer season with a simulator comes first
+  const template = seasons.find((season) => season.year === 2027);
+  assert.ok(template);
+  const season2028: Season = {
+    ...template,
+    year: 2028,
+    slug: '2028',
+    categories: [{ ...template.categories[0], slug: 'next-one', name: 'Next One', simulator: { href: '/simulator/next-one', ...withSummary } }],
+  };
+  assert.deepEqual(simulatorMenu(simulatorSeasons([...seasons, season2028], missionSimulators)).slice(0, 3), [
     { label: 'All simulators', href: '/simulator' },
-    { label: 'Tri d’entrepôt — Robot en fête 2027', href: '/simulator/tri-entrepot' },
+    { label: 'Season 2028', href: '/simulator#season-2028', description: '1 simulator', children: [{ label: 'Next One', href: '/simulator/next-one' }] },
+    season2027,
   ]);
+  // no simulator at all: only the Simulator page; no season but the category of its own: its group alone
+  assert.deepEqual(simulatorMenu([], []), [{ label: 'All simulators', href: '/simulator' }]);
+  assert.deepEqual(simulatorMenu([]), [{ label: 'All simulators', href: '/simulator' }, robotEnFete]);
   // a second simulator of the category (the organiser's « Logistique intelligente », to come) gets its line after the first, by itself
   const [fete] = standaloneCategories;
-  const later = { ...fete.simulators[0], name: 'Plus tard', href: '/simulator/plus-tard', menuLabel: 'Plus tard — Robot en fête 2027' };
+  const later = { ...fete.simulators[0], name: 'Plus tard', href: '/simulator/plus-tard' };
   assert.deepEqual(simulatorMenu([], [{ ...fete, simulators: [...fete.simulators, later] }]), [
     { label: 'All simulators', href: '/simulator' },
-    { label: 'Tri d’entrepôt — Robot en fête 2027', href: '/simulator/tri-entrepot' },
-    { label: 'Plus tard — Robot en fête 2027', href: '/simulator/plus-tard' },
+    { ...robotEnFete, description: '2 simulators', children: [...robotEnFete.children, { label: 'Plus tard', href: '/simulator/plus-tard' }] },
   ]);
+  // a second category of its own gets its group after the first; a category without a simulator gets none
+  const other: StandaloneCategory = { ...fete, slug: 'autre-fete', name: 'Autre fête', simulators: [later] };
+  const empty: StandaloneCategory = { ...fete, slug: 'vide', name: 'Vide', simulators: [] };
+  assert.deepEqual(simulatorMenu(simulatorSeasons(), [...standaloneCategories, empty, other]).slice(3), [
+    robotEnFete,
+    { label: 'Autre fête', href: '/simulator#category-autre-fete', lang: 'fr', description: '1 simulator', children: [{ label: 'Plus tard', href: '/simulator/plus-tard' }] },
+  ]);
+  // ... by the same rule as the Simulator page, which has no part for it either (simulatorCategories(), content/standalone.ts)
+  assert.deepEqual(simulatorCategories([...standaloneCategories, empty, other]).map((category) => category.slug), ['robot-en-fete', 'autre-fete']);
+  assert.deepEqual(simulatorCategories(), standaloneCategories);
+  const page = readFileSync(fromRoot('src/app/simulator/page.tsx'), 'utf8');
+  assert.match(page, /\{simulatorCategories\(\)\.map\(\(category\) => \(\s*<section key=\{category\.slug\}/);
+  assert.ok(!page.includes('standaloneCategories'), 'the page takes its categories from simulatorCategories() only');
+  assert.match(readFileSync(fromRoot('content/site.ts'), 'utf8'), /\.\.\.simulatorCategories\(standalone\)\.map\(/);
 });
 
 test('menu: a category with a long name can give the dropdown a shorter one (menuName); the Simulator page keeps the full name', () => {
@@ -152,17 +268,62 @@ test('menu: a category with a long name can give the dropdown a shorter one (men
       .map((card) => card.href),
     ['/simulator/locker-room'],
   );
-  // no line of the dropdown has two dashes
-  for (const child of simulatorMenu().slice(1)) assert.equal(child.label.split(' — ').length, 2, child.label);
+  // in the menu: "Locker Room" in the group of Season 2026; every other line is the simulator's name as the page shows it
+  const lines = simulatorMenu()
+    .filter(isNavGroup)
+    .flatMap((group) => group.children);
+  assert.deepEqual(lines.find((link) => link.href === '/simulator/locker-room'), { label: 'Locker Room', href: '/simulator/locker-room' });
+  const names = new Map([
+    ...simulatorSeasons().flatMap((section) => section.simulators.map((card) => [card.href, card.menuName ?? card.name] as const)),
+    ...standaloneCategories.flatMap((category) => category.simulators.map((card) => [card.href, card.name] as const)),
+  ]);
+  for (const link of lines) assert.equal(link.label, names.get(link.href), link.href);
 });
 
-test('menu: every line of the Simulator dropdown opens a page of the website', () => {
+test('menu: every line of the Simulator dropdown opens a page of the website (a group: its part of the Simulator page)', async () => {
   const simulator = nav.find((item) => item.label === 'Simulator');
   assert.ok(simulator?.children?.length);
-  for (const { href } of simulator.children) {
-    const page = `src/app${href}/page.tsx`;
+  const html = await simulatorPageHtml();
+  const links = linksOf(simulator.children);
+  assert.equal(links.length, 12);
+  for (const { href } of links) {
+    const [address, id] = href.split('#');
+    const page = `src/app${address}/page.tsx`;
     assert.ok(existsSync(fromRoot(page)), `${href}: ${page}`);
+    if (id !== undefined) {
+      assert.equal(address, '/simulator', href);
+      assert.ok(html.includes(` id="${id}"`), `${href}: an id of the Simulator page`);
+    }
   }
+});
+
+test('README: the Simulator menu and the Simulator page as they are - a group per part of the page, the newest season first; no line "<name> — Season <year>" any more', () => {
+  const readme = readFileSync(fromRoot('README.md'), 'utf8').replace(/\s+/g, ' ');
+  for (const part of [
+    'with one part per season, the newest first — "Season 2027", then "Season 2026"',
+    'then one **group** per part of the page, in its order — "Season 2027", "Season 2026", then "Robot en fête 2027" — each holding its simulators by their name only',
+    'below 1536 px the list opens to the **left** of the dropdown',
+    'a button per group (`aria-expanded`, `aria-controls`, a chevron)',
+    'The row is a link too, to its part of the Simulator page (`/simulator#season-2027`',
+    '("Seasons 2027 · 2026")',
+    // the page's description is written by hand: it does not follow the data
+    "the menu and the Training card take this order from it; the page's description, written by hand in `src/app/simulator/page.tsx`, lists them in the same order and must be edited when a simulator is added",
+    // a category without a simulator: no part and no group (one rule, simulatorCategories())
+    'if it has a simulator: `simulatorCategories()`, which the menu takes too, so a category without one has neither a part nor a group',
+    'Each group also says how many simulators it holds ("5 simulators")',
+    // the computer: the aim, the keyboard both ways, Escape, and the dropdown that closes once clicked
+    "the group's **aim**, a see-through triangle from where the pointer last was on the row to the edge of the list",
+    'and Shift+Tab goes back the same way, through the lines of the group above',
+    'Escape, with the focus or the pointer on the item, closes the dropdown',
+    'this dropdown closes at once: it stays closed until the pointer leaves the item',
+    'a small chevron (pointing right, as in the menus of a computer; none on a screen without hover)',
+  ]) {
+    assert.ok(readme.includes(part), part);
+  }
+  for (const old of ["the menu, the Training card and the page's description follow it", 'and the chevron points to that side']) assert.ok(!readme.includes(old), old);
+  // (the lines of the dropdown of before, and its width)
+  assert.ok(!/ — Season 20\d\d"/.test(readme), 'no line "<name> — Season <year>"');
+  for (const old of ['max-w-sm', '"Season 2026", then "Season 2027"', 'childrenOnOneLine', 'menuLabel']) assert.ok(!readme.includes(old), old);
 });
 
 test('menu: the other items and their dropdowns are as before', () => {
@@ -241,12 +402,8 @@ function withDom(): (() => void) | null {
   };
 }
 
-test('menu on a computer: a line picked in a dropdown lets go of the focus, so the list does not stay open over the new page', async (t) => {
-  const removeDom = withDom();
-  if (!removeDom) {
-    t.skip('jsdom is not installed');
-    return;
-  }
+/** Draws the Header into the document of withDom(), at the given address; returns how to draw it again elsewhere, and to take it away. */
+async function drawHeader(pathname: string): Promise<{ moveTo: (pathname: string) => Promise<void>; remove: () => Promise<void> }> {
   const { act } = await import('react');
   const { createRoot } = await import('react-dom/client');
   // (usePathname() reads the page's address from this context, which Next fills on the website)
@@ -258,35 +415,58 @@ test('menu on a computer: a line picked in a dropdown lets go of the focus, so t
   // (a link here would lead jsdom to a page it cannot open: the click only does what the menu does)
   const stay = (event: Event) => event.preventDefault();
   window.addEventListener('click', stay);
+  const moveTo = (to: string) => act(async () => root.render(createElement(PathnameContext.Provider, { value: to }, createElement(Header))));
+  await moveTo(pathname);
+  return {
+    moveTo,
+    remove: async () => {
+      window.removeEventListener('click', stay);
+      await act(async () => root.unmount());
+    },
+  };
+}
+
+/** What has the focus, in words: a failed assert.equal on the elements themselves would print all of jsdom. */
+function focused(): string {
+  const element = document.activeElement;
+  return element === document.body ? 'the page' : `${element?.tagName} ${element?.textContent}`;
+}
+
+test('menu on a computer: a line picked in a dropdown lets go of the focus, so the list does not stay open over the new page - a group\'s row and its lines too', async (t) => {
+  const removeDom = withDom();
+  if (!removeDom) {
+    t.skip('jsdom is not installed');
+    return;
+  }
+  const { act } = await import('react');
+  const header = await drawHeader('/contact');
   try {
-    await act(async () => root.render(createElement(PathnameContext.Provider, { value: '/contact' }, createElement(Header))));
     const groups = [...document.querySelectorAll('nav[aria-label="Main"] > div.group')];
     const groupOf = (label: string): Element => {
       const group = groups.find((g) => g.querySelector(':scope > a')?.textContent === label);
       assert.ok(group, label);
       return group;
     };
-    // (the list shows on :focus-within of its menu item, that is while the focus is inside it; asked
-    // this way because jsdom's own :focus-within still matches after the focus has gone)
-    const open = (group: Element): boolean => group.contains(document.activeElement);
-    // (what has the focus, in words: a failed assert.equal on the elements themselves would print all of jsdom)
-    const focused = (): string => {
-      const element = document.activeElement;
-      return element === document.body ? 'the page' : `${element?.tagName} ${element?.textContent}`;
-    };
+    // (a list shows on :focus-within of its menu item - and a group's list on :focus-within of its group - that is while
+    // the focus is inside it; asked this way because jsdom's own :focus-within still matches after the focus has gone)
+    const open = (element: Element): boolean => element.contains(document.activeElement);
     let lines = 0;
     for (const item of nav.filter((navItem) => navItem.children)) {
       const group = groupOf(item.label);
       const links = [...group.querySelectorAll<HTMLAnchorElement>(':scope > div a')];
+      // every line in the order of the menu, a group's row followed by its lines: the order of the Tab key
       assert.deepEqual(
         links.map((link) => link.textContent),
-        item.children?.map((child) => child.label),
+        linksOf(item.children ?? []).map((child) => child.label),
       );
       for (const link of links) {
-        // the list shows while one of its lines has the focus (that is how the keyboard opens it) ...
+        // the list shows while one of its lines has the focus (that is how the keyboard opens it) - a group's list
+        // while its row or one of its lines has it ...
         link.focus();
         assert.equal(focused(), `A ${link.textContent}`);
         assert.ok(open(group), `${item.label} / ${link.textContent}: open on focus`);
+        const sub = link.closest('li.group\\/sub');
+        if (sub) assert.ok(open(sub), `${item.label} / ${link.textContent}: its group's list open on focus`);
         // ... and a click on the line (or Enter, which is a click too) lets go of it: Next changes the
         // page without a reload, so a line that kept the focus would keep the list open over the new
         // page, where on a game it covers the Start button and a click there opened another game
@@ -296,7 +476,9 @@ test('menu on a computer: a line picked in a dropdown lets go of the focus, so t
         lines += 1;
       }
     }
-    assert.equal(lines, nav.reduce((sum, item) => sum + (item.children?.length ?? 0), 0));
+    // (the Simulator dropdown: "All simulators", three rows of groups and their eight simulators)
+    assert.equal(lines, nav.reduce((sum, item) => sum + linksOf(item.children ?? []).length, 0));
+    assert.equal(linksOf(nav.find((item) => item.label === 'Simulator')?.children ?? []).length, 12);
     // the menu item itself keeps the focus after a click: on a touch screen, which has no hover, a tap on
     // "Simulator" opens the Simulator page and shows its list, from which a game is then picked
     const simulator = groupOf('Simulator').querySelector<HTMLAnchorElement>(':scope > a');
@@ -306,16 +488,414 @@ test('menu on a computer: a line picked in a dropdown lets go of the focus, so t
     assert.equal(focused(), 'A Simulator');
     assert.ok(open(groupOf('Simulator')));
 
-    // the width of the lists: the usual 14rem (w-56); Simulator's as wide as its longest line, but at most
-    // 24rem (max-w-sm), so that a long simulator name wraps instead of running off the window at 1024 px,
-    // where the list starts about 621 px from the left (621 + 384 = 1005)
-    const widthOf = (label: string): string[] =>
-      (groupOf(label).querySelector(':scope > div')?.className ?? '').split(/\s+/).filter((name) => /^(min-|max-)?w-/.test(name));
-    assert.deepEqual(widthOf('Simulator'), ['w-max', 'min-w-56', 'max-w-sm']);
-    for (const label of ['Seasons', 'Competitions', 'Training']) assert.deepEqual(widthOf(label), ['w-56'], label);
+    // the width of the lists: the usual 14rem (w-56), Simulator's too, and the lists of its groups
+    const widthOf = (element: Element | null): string[] => (element?.className ?? '').split(/\s+/).filter((name) => /^(min-|max-)?w-/.test(name));
+    for (const label of ['Seasons', 'Competitions', 'Training', 'Simulator']) assert.deepEqual(widthOf(groupOf(label).querySelector(':scope > div')), ['w-56'], label);
+    const flyouts = [...groupOf('Simulator').querySelectorAll('li.group\\/sub > div')];
+    assert.equal(flyouts.length, 3);
+    for (const flyout of flyouts) assert.deepEqual(widthOf(flyout), ['w-56']);
   } finally {
-    window.removeEventListener('click', stay);
-    await act(async () => root.unmount());
+    await header.remove();
+    removeDom();
+  }
+});
+
+test('menu on a computer: the Simulator dropdown closes as soon as one of its links is clicked, and on Escape, until the pointer leaves the item or the focus does; the other dropdowns are as before', async (t) => {
+  const removeDom = withDom();
+  if (!removeDom) {
+    t.skip('jsdom is not installed');
+    return;
+  }
+  const { act } = await import('react');
+  const header = await drawHeader('/contact');
+  try {
+    const items = [...document.querySelectorAll('nav[aria-label="Main"] > div.group')];
+    const itemOf = (label: string): Element => {
+      const item = items.find((candidate) => candidate.querySelector(':scope > a')?.textContent === label);
+      assert.ok(item, label);
+      return item;
+    };
+    const topOf = (label: string): HTMLAnchorElement => {
+      const link = itemOf(label).querySelector<HTMLAnchorElement>(':scope > a');
+      assert.ok(link, label);
+      return link;
+    };
+    // (closed: display none, class "hidden", on the box of the dropdown; a dropdown that is not closed shows by CSS, on
+    // hover or focus, as always)
+    const closed = (label: string): boolean => itemOf(label).querySelector(':scope > div')?.classList.contains('hidden') ?? false;
+    // the pointer goes from one element to another, as a browser tells it (React draws mouseenter and mouseleave from these)
+    const pointer = (from: Element, to: Element) =>
+      act(async () => {
+        from.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: to }));
+        to.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, relatedTarget: from }));
+      });
+    const away = document.body;
+    // (in act: the focus that comes or goes changes what the item shows)
+    const focusOn = (element: HTMLElement) => act(async () => element.focus());
+    const simulator = itemOf('Simulator');
+    const links = [...simulator.querySelectorAll<HTMLAnchorElement>(':scope > div a')];
+    assert.equal(links.length, 12);
+    for (const link of links) {
+      // the pointer comes onto the item, then onto the line (or the row), and clicks it: the dropdown closes at once,
+      // and the focus is let go (from 1024 to 1279 px its lists lie over a game's Start, Stop and Pause buttons)
+      await pointer(topOf('Videos'), topOf('Simulator'));
+      await pointer(topOf('Simulator'), link);
+      assert.equal(closed('Simulator'), false, link.textContent ?? '');
+      await focusOn(link);
+      await act(async () => link.click());
+      assert.equal(focused(), 'the page', link.textContent ?? '');
+      assert.ok(closed('Simulator'), `${link.textContent}: closed once clicked`);
+      // ... and it stays so on the new page, while the pointer has not moved; once it leaves the item, the dropdown
+      // is no longer closed (and, without hover or focus, not shown)
+      await header.moveTo(link.getAttribute('href')?.split('#')[0] ?? '/');
+      assert.ok(closed('Simulator'), `${link.textContent}: still closed on the new page`);
+      await pointer(link, away);
+      assert.equal(closed('Simulator'), false, `${link.textContent}: open again once the pointer has left`);
+      await header.moveTo('/contact');
+    }
+    // a click on "Simulator" itself does not close it: on a touch screen its dropdown then shows (focus), to pick a game
+    await pointer(topOf('Videos'), topOf('Simulator'));
+    await focusOn(topOf('Simulator'));
+    await act(async () => topOf('Simulator').click());
+    assert.equal(closed('Simulator'), false);
+    await pointer(topOf('Simulator'), away);
+
+    // a keyboard user who presses Enter on a line, the pointer elsewhere: closed, until the pointer comes onto the item
+    // or the focus into it (so that the next hover shows it)
+    const fireChief = simulator.querySelector<HTMLAnchorElement>('a[href="/simulator/fire-chief"]');
+    assert.ok(fireChief);
+    await focusOn(fireChief);
+    await act(async () => fireChief.click());
+    assert.ok(closed('Simulator'));
+    await pointer(away, topOf('Simulator'));
+    assert.equal(closed('Simulator'), false, 'open again when the pointer comes onto the item');
+    await pointer(topOf('Simulator'), away);
+    await focusOn(fireChief);
+    await act(async () => fireChief.click());
+    assert.ok(closed('Simulator'));
+    await focusOn(topOf('Simulator'));
+    assert.equal(closed('Simulator'), false, 'open again when the focus comes into the item');
+
+    // Escape with the focus in it: the focus goes back to "Simulator", and the dropdown closes (WCAG 1.4.13) ...
+    const escape = () => act(async () => void (document.activeElement ?? document.body).dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    const junior = simulator.querySelector<HTMLAnchorElement>('a[href="/simulator/fire-rescue-junior"]');
+    assert.ok(junior);
+    await focusOn(junior);
+    await escape();
+    assert.equal(focused(), 'A Simulator');
+    assert.ok(closed('Simulator'), 'closed on Escape');
+    // ... until the focus leaves the item (Tab: the next item)
+    await focusOn(topOf('Videos'));
+    assert.equal(closed('Simulator'), false, 'open again once the focus has left');
+    // Escape on the link of the item: closed, the focus stays there
+    await focusOn(topOf('Simulator'));
+    await escape();
+    assert.equal(focused(), 'A Simulator');
+    assert.ok(closed('Simulator'));
+    await focusOn(topOf('Videos'));
+    assert.equal(closed('Simulator'), false);
+    // Escape with neither the focus nor the pointer on the item does nothing
+    await escape();
+    assert.equal(focused(), 'A Videos');
+    assert.equal(closed('Simulator'), false);
+
+    // the other dropdowns are as before: a click on a line lets go of the focus (the test above) but closes nothing
+    // of its own, and Escape does nothing to them
+    for (const label of ['Seasons', 'Competitions', 'Training']) {
+      for (const link of itemOf(label).querySelectorAll<HTMLAnchorElement>(':scope > div a')) {
+        await focusOn(link);
+        await escape();
+        assert.equal(focused(), `A ${link.textContent}`, `${label}: Escape`);
+        await act(async () => link.click());
+        assert.equal(closed(label), false, `${label} / ${link.textContent}`);
+        assert.equal(itemOf(label).querySelector(':scope > div')?.className, itemOf('Seasons').querySelector(':scope > div')?.className);
+      }
+    }
+  } finally {
+    await header.remove();
+    removeDom();
+  }
+});
+
+test('menu on a computer: the aim of a group - a see-through triangle from the pointer on its row to the edge of its list - follows the pointer on the row, goes when the pointer leaves the group or rests on it, and passes a click on to what lies under it', async (t) => {
+  const removeDom = withDom();
+  if (!removeDom) {
+    t.skip('jsdom is not installed');
+    return;
+  }
+  const { act } = await import('react');
+  const header = await drawHeader('/contact');
+  try {
+    const groups = [...document.querySelectorAll('nav[aria-label="Main"] li.group\\/sub')];
+    assert.equal(groups.length, 3);
+    const [season2027] = groups;
+    const row = season2027.querySelector<HTMLAnchorElement>(':scope > a');
+    const aim = season2027.querySelector<HTMLSpanElement>(':scope > div > span[aria-hidden="true"]');
+    const list = season2027.querySelector<HTMLUListElement>(':scope > div > ul');
+    assert.ok(row && aim && list);
+    // where the boxes are at 1440 px (jsdom lays nothing out): the aim over the dropdown, the list to its left
+    const box = (left: number, top: number, width: number, height: number) => () =>
+      ({ left, top, width, height, right: left + width, bottom: top + height, x: left, y: top, toJSON: () => ({}) }) as DOMRect;
+    aim.getBoundingClientRect = box(865, 98, 224, 192);
+    list.getBoundingClientRect = box(641, 98, 220, 192);
+    const move = (target: Element, x: number, y: number) =>
+      act(async () => void target.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: x, clientY: y })));
+    const wait = (ms: number) => act(() => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+    // nothing until the pointer moves on the row (the class clips it all away)
+    assert.equal(aim.style.clipPath, '');
+    // on the row: from the pointer to the list's edge, its top and its bottom (the triangle's left side here)
+    await move(row, 1015, 122);
+    assert.equal(aim.style.clipPath, 'polygon(150px 24px, 0px 0, 0px 100%)');
+    await move(row, 900, 120);
+    assert.equal(aim.style.clipPath, 'polygon(35px 22px, 0px 0, 0px 100%)');
+    // from 1536 px the list opens to the right of the dropdown: its edge is the triangle's right side
+    list.getBoundingClientRect = box(1093, 98, 220, 192);
+    await move(row, 900, 120);
+    assert.equal(aim.style.clipPath, 'polygon(35px 22px, 224px 0, 224px 100%)');
+    // on its way across the aim the pointer does not move it (only the row does), and keeps it while it moves ...
+    await move(aim, 950, 160);
+    await wait(200);
+    await move(aim, 1000, 200);
+    await wait(200);
+    assert.equal(aim.style.clipPath, 'polygon(35px 22px, 224px 0, 224px 100%)');
+    // ... but the pointer that rests on it for 300 ms has it taken away (it wants the row below, under the aim)
+    await wait(150);
+    assert.equal(aim.style.clipPath, '');
+    // in the list, the pointer can rest
+    await move(row, 900, 120);
+    const fireChief = list.querySelector('a[href="/simulator/fire-chief"]');
+    assert.ok(fireChief);
+    await move(aim, 1000, 200);
+    await move(fireChief, 1200, 270);
+    await wait(350);
+    assert.equal(aim.style.clipPath, 'polygon(35px 22px, 224px 0, 224px 100%)');
+    // the pointer leaves the group: gone at once
+    await act(async () => void fireChief.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body })));
+    assert.equal(aim.style.clipPath, '');
+    // a click on the aim is not lost: it goes to what lies under it (here the row of Season 2026), with the aim taken
+    // away first, and the dropdown closes as after any click on a row
+    await move(row, 900, 120);
+    const season2026Row = groups[1].querySelector<HTMLAnchorElement>(':scope > a');
+    assert.ok(season2026Row);
+    const clicked: string[] = [];
+    season2026Row.addEventListener('click', () => clicked.push(aim.style.clipPath === '' ? 'aim away' : 'aim still there'));
+    const asked: number[][] = [];
+    // (jsdom lays nothing out: what lies there is the chevron of the row of Season 2026)
+    const elementFromPoint = (x: number, y: number) => {
+      asked.push([x, y]);
+      return season2026Row.querySelector('svg');
+    };
+    Object.defineProperty(document, 'elementFromPoint', { value: elementFromPoint, configurable: true });
+    try {
+      await act(async () => void aim.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 950, clientY: 160 })));
+    } finally {
+      delete (document as { elementFromPoint?: unknown }).elementFromPoint;
+    }
+    assert.deepEqual(asked, [[950, 160]]);
+    assert.deepEqual(clicked, ['aim away']);
+    assert.ok(document.querySelector('nav[aria-label="Main"] li.group\\/sub')?.closest('ul')?.parentElement?.classList.contains('hidden'), 'closed, as after a click on the row');
+    // each group has its own
+    const aims = groups.map((group) => group.querySelector(':scope > div > span[aria-hidden="true"]'));
+    assert.equal(new Set(aims).size, 3);
+    assert.ok(aims.every(Boolean));
+  } finally {
+    await header.remove();
+    removeDom();
+  }
+});
+
+test('menu on a computer: the Simulator dropdown shows "All simulators" and a row per group, each with a chevron and, beside it, its list, named after it', async () => {
+  const { Header } = await import('../../components/Header');
+  const { PathnameContext } = createRequire(import.meta.url)('next/dist/shared/lib/hooks-client-context.shared-runtime') as {
+    PathnameContext: import('react').Context<string | null>;
+  };
+  const html = renderToStaticMarkup(createElement(PathnameContext.Provider, { value: '/contact' }, createElement(Header)));
+  const desktop = /<nav aria-label="Main" class="hidden [^"]*lg:flex">[^]*?<\/nav>/.exec(html)?.[0] ?? '';
+  assert.ok(desktop, 'the menu of a computer');
+  const items = desktop.split('<div class="group relative">').slice(1);
+  const itemOf = (label: string): string => items.find((item) => item.includes(`>${label}</a>`)) ?? '';
+  const simulator = itemOf('Simulator');
+  assert.ok(simulator);
+  // the dropdown: the same box as the others, but its list does not cut what stands out of it (the lists of the groups)
+  assert.ok(
+    simulator.includes(
+      '<div class="invisible absolute left-0 top-full pt-2 opacity-0 transition-opacity group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100 w-56"><ul class="rounded-lg bg-white py-1.5 shadow-xl ring-1 ring-black/5"><li><a class="block px-4 py-2 text-sm text-ink-700 hover:bg-brand-50 hover:text-brand-700" href="/simulator">All simulators</a></li>',
+    ),
+    simulator,
+  );
+  const groups = [
+    ...simulator.matchAll(
+      /<li class="([^"]+)"( lang="fr")?>(<a [^>]*>)([^<]+)(<svg [^]*?<\/svg>)<\/a>(<span [^>]*>)([^<]*)<\/span><div class="([^"]+)">(<span [^>]*><\/span>)<ul aria-label="([^"]+)" class="[^"]+">([^]*?)<\/ul><\/div><\/li>/g,
+    ),
+  ];
+  assert.deepEqual(
+    groups.map((group) => [group[4], group[2] ?? null, /href="([^"]+)"/.exec(group[3])?.[1], group[10]]),
+    [
+      ['Season 2027', null, '/simulator#season-2027', 'Season 2027'],
+      ['Season 2026', null, '/simulator#season-2026', 'Season 2026'],
+      // the French group and everything in it say lang="fr": its row (a link) and its list
+      ['Robot en fête 2027', ' lang="fr"', '/simulator#category-robot-en-fete', 'Robot en fête 2027'],
+    ],
+  );
+  for (const group of groups) {
+    const [, item, lang, row, label, chevron, description, descriptionText, flyout, aim, , lines] = group;
+    const menuGroup = simulatorMenu().filter(isNavGroup).find((candidate) => candidate.label === label);
+    assert.ok(menuGroup, label);
+    // the group with the focus is drawn over the one under the pointer, and that one over the others: a list shown by
+    // the keyboard is not hidden under one shown by the mouse resting on a row below, and the aim (below) lies over
+    // the rows below its own
+    assert.equal(item, 'group/sub relative hover:z-10 focus-within:z-20', label);
+    // the row: a link that keeps the look of the others, lit while its group is open (hover or focus); and a chevron,
+    // hidden from screen readers, that points right, wherever the list opens (as in the menus of a computer), and is
+    // not there on a screen without hover, where a tap on the row leads to its part of the page and shows no list
+    assert.match(row, /^<a [^>]*class="flex items-center justify-between gap-3 px-4 py-2 text-sm text-ink-700 hover:bg-brand-50 hover:text-brand-700 group-hover\/sub:bg-brand-50 group-hover\/sub:text-brand-700 group-focus-within\/sub:bg-brand-50 group-focus-within\/sub:text-brand-700"/, label);
+    assert.match(chevron, /^<svg aria-hidden="true" [^>]*class="h-3\.5 w-3\.5 shrink-0 \[@media\(hover:none\)\]:hidden">/, label);
+    assert.ok(!/rotate/.test(chevron), `${label}: the chevron is not turned`);
+    // a screen reader hears what the row holds ("Season 2027, link, 5 simulators"): a description, hidden, in the
+    // menu's English (also in the French group)
+    const describedBy = /aria-describedby="([^"]+)"/.exec(row)?.[1];
+    assert.ok(describedBy, `${label}: aria-describedby`);
+    assert.equal(description, `<span id="${describedBy}" hidden=""${lang ? ' lang="en"' : ''}>`, label);
+    assert.equal(descriptionText, menuGroup.description, label);
+    const classes = flyout.split(/\s+/);
+    // shown on hover of its group or focus inside it (CSS only), beside the row: to the left of the dropdown below
+    // 1536 px, to its right from there; it touches the row, and its padding is the gap one sees (no margin: no strip
+    // where the pointer would leave the group on its way to the list)
+    for (const name of ['absolute', '-top-1.5', 'right-full', 'pr-1', '2xl:right-auto', '2xl:left-full', '2xl:pl-1', '2xl:pr-0']) assert.ok(classes.includes(name), `${label}: ${name}`);
+    assert.ok(!classes.some((name) => /^(\w+:)*-?m[trblxy]?-/.test(name)), `${label}: no margin`);
+    // hidden, it is see-through and lets the pointer through, but has no visibility of its own: it hides with the
+    // dropdown, and while the dropdown is open the keyboard reaches its lines (Shift+Tab from the row below)
+    for (const name of ['opacity-0', 'pointer-events-none', 'group-hover/sub:opacity-100', 'group-hover/sub:pointer-events-auto', 'group-focus-within/sub:opacity-100', 'group-focus-within/sub:pointer-events-auto']) {
+      assert.ok(classes.includes(name), `${label}: ${name}`);
+    }
+    assert.ok(!classes.some((name) => /(^|:)(invisible|visible)$/.test(name)), `${label}: no visibility of its own`);
+    // hover intent: shown and hidden 150 ms late while the pointer is in the dropdown, both how it looks and whether
+    // it takes the pointer (pointer-events, a discrete transition); at once for the focus
+    for (const name of ['transition-[opacity,pointer-events]', 'transition-discrete', 'duration-0', 'group-hover:group-not-focus-within/sub:delay-150']) assert.ok(classes.includes(name), `${label}: ${name}`);
+    // the aim: a box over the dropdown, beside the list (to its right below 1536 px, to its left from there), empty
+    // until the pointer moves on the row (a clip-path of nothing), hidden from screen readers
+    assert.equal(aim, '<span aria-hidden="true" class="absolute inset-y-0 left-full w-full [clip-path:inset(50%)] 2xl:left-auto 2xl:right-full"></span>', label);
+    // its lines: links like those of the other dropdowns, each its simulator's name
+    assert.equal(
+      lines,
+      menuGroup.children.map((link) => `<li><a class="block px-4 py-2 text-sm text-ink-700 hover:bg-brand-50 hover:text-brand-700" href="${link.href}">${link.label}</a></li>`).join(''),
+    );
+  }
+  // (each description has its own id)
+  assert.equal(new Set(groups.map((group) => /aria-describedby="([^"]+)"/.exec(group[3])?.[1])).size, 3);
+  // the Simulator dropdown is "All simulators" and the three groups, nothing else
+  assert.equal(simulator.match(/<li/g)?.length, 1 + 3 + 8);
+  // the other dropdowns keep their markup exactly: same box, same list (overflow-hidden), same lines, no group
+  const line = (label: string, href: string) => `<li><a class="block px-4 py-2 text-sm text-ink-700 hover:bg-brand-50 hover:text-brand-700" href="${href}">${label}</a></li>`;
+  const box = (lines: string) =>
+    `<div class="invisible absolute left-0 top-full pt-2 opacity-0 transition-opacity group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100 w-56"><ul class="overflow-hidden rounded-lg bg-white py-1.5 shadow-xl ring-1 ring-black/5">${lines}</ul></div></div>`;
+  assert.ok(itemOf('Seasons').endsWith(box(line('Season 2027 — Fire Rescue ✨', '/season/2027') + line('Season 2026 — Capelli Sport', '/season/2026'))), itemOf('Seasons'));
+  assert.ok(itemOf('Competitions').endsWith(box(line('National', '/competitions/national') + line('International', '/competitions/international'))));
+  assert.ok(itemOf('Training').endsWith(box(line('Training &amp; hints', '/training') + line('Workshops &amp; events', '/workshops') + line('Competition kits', '/kits'))));
+  for (const label of ['Seasons', 'Competitions', 'Training']) assert.ok(!itemOf(label).includes('group/sub'), label);
+});
+
+test('menu on a phone: under "Simulator", "All simulators" and a button per group that shows its simulators below it - closed, but the group of the page one is on', async (t) => {
+  const removeDom = withDom();
+  if (!removeDom) {
+    t.skip('jsdom is not installed');
+    return;
+  }
+  const { act } = await import('react');
+  const header = await drawHeader('/simulator/locker-room');
+  try {
+    const toggle = (): HTMLButtonElement => {
+      const button = document.querySelector<HTMLButtonElement>('button[aria-controls="mobile-nav"]');
+      assert.ok(button, 'the button of the menu');
+      return button;
+    };
+    const openMenu = async (): Promise<Element> => {
+      await act(async () => toggle().click());
+      const menu = document.getElementById('mobile-nav');
+      assert.ok(menu, 'the menu of a phone is open');
+      return menu;
+    };
+    const simulatorItem = (menu: Element): Element => {
+      const item = [...menu.querySelectorAll(':scope ul > li')].find((li) => li.querySelector(':scope > a')?.textContent === 'Simulator');
+      assert.ok(item, 'Simulator in the menu of a phone');
+      return item;
+    };
+    /** Each group of the Simulator item: its name, whether it is open, whether its list shows, and its lines. */
+    const groupsOf = (item: Element) =>
+      [...item.querySelectorAll<HTMLButtonElement>(':scope > ul > li > button')].map((button) => {
+        const list = document.getElementById(button.getAttribute('aria-controls') ?? '');
+        assert.ok(list, `${button.textContent}: the list it controls`);
+        assert.equal(list.parentElement, button.parentElement, `${button.textContent}: its list right under it`);
+        return {
+          button,
+          name: button.textContent,
+          expanded: button.getAttribute('aria-expanded'),
+          shown: !list.hidden,
+          lang: button.closest('li')?.getAttribute('lang') ?? null,
+          lines: [...list.querySelectorAll('a')].map((link) => [link.textContent, link.getAttribute('href')]),
+        };
+      });
+
+    let menu = await openMenu();
+    let item = simulatorItem(menu);
+    // "All simulators" first, a link; then the groups, buttons (with a chevron hidden from screen readers), in the order of the page
+    assert.deepEqual(
+      [...item.querySelectorAll(':scope > ul > li > :first-child')].map((element) => `${element.tagName} ${element.textContent}`),
+      ['A All simulators', 'BUTTON Season 2027', 'BUTTON Season 2026', 'BUTTON Robot en fête 2027'],
+    );
+    for (const button of item.querySelectorAll(':scope > ul > li > button')) {
+      assert.equal(button.getAttribute('type'), 'button');
+      assert.equal(button.querySelector('svg')?.getAttribute('aria-hidden'), 'true');
+    }
+    // on the page of Locker Room, its group (Season 2026) starts open; the others are closed
+    assert.deepEqual(
+      groupsOf(item).map(({ name, expanded, shown, lang }) => [name, expanded, shown, lang]),
+      [
+        ['Season 2027', 'false', false, null],
+        ['Season 2026', 'true', true, null],
+        ['Robot en fête 2027', 'false', false, 'fr'],
+      ],
+    );
+    // each holds the simulators of its group, by their name, as the dropdown of a computer
+    assert.deepEqual(
+      groupsOf(item).map(({ name, lines }) => [name, lines]),
+      simulatorMenu()
+        .filter(isNavGroup)
+        .map((group) => [group.label, group.children.map((link) => [link.label, link.href])]),
+    );
+    // a tap opens a group (its chevron turns down), a second tap closes it
+    const [season2027] = groupsOf(item);
+    await act(async () => season2027.button.click());
+    assert.deepEqual(groupsOf(item).map(({ expanded, shown }) => [expanded, shown]), [['true', true], ['true', true], ['false', false]]);
+    assert.match(season2027.button.querySelector('svg')?.getAttribute('class') ?? '', /\brotate-90\b/);
+    await act(async () => season2027.button.click());
+    assert.deepEqual(groupsOf(item).map(({ expanded }) => expanded), ['false', 'true', 'false']);
+    // a tap on a simulator opens its page, and the menu closes with the page (as every link of the menu does)
+    await act(async () => groupsOf(item)[2].button.click());
+    const tri = item.querySelector<HTMLAnchorElement>('a[href="/simulator/tri-entrepot"]');
+    assert.ok(tri);
+    await act(async () => tri.click());
+    await header.moveTo('/simulator/tri-entrepot');
+    assert.equal(document.getElementById('mobile-nav'), null, 'the menu is closed');
+    // opened again on that page: all the groups closed but Robot en fête 2027, which holds it
+    menu = await openMenu();
+    item = simulatorItem(menu);
+    assert.deepEqual(groupsOf(item).map(({ name, expanded }) => [name, expanded]), [['Season 2027', 'false'], ['Season 2026', 'false'], ['Robot en fête 2027', 'true']]);
+    // ... and on a page of no simulator, all closed
+    await act(async () => toggle().click());
+    await header.moveTo('/contact');
+    item = simulatorItem(await openMenu());
+    assert.deepEqual(groupsOf(item).map(({ expanded }) => expanded), ['false', 'false', 'false']);
+    // the other items keep their lines as before: links only, no button
+    const others = [...document.querySelectorAll('#mobile-nav > div > ul > li')].filter((li) => li.querySelector(':scope > ul') && li !== item);
+    assert.deepEqual(
+      others.map((li) => [li.querySelector(':scope > a')?.textContent, [...li.querySelectorAll(':scope > ul > li > *')].map((element) => element.outerHTML)]),
+      nav
+        .filter((navItem) => navItem.children && navItem.label !== 'Simulator')
+        .map((navItem) => [navItem.label, (navItem.children ?? []).map((child) => `<a class="block px-3 py-2 text-sm text-white/65" href="${child.href}">${child.label.replace(/&/g, '&amp;')}</a>`)]),
+    );
+  } finally {
+    await header.remove();
     removeDom();
   }
 });
@@ -371,16 +951,16 @@ test('pages: every simulator is /simulator/<game>, with its page folder, its add
   assert.ok(!existsSync(fromRoot('src/app/simulator/fire-rescue')), 'the page of before the split is gone: its address is a redirect');
 });
 
-test('Simulator page: seven simulators - Season 2026 (Locker Room, Warehouse Sort), then Season 2027 (Fire Cadet, Fire Fighter, Fire Rescue Junior, Fire Rescue Senior, Fire Chief)', () => {
+test('Simulator page: seven simulators - Season 2027 (Fire Cadet, Fire Fighter, Fire Rescue Junior, Fire Rescue Senior, Fire Chief), then Season 2026 (Locker Room, Warehouse Sort): the newest season first', () => {
   assert.deepEqual(
     simulatorSeasons().map((section) => [section.year, section.simulators.map((simulator) => simulator.name)]),
     [
-      [2026, ['Capelli Starter — Locker Room', 'Warehouse Sort']],
       [2027, ['Fire Cadet', 'Fire Fighter', 'Fire Rescue Junior', 'Fire Rescue Senior', 'Fire Chief']],
+      [2026, ['Capelli Starter — Locker Room', 'Warehouse Sort']],
     ],
   );
   assert.equal(simulatorSeasons().flatMap((section) => section.simulators).length, 7);
-  const [season2026, season2027] = simulatorSeasons();
+  const [season2027, season2026] = simulatorSeasons();
   // (the category first, with its age group, its season and its "About" link; then the mission of the local event)
   assert.deepEqual(season2026.simulators.map((card) => [card.href, card.labels, card.about]), [
     ['/simulator/locker-room', ['13–15 years', 'Season 2026'], '/season/2026/locker-room'],
@@ -485,13 +1065,19 @@ test('Simulator page: a simulator added to a season appears in its part by itsel
     ...missionSimulators,
     { name: 'Later Mission', season: 2027, label: 'Level', event: 'Local event', href: '/simulator/later', ...withSummary },
   ];
+  // (in its season's place: the newest season first, so an older one after the others)
   assert.deepEqual(
     simulatorSeasons(added, missions).map((section) => [section.year, section.simulators.map((simulator) => simulator.href)]),
     [
-      [2025, ['/simulator/new']],
-      [2026, ['/simulator/locker-room', '/simulator/warehouse-sort']],
       [2027, ['/simulator/fire-cadet', '/simulator/fire-fighter', '/simulator/fire-rescue-junior', '/simulator/fire-rescue-senior', '/simulator/fire-chief', '/simulator/later']],
+      [2026, ['/simulator/locker-room', '/simulator/warehouse-sort']],
+      [2025, ['/simulator/new']],
     ],
+  );
+  // (the seasons are in any order in the list handed in: the sections are the newest first all the same)
+  assert.deepEqual(
+    simulatorSeasons([...added].reverse(), missions).map((section) => section.year),
+    [2027, 2026, 2025],
   );
   // no simulator at all: no part at all
   assert.deepEqual(simulatorSeasons(seasons.map((season) => ({ ...season, categories: season.categories.map(({ simulator: _, ...category }) => category) })), []), []);
@@ -507,9 +1093,10 @@ test('Simulator page: each card is one link (picture, name, sentences) that name
   // the page is about every simulator, so it names both robots, not only the mBot2
   assert.equal(metadata.title, 'Robot simulators');
   assert.match(metadata.description ?? '', /^Program a Makeblock mBot2 with mBlock-style blocks, or lay mTiny coding cards, /);
+  // ... in the order of the page: the 2027 categories, then the Season 2026 ones, then Robot en fête 2027
   assert.match(
     metadata.description ?? '',
-    /the 2027 categories Fire Cadet \(mTiny, ages 4–7\), Fire Fighter \(ages 8–10\), Fire Rescue Junior \(ages 10–12\), Fire Rescue Senior \(ages 13–15\) and Fire Chief \(ages 14–17\)\./,
+    /: the 2027 categories Fire Cadet \(mTiny, ages 4–7\), Fire Fighter \(ages 8–10\), Fire Rescue Junior \(ages 10–12\), Fire Rescue Senior \(ages 13–15\) and Fire Chief \(ages 14–17\), and the Season 2026 category Locker Room \(Capelli, ages 13–15\) and Warehouse Sort, the beginner mission of the Inspire category \(Season 2026\)\. And Robot en fête 2027 /,
   );
   const html = renderToStaticMarkup(createElement(SimulatorPage));
   assert.ok(html.includes('mBot2 · mTiny · In the browser'), 'the eyebrow');
@@ -517,9 +1104,9 @@ test('Simulator page: each card is one link (picture, name, sentences) that name
   // the breadcrumb of the hero: Home / Simulator
   assert.match(html, /<nav aria-label="Breadcrumb"[^>]*><ol[^>]*><li[^>]*><a[^>]*href="\/">Home<\/a>.*?<\/li><li[^>]*><span[^>]*>Simulator<\/span><\/li><\/ol><\/nav>/);
   assert.match(html, /<h1[^>]*>Simulator<\/h1>/);
-  // the two parts, in this order
+  // the two parts, in this order: the newest season first
   const headings = [...html.matchAll(/<h2 id="season-(\d+)"[^>]*>Season (\d+)<\/h2>/g)].map((match) => match[2]);
-  assert.deepEqual(headings, ['2026', '2027']);
+  assert.deepEqual(headings, ['2027', '2026']);
   for (const section of simulatorSeasons()) {
     const part = html.slice(html.indexOf(`<section aria-labelledby="season-${section.year}"`), html.indexOf('</section>', html.indexOf(`season-${section.year}`)));
     for (const card of section.simulators) {
@@ -651,12 +1238,13 @@ test('Training page: one card that leads to /simulator, and no card of a single 
 test('Training page: the card names the seasons and the simulators of the Simulator page, from the same data', () => {
   const card = trainingTracks.find((track) => track.href === '/simulator');
   assert.deepEqual(card, simulatorTrack(simulatorSeasons()));
-  assert.equal(card?.ageRange, 'Seasons 2026 · 2027');
+  // (in the order of the Simulator page: the newest season first)
+  assert.equal(card?.ageRange, 'Seasons 2027 · 2026');
   assert.equal(card?.name, 'Robot simulators');
   assert.equal(
     card?.summary,
     'Program the robot with blocks (mBot2) or coding cards (mTiny) and watch it play on the competition mat: ' +
-      'Capelli Starter — Locker Room and Warehouse Sort (Season 2026), Fire Cadet, Fire Fighter, Fire Rescue Junior, Fire Rescue Senior and Fire Chief (Season 2027). ' +
+      'Fire Cadet, Fire Fighter, Fire Rescue Junior, Fire Rescue Senior and Fire Chief (Season 2027), Capelli Starter — Locker Room and Warehouse Sort (Season 2026). ' +
       'Works in the browser, no robot needed.',
   );
   // a simulator added later is named on the card too, in its season
@@ -666,7 +1254,7 @@ test('Training page: the card names the seasons and the simulators of the Simula
   ];
   assert.match(
     simulatorTrack(simulatorSeasons(seasons, missions)).summary,
-    /: Capelli Starter — Locker Room and Warehouse Sort \(Season 2026\), Fire Cadet, Fire Fighter, Fire Rescue Junior, Fire Rescue Senior, Fire Chief and Later Mission \(Season 2027\)\. /,
+    /: Fire Cadet, Fire Fighter, Fire Rescue Junior, Fire Rescue Senior, Fire Chief and Later Mission \(Season 2027\), Capelli Starter — Locker Room and Warehouse Sort \(Season 2026\)\. /,
   );
   // one season only: "Season", not "Seasons"
   const only2027 = simulatorTrack(simulatorSeasons(seasons.filter((season) => season.year !== 2026), []));
@@ -948,8 +1536,8 @@ test('Robot en fête 2027: a category of its own - in no season, with no age gro
   assert.deepEqual(entry.simulators.map((simulator) => simulator.name), ['Tri d’entrepôt']);
   const [simulator] = entry.simulators;
   assert.deepEqual(
-    [simulator.href, simulator.mat, simulator.menuLabel, simulator.pageTitle],
-    ['/simulator/tri-entrepot', '/simulator/warehouse-sort/mat.webp', 'Tri d’entrepôt — Robot en fête 2027', 'Essaie le simulateur Tri d’entrepôt'],
+    [simulator.href, simulator.mat, simulator.pageTitle],
+    ['/simulator/tri-entrepot', '/simulator/warehouse-sort/mat.webp', 'Essaie le simulateur Tri d’entrepôt'],
   );
   assert.match(simulator.summary, /^Construis un programme avec des blocs comme dans mBlock et regarde le mBot2 trier des cubes rouges et verts sur le tapis Inspire : /);
   assert.ok(simulator.summary.includes(' — avec toutes les dispositions des cubes, et le score que donnent les règles de la mission pour débutants. '), simulator.summary);
@@ -977,8 +1565,16 @@ test('Robot en fête 2027: a category of its own - in no season, with no age gro
     assert.ok(!/ [:;!?]/.test(text), `${at}: a plain space before : ; ! ? - ${text}`);
     assert.ok(!/'/.test(text), `${at}: ’, not ' - ${text}`);
   }
-  // ... but the menu line, which is English, as the whole menu - "<simulator> — <category>", both French proper names: one dash, as every line of the dropdown
-  assert.deepEqual(simulator.menuLabel.split(' — '), [simulator.name, entry.name]);
+  // in the menu, which is English, a group of its own after the seasons': its name, then its simulators by their
+  // name, all French and saying so (lang="fr"); no English line of it of its own (no menuLabel any more)
+  assert.deepEqual(simulatorMenu().at(-1), {
+    label: entry.name,
+    href: `/simulator#category-${entry.slug}`,
+    lang: entry.lang,
+    description: '1 simulator',
+    children: entry.simulators.map((card) => ({ label: card.name, href: card.href })),
+  });
+  assert.ok(!('menuLabel' in simulator));
   // the mat is Warehouse Sort's picture (the same mission on the same mat), and nothing in public/ has the page's address
   assert.equal(simulator.mat, missionSimulators.find((mission) => mission.name === 'Warehouse Sort')?.mat);
   assert.ok(statSync(fromRoot(`public${simulator.mat}`)).isFile());
@@ -1039,14 +1635,17 @@ test('Simulator page: after the seasons, a part of its own for Robot en fête 20
     default: () => Parameters<typeof renderToStaticMarkup>[0];
     metadata: { description?: string };
   };
-  // the page's description names it after the seasons' categories, in one more English sentence
+  // the page's description names it after the seasons' categories (Season 2027's, then Season 2026's, as the page), in one more English sentence
   assert.match(
     metadata.description ?? '',
-    /Fire Chief \(ages 14–17\)\. And Robot en fête 2027 \(in French\): Tri d’entrepôt, the French version of Warehouse Sort\. Free, nothing to install\.$/,
+    /Warehouse Sort, the beginner mission of the Inspire category \(Season 2026\)\. And Robot en fête 2027 \(in French\): Tri d’entrepôt, the French version of Warehouse Sort\. Free, nothing to install\.$/,
   );
   const html = renderToStaticMarkup(createElement(SimulatorPage));
   const start = html.indexOf('<section aria-labelledby="category-robot-en-fete" lang="fr">');
-  assert.ok(start > html.indexOf('<section aria-labelledby="season-2027"') && html.indexOf('<section aria-labelledby="season-2027"') > 0, 'after Season 2027');
+  // after every season: Season 2027, then Season 2026, then it (the organiser's order)
+  const season2027 = html.indexOf('<section aria-labelledby="season-2027"');
+  const season2026 = html.indexOf('<section aria-labelledby="season-2026"');
+  assert.ok(season2027 > 0 && season2026 > season2027 && start > season2026, 'after Season 2027 and Season 2026');
   const part = html.slice(start, html.indexOf('</section>', start) + '</section>'.length);
   // the last part of the page, with its own heading and one card
   assert.equal(html.indexOf('<section', start + 1), -1, 'the last part');
@@ -1108,7 +1707,9 @@ test('README: the section of Tri d’entrepôt (Robot en fête 2027), after Ware
   assert.ok(!/(?<!src)\/simulator\/robot-en-fete\b/.test(readme), 'the simulator\'s address before its name is nowhere');
   // where it is: its own entry, outside the seasons, which content/seasons.ts does not know
   assert.ok(flat.includes('**`content/standalone.ts`**') && flat.includes('`content/seasons.ts` does not know it'));
-  assert.ok(flat.includes('`text={FR_TEXT}`') && flat.includes('"Tri d’entrepôt — Robot en fête 2027"'));
+  assert.ok(flat.includes('`text={FR_TEXT}`') && flat.includes('its group "Robot en fête 2027" holds the line "Tri d’entrepôt"'));
+  // (its line of before, "<simulator> — <category>", is gone with the menu of before)
+  assert.ok(!readme.includes('Tri d’entrepôt — Robot en fête 2027'));
   // the six examples of its catalog, each with its level and its title, in catalog order, and the points they score
   const rows = [...section.matchAll(/^\| `(fete-[a-z-]+)` \| (starter|intermediate|advanced) \| ([^|]+) \| ([^|]+) \|/gm)];
   assert.deepEqual(
@@ -1145,7 +1746,10 @@ test('Robot en fête 2027 is proposed by Eddy Bachaalany: its page and its part 
   assert.match(french, /<p[^>]*>Proposé par <span[^>]*>Eddy Bachaalany<\/span><\/p><\/section>$/);
   assert.ok(!french.includes('RoboHolic') && !french.includes('Powered by'), french);
   const academy = html.indexOf('Powered by <span class="font-semibold text-ink-700">RoboHolic Robotics Academy</span>');
-  assert.ok(academy > html.indexOf('Season 2027') && academy < html.indexOf('lang="fr"'), 'the academy credit sits between the seasons and the French part');
+  assert.ok(
+    academy > html.indexOf('<section aria-labelledby="season-2026"') && academy > html.indexOf('<section aria-labelledby="season-2027"') && academy < html.indexOf('lang="fr"'),
+    'the academy credit sits between the seasons and the French part',
+  );
   assert.equal(html.split('RoboHolic').length - 1, 1, 'the academy is named once');
 
   // the page /robot-en-fete: the credit in its French hero

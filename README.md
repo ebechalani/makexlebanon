@@ -383,8 +383,8 @@ visitor by visitor, which of them to show and to open. See "Member codes for the
 examples" below.
 
 Visitors reach each page from the Simulator page (the **Simulator** item of the menu, whose
-dropdown also opens each simulator directly: "Fire Rescue Junior — Season 2027", "Fire Rescue
-Senior — Season 2027"), its category page and the Season 2027 block on the homepage; the Season
+dropdown also opens each simulator directly: "Fire Rescue Junior" and "Fire Rescue Senior" in its
+group "Season 2027"), its category page and the Season 2027 block on the homepage; the Season
 2027 page marks both categories with an "Online simulator" label. All of that comes from the
 `simulator` entry on each of the two categories in `content/seasons.ts`. Remove an entry and its
 links disappear; the simulator page itself stays.
@@ -861,10 +861,14 @@ with "Powered by …", the header height.
 
 The simulators have a section of their own on the website: **Simulator** in the menu, between
 Training and Videos, leads to `/simulator`. It is one page (`src/app/simulator/page.tsx`, titled
-"Robot simulators") that lists the eight simulators of two robots — Locker Room and Warehouse Sort
-(Season 2026), Fire Cadet, Fire Fighter, Fire Rescue Junior, Fire Rescue Senior and Fire Chief (Season 2027), and
-Tri d’entrepôt (Robot en fête 2027, no season); Fire Cadet is played with the
-mTiny, the others with the mBot2 — with one part per season — "Season 2026", then "Season 2027" —
+"Robot simulators") that lists the eight simulators of two robots — Fire Cadet, Fire Fighter, Fire
+Rescue Junior, Fire Rescue Senior and Fire Chief (Season 2027), Locker Room and Warehouse Sort
+(Season 2026), and Tri d’entrepôt (Robot en fête 2027, no season); Fire Cadet is played with the
+mTiny, the others with the mBot2 — with one part per season, the newest first — "Season 2027", then
+"Season 2026" (the organiser's order: "season 2027, season 2026, robot en fête"; `simulatorSeasons()`
+sorts them so, and the menu and the Training card take this order from it; the page's description,
+written by hand in `src/app/simulator/page.tsx`, lists them in the same order and must be edited
+when a simulator is added) —
 and in each part one card per simulator: the picture of its mat, its two labels (age group and season, or for a mission
 without an age group its category and level, and its event), its name and two sentences. The
 whole card is one link to the simulator; under the card of a category is the link "About
@@ -892,28 +896,70 @@ it is shown, after the categories of that season; it has two labels of its own (
 `event`) and no "About" link. A season without a simulator gets no part. A category that belongs
 to no season at all (Robot en fête 2027, whose simulator Tri d’entrepôt is the French version of
 Warehouse Sort) is an entry of `standaloneCategories` in `content/standalone.ts`: after the seasons
-it gets a part of its own, headed with its name and in its language (`lang="fr"`), with one card
+it gets a part of its own (if it has a simulator: `simulatorCategories()`, which the menu takes
+too, so a category without one has neither a part nor a group, as a season without one), headed
+with its name and in its language (`lang="fr"`), with one card
 per item of its `simulators`, which takes all its words from that entry ("Ouvrir le simulateur
 Tri d’entrepôt", "À propos de Robot en fête 2027"), and whose "About" link leads to the category's
 own page, `/<slug>`. `content/seasons.ts` does not know it, so no
 season, count or list changes for it. The Training page
 keeps one card that leads to `/simulator` (`simulatorTrack()` in `trainingTracks`, same file),
 "Robot simulators": its badge and its sentence name the seasons and the simulators, worked out
-from `simulatorSeasons()` too, so a simulator added later is named there by itself. The page and
+from `simulatorSeasons()` too, so a simulator added later is named there by itself, and in the same
+order as the page ("Seasons 2027 · 2026"). The page and
 the card name both robots ("blocks (mBot2) or coding cards (mTiny)"); the page of each game names
 its own robot in its title row ("Fire Cadet simulator · mTiny", "Fire Rescue Senior simulator · mBot2").
 
 The **Simulator** item of the menu has a dropdown, built by `simulatorMenu()` in
-`content/site.ts` from the same `simulatorSeasons()`: "All simulators" (this page), then one
-line per simulator in the order of the page, as "<name> — Season <year>" ("Warehouse Sort —
-Season 2026"), and after them one line per simulator of a category of its own, from `content/standalone.ts`
-("Tri d’entrepôt — Robot en fête 2027": the menu is English, and these two French names are proper names). A simulator added later gets its line by itself; on a phone the lines are listed
-under "Simulator" in the menu. Keep simulator names short: on a computer the dropdown is as
-wide as its longest line but at most 24rem (`max-w-sm` in `src/components/Header.tsx`), so that
-at 1024 px it still ends inside the window; a longer line breaks onto a second one. A category
-with a long name gives its simulator a shorter one for the menu with `menuName` (Capelli
-Starter — Locker Room is "Locker Room — Season 2026" in the dropdown); the Simulator page keeps
-the full name.
+`content/site.ts` from the same `simulatorSeasons()` and from `content/standalone.ts`: "All
+simulators" (this page), then one **group** per part of the page, in its order — "Season 2027",
+"Season 2026", then "Robot en fête 2027" — each holding its simulators by their name only, in the
+order of the page ("Fire Cadet", "Fire Fighter", "Fire Rescue Junior", "Fire Rescue Senior", "Fire
+Chief"; "Locker Room", "Warehouse Sort"; « Tri d’entrepôt »). The menu is English; the group of a
+category of its own shows French names only, its own and its simulators', and says so
+(`lang="fr"`). A simulator, a season or a category added later gets its line or its group by
+itself, in its place; a season or a category without a simulator gets no group (and no part of
+the page). Each group also says how many simulators it holds ("5 simulators"): on a computer a
+screen reader hears it after the row's name (`aria-describedby`, in the menu's English).
+
+- **On a computer** (1024 px and up) the dropdown lists "All simulators" and the rows of the
+  groups, each with a small chevron (pointing right, as in the menus of a computer; none on a
+  screen without hover). Hovering a row, or the focus in it, shows the group's list
+  beside the dropdown (CSS only, like the dropdowns: the named Tailwind group `group/sub` in
+  `src/components/Header.tsx`). The Simulator item stands near the right end of the menu, so below
+  1536 px the list opens to the **left** of the dropdown, where there is room at every width; from
+  1536 px (`2xl`) it opens to the right. The list touches its
+  row (its padding is the gap one sees), so the pointer that crosses to it keeps it open; and while
+  the pointer is in the dropdown a list shows and goes 150 ms late. On its way from a row to a line
+  low in the list ("Fire Chief") the pointer cuts across the rows below, or passes below the
+  dropdown's corner, outside both: the group's **aim**, a see-through triangle from where the
+  pointer last was on the row to the edge of the list (a `clip-path` set as the pointer moves on
+  the row), holds the group the whole way, so the list stays, at any speed (menu-aim). The pointer
+  that goes down the rows leaves it at once; one that rests on it for 300 ms has it taken away (the
+  row under it takes over at the next move), and a click on it goes to what lies under it. The
+  group with the focus, then the one under the pointer, is drawn over the others. A list that does
+  not show is see-through and lets the pointer through (`opacity`, `pointer-events`), but has no
+  visibility of its own: the keyboard reaches "All simulators", each row and, right after a row, the
+  lines of its group (the list shows at once while the focus is in it), and Shift+Tab goes back the
+  same way, through the lines of the group above; each list is named after its group
+  (`aria-label`). Escape, with the focus or the pointer on the item, closes the dropdown (the focus
+  goes back to "Simulator"). Every link lets go of the focus when it is clicked, and this dropdown
+  closes at once: it stays closed until the pointer leaves the item (or comes back onto it, or the
+  focus comes in or goes out), so that nothing stays over the new page — from 1024 to 1279 px the
+  lists lie over a game's Start, Stop and Pause buttons. The other dropdowns do as they always did.
+  The row is a link too, to its part of the Simulator page (`/simulator#season-2027`,
+  `/simulator#category-robot-en-fete`: the ids of the headings, which keep the height of the sticky
+  header above them, `scroll-mt-24`): on a touch screen, which cannot hover, a tap on a row leads
+  there, to the cards of the same simulators.
+- **On a phone** the menu lists, under "Simulator", "All simulators" and a button per group
+  (`aria-expanded`, `aria-controls`, a chevron) that shows its simulators indented below it. All
+  are closed when the menu opens, but the group of the page one is on, which starts open; a tap on
+  a simulator opens it and closes the menu.
+
+The dropdown, its groups and their lists are 14rem wide (`w-56`), as the other dropdowns: a long
+simulator name breaks onto a second line. A category with a long name gives its simulator a
+shorter one for the menu with `menuName` (Capelli Starter — Locker Room is "Locker Room" in the
+group "Season 2026"); the Simulator page keeps the full name.
 
 The simulators used to be under Training: `/training/simulator` and
 `/training/simulator/<game>`. Those addresses are permanent redirects to the new ones
@@ -1734,9 +1780,9 @@ A few names are this game's own:
 | arrangement, bay, finish pad, restart | disposition, baie, aire d'arrivée, relance |
 | Starter, Intermediate, Advanced | Premiers pas, Intermédiaire, Avancé |
 
-**What stays English.** The website around it: the header, the menu (its line in the Simulator
-dropdown reads "Tri d’entrepôt — Robot en fête 2027": two French proper names in the English menu),
-the footer, the breadcrumbs of `/robot-en-fete` (Home / Simulator / Robot en fête 2027) and the
+**What stays English.** The website around it: the header, the menu (in the Simulator dropdown,
+after the seasons, its group "Robot en fête 2027" holds the line "Tri d’entrepôt": French names in
+the English menu, the group marked `lang="fr"`), the footer, the breadcrumbs of `/robot-en-fete` (Home / Simulator / Robot en fête 2027) and the
 share picture. And the **values a program gets**:
 the colour sensor gives `red`, `green`, `blue`, … `none`, a condition is `true` or `false`, the
 same on both pages, as we believe the robot gives them (not verified: question 1 below). The
@@ -1749,15 +1795,15 @@ French in brackets: `red (rouge)`. The block menus show French and store the Eng
 
 Its entry is **`content/standalone.ts`**, a list of the categories of their own: its name, its
 robot, the lead of its page, the words of its page, and its `simulators` — today one, Tri
-d’entrepôt, with its address, its sentences, the words of its card, its picture (the mat of
-Warehouse Sort) and its line in the menu. Every text is in French but the menu line, and every one
+d’entrepôt, with its address, its sentences, the words of its card and its picture (the mat of
+Warehouse Sort); its line in the menu is its name. Every text is in French, and every one
 is required, so nothing on a card or a page can fall back to English. A second simulator is one
 more item of `simulators`: its card, its part of the category's page, its line in the menu and the
 sitemap follow by themselves, with no change to any page. `content/seasons.ts`
 does not know it: no season page, no count of categories, the homepage, the Training card and
 the lists of Season 2026 and Season 2027 are exactly as they were. From that entry:
 
-- **The Simulator page** shows, after the two seasons, a part of its own headed "Robot en fête
+- **The Simulator page** shows, after the two seasons (Season 2027, then Season 2026), a part of its own headed "Robot en fête
   2027", in French (`lang="fr"`), with one card per simulator, like the others: the mat, the
   labels "En français" and "mBot2", "Simulateur Tri d’entrepôt", its sentences, "Ouvrir le
   simulateur Tri d’entrepôt", and under it "À propos de Robot en fête 2027", the link to the
@@ -1767,8 +1813,9 @@ the lists of Season 2026 and Season 2027 are exactly as they were. From that ent
   ("mBot2", no age) and one part per simulator, "Essaie le simulateur Tri d’entrepôt" with the
   button "Ouvrir le simulateur". The French texts say `lang="fr"`; the breadcrumbs are English. It
   has no photos, no downloads and no other categories next to it: it belongs to no season.
-- **The menu**: "Tri d’entrepôt — Robot en fête 2027", after the lines of the seasons
-  (`simulatorMenu()` in `content/site.ts`).
+- **The menu**: a group "Robot en fête 2027" in the Simulator dropdown, after the groups of the
+  seasons, with the line "Tri d’entrepôt"; the group and its line say `lang="fr"` (`simulatorMenu()`
+  in `content/site.ts`, drawn by `src/components/Header.tsx`).
 - **The sitemap** has the category's page and the simulator's page.
 
 The simulator's page itself, `src/app/simulator/tri-entrepot/page.tsx`, has a French title
@@ -1862,9 +1909,9 @@ English pages did not change.
    servos)? In particular: is the start block **"lorsque CyberPi démarre"** (our choice, from
    French mBot sheets) or "quand CyberPi démarre"? And "lorsque le bouton A est pressé", "bouton A
    pressé ?"?
-3. **What stays English.** The site's menu, header, footer and breadcrumbs stay English; the menu
-   line reads "Tri d’entrepôt — Robot en fête 2027". Warehouses E1 – E4 and codes with V for
-   "vert": fine?
+3. **What stays English.** The site's menu, header, footer and breadcrumbs stay English; in the
+   menu, after the seasons, the group "Robot en fête 2027" holds the line "Tri d’entrepôt" (French
+   names, marked `lang="fr"`). Warehouses E1 – E4 and codes with V for "vert": fine?
 4. **Its page and its place.** Its own page at `/robot-en-fete`; on the Simulator page a part of
    its own after the seasons, headed "Robot en fête 2027"; not on the Training page's card. Is
    that what you want?
@@ -2368,7 +2415,7 @@ for all games: "Member codes for the simulator examples" above).
 | `public/simulator/fire-cadet/mat.webp` | The picture of the map (2500 px, 2 px per mm). There is no `mat-sensor.webp`: the mTiny has no floor sensor here |
 
 The category has a `simulator` entry in `content/seasons.ts`, so the Simulator page shows it first
-in the part "Season 2027", the menu's dropdown has the line "Fire Cadet — Season 2027", the season
+in the part "Season 2027", the menu's dropdown has the line "Fire Cadet" in its group "Season 2027", the season
 page labels it "Online simulator", its category page has the "Try the Fire Cadet simulator" block,
 the homepage's 2027 block has "Try the simulator", and the Training page's card names it. It has
 no `menuName` ("Fire Cadet" is short; question 21).
@@ -2960,7 +3007,7 @@ Its tests: `field.test.ts`, `scenario.test.ts`, `game.test.ts`, `integration.tes
 
 The category has a `simulator` entry in `content/seasons.ts`, so the Simulator page shows it in the
 part "Season 2027" (after Fire Cadet, in the order of that file), the menu's dropdown has the line
-"Fire Fighter — Season 2027", the season page labels it "Online simulator", its category page has
+"Fire Fighter" in its group "Season 2027", the season page labels it "Online simulator", its category page has
 the "Try the Fire Fighter simulator" block, the homepage's 2027 block has "Try the simulator", and
 the Training page's card names it. It has no `menuName` ("Fire Fighter" is short).
 
