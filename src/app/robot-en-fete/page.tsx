@@ -70,6 +70,10 @@ export default function RobotEnFetePage() {
         <div className="flex flex-wrap gap-2 text-sm">
           <span className="rounded-full bg-white/10 px-3 py-1.5 ring-1 ring-inset ring-white/20">{category.platform}</span>
         </div>
+        {/* who its simulators are powered by: the same name as in their title row */}
+        <p className="mt-4 text-sm text-white/70">
+          {category.page.poweredByLabel} <span className="font-semibold text-white">{category.poweredBy}</span>
+        </p>
       </PageHero>
 
       {/* Its simulators, as a category page of a season shows its own */}

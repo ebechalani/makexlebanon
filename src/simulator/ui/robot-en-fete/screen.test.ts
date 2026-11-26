@@ -27,7 +27,7 @@ import { EXAMPLES_GAMES } from '../member-unlock';
 import { ScreenTextContext } from '../text/context';
 import { FR_TEXT } from '../text/fr';
 import { FR_TITLE_TEXT } from '../text/fr-title';
-import { TitleTextContext } from '../text/title-context';
+import { PoweredByContext, TitleTextContext } from '../text/title-context';
 import { TitleBar } from '../TitleBar';
 import { TRI_ENTREPOT_TITLE } from './title';
 
@@ -111,7 +111,7 @@ test('page: its address and its French title and description; the loader shows t
   assert.ok(description.includes(' — avec toutes les dispositions des cubes, et le score que donnent les règles de la mission pour débutants « Warehouse Sort ». '), description);
   assert.match(description, / Gratuit, dans le navigateur\. Tri d’entrepôt est la version française de Warehouse Sort\.$/);
   assert.ok(!/ [:;!?»]|« /.test(description), 'a no-break space before : ; ! ? » and after «');
-  assert.match(read('../../../app/simulator/tri-entrepot/page.tsx'), /return <RobotEnFeteLoader \/>;/);
+  assert.match(read('../../../app/simulator/tri-entrepot/page.tsx'), /return <RobotEnFeteLoader poweredBy=\{category\.poweredBy\} \/>;/);
   // the loader: the French words of the title row above the loading screen (not the whole table:
   // every page fetches the loader ahead, through the menu), lang="fr" on its frame, the title row of this page
   const loader = code(read('./RobotEnFeteLoader.tsx'));
@@ -212,4 +212,26 @@ test('the English page of Warehouse Sort is as it was: no language, no French ta
   // (the English page's share data keeps the site's own locale)
   assert.match(code(read('../../../app/simulator/warehouse-sort/page.tsx')), /\slocale: site\.locale,\s/);
   assert.match(code(read('../warehouse-sort/WarehouseSortLoader.tsx')), /<div className=\{PAGE_FRAME\}>\s*<TitleBar title="Warehouse Sort" wrapOnPhone \/>/);
+});
+
+test('the title row of Tri d’entrepôt says « Proposé par Eddy Bachaalany » - while it loads and on the screen - and the English title rows keep the academy', () => {
+  // the page hands the loader the name of content/standalone.ts; the loader sets it above the loading screen and the screen
+  const page = code(read('../../../app/simulator/tri-entrepot/page.tsx'));
+  assert.match(page, /standaloneCategories\.find\(\(entry\) => entry\.slug === 'robot-en-fete'\)/);
+  assert.match(page, /return <RobotEnFeteLoader poweredBy=\{category\.poweredBy\} \/>;/);
+  const loader = code(read('./RobotEnFeteLoader.tsx'));
+  assert.match(loader, /<PoweredByContext\.Provider value=\{poweredBy\}>\s*<RobotEnFeteSimulator \/>\s*<\/PoweredByContext\.Provider>/);
+  const french = (poweredBy: string | null) =>
+    renderToStaticMarkup(
+      createElement(PoweredByContext.Provider, { value: poweredBy }, createElement(TitleTextContext.Provider, { value: FR_TITLE_TEXT }, createElement(TitleBar, { title: TRI_ENTREPOT_TITLE, wrapOnPhone: true }))),
+    );
+  const row = french('Eddy Bachaalany');
+  // (twice: under the title on a computer, on a line of its own on a phone)
+  assert.equal(row.split('Proposé par <span class="font-semibold text-white/85">Eddy Bachaalany</span>').length - 1, 2, row);
+  assert.ok(!row.includes('RoboHolic'), row);
+  // nobody set: the academy, as on every season simulator
+  assert.ok(french(null).includes('Proposé par <span class="font-semibold text-white/85">RoboHolic Robotics Academy</span>'));
+  const english = renderToStaticMarkup(createElement(TitleBar, { title: 'Warehouse Sort', wrapOnPhone: true }));
+  assert.equal(english.split('Powered by <span class="font-semibold text-white/85">RoboHolic Robotics Academy</span>').length - 1, 2, english);
+  assert.ok(!english.includes('Eddy'), english);
 });

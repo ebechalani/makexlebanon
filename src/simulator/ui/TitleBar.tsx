@@ -10,7 +10,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { POWERED_BY } from './powered-by';
-import { useTitleText } from './text/title-context';
+import { usePoweredBy, useTitleText } from './text/title-context';
 import type { TitleText } from './text/types';
 
 /** The pages above the simulator on the website: the Simulator page lists all the simulators. */
@@ -78,9 +78,11 @@ export { POWERED_BY };
 
 function PoweredBy({ className }: { className: string }) {
   const text = useTitleText();
+  // (a Robot en fête simulator names who its page hands its loader: ./text/title-context.tsx PoweredByContext)
+  const name = usePoweredBy() ?? POWERED_BY;
   return (
     <p className={`text-[11px] leading-tight text-white/60 ${className}`} data-powered-by>
-      {text.poweredBy}<span className="font-semibold text-white/85">{POWERED_BY}</span>
+      {text.poweredBy}<span className="font-semibold text-white/85">{name}</span>
     </p>
   );
 }

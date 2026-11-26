@@ -221,8 +221,15 @@ The categories of their own, outside every season: today **Robot en fête 2027**
 simulators are named by their mission — today **Tri d’entrepôt**, the French version of Warehouse
 Sort (a second, « Logistique intelligente », is to come: one more item of its `simulators`). Its
 name, its texts (in French: the cards of its simulators on the Simulator page, its page
-`/robot-en-fete`), its simulators and their lines in the menu. No season counts it (see "The Tri
-d’entrepôt simulator (Robot en fête 2027)").
+`/robot-en-fete`), its simulators and their lines in the menu, and who it is proposed by
+(`poweredBy`: **Eddy Bachaalany**, the organiser's choice, with `page.poweredByLabel` "Proposé
+par"). That name takes the place of the academy of the season simulators (`POWERED_BY`,
+`src/simulator/ui/powered-by.ts`) in the title row of each of its simulators — the simulator's page
+hands it to its loader, which sets it in `PoweredByContext`
+(`src/simulator/ui/text/title-context.tsx`) above the loading screen and the screen — at the end of
+its part of the Simulator page and in the hero of its own page. On the Simulator page the academy's
+"Powered by RoboHolic Robotics Academy" stands right after the seasons, before that part. No season
+counts it (see "The Tri d’entrepôt simulator (Robot en fête 2027)").
 
 ---
 
