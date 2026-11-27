@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
  * Makes new codes for the examples of the simulators: member codes, or - with --advanced -
- * advanced codes. One set of codes serves all seven games, Fire Rescue, Fire Chief, Warehouse
- * Sort, Locker Room, Fire Cadet, Fire Fighter and Robot en fête 2027: there is no code "for a
- * game".
+ * advanced codes. One set of codes serves all eight games, Fire Rescue, Fire Chief, Warehouse
+ * Sort, Locker Room, Fire Cadet, Fire Fighter, Tri d’entrepôt (Robot en fête 2027) and Logistique
+ * intelligente (Robot en fête 2027): there is no code "for a game".
  *
  *   node scripts/generate-simulator-codes.mjs --count 500 --out ~/Documents/makex-simulator-codes.csv
  *   node scripts/generate-simulator-codes.mjs --advanced --count 10 --out ~/Documents/makex-advanced-codes.csv
@@ -160,13 +160,14 @@ function entryLine(no, fingerprint, kind) {
  */
 export function freshListFile() {
   return `/**
- * Codes for the examples of the simulators - for all seven games, Fire Rescue, Fire Chief,
- * Warehouse Sort, Locker Room, Fire Cadet, Fire Fighter and Robot en fête 2027.
+ * Codes for the examples of the simulators - for all eight games, Fire Rescue, Fire Chief,
+ * Warehouse Sort, Locker Room, Fire Cadet, Fire Fighter, Tri d’entrepôt (Robot en fête 2027) and
+ * Logistique intelligente (Robot en fête 2027).
  *
  * Each game has an Examples window with ready-made programs: seven in Fire Rescue, six in
  * Fire Chief, six in Warehouse Sort, six in Locker Room, six in Fire Cadet, six in Fire Fighter,
- * six in Robot en fête 2027. This file decides who gets which of them. The examples are in three
- * groups, and there are two kinds of codes:
+ * six in Tri d’entrepôt, six in Logistique intelligente. This file decides who gets which of them.
+ * The examples are in three groups, and there are two kinds of codes:
  *
  *   GROUP                         WHO SEES THE CARD            WHO CAN OPEN IT
  *   open to everyone              everybody                    everybody, without a code
@@ -179,11 +180,12 @@ export function freshListFile() {
  * code, do not see its card, its title or the heading above it - nothing tells them that it
  * exists.
  *
- * ONE SET OF CODES FOR ALL SEVEN GAMES. There is no code "for Fire Rescue", "for Fire Chief",
- * "for Warehouse Sort", "for Locker Room", "for Fire Cadet", "for Fire Fighter" or "for Robot en
- * fête 2027": a member code opens the examples for members in every game, an advanced code opens
- * every example in every game. Somebody who has typed a code in one game does not have to type
- * it again in another. Cancelling a code cancels it in all seven.
+ * ONE SET OF CODES FOR ALL EIGHT GAMES. There is no code "for Fire Rescue", "for Fire Chief",
+ * "for Warehouse Sort", "for Locker Room", "for Fire Cadet", "for Fire Fighter", "for Tri
+ * d’entrepôt" or "for Logistique intelligente": a member code opens the examples for members in
+ * every game, an advanced code opens every example in every game. Somebody who has typed a code
+ * in one game does not have to type it again in another. Cancelling a code cancels it in all
+ * eight.
  *
  * The four things you decide here, in this order:
  *
@@ -193,15 +195,17 @@ export function freshListFile() {
  *   4. which advanced codes work                             (at the very end of the file)
  *
  * An example that is on neither list 1 nor list 2 is "for members". Lists 1 and 2 hold the
- * examples of all seven games together: an example is named by its id, every id of Fire Chief
+ * examples of all eight games together: an example is named by its id, every id of Fire Chief
  * begins with "chief-", every id of Warehouse Sort with "sort-", every id of Locker Room with
- * "locker-", every id of Fire Cadet with "cadet-", every id of Fire Fighter with "fighter-" and
- * every id of Robot en fête 2027 with "fete-".
+ * "locker-", every id of Fire Cadet with "cadet-", every id of Fire Fighter with "fighter-", every
+ * id of Tri d’entrepôt with "fete-" and every id of Logistique intelligente with "logi-".
  *
- * Robot en fête 2027 is the Warehouse Sort mission in French: the same six programs, with French
- * titles and texts, on a page of its own. Its examples have ids of their own, so a line about an
- * example of Warehouse Sort ("sort-") decides nothing on the French page ("fete-"): to open or to
- * hide an example on both pages, write both ids.
+ * Tri d’entrepôt (Robot en fête 2027) is the Warehouse Sort mission in French: the same six
+ * programs, with French titles and texts, on a page of its own. Its examples have ids of their
+ * own, so a line about an example of Warehouse Sort ("sort-") decides nothing on the French page
+ * ("fete-"): to open or to hide an example on both pages, write both ids. Logistique intelligente
+ * (Robot en fête 2027) is the regular mission of MakeX Inspire 2024 in French, with six examples
+ * of its own ("logi-").
  *
  * Read "Member codes for the simulator examples" in README.md first. After every change:
  * save, commit and push. The change is live once Vercel has redeployed the site.
@@ -273,7 +277,7 @@ export function freshListFile() {
  *     'fighter-right-bay'      Two red cubes: bakery and hospital          (intermediate)
  *     'fighter-whole-mission'  The whole Fire Fighter mission              (advanced)
  *
- *   Robot en fête 2027 (six)
+ *   Tri d’entrepôt (Robot en fête 2027) (six)
  *
  *     'fete-leave-start'     Sortir de la zone de départ et s’arrêter      (starter)
  *     'fete-white-line'      Suivre la ligne blanche jusqu’au T            (starter)
@@ -281,6 +285,15 @@ export function freshListFile() {
  *     'fete-one-cube'        Mettre un cube dans sa baie                   (intermediate)
  *     'fete-two-cubes'       Deux cubes, puis se garer                     (intermediate)
  *     'fete-all-cubes'       Trier les cubes et se garer                   (advanced)
+ *
+ *   Logistique intelligente (Robot en fête 2027) (six)
+ *
+ *     'logi-ligne-croix'     Suivre la ligne jusqu’à la croix              (starter)
+ *     'logi-cube-dessus'     Prendre le cube du dessus                     (starter)
+ *     'logi-un-cube-e8'      Un cube dans l’entrepôt E8                    (starter)
+ *     'logi-pile-e7'         Une pile entière dans l’entrepôt E7           (intermediate)
+ *     'logi-empiler-e6'      Empiler deux cubes dans l’entrepôt E6         (intermediate)
+ *     'logi-toute-mission'   Toute la mission : 500 points                 (advanced)
  *
  * Mind the two that look alike: 'full-mission' is the one of Fire Rescue, 'chief-full-mission'
  * the one of Fire Chief.
@@ -326,10 +339,14 @@ export const examplesOpenToEveryone: string[] = [
   'fighter-first-grab',
   'fighter-line-to-t',
   'fighter-yellow-x',
-  // Robot en fête 2027: the three starter examples
+  // Tri d’entrepôt (Robot en fête 2027): the three starter examples
   'fete-leave-start',
   'fete-white-line',
   'fete-cube-colour',
+  // Logistique intelligente (Robot en fête 2027): the three starter examples
+  'logi-ligne-croix',
+  'logi-cube-dessus',
+  'logi-un-cube-e8',
 ];
 
 // =====================================================================================
@@ -341,7 +358,7 @@ export const examplesOpenToEveryone: string[] = [
  * and a member with an ordinary member code - does not get to see that these examples exist:
  * no card, no title, no "Advanced" heading.
  *
- * The ids are the same forty-three as above. To hide an example from everybody but the holders of
+ * The ids are the same forty-nine as above. To hide an example from everybody but the holders of
  * an advanced code, write its id here. To show it to all members again (with a lock for
  * visitors), take its line out.
  *
@@ -365,8 +382,10 @@ export const examplesForAdvancedCodesOnly: string[] = [
   'cadet-all-four',
   // Fire Fighter: the advanced example
   'fighter-whole-mission',
-  // Robot en fête 2027: the advanced example
+  // Tri d’entrepôt (Robot en fête 2027): the advanced example
   'fete-all-cubes',
+  // Logistique intelligente (Robot en fête 2027): the advanced example
+  'logi-toute-mission',
 ];
 
 // =====================================================================================
@@ -619,7 +638,7 @@ function isInside(folder, file) {
 function usage() {
   return [
     'Makes new codes for the examples of the simulators: member codes, or with --advanced',
-    'advanced codes. The same codes work in all seven games, Fire Rescue, Fire Chief, Warehouse Sort, Locker Room, Fire Cadet, Fire Fighter and Robot en fête 2027.',
+    'advanced codes. The same codes work in all eight games, Fire Rescue, Fire Chief, Warehouse Sort, Locker Room, Fire Cadet, Fire Fighter, Tri d’entrepôt (Robot en fête 2027) and Logistique intelligente (Robot en fête 2027).',
     '',
     '  node scripts/generate-simulator-codes.mjs --count 500 --out ~/Documents/makex-simulator-codes.csv',
     '  node scripts/generate-simulator-codes.mjs --advanced --count 10 --out ~/Documents/makex-advanced-codes.csv',

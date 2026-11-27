@@ -289,7 +289,7 @@ test('fixedSetup: left out it is as always; true takes out the "Test on many ...
   assert.match(plain, /<span class="shrink-0">The field<\/span><\/button>/);
 });
 
-test('fixedSetup: only this screen passes it; the general screen uses it in its two places and nowhere else', async () => {
+test('fixedSetup: of the English screens only this one passes it (and the French screen of Logistique intelligente); the general screen uses it in its two places and nowhere else', async () => {
   const page = code(read('./FireFighterSimulator.tsx'));
   assert.match(page, /\sfixedSetup\s/);
   for (const other of ['../fire-rescue/FireRescueSimulator.tsx', '../fire-rescue-junior/FireRescueJuniorSimulator.tsx', '../fire-chief/FireChiefSimulator.tsx', '../warehouse-sort/WarehouseSortSimulator.tsx', '../locker-room/LockerRoomSimulator.tsx']) {

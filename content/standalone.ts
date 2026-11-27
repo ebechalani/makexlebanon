@@ -3,13 +3,14 @@
  *
  * Robot en fête 2027 is one (the organiser: "une catégorie seule robot en fête 2027", "à part, sa
  * propre fiche", "fiche en français"). Its simulators are French and named by their mission (the
- * organiser's choice): today « Tri d’entrepôt », the French version of the Warehouse Sort
- * simulator - the same beginner mission, all in French, the blocks included. (A second one,
- * « Logistique intelligente », is to come: it is one more item of `simulators`, and no page needs a
- * change for it.) The category has its own page (/robot-en-fete), a part of its own on the
- * Simulator page after the seasons, with a card for each of its simulators, a group of its own in
- * the Simulator dropdown of the menu, after the seasons' (its name, then its simulators by their
- * name), and each simulator its own page (/simulator/tri-entrepot).
+ * organiser's choice): « Tri d’entrepôt », the French version of the Warehouse Sort simulator -
+ * the same beginner mission, all in French, the blocks included - and « Logistique intelligente »,
+ * the regular mission of MakeX Inspire 2024 ("Smart Logistics"), all in French too, on a mat of its
+ * own. (A third one would be one more item of `simulators`: no page needs a change for it.) The
+ * category has its own page (/robot-en-fete), a part of its own on the Simulator page after the
+ * seasons, with a card for each of its simulators, a group of its own in the Simulator dropdown of
+ * the menu, after the seasons' (its name, then its simulators by their name), and each simulator
+ * its own page (/simulator/tri-entrepot, /simulator/logistique-intelligente).
  *
  * Nothing here is counted by a season: ./seasons.ts does not import this file, so no season page,
  * no count of categories and no list built from the seasons changes because of it. There is no
@@ -102,13 +103,18 @@ export const standaloneCategories: StandaloneCategory[] = [
     platform: 'mBot2',
     // (the organiser's choice: Robot en fête 2027 is proposed by Eddy Bachaalany, not by the academy of the season simulators)
     poweredBy: 'Eddy Bachaalany',
+    // (the lead of its page names both simulators; our wording, not the organiser's: question 12 of the
+    // design of Logistique intelligente, "Page Robot en fête 2027", asks the organiser to confirm it)
     summary:
-      `La version française de Warehouse Sort${NB}: la même mission pour débutants, entièrement en français, blocs compris. ` +
-      'Le robot trie des cubes rouges et verts, laisse le cube bleu à sa place, puis se gare.',
+      `Deux simulateurs du mBot2, entièrement en français, blocs compris${NB}: Tri d’entrepôt, la version française de Warehouse Sort, ` +
+      'et Logistique intelligente, la mission normale de MakeX Inspire 2024. ' +
+      `Dans le premier, le robot trie des cubes rouges et verts${NB}; dans le second, il range dix cubes jaunes dans huit entrepôts.`,
     page: {
       title: 'Robot en fête 2027',
       // (the first sentence of `summary`: the design's table gives this page no description of its own)
-      description: `La version française de Warehouse Sort${NB}: la même mission pour débutants, entièrement en français, blocs compris.`,
+      description:
+        `Deux simulateurs du mBot2, entièrement en français, blocs compris${NB}: Tri d’entrepôt, la version française de Warehouse Sort, ` +
+        'et Logistique intelligente, la mission normale de MakeX Inspire 2024.',
       eyebrow: '2027',
       simulatorEyebrow: 'S’entraîner en ligne',
       open: 'Ouvrir le simulateur',
@@ -135,6 +141,27 @@ export const standaloneCategories: StandaloneCategory[] = [
           labels: ['En français', 'mBot2'],
         },
         pageTitle: 'Essaie le simulateur Tri d’entrepôt',
+      },
+      {
+        // (the regular mission of MakeX Inspire 2024, "Smart Logistics", in French: src/simulator/logistique-intelligente/game.ts)
+        name: 'Logistique intelligente',
+        href: '/simulator/logistique-intelligente',
+        summary:
+          `Construis un programme avec des blocs comme dans mBlock et regarde le mBot2 ranger dix cubes jaunes dans les entrepôts du tapis MakeX Inspire${NB}: ` +
+          // (no-break spaces: the dash never starts a line, nor « points » a line without its number)
+          `deux cubes au plus par entrepôt, le deuxième posé sur le premier${NB}— ` +
+          `avec le score de la mission normale${NB}: 500${NB}points au plus. Tout est en français, les blocs aussi. ` +
+          `Le simulateur fonctionne dans le navigateur${NB}: pas besoin de robot ni d’installation.`,
+        // (its own mat: public/simulator/logistique-intelligente/)
+        mat: '/simulator/logistique-intelligente/mat.webp',
+        card: {
+          heading: 'Simulateur Logistique intelligente',
+          open: 'Ouvrir le simulateur Logistique intelligente',
+          matAlt: 'Le tapis du simulateur Logistique intelligente, vu de dessus',
+          about: 'À propos de Robot en fête 2027',
+          labels: ['En français', 'mBot2'],
+        },
+        pageTitle: 'Essaie le simulateur Logistique intelligente',
       },
     ],
   },

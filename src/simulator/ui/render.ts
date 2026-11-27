@@ -426,6 +426,10 @@ export function drawBody(ctx: CanvasRenderingContext2D, body: Body, devicePerMm:
   const edge = rgbCss(shade(fill, -0.45));
   const { w, l } = body;
   const size = Math.min(w, l);
+  // a platform is drawn as a tower - except a cube that others can stand on (Logistique
+  // intelligente: a cube of a stack of two), which is drawn as a cube. No body of the games before
+  // it is a cube and a platform.
+  const tower = body.platform && body.kind !== CUBE_KIND;
 
   ctx.save();
   ctx.translate(body.x, body.y);
@@ -433,7 +437,7 @@ export function drawBody(ctx: CanvasRenderingContext2D, body: Body, devicePerMm:
 
   // base shape = the exact footprint the referee measures
   castShadow(ctx, body.z + body.h, devicePerMm);
-  roundRect(ctx, -w / 2, -l / 2, w, l, body.platform ? 5 : 6);
+  roundRect(ctx, -w / 2, -l / 2, w, l, tower ? 5 : 6);
   ctx.fillStyle = body.fill;
   ctx.fill();
   noShadow(ctx);
@@ -442,7 +446,7 @@ export function drawBody(ctx: CanvasRenderingContext2D, body: Body, devicePerMm:
   ctx.stroke();
 
   let ink = inkOn(fill);
-  if (body.platform) {
+  if (tower) {
     // tower: a lighter top plate inside a darker rim
     const inset = Math.min(8, size * 0.12);
     roundRect(ctx, -w / 2 + inset, -l / 2 + inset, w - 2 * inset, l - 2 * inset, 3);
@@ -472,7 +476,8 @@ export function drawBody(ctx: CanvasRenderingContext2D, body: Body, devicePerMm:
     roundRect(ctx, -w / 2 + inset, -l / 2 + inset, w - 2 * inset, l - 2 * inset, 3);
     ctx.fillStyle = rgbCss(shade(fill, 0.18));
     ctx.fill();
-    ink = '#ffffff';
+    // (the number on a cube that others can stand on - a yellow one - is written dark)
+    ink = body.platform ? inkOn(shade(fill, 0.18)) : '#ffffff';
   } else if (body.grippable) {
     // bucket: an open container, darker inside
     ctx.beginPath();
@@ -488,7 +493,7 @@ export function drawBody(ctx: CanvasRenderingContext2D, body: Body, devicePerMm:
   // label, always upright so it can be read whichever way the element is turned
   if (body.label) {
     ctx.rotate(-body.angle);
-    const fontSize = body.platform ? size * 0.34 : size * 0.44;
+    const fontSize = tower ? size * 0.34 : size * 0.44;
     ctx.font = `700 ${fontSize}px ${FONT}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -1471,6 +1476,31 @@ type StageWords = Pick<StageText, 'rulerLabels'>;
 /** The table the mat lies on: the website's ink-600 (the frame of the stage in StageCanvas.tsx has the same colour). */
 export const TABLE_COLOR = '#2c3a5c';
 
+/**
+ * What stands on the body the claw holds - and what stands on that, and so on - lowest first.
+ * With Body.keepsRiders (Logistique intelligente: a stack of two cubes taken by its bottom cube)
+ * they stay on it and rise with it, so the stage draws them over the robot, as it draws the held
+ * body. Empty in every game before it: there, the claw takes nothing along (core/engine.ts
+ * grab(): whatever stood on a platform it takes comes down).
+ */
+export function ridersOfHeld(bodies: readonly Body[], holding: string | null): Body[] {
+  if (holding === null) return [];
+  const riders: Body[] = [];
+  const carried = new Set<string>([holding]);
+  // a rider stands on the held body or on a rider found before it: pass again until none is new
+  for (let found = true; found; ) {
+    found = false;
+    for (const b of bodies) {
+      if (b.held || b.restingOn === null || carried.has(b.id) || !carried.has(b.restingOn)) continue;
+      carried.add(b.id);
+      riders.push(b);
+      found = true;
+    }
+  }
+  riders.sort((a, b) => a.z - b.z);
+  return riders;
+}
+
 export function drawStage(ctx: CanvasRenderingContext2D, scene: StageScene): void {
   const { sim, view, options, painters } = scene;
   const devicePerMm = view.scale * view.dpr;
@@ -1510,17 +1540,19 @@ export function drawStage(ctx: CanvasRenderingContext2D, scene: StageScene): voi
   else drawWalls(ctx, walls, view);
   if (options.overlays && namesOverWalls) drawZoneNames(ctx, scene.overlays, view);
 
-  // game elements, lowest first, so that what stands on a tower is drawn over the tower
+  // game elements, lowest first, so that what stands on a tower is drawn over the tower; what
+  // stands on the body in the claw rises with it, over the robot: it is drawn after the robot
   const holding = sim.world.robot.gripper.holding;
-  const standing = sim.world.bodies.filter((b) => b.id !== holding && !b.held);
+  const riders = ridersOfHeld(sim.world.bodies, holding);
+  const standing = sim.world.bodies.filter((b) => b.id !== holding && !b.held && (riders.length === 0 || !riders.includes(b)));
   standing.sort((a, b) => a.z - b.z);
 
   const sensors = options.sensors ? sim.readSensors() : null;
   const beam = sensors ? beamOf(sim, sensors) : null;
   if (beam) drawUltrasonicBeam(ctx, beam, view);
 
-  for (const body of standing) {
-    if (painters?.body?.(ctx, body, view)) continue;
+  const drawElement = (body: Body): void => {
+    if (painters?.body?.(ctx, body, view)) return;
     if (body.kind === FIRE_KIND) {
       // the fire: its sign first, then the body itself on top, with an outline that shows on a small stage too
       drawFlameSign(ctx, body, view);
@@ -1528,9 +1560,12 @@ export function drawStage(ctx: CanvasRenderingContext2D, scene: StageScene): voi
     } else {
       drawBody(ctx, body, devicePerMm);
     }
-  }
+  };
+  for (const body of standing) drawElement(body);
   if (painters?.robot) painters.robot(ctx, sim, view);
   else drawRobot(ctx, sim, devicePerMm);
+  // (empty in every game before Logistique intelligente: see ridersOfHeld)
+  for (const body of riders) drawElement(body);
   // (only a game whose referee holds something has World.props: every other game draws nothing more here)
   drawProps(ctx, sim, view, devicePerMm);
   drawFanAir(ctx, sim, view);

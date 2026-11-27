@@ -42,6 +42,8 @@ import { buildToolbox, paletteToolbox, SEE_MBLOCK_CODE, TOOLBOX, toolboxBlock, t
 
 const NB = ' ';
 const ROBOT_EN_FETE = 'robot-en-fete';
+/** The second French simulator of Robot en fête 2027: a palette of its own (French only), the robot of Warehouse Sort. */
+const LOGISTIQUE = 'logistique-intelligente';
 
 /** The placeholders of a row, sorted: "%1,%2". */
 const holes = (message: string): string => (message.match(/%\d+/g) ?? []).sort().join(',');
@@ -219,6 +221,24 @@ describe('the palette in French', () => {
     assert.deepEqual(TOOLBOX, paletteToolbox());
     // no French word in any English palette
     for (const id of PALETTE_IDS) assert.equal(/[éèàçû’]|Capteur|Pince|pomme/.test(JSON.stringify(paletteToolbox(id))), false, id);
+  });
+
+  test('Logistique intelligente: a palette of its own - the categories of Warehouse Sort, in French the words of Tri d’entrepôt - and no version of Warehouse Sort', () => {
+    assert.ok(PALETTE_IDS.includes(LOGISTIQUE as never));
+    assert.equal(paletteOf(LOGISTIQUE), LOGISTIQUE);
+    assert.deepEqual(paletteCategories(LOGISTIQUE), paletteCategories('warehouse-sort'));
+    // (a program saved here is a program of this game, not of Warehouse Sort: no version, of either kind)
+    assert.equal(versionOf(LOGISTIQUE), undefined);
+    assert.deepEqual(LANGUAGE_VERSIONS, { [ROBOT_EN_FETE]: 'warehouse-sort' });
+    // no English hover text of its own: the page is French only (its French ones: the French workspace below)
+    assert.equal(PALETTE_TOOLTIPS[LOGISTIQUE as keyof typeof PALETTE_TOOLTIPS], undefined);
+    const french = paletteToolbox(LOGISTIQUE, 'fr');
+    assert.deepEqual(french, paletteToolbox(ROBOT_EN_FETE, 'fr'));
+    assert.deepEqual(
+      french.contents.map((c) => c.name),
+      ['CyberPi', 'Capteurs', 'Événements', 'Contrôle', 'Opérateurs', 'Variables', 'Mes blocs', 'Châssis mBot2', 'Servomoteurs', 'Pince', 'Capteur quad RGB', 'Capteur à ultrasons 2', 'Capteur de couleur'],
+    );
+    assert.deepEqual(toolboxBlockTypes(french), toolboxBlockTypes(paletteToolbox('warehouse-sort')));
   });
 });
 
@@ -442,6 +462,38 @@ describe('a French workspace (real Blockly)', () => {
       fr.dispose(false);
     }
     assert.deepEqual(problems, []);
+  });
+
+  test('Logistique intelligente: its French editor shows the three French hover texts of Warehouse Sort (the white line, a cube); a French editor of another palette shows the blocks\' own', () => {
+    const tips = (palette: string): Record<string, string> => {
+      const editor = createEditor(Blockly, 'fr2', { sounds: false, palette, locale: 'fr', frenchMessages: blocklyFrench });
+      try {
+        return Object.fromEntries(
+          Object.keys(FR_PALETTE_TOOLTIPS).map((type) => {
+            const { kind: _kind, ...state } = toolboxBlock(type);
+            const block = Blockly.serialization.blocks.append(state as never, editor);
+            const tip = Blockly.Tooltip.getTooltipOfObject(block);
+            block.dispose(false);
+            return [type, tip];
+          }),
+        );
+      } finally {
+        editor.dispose();
+      }
+    };
+    assert.deepEqual(Object.keys(FR_PALETTE_TOOLTIPS).sort(), ['gripper_claw', 'sensing_claw_object_detected', 'sensing_quadrgb_probe_detects']);
+    const logistique = tips(LOGISTIQUE);
+    for (const [type, text] of Object.entries(FR_PALETTE_TOOLTIPS)) {
+      assert.equal(logistique[type], frenchTooltipLines(Blockly, text), type);
+      assert.notEqual(text, FR_BLOCKS[type].tooltip, `${type}: the game's own text, not the block's`);
+    }
+    assert.match(logistique.sensing_quadrgb_probe_detects.replace(/\n/g, ' '), /ligne blanche/);
+    assert.match(logistique.sensing_claw_object_detected.replace(/\n/g, ' '), /un cube/);
+    // the same as on the page of Tri d’entrepôt
+    assert.deepEqual(tips(ROBOT_EN_FETE), logistique);
+    // ... and only these two games: Fire Fighter's palette (no French page) keeps the blocks' own French texts
+    const other = tips('fire-fighter');
+    for (const type of Object.keys(FR_PALETTE_TOOLTIPS)) assert.equal(other[type], frenchTooltipLines(Blockly, FR_BLOCKS[type].tooltip), type);
   });
 
   test('a menu shows French and keeps the English value; a program moves between the two pages unchanged', () => {

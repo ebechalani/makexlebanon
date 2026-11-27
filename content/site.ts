@@ -96,11 +96,12 @@ export function isNavGroup(child: NavChild): child is NavGroup {
  * simulators by their name, in the order of the page ("Fire Cadet", ... "Fire Chief"; a long name
  * gives way to its `menuName`: "Locker Room"). Then the categories of their own
  * (content/standalone.ts), each a group under its own name ("Robot en fête 2027", leading to
- * /simulator#category-robot-en-fete) with its simulators by their name ("Tri d’entrepôt"), in the
- * category's language (lang="fr"). Built from `simulatorSeasons()`, the parts the page shows, and
- * from `simulatorCategories()`, so that a simulator, a season or a category added later appears
- * here by itself, in its place; a season or a category without a simulator has no part and no
- * group. Each group also says how many simulators it holds ("5 simulators"), for a screen reader.
+ * /simulator#category-robot-en-fete) with its simulators by their name ("Tri d’entrepôt", then
+ * "Logistique intelligente"), in the category's language (lang="fr"). Built from
+ * `simulatorSeasons()`, the parts the page shows, and from `simulatorCategories()`, so that a
+ * simulator, a season or a category added later appears here by itself, in its place; a season or
+ * a category without a simulator has no part and no group. Each group also says how many
+ * simulators it holds ("5 simulators"), for a screen reader.
  * (The sections and the categories can be handed in, for the tests.)
  */
 export function simulatorMenu(

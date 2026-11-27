@@ -91,13 +91,17 @@ export const FR_CONSOLE_PATTERNS: readonly ConsolePattern[] = [
 ];
 
 /**
- * The sentences of core and vm that the French page never shows, and why: they stay English
+ * The sentences of core and vm that the French pages never show, and why: they stay English
  * (as every line that is in no pattern does). The design's table has no French for them.
+ * (Two French pages: Tri d’entrepôt and Logistique intelligente.)
  */
 export const FR_CONSOLE_NOT_ON_THIS_PAGE: readonly { english: RegExp; reason: string }[] = [
-  { english: /^No restart: this game does not allow restarts\.$/, reason: 'this game allows restarts' },
-  { english: /^No restart left: this game allows \d+ restarts? per attempt\.$/, reason: 'this game sets no limit on restarts' },
-  { english: /^The robot stands [\d.]+ mm inside a wall \([^]*\) at its start position\. At the start it is moved out of that wall\.$/, reason: 'this mat has no walls' },
+  { english: /^No restart: this game does not allow restarts\.$/, reason: 'Tri d’entrepôt allows restarts; Logistique intelligente has no Restart button' },
+  { english: /^No restart left: this game allows \d+ restarts? per attempt\.$/, reason: 'Tri d’entrepôt sets no limit on restarts; Logistique intelligente has no Restart button' },
+  {
+    english: /^The robot stands [\d.]+ mm inside a wall \([^]*\) at its start position\. At the start it is moved out of that wall\.$/,
+    reason: 'no French page’s start area overlaps a wall: Tri d’entrepôt has none, the frame of Logistique intelligente stands outside its arena',
+  },
   { english: /^This robot has no gripper fitted, so this block does nothing\.$/, reason: 'this robot has a gripper' },
   { english: /^This robot has no claw, so this block finds nothing there\. The colour sensor of this robot looks forward and has its own blocks\.$/, reason: 'this robot has a claw' },
   { english: /^This robot has one colour sensor: its number is 1\. With any other number this block sees no colour\.$/, reason: "Fire Chief's robot only" },

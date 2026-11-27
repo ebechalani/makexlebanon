@@ -20,7 +20,8 @@ const DESCRIPTION =
   '(ages 8–10), Fire Rescue Junior (ages 10–12), Fire Rescue Senior (ages 13–15) and Fire Chief (ages 14–17), ' +
   'and the Season 2026 category Locker Room (Capelli, ages 13–15) and Warehouse Sort, the beginner mission of ' +
   'the Inspire category (Season 2026). And Robot en fête 2027 (in French): Tri d’entrepôt, the French ' +
-  'version of Warehouse Sort. Free, nothing to install.';
+  'version of Warehouse Sort, and Logistique intelligente, the regular mission of MakeX Inspire 2024. ' +
+  'Free, nothing to install.';
 
 /**
  * The site's share card (src/app/opengraph-image.tsx). A page that sets its own `openGraph`
@@ -62,10 +63,10 @@ export const metadata: Metadata = {
  *
  * After the seasons, one part for each category of its own that has a simulator
  * (`simulatorCategories()` in content/standalone.ts, which the menu takes too): Robot en
- * fête 2027, in French, with a card for each of its simulators (today Tri d’entrepôt). That part is
- * in its category's language (lang="fr"), and so are all the words of its cards, which come from
- * the same entry: a card is given all its words (CardWords), so that none of them can fall back to
- * the English of the other cards.
+ * fête 2027, in French, with a card for each of its simulators (today Tri d’entrepôt and Logistique
+ * intelligente, side by side from 768 px). That part is in its category's language (lang="fr"),
+ * and so are all the words of its cards, which come from the same entry: a card is given all its
+ * words (CardWords), so that none of them can fall back to the English of the other cards.
  *
  * The heading of each part has an id (season-2027, category-robot-en-fete): the groups of the
  * Simulator dropdown of the menu lead to it (/simulator#season-2027, simulatorMenu() in

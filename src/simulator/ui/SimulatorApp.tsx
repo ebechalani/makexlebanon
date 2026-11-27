@@ -86,6 +86,16 @@ export interface RulesPart {
   sections: RulesSection[];
 }
 
+/**
+ * What the closed Score sheet shows beside its heading. With a three-digit score (scoreDigits) it may
+ * wrap onto a second line instead of being cut: « 500 / 500 points · cubes : 10/10 » is wider than a
+ * 360 px phone has room for. Left out, it is the plain text, as it always was. (An inline style:
+ * no stylesheet change.)
+ */
+function sheetSummary(summary: string, scoreDigits: number | undefined): ReactNode {
+  return scoreDigits ? <span style={{ whiteSpace: 'normal' }}>{summary}</span> : summary;
+}
+
 export interface SimulatorAppProps<S> {
   /**
    * The word table of the screen in another language: the French page (Tri d’entrepôt, Robot en
@@ -159,6 +169,14 @@ export interface SimulatorAppProps<S> {
    * it does and when it is off.
    */
   restartButton?: boolean;
+  /**
+   * How many digits the score of the match controls always has room for, from the first second
+   * (3: Logistique intelligente, whose score goes 0, 50, 100 … 500 - the number does not make
+   * the box grow when it reaches 100). With it, the closed Score sheet's summary may take a
+   * second line on a narrow phone instead of being cut (sheetSummary above). Left out by every
+   * game before Logistique intelligente: the box and the summary are as they always were.
+   */
+  scoreDigits?: 3;
   /**
    * What to tell a student who finds the workspace empty, for a category whose students may look
    * here for blocks they made on another page (Fire Rescue Junior: where the blocks of the Fire
@@ -892,6 +910,7 @@ function SimulatorScreen<S>(props: SimulatorAppProps<S>) {
             restartRules={game.restartRules}
             restartsLeft={snapshot.restartsLeft}
             restartButton={props.restartButton}
+            scoreDigits={props.scoreDigits}
             words={words}
             speed={sim.speed}
             onSpeed={sim.setSpeed}
@@ -1065,7 +1084,7 @@ function SimulatorScreen<S>(props: SimulatorAppProps<S>) {
           <div ref={scoreSheetRef} className="scroll-mb-3 scroll-mt-24 lg:scroll-mt-3">
           <Section
             title={text.scoreSheet}
-            summary={text.scoreSheetSummary(snapshot.score, missionsDone, missions.length, words)}
+            summary={sheetSummary(text.scoreSheetSummary(snapshot.score, missionsDone, missions.length, words), props.scoreDigits)}
             open={open.score}
             onToggle={toggleSection('score')}
           >

@@ -3,10 +3,11 @@
  * the text that explains one - or so much as the title of one.
  *
  * Every game of the simulator has examples of its own: Fire Rescue, Fire Chief, Warehouse Sort,
- * Locker Room, Fire Cadet, Fire Fighter and Robot en fête 2027 (Warehouse Sort in French). The
- * programs and descriptions (samples.ts in ../fire-rescue, ../fire-chief, ../warehouse-sort,
- * ../locker-room, ../fire-cadet, ../fire-fighter and ../robot-en-fete) and the lists of the
- * titles (sample-catalog.ts, next to them) stay on the server. They leave it only through
+ * Locker Room, Fire Cadet, Fire Fighter, Tri d’entrepôt (Robot en fête 2027: Warehouse Sort in
+ * French) and Logistique intelligente (Robot en fête 2027). The programs and descriptions
+ * (samples.ts in ../fire-rescue, ../fire-chief, ../warehouse-sort, ../locker-room, ../fire-cadet,
+ * ../fire-fighter, ../robot-en-fete and ../logistique-intelligente) and the lists of the titles
+ * (sample-catalog.ts, next to them) stay on the server. They leave it only through
  * /api/simulator/unlock, which decides for every request what that visitor may see: an example
  * the owner keeps for advanced codes only must not show anywhere - not even its title, not
  * even the heading of its level - before an advanced code was checked. If a file of the
@@ -69,6 +70,7 @@ import { EXAMPLE_LEVELS as CHIEF_LEVELS, SAMPLE_CATALOG as CHIEF_CATALOG } from 
 import { EXAMPLE_LEVELS as FIGHTER_LEVELS, SAMPLE_CATALOG as FIGHTER_CATALOG } from '../fire-fighter/sample-catalog';
 import { EXAMPLE_LEVELS as RESCUE_LEVELS, SAMPLE_CATALOG as RESCUE_CATALOG } from '../fire-rescue/sample-catalog';
 import { EXAMPLE_LEVELS as LOCKER_LEVELS, SAMPLE_CATALOG as LOCKER_CATALOG } from '../locker-room/sample-catalog';
+import { EXAMPLE_LEVELS as LOGI_LEVELS, SAMPLE_CATALOG as LOGI_CATALOG } from '../logistique-intelligente/sample-catalog';
 import { EXAMPLE_LEVELS as FETE_LEVELS, SAMPLE_CATALOG as FETE_CATALOG } from '../robot-en-fete/sample-catalog';
 import { EXAMPLE_LEVELS as SORT_LEVELS, SAMPLE_CATALOG as SORT_CATALOG } from '../warehouse-sort/sample-catalog';
 import { ALL_GAMES } from './all-examples';
@@ -87,8 +89,10 @@ const LOCKER_CATALOG_FILE = 'src/simulator/locker-room/sample-catalog.ts';
 const CADET_CATALOG_FILE = 'src/simulator/fire-cadet/sample-catalog.ts';
 /** ... for Fire Fighter ... */
 const FIGHTER_CATALOG_FILE = 'src/simulator/fire-fighter/sample-catalog.ts';
-/** ... and for Robot en fête 2027 (its titles and headings are French). */
+/** ... for Robot en fête 2027's Tri d'entrepôt (its titles and headings are French) ... */
 const FETE_CATALOG_FILE = 'src/simulator/robot-en-fete/sample-catalog.ts';
+/** ... and for Robot en fête 2027's Logistique intelligente (French too). */
+const LOGI_CATALOG_FILE = 'src/simulator/logistique-intelligente/sample-catalog.ts';
 /** The list of every game, with the number of examples it holds. */
 const CATALOGS: ReadonlyArray<{ file: string; samples: string; game: string; examples: number }> = [
   { file: CATALOG, samples: 'src/simulator/fire-rescue/samples.ts', game: 'Fire Rescue', examples: 7 },
@@ -98,16 +102,18 @@ const CATALOGS: ReadonlyArray<{ file: string; samples: string; game: string; exa
   { file: CADET_CATALOG_FILE, samples: 'src/simulator/fire-cadet/samples.ts', game: 'Fire Cadet', examples: 6 },
   { file: FIGHTER_CATALOG_FILE, samples: 'src/simulator/fire-fighter/samples.ts', game: 'Fire Fighter', examples: 6 },
   { file: FETE_CATALOG_FILE, samples: 'src/simulator/robot-en-fete/samples.ts', game: 'Robot en fête 2027', examples: 6 },
+  { file: LOGI_CATALOG_FILE, samples: 'src/simulator/logistique-intelligente/samples.ts', game: 'Logistique intelligente', examples: 6 },
 ];
 
 /** The cards of every game: what the titles and the ids are taken from. */
-const SAMPLE_CATALOG = [...RESCUE_CATALOG, ...CHIEF_CATALOG, ...SORT_CATALOG, ...LOCKER_CATALOG, ...CADET_CATALOG, ...FIGHTER_CATALOG, ...FETE_CATALOG];
+const SAMPLE_CATALOG = [...RESCUE_CATALOG, ...CHIEF_CATALOG, ...SORT_CATALOG, ...LOCKER_CATALOG, ...CADET_CATALOG, ...FIGHTER_CATALOG, ...FETE_CATALOG, ...LOGI_CATALOG];
 /**
  * The headings of every game. (The six English games call their levels the same - Starter,
- * Intermediate, Advanced - and Robot en fête 2027 calls them Premiers pas, Intermédiaire,
- * Avancé; the few words after a heading are a game's own, and all twenty-one are looked for.)
+ * Intermediate, Advanced - and the two games of Robot en fête 2027 call them Premiers pas,
+ * Intermédiaire, Avancé; the few words after a heading are a game's own, and all twenty-four are
+ * looked for.)
  */
-const EXAMPLE_LEVELS = [...RESCUE_LEVELS, ...CHIEF_LEVELS, ...SORT_LEVELS, ...LOCKER_LEVELS, ...CADET_LEVELS, ...FIGHTER_LEVELS, ...FETE_LEVELS];
+const EXAMPLE_LEVELS = [...RESCUE_LEVELS, ...CHIEF_LEVELS, ...SORT_LEVELS, ...LOCKER_LEVELS, ...CADET_LEVELS, ...FIGHTER_LEVELS, ...FETE_LEVELS, ...LOGI_LEVELS];
 
 /** The files that hold the examples (paths from the repository's folder), and what they hold. */
 const HOLDERS: Record<string, string> = {
@@ -119,6 +125,7 @@ const HOLDERS: Record<string, string> = {
   'src/simulator/fire-cadet/samples.ts': 'holds example programs and descriptions',
   'src/simulator/fire-fighter/samples.ts': 'holds example programs and descriptions',
   'src/simulator/robot-en-fete/samples.ts': 'holds example programs and descriptions',
+  'src/simulator/logistique-intelligente/samples.ts': 'holds example programs and descriptions',
   'src/simulator/members/all-examples.ts': 'holds example programs and descriptions',
   [CATALOG]: 'holds the titles of the examples',
   [CHIEF_CATALOG_FILE]: 'holds the titles of the examples',
@@ -127,6 +134,7 @@ const HOLDERS: Record<string, string> = {
   [CADET_CATALOG_FILE]: 'holds the titles of the examples',
   [FIGHTER_CATALOG_FILE]: 'holds the titles of the examples',
   [FETE_CATALOG_FILE]: 'holds the titles of the examples',
+  [LOGI_CATALOG_FILE]: 'holds the titles of the examples',
 };
 
 /** Files that belong to the server for other reasons: the lists of codes and the code that checks one. */
@@ -696,6 +704,10 @@ describe('the examples stay on the server', () => {
       // Cube colours panel is Warehouse Sort's, with French words)
       'src/simulator/ui/robot-en-fete/RobotEnFeteSimulator.tsx',
       'src/simulator/ui/robot-en-fete/RobotEnFeteLoader.tsx',
+      // Robot en fête 2027's Logistique intelligente: its loader, its screen (the general one, in French) and its list of the one setup
+      'src/simulator/ui/logistique-intelligente/LogistiqueSimulator.tsx',
+      'src/simulator/ui/logistique-intelligente/LogistiqueLoader.tsx',
+      'src/simulator/ui/logistique-intelligente/SetupList.tsx',
       // ... and the French word table of the screen, which the screen and the loader set above it
       'src/simulator/ui/text/context.tsx',
       'src/simulator/ui/text/title-context.tsx',
@@ -711,6 +723,7 @@ describe('the examples stay on the server', () => {
       ['src/app/simulator/locker-room/page.tsx', 'src/simulator/ui/locker-room/LockerRoomLoader.tsx', 'src/simulator/ui/locker-room/LockerRoomSimulator.tsx', 'src/simulator/locker-room/game.ts'],
       ['src/app/simulator/fire-fighter/page.tsx', 'src/simulator/ui/fire-fighter/FireFighterLoader.tsx', 'src/simulator/ui/fire-fighter/FireFighterSimulator.tsx', 'src/simulator/fire-fighter/game.ts'],
       ['src/app/simulator/tri-entrepot/page.tsx', 'src/simulator/ui/robot-en-fete/RobotEnFeteLoader.tsx', 'src/simulator/ui/robot-en-fete/RobotEnFeteSimulator.tsx', 'src/simulator/robot-en-fete/game.ts'],
+      ['src/app/simulator/logistique-intelligente/page.tsx', 'src/simulator/ui/logistique-intelligente/LogistiqueLoader.tsx', 'src/simulator/ui/logistique-intelligente/LogistiqueSimulator.tsx', 'src/simulator/logistique-intelligente/game.ts'],
     ]) {
       assert.ok(roots.pages.includes(page), page);
       const fromPage = reachableFrom(graph, page);
@@ -844,6 +857,35 @@ describe('the examples stay on the server', () => {
     // (its loading screen is French already: the loader reaches the French table itself, and not the examples)
     const feteLoader = reachableFrom(graph, 'src/simulator/ui/robot-en-fete/RobotEnFeteLoader.tsx');
     assert.ok(feteLoader.has('src/simulator/ui/text/fr.tsx') && feteLoader.has('src/simulator/ui/robot-en-fete/RobotEnFeteSimulator.tsx'));
+    // ... and so has the screen of Logistique intelligente, Robot en fête 2027's second: its name, French words, rules
+    // window and list « Le terrain », the field, robot, scenario and game it plays (French itself: its referee writes
+    // French), and the screen's French table and French blocks. A French title, heading or sentence of a description of
+    // one of its examples written into any of them is caught (its examples are in the guard's lists: CATALOGS, ALL_GAMES)
+    const logiScreen = reachableFrom(graph, 'src/simulator/ui/logistique-intelligente/LogistiqueSimulator.tsx');
+    for (const file of [
+      'src/simulator/ui/logistique-intelligente/title.ts',
+      'src/simulator/ui/logistique-intelligente/words.ts',
+      'src/simulator/ui/logistique-intelligente/rules.ts',
+      'src/simulator/ui/logistique-intelligente/SetupList.tsx',
+      'src/simulator/logistique-intelligente/field.ts',
+      'src/simulator/logistique-intelligente/robot.ts',
+      'src/simulator/logistique-intelligente/scenario.ts',
+      'src/simulator/logistique-intelligente/game.ts',
+      'src/simulator/warehouse-sort/robot.ts',
+      'src/simulator/ui/text/fr.tsx',
+      'src/simulator/ui/text/fr-common.tsx',
+      'src/simulator/ui/text/fr-screen.tsx',
+      'src/simulator/ui/text/fr-console.tsx',
+      'src/simulator/ui/text/gripper.tsx',
+      'src/simulator/blocks/fr.ts',
+    ]) {
+      assert.ok(logiScreen.has(file), `the Logistique intelligente screen -> ${file}`);
+    }
+    // (its loader: the French words of its title row and its name, and through import() the screen; not the examples)
+    const logiLoader = reachableFrom(graph, 'src/simulator/ui/logistique-intelligente/LogistiqueLoader.tsx');
+    for (const file of ['src/simulator/ui/text/fr-title.tsx', 'src/simulator/ui/logistique-intelligente/title.ts', 'src/simulator/ui/logistique-intelligente/LogistiqueSimulator.tsx', 'src/simulator/ui/text/fr.tsx']) {
+      assert.ok(logiLoader.has(file), `the Logistique intelligente loader -> ${file}`);
+    }
     // the page that lists the simulators is a page of the website like any other, and so is the page of Robot en fête 2027
     assert.ok(roots.pages.includes('src/app/simulator/page.tsx'));
     assert.ok(roots.pages.includes('src/app/robot-en-fete/page.tsx'));
@@ -855,7 +897,7 @@ describe('the examples stay on the server', () => {
     // the examples of every game: its list of titles and its programs
     assert.deepEqual(
       CATALOGS.map((catalog) => catalog.game),
-      ['Fire Rescue', 'Fire Chief', 'Warehouse Sort', 'Locker Room', 'Fire Cadet', 'Fire Fighter', 'Robot en fête 2027'],
+      ['Fire Rescue', 'Fire Chief', 'Warehouse Sort', 'Locker Room', 'Fire Cadet', 'Fire Fighter', 'Robot en fête 2027', 'Logistique intelligente'],
     );
     for (const catalog of CATALOGS) {
       assert.match(forbidden.get(catalog.file) ?? '', /titles/, catalog.file);
@@ -888,11 +930,16 @@ describe('the examples stay on the server', () => {
       'Fire Fighter: six titles, the first halves of three titles ("First grab", and "Two red cubes" of two titles), six ids of more than one word',
     );
     assert.equal(exampleMarkers(FETE_CATALOG).length, 6 + 0 + 6, 'Robot en fête 2027: six French titles (none with a colon), six ids of more than one word');
-    assert.equal(TITLE_MARKERS.length, 15 + 12 + 12 + 12 + 12 + 15 + 12, 'and the guard looks for all of them');
-    assert.equal(SAMPLE_CATALOG.length, 7 + 6 + 6 + 6 + 6 + 6 + 6);
-    // ... and for the sentences of every description: of all forty-three examples, several each
+    assert.equal(
+      exampleMarkers(LOGI_CATALOG).length,
+      6 + 1 + 6,
+      'Logistique intelligente: six French titles, the first half of one ("Toute la mission"), six ids of more than one word',
+    );
+    assert.equal(TITLE_MARKERS.length, 15 + 12 + 12 + 12 + 12 + 15 + 12 + 13, 'and the guard looks for all of them');
+    assert.equal(SAMPLE_CATALOG.length, 7 + 6 + 6 + 6 + 6 + 6 + 6 + 6);
+    // ... and for the sentences of every description: of all forty-nine examples, several each
     const everyExample = ALL_GAMES.flatMap((game) => game.examples);
-    assert.equal(everyExample.length, 7 + 6 + 6 + 6 + 6 + 6 + 6);
+    assert.equal(everyExample.length, 7 + 6 + 6 + 6 + 6 + 6 + 6 + 6);
     for (const example of everyExample) {
       const mine = descriptionMarkers([example]);
       assert.ok(mine.length >= 2, `${example.id}: ${mine.length} sentences of its description are looked for`);
@@ -1092,8 +1139,8 @@ describe('the examples stay on the server', () => {
         'must not get the word "Advanced" either.\n',
     );
     // the headings of every game are looked for: the names of the three levels, and the words after each heading
-    assert.equal(EXAMPLE_LEVELS.length, 3 + 3 + 3 + 3 + 3 + 3 + 3);
-    assert.equal(new Set(EXAMPLE_LEVELS.map((level) => level.about)).size, 21, 'twenty-one different texts');
+    assert.equal(EXAMPLE_LEVELS.length, 3 + 3 + 3 + 3 + 3 + 3 + 3 + 3);
+    assert.equal(new Set(EXAMPLE_LEVELS.map((level) => level.about)).size, 24, 'twenty-four different texts');
     assert.deepEqual(
       [...new Set(EXAMPLE_LEVELS.map((level) => level.title))],
       ['Starter', 'Intermediate', 'Advanced', 'Premiers pas', 'Intermédiaire', 'Avancé'],
@@ -1120,7 +1167,8 @@ describe('the examples stay on the server', () => {
       // every entry of the list is one short line: { id, title, level }
       const entries = text.match(/^ {2}\{ id: .* level: .*\},$/gm) ?? [];
       assert.equal(entries.length, catalog.examples);
-      for (const entry of entries) assert.match(entry.trim(), /^\{ id: '[a-z-]+', title: '[^']{4,80}', level: '(starter|intermediate|advanced)' \},$/);
+      // (an id is small letters, digits and hyphens: 'logi-un-cube-e8')
+      for (const entry of entries) assert.match(entry.trim(), /^\{ id: '[a-z0-9-]+', title: '[^']{4,80}', level: '(starter|intermediate|advanced)' \},$/);
       // nothing the browser gets leads to it, or to the programs
       for (const root of [...roots.client, ...roots.pages]) {
         const reached = reachableFrom(graph, root);
@@ -1168,6 +1216,8 @@ describe('the examples stay on the server', () => {
     assert.deepEqual(importers('src/simulator/fire-fighter/samples.ts'), ['src/simulator/members/all-examples.ts']);
     assert.deepEqual(importers(FETE_CATALOG_FILE), ['src/simulator/members/all-examples.ts', 'src/simulator/robot-en-fete/samples.ts']);
     assert.deepEqual(importers('src/simulator/robot-en-fete/samples.ts'), ['src/simulator/members/all-examples.ts']);
+    assert.deepEqual(importers(LOGI_CATALOG_FILE), ['src/simulator/logistique-intelligente/samples.ts', 'src/simulator/members/all-examples.ts']);
+    assert.deepEqual(importers('src/simulator/logistique-intelligente/samples.ts'), ['src/simulator/members/all-examples.ts']);
     assert.deepEqual(importers('src/simulator/members/all-examples.ts'), ['src/app/api/simulator/unlock/route.ts']);
     assert.deepEqual(importers('src/simulator/members/unlock.ts'), ['src/app/api/simulator/unlock/route.ts']);
     assert.deepEqual(importers('content/simulator-codes.ts'), ['src/app/api/simulator/unlock/route.ts']);
